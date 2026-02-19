@@ -6,6 +6,8 @@ const JWT_EXPIRY = 3600; // 1 hour
 
 // --- Password hashing (PBKDF2 via Web Crypto) ---
 
+const PBKDF2_ITERATIONS = 10_000;
+
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey(
@@ -16,17 +18,15 @@ export async function hashPassword(password: string): Promise<string> {
     ["deriveBits"],
   );
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations: 100_000 },
+    { name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations: PBKDF2_ITERATIONS },
     key,
     256,
   );
   const hash = new Uint8Array(bits);
-  return `${toHex(salt)}:${toHex(hash)}`;
+  return `${toHex(salt)}:${toHex(hash)}:${PBKDF2_ITERATIONS}`;
 }
 
-export async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  const [saltHex, hashHex] = stored.split(":");
-  const salt = fromHex(saltHex);
+async function deriveHash(password: string, salt: Uint8Array, iterations: number): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     encoder.encode(password),
@@ -35,11 +35,21 @@ export async function verifyPassword(password: string, stored: string): Promise<
     ["deriveBits"],
   );
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations: 100_000 },
+    { name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations },
     key,
     256,
   );
-  return toHex(new Uint8Array(bits)) === hashHex;
+  return toHex(new Uint8Array(bits));
+}
+
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const parts = stored.split(":");
+  const saltHex = parts[0];
+  const hashHex = parts[1];
+  // Backward compat: old hashes have no iteration count (were 100k)
+  const iterations = parts[2] ? parseInt(parts[2]) : 100_000;
+  const salt = fromHex(saltHex);
+  return await deriveHash(password, salt, iterations) === hashHex;
 }
 
 // --- JWT (HMAC-SHA256 via Web Crypto) ---
