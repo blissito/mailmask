@@ -282,7 +282,7 @@ export function getUserPlanLimits(user: User): { domains: number; aliases: numbe
     const plan = PLANS[sub.plan];
     return { domains: plan.domains, aliases: plan.aliases, rules: plan.rules, logDays: plan.logDays };
   }
-  // Grace period: existing users with no subscription get basico read-only limits
+  // Sin plan = sin acceso. Bloquear todo.
   return { domains: 0, aliases: 0, rules: 0, logDays: 0 };
 }
 

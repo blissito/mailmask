@@ -530,20 +530,24 @@ const app = new Elysia()
     const preApproval = new PreApproval({ accessToken: mpAccessToken });
     const backUrl = getMainDomainUrl() + "/app?billing=success";
 
-    const result = await preApproval.create({
-      body: {
-        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)}`,
-        auto_recurring: {
+    // deno-lint-ignore no-explicit-any
+    const body: any = {
+      reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)}`,
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: "months",
+        transaction_amount: PLANS[planKey].price / 100,
+        currency_id: "MXN",
+        free_trial: {
           frequency: 1,
           frequency_type: "months",
-          transaction_amount: PLANS[planKey].price / 100,
-          currency_id: "MXN",
         },
-        payer_email: user.email,
-        back_url: backUrl,
-        external_reference: user.email,
       },
-    });
+      payer_email: user.email,
+      back_url: backUrl,
+      external_reference: user.email,
+    };
+    const result = await preApproval.create({ body });
 
     return new Response(JSON.stringify({ init_point: result.init_point }), {
       headers: { "content-type": "application/json" },
@@ -578,7 +582,7 @@ const app = new Elysia()
 
       if (computed !== v1) {
         console.warn("MP webhook: invalid signature");
-        return new Response("OK", { status: 200 });
+        return new Response("Unauthorized", { status: 401 });
       }
     }
 
@@ -599,11 +603,14 @@ const app = new Elysia()
         if (sub.status === "authorized") {
           const email = sub.external_reference ?? sub.payer_email;
           if (email) {
-            // Determine plan from amount
+            // Determine plan from exact amount (MXN pesos)
             const amount = sub.auto_recurring?.transaction_amount ?? 0;
-            let plan: "basico" | "pro" | "agencia" = "basico";
-            if (amount >= 999) plan = "agencia";
-            else if (amount >= 299) plan = "pro";
+            const amountToPlan: Record<number, "basico" | "pro" | "agencia"> = { 99: "basico", 299: "pro", 999: "agencia" };
+            const plan = amountToPlan[amount];
+            if (!plan) {
+              console.warn(`MP webhook: unexpected amount ${amount}, not activating`);
+              return new Response("OK", { status: 200 });
+            }
 
             const periodEnd = new Date();
             periodEnd.setDate(periodEnd.getDate() + 30);
