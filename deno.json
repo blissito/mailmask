@@ -8,6 +8,7 @@
     "elysia": "npm:elysia@^1.2",
     "@aws-sdk/client-ses": "npm:@aws-sdk/client-ses@^3",
     "@aws-sdk/client-sesv2": "npm:@aws-sdk/client-sesv2@^3",
+    "@aws-sdk/client-s3": "npm:@aws-sdk/client-s3@^3",
     "postal-mime": "npm:postal-mime@^2"
   }
 }

@@ -195,7 +195,7 @@ const app = new Elysia()
     }
 
     // Validate domain format
-    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,}$/;
+    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$/;
     if (!domainRegex.test(domain)) {
       return new Response(JSON.stringify({ error: "Formato de dominio inválido" }), { status: 400 });
     }
@@ -491,9 +491,6 @@ const app = new Elysia()
     });
   })
 
-  // --- Start ---
-  .listen(parseInt(Deno.env.get("PORT") ?? "8000"));
-
-console.log(`MailMask corriendo en http://localhost:${app.server?.port}`);
-
+const port = parseInt(Deno.env.get("PORT") ?? "8000");
+Deno.serve({ port }, (req) => app.fetch(req));
 export { app };

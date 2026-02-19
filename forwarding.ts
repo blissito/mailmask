@@ -1,5 +1,5 @@
 import { getDomainByName, getAlias, listAliases, listRules, addLog, type Rule } from "./db.ts";
-import { forwardEmail } from "./ses.ts";
+import { forwardEmail, fetchEmailFromS3 } from "./ses.ts";
 
 // --- SNS notification types ---
 
@@ -56,7 +56,19 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
   const recipients = notification.receipt.recipients;
   const from = notification.mail.source;
   const subject = notification.mail.commonHeaders.subject ?? "(sin asunto)";
-  const rawContent = notification.content ?? "";
+
+  // Fetch raw email from S3 (SNS notification only has metadata)
+  let rawContent = notification.content ?? "";
+  if (!rawContent && notification.receipt.action.bucketName && notification.receipt.action.objectKey) {
+    try {
+      rawContent = await fetchEmailFromS3(
+        notification.receipt.action.bucketName,
+        notification.receipt.action.objectKey,
+      );
+    } catch (err) {
+      console.error("Failed to fetch email from S3:", err);
+    }
+  }
 
   let forwarded = 0;
   let discarded = 0;

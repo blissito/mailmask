@@ -1,6 +1,8 @@
 import { SESClient, VerifyDomainIdentityCommand, VerifyDomainDkimCommand, GetIdentityVerificationAttributesCommand, SendRawEmailCommand, CreateReceiptRuleCommand, DeleteReceiptRuleCommand, DescribeReceiptRuleSetCommand } from "@aws-sdk/client-ses";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 
 const ses = new SESClient({ region: Deno.env.get("AWS_REGION") ?? "us-east-1" });
+const s3 = new S3Client({ region: Deno.env.get("AWS_REGION") ?? "us-east-1" });
 
 const SNS_TOPIC_ARN = Deno.env.get("SNS_TOPIC_ARN") ?? "";
 const RECEIPT_RULE_SET = Deno.env.get("SES_RULE_SET") ?? "mailmask-inbound";
@@ -75,6 +77,13 @@ export async function deleteReceiptRule(domain: string): Promise<void> {
   } catch {
     // Rule may not exist, ignore
   }
+}
+
+// --- Fetch raw email from S3 ---
+
+export async function fetchEmailFromS3(bucketName: string, objectKey: string): Promise<string> {
+  const res = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: objectKey }));
+  return await res.Body!.transformToString("utf-8");
 }
 
 // --- Email forwarding ---
