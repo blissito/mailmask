@@ -686,28 +686,36 @@ const app = new Elysia()
     const preApproval = new PreApproval({ accessToken: mpAccessToken });
     const backUrl = getMainDomainUrl() + "/landing?success=1";
 
-    // deno-lint-ignore no-explicit-any
-    const body: any = {
-      reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)}`,
-      auto_recurring: {
-        frequency: 1,
-        frequency_type: "months",
-        transaction_amount: PLANS[planKey].price / 100,
-        currency_id: "MXN",
-        free_trial: {
+    try {
+      // deno-lint-ignore no-explicit-any
+      const body: any = {
+        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)}`,
+        auto_recurring: {
           frequency: 1,
           frequency_type: "months",
+          transaction_amount: PLANS[planKey].price / 100,
+          currency_id: "MXN",
+          free_trial: {
+            frequency: 1,
+            frequency_type: "months",
+          },
         },
-      },
-      payer_email: "guest@mailmask.app",
-      back_url: backUrl,
-      external_reference: token,
-    };
-    const result = await preApproval.create({ body });
+        payer_email: "guest@mailmask.app",
+        back_url: backUrl,
+        external_reference: token,
+      };
+      const result = await preApproval.create({ body });
 
-    return new Response(JSON.stringify({ init_point: result.init_point }), {
-      headers: { "content-type": "application/json" },
-    });
+      return new Response(JSON.stringify({ init_point: result.init_point }), {
+        headers: { "content-type": "application/json" },
+      });
+    } catch (err) {
+      console.error("MP guest-checkout error:", err);
+      return new Response(JSON.stringify({ error: "Error al crear suscripción en MercadoPago" }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      });
+    }
   })
 
   .post("/api/billing/checkout", async ({ request }) => {
@@ -729,28 +737,36 @@ const app = new Elysia()
     const preApproval = new PreApproval({ accessToken: mpAccessToken });
     const backUrl = getMainDomainUrl() + "/app?billing=success";
 
-    // deno-lint-ignore no-explicit-any
-    const body: any = {
-      reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)}`,
-      auto_recurring: {
-        frequency: 1,
-        frequency_type: "months",
-        transaction_amount: PLANS[planKey].price / 100,
-        currency_id: "MXN",
-        free_trial: {
+    try {
+      // deno-lint-ignore no-explicit-any
+      const body: any = {
+        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)}`,
+        auto_recurring: {
           frequency: 1,
           frequency_type: "months",
+          transaction_amount: PLANS[planKey].price / 100,
+          currency_id: "MXN",
+          free_trial: {
+            frequency: 1,
+            frequency_type: "months",
+          },
         },
-      },
-      payer_email: user.email,
-      back_url: backUrl,
-      external_reference: user.email,
-    };
-    const result = await preApproval.create({ body });
+        payer_email: user.email,
+        back_url: backUrl,
+        external_reference: user.email,
+      };
+      const result = await preApproval.create({ body });
 
-    return new Response(JSON.stringify({ init_point: result.init_point }), {
-      headers: { "content-type": "application/json" },
-    });
+      return new Response(JSON.stringify({ init_point: result.init_point }), {
+        headers: { "content-type": "application/json" },
+      });
+    } catch (err) {
+      console.error("MP checkout error:", err);
+      return new Response(JSON.stringify({ error: "Error al crear suscripción en MercadoPago" }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      });
+    }
   })
 
   .post("/api/webhooks/mercadopago", async ({ request }) => {
