@@ -4,14 +4,14 @@ import {
   updateDomain, deleteDomain, countUserDomains, createAlias, getAlias,
   listAliases, updateAlias, deleteAlias, countAliases, createRule,
   listRules, deleteRule, listLogs, PLANS, updateUserSubscription,
-  getUserPlanLimits,
+  getUserPlanLimits, setVerifyToken, getUserByVerifyToken, verifyUserEmail,
 } from "./db.ts";
 import {
   hashPassword, verifyPassword, signJwt, makeAuthCookie,
   clearAuthCookie, getAuthUser,
 } from "./auth.ts";
 import { checkRateLimit } from "./rate-limit.ts";
-import { verifyDomain, checkDomainStatus, createReceiptRule, deleteReceiptRule } from "./ses.ts";
+import { verifyDomain, checkDomainStatus, createReceiptRule, deleteReceiptRule, sendFromDomain } from "./ses.ts";
 import { processInbound } from "./forwarding.ts";
 
 // --- Helpers ---
@@ -62,6 +62,20 @@ function rateLimitGuard(ip: string, limit: number, windowMs: number): Response |
     });
   }
   return null;
+}
+
+const GRACE_PERIOD_MS = 15 * 24 * 60 * 60 * 1000; // 15 days
+
+async function checkEmailVerified(email: string): Promise<Response | null> {
+  const user = await getUser(email);
+  if (!user) return null;
+  if (user.emailVerified) return null;
+  const createdAt = new Date(user.createdAt).getTime();
+  if (Date.now() - createdAt < GRACE_PERIOD_MS) return null;
+  return new Response(JSON.stringify({ error: "Verifica tu email para continuar" }), {
+    status: 403,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 // --- App ---
@@ -115,6 +129,17 @@ const app = new Elysia()
 
     const hash = await hashPassword(password);
     await createUser(email, hash);
+
+    // Send verification email
+    const verifyToken = crypto.randomUUID();
+    await setVerifyToken(email, verifyToken);
+    const verifyUrl = `${getMainDomainUrl()}/api/auth/verify-email?token=${verifyToken}`;
+    const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+    try {
+      await sendFromDomain(alertFrom, email, "Verifica tu email — MailMask", `Hola,\n\nVerifica tu email haciendo clic en este enlace:\n${verifyUrl}\n\nTienes 15 días para verificar tu cuenta.\n\n— MailMask`);
+    } catch (err) {
+      console.error("Failed to send verification email:", err);
+    }
 
     const token = await signJwt({ email });
     return new Response(JSON.stringify({ ok: true }), {
@@ -170,8 +195,25 @@ const app = new Elysia()
       domainsCount: domains.length,
       subscription: user.subscription ?? { plan: "basico", status: "none" },
       limits,
+      emailVerified: user.emailVerified ?? false,
     }), {
       headers: { "content-type": "application/json" },
+    });
+  })
+
+  .get("/api/auth/verify-email", async ({ request }) => {
+    const url = new URL(request.url);
+    const token = url.searchParams.get("token");
+    if (!token) return new Response("Token inválido", { status: 400 });
+
+    const user = await getUserByVerifyToken(token);
+    if (!user) return new Response("Token inválido o expirado", { status: 400 });
+
+    await verifyUserEmail(user.email);
+    // Redirect to app with success message
+    return new Response(null, {
+      status: 302,
+      headers: { "location": "/app?verified=true" },
     });
   })
 
@@ -195,6 +237,10 @@ const app = new Elysia()
     const ip = getIp(request);
     const limited = rateLimitGuard(ip, 10, 60_000);
     if (limited) return limited;
+
+    // Check email verification grace period
+    const verifyBlock = await checkEmailVerified(auth.email);
+    if (verifyBlock) return verifyBlock;
 
     // Check plan limits
     const limits = getUserPlanLimits(user);
@@ -344,6 +390,9 @@ const app = new Elysia()
     if (!domain || domain.ownerEmail !== auth.email) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     }
+
+    const verifyBlock = await checkEmailVerified(auth.email);
+    if (verifyBlock) return verifyBlock;
 
     const aliasLimits = getUserPlanLimits(fullUser);
     const count = await countAliases(domain.id);
@@ -600,9 +649,9 @@ const app = new Elysia()
         });
         const sub = await subRes.json();
 
-        if (sub.status === "authorized") {
-          const email = sub.external_reference ?? sub.payer_email;
-          if (email) {
+        const email = sub.external_reference ?? sub.payer_email;
+        if (email) {
+          if (sub.status === "authorized") {
             // Determine plan from exact amount (MXN pesos)
             const amount = sub.auto_recurring?.transaction_amount ?? 0;
             const amountToPlan: Record<number, "basico" | "pro" | "agencia"> = { 99: "basico", 299: "pro", 999: "agencia" };
@@ -622,6 +671,20 @@ const app = new Elysia()
               currentPeriodEnd: periodEnd.toISOString(),
             });
             console.log(`Subscription activated: ${email} -> ${plan}`);
+          } else if (sub.status === "cancelled") {
+            const existingUser = await getUser(email);
+            const currentSub = existingUser?.subscription;
+            if (currentSub) {
+              await updateUserSubscription(email, { ...currentSub, status: "cancelled" });
+              console.log(`Subscription cancelled: ${email}`);
+            }
+          } else if (sub.status === "paused") {
+            const existingUser = await getUser(email);
+            const currentSub = existingUser?.subscription;
+            if (currentSub) {
+              await updateUserSubscription(email, { ...currentSub, status: "past_due" });
+              console.log(`Subscription paused (past_due): ${email}`);
+            }
           }
         }
       } catch (err) {
@@ -630,6 +693,43 @@ const app = new Elysia()
     }
 
     return new Response("OK", { status: 200 });
+  })
+
+  .post("/api/billing/cancel", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const user = await getUser(auth.email);
+    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const subId = user.subscription?.mpSubscriptionId;
+    if (!subId) {
+      return new Response(JSON.stringify({ error: "No hay suscripción activa" }), { status: 400 });
+    }
+
+    const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
+    if (!mpAccessToken) {
+      return new Response(JSON.stringify({ error: "MercadoPago no configurado" }), { status: 500 });
+    }
+
+    const res = await fetch(`https://api.mercadopago.com/preapproval/${subId}`, {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${mpAccessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("MP cancel error:", err);
+      return new Response(JSON.stringify({ error: "Error al cancelar en MercadoPago" }), { status: 500 });
+    }
+
+    await updateUserSubscription(auth.email, { ...user.subscription!, status: "cancelled" });
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "content-type": "application/json" },
+    });
   })
 
   .get("/api/billing/status", async ({ request }) => {

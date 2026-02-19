@@ -14,6 +14,8 @@ export interface User {
   passwordHash: string;
   createdAt: string;
   subscription?: Subscription;
+  emailVerified?: boolean;
+  verifyToken?: string;
 }
 
 export interface Domain {
@@ -84,6 +86,27 @@ export async function createUser(email: string, passwordHash: string): Promise<U
   const user: User = { email, passwordHash, createdAt: new Date().toISOString() };
   await kv.set(["users", email], user);
   return user;
+}
+
+export async function getUserByVerifyToken(token: string): Promise<User | null> {
+  const entry = await kv.get<string>(["verify-tokens", token]);
+  if (!entry.value) return null;
+  return getUser(entry.value);
+}
+
+export async function setVerifyToken(email: string, token: string): Promise<void> {
+  const user = await getUser(email);
+  if (!user) return;
+  await kv.set(["users", email], { ...user, verifyToken: token, emailVerified: false });
+  await kv.set(["verify-tokens", token], email);
+}
+
+export async function verifyUserEmail(email: string): Promise<void> {
+  const user = await getUser(email);
+  if (!user) return;
+  const token = user.verifyToken;
+  await kv.set(["users", email], { ...user, emailVerified: true, verifyToken: undefined });
+  if (token) await kv.delete(["verify-tokens", token]);
 }
 
 // --- Domains ---

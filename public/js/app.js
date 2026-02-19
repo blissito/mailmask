@@ -20,10 +20,14 @@ async function checkAuth() {
   document.getElementById("user-email").textContent = currentUser.email;
   renderBillingBanner();
 
-  // Handle billing success redirect
+  // Handle query param redirects
   const params = new URLSearchParams(window.location.search);
   if (params.get("billing") === "success") {
     showToast("Plan activado exitosamente");
+    window.history.replaceState({}, "", "/app");
+  }
+  if (params.get("verified") === "true") {
+    showToast("Email verificado exitosamente");
     window.history.replaceState({}, "", "/app");
   }
 }
@@ -40,8 +44,12 @@ function renderBillingBanner() {
     container.innerHTML = `
       <div class="bg-green-900/20 border border-green-800/50 rounded-lg px-4 py-3 flex items-center justify-between">
         <span class="text-sm text-green-400">Plan ${planName} — Activo</span>
-        <span class="text-xs text-zinc-500">Hasta ${sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString("es-MX") : "—"}</span>
+        <div class="flex items-center gap-4">
+          <span class="text-xs text-zinc-500">Hasta ${sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString("es-MX") : "—"}</span>
+          <button id="btn-cancel-sub" class="text-xs text-zinc-500 hover:text-red-400 transition-colors underline">Cancelar suscripción</button>
+        </div>
       </div>`;
+    document.getElementById("btn-cancel-sub")?.addEventListener("click", cancelSubscription);
   } else {
     container.innerHTML = `
       <div class="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 flex items-center justify-between">
@@ -81,6 +89,22 @@ async function startCheckout() {
   } catch {
     showToast("Error de conexión", true);
     if (btn) { btn.textContent = "Activar Plan — $99/mes"; btn.disabled = false; }
+  }
+}
+
+async function cancelSubscription() {
+  if (!confirm("¿Estás seguro de que quieres cancelar tu suscripción? Perderás acceso a las funciones de tu plan.")) return;
+  try {
+    const res = await fetch("/api/billing/cancel", { method: "POST" });
+    const data = await res.json();
+    if (data.ok) {
+      showToast("Suscripción cancelada");
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      showToast(data.error || "Error al cancelar", true);
+    }
+  } catch {
+    showToast("Error de conexión", true);
   }
 }
 
