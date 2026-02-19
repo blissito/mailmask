@@ -361,7 +361,7 @@
             <li>✓ 10 máscaras (alias)</li>
           </ul>
           <button
-            onclick="startCheckout('basico')"
+            onclick="startCheckout('basico', this)"
             class="mt-auto block w-full text-center bg-mask-600 hover:bg-mask-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
           >
             Empezar
@@ -393,7 +393,7 @@
             <li>✓ Entrega fuera de spam (DKIM + SPF)</li>
           </ul>
           <button
-            onclick="startCheckout('pro')"
+            onclick="startCheckout('pro', this)"
             class="mt-auto block w-full text-center bg-mask-600 hover:bg-mask-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
           >
             Empezar
@@ -425,7 +425,7 @@
             <li>✓ Soporte prioritario</li>
           </ul>
           <button
-            onclick="startCheckout('agencia')"
+            onclick="startCheckout('agencia', this)"
             class="mt-auto block w-full text-center border border-zinc-700 hover:border-zinc-500 text-zinc-300 font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
           >
             Empezar
@@ -515,8 +515,7 @@
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
 
-      async function startCheckout(plan) {
-        const btn = event.currentTarget;
+      async function startCheckout(plan, btn) {
         btn.disabled = true;
         btn.textContent = "Redirigiendo...";
         try {
