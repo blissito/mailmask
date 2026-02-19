@@ -14,10 +14,15 @@ import { checkRateLimit } from "./rate-limit.ts";
 import { verifyDomain, checkDomainStatus, createReceiptRule, deleteReceiptRule, sendFromDomain } from "./ses.ts";
 import { processInbound } from "./forwarding.ts";
 
-// --- Fail-fast env validation ---
-const REQUIRED_ENV = ["JWT_SECRET", "MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"];
-for (const key of REQUIRED_ENV) {
-  if (!Deno.env.get(key)) throw new Error(`Missing required env var: ${key}`);
+// --- Fail-fast env validation (deferred for Deno Deploy compatibility) ---
+let envChecked = false;
+function ensureEnv() {
+  if (envChecked) return;
+  const REQUIRED_ENV = ["JWT_SECRET", "MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"];
+  for (const key of REQUIRED_ENV) {
+    if (!Deno.env.get(key)) throw new Error(`Missing required env var: ${key}`);
+  }
+  envChecked = true;
 }
 
 // --- Helpers ---
@@ -145,6 +150,7 @@ const app = new Elysia()
 
   // --- CORS ---
   .onRequest(({ request }) => {
+    ensureEnv();
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {

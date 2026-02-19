@@ -1,25 +1,30 @@
 // --- Persistent rate limiter using Deno KV ---
 
-const kv = await Deno.openKv();
+let kv: Deno.Kv | null = null;
+async function getKv(): Promise<Deno.Kv> {
+  if (!kv) kv = await Deno.openKv();
+  return kv;
+}
 
 export async function checkRateLimit(
   ip: string,
   limit: number,
   windowMs: number,
 ): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+  const db = await getKv();
   const now = Date.now();
   const key = ["rate", `${ip}:${limit}:${windowMs}`];
-  const entry = await kv.get<{ count: number; windowStart: number }>(key);
+  const entry = await db.get<{ count: number; windowStart: number }>(key);
 
   if (!entry.value || entry.value.windowStart + windowMs <= now) {
-    await kv.set(key, { count: 1, windowStart: now }, { expireIn: windowMs });
+    await db.set(key, { count: 1, windowStart: now }, { expireIn: windowMs });
     return { allowed: true, remaining: limit - 1, resetAt: now + windowMs };
   }
 
   const newCount = entry.value.count + 1;
   const resetAt = entry.value.windowStart + windowMs;
 
-  await kv.set(key, { count: newCount, windowStart: entry.value.windowStart }, { expireIn: resetAt - now });
+  await db.set(key, { count: newCount, windowStart: entry.value.windowStart }, { expireIn: resetAt - now });
 
   if (newCount > limit) {
     return { allowed: false, remaining: 0, resetAt };
