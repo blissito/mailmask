@@ -68,8 +68,8 @@ export interface EmailLog {
 // --- Plans ---
 
 export const PLANS = {
-  basico:  { price: 99_00, domains: 1, aliases: 10, rules: 10, logDays: 15 },
-  pro:     { price: 299_00, domains: 5, aliases: 20, rules: 20, logDays: 30 },
+  basico:  { price: 99_00, domains: 1, aliases: 10, rules: 0, logDays: 0 },
+  pro:     { price: 299_00, domains: 5, aliases: 20, rules: 20, logDays: 15 },
   agencia: { price: 999_00, domains: 20, aliases: 100, rules: 100, logDays: 90 },
 } as const;
 
