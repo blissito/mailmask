@@ -1,8 +1,9 @@
 import { SESClient, VerifyDomainIdentityCommand, VerifyDomainDkimCommand, GetIdentityVerificationAttributesCommand, SendRawEmailCommand, CreateReceiptRuleCommand, DeleteReceiptRuleCommand, DescribeReceiptRuleSetCommand } from "@aws-sdk/client-ses";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 
-const ses = new SESClient({ region: Deno.env.get("AWS_REGION") ?? "us-east-1" });
-const s3 = new S3Client({ region: Deno.env.get("AWS_REGION") ?? "us-east-1" });
+const sesOutbound = new SESClient({ region: Deno.env.get("AWS_REGION") ?? "us-east-2" });
+const sesInbound = new SESClient({ region: Deno.env.get("AWS_SES_INBOUND_REGION") ?? "us-east-1" });
+const s3 = new S3Client({ region: Deno.env.get("AWS_SES_INBOUND_REGION") ?? "us-east-1" });
 
 const SNS_TOPIC_ARN = Deno.env.get("SNS_TOPIC_ARN") ?? "";
 const RECEIPT_RULE_SET = Deno.env.get("SES_RULE_SET") ?? "mailmask-email-forwarding";
@@ -17,11 +18,11 @@ export interface DnsRecords {
 
 export async function verifyDomain(domain: string): Promise<DnsRecords> {
   // Step 1: Verify domain identity (TXT record)
-  const verifyRes = await ses.send(new VerifyDomainIdentityCommand({ Domain: domain }));
+  const verifyRes = await sesInbound.send(new VerifyDomainIdentityCommand({ Domain: domain }));
   const verificationToken = verifyRes.VerificationToken ?? "";
 
   // Step 2: Enable DKIM (CNAME records)
-  const dkimRes = await ses.send(new VerifyDomainDkimCommand({ Domain: domain }));
+  const dkimRes = await sesInbound.send(new VerifyDomainDkimCommand({ Domain: domain }));
   const dkimTokens = dkimRes.DkimTokens ?? [];
 
   return { verificationToken, dkimTokens };
@@ -29,7 +30,7 @@ export async function verifyDomain(domain: string): Promise<DnsRecords> {
 
 export async function checkDomainStatus(domain: string): Promise<{ verified: boolean; dkimVerified: boolean }> {
   try {
-    const res = await ses.send(new GetIdentityVerificationAttributesCommand({ Identities: [domain] }));
+    const res = await sesInbound.send(new GetIdentityVerificationAttributesCommand({ Identities: [domain] }));
     const attrs = res.VerificationAttributes?.[domain];
     if (!attrs) return { verified: false, dkimVerified: false };
 
@@ -47,7 +48,7 @@ export async function checkDomainStatus(domain: string): Promise<{ verified: boo
 export async function createReceiptRule(domain: string): Promise<void> {
   const ruleName = `mailmask-${domain.replace(/\./g, "-")}`;
 
-  await ses.send(new CreateReceiptRuleCommand({
+  await sesInbound.send(new CreateReceiptRuleCommand({
     RuleSetName: RECEIPT_RULE_SET,
     Rule: {
       Name: ruleName,
@@ -70,7 +71,7 @@ export async function createReceiptRule(domain: string): Promise<void> {
 export async function deleteReceiptRule(domain: string): Promise<void> {
   const ruleName = `mailmask-${domain.replace(/\./g, "-")}`;
   try {
-    await ses.send(new DeleteReceiptRuleCommand({
+    await sesInbound.send(new DeleteReceiptRuleCommand({
       RuleSetName: RECEIPT_RULE_SET,
       RuleName: ruleName,
     }));
@@ -102,7 +103,7 @@ export async function forwardEmail(originalRaw: string, from: string, to: string
     ? originalRaw.slice(0, firstNewline) + "\r\n" + headers + originalRaw.slice(firstNewline)
     : headers + "\r\n" + originalRaw;
 
-  await ses.send(new SendRawEmailCommand({
+  await sesOutbound.send(new SendRawEmailCommand({
     RawMessage: { Data: new TextEncoder().encode(rewrittenRaw) },
     Source: from,
     Destinations: [to],
@@ -129,7 +130,7 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
     `--${boundary}--`,
   ].join("\r\n");
 
-  await ses.send(new SendRawEmailCommand({
+  await sesOutbound.send(new SendRawEmailCommand({
     RawMessage: { Data: new TextEncoder().encode(rawEmail) },
     Source: from,
     Destinations: [to],
@@ -138,7 +139,7 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
 
 // --- Test helpers ---
 
-let _sesClient = ses;
+let _sesClient = sesOutbound;
 export function _injectSesClient(client: any) {
   _sesClient = client;
 }

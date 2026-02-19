@@ -307,6 +307,13 @@ const app = new Elysia()
     const { email } = await request.json();
     if (!email) return new Response(JSON.stringify({ error: "Email requerido" }), { status: 400 });
 
+    const emailLimited = await checkRateLimit(`forgot:${email}`, 1, 300_000);
+    if (!emailLimited.allowed) {
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+
     const user = await getUser(email);
     if (user) {
       const token = crypto.randomUUID();
