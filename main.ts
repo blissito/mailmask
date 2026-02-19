@@ -63,8 +63,8 @@ function rateLimitGuard(ip: string, limit: number, windowMs: number): Response |
   return null;
 }
 
-const MAX_ALIASES_PER_DOMAIN = 25;
-const MAX_RULES_PER_DOMAIN = 10;
+const MAX_ALIASES_PER_DOMAIN = 3;
+const MAX_RULES_PER_DOMAIN = 3;
 
 // --- App ---
 
@@ -340,6 +340,13 @@ const app = new Elysia()
     // Validate alias format (alphanumeric, dots, hyphens, or * for catch-all)
     if (alias !== "*" && !/^[a-zA-Z0-9._-]+$/.test(alias)) {
       return new Response(JSON.stringify({ error: "Formato de alias inválido" }), { status: 400 });
+    }
+
+    // Validate destination emails
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalid = destinations.filter((d: string) => !emailRegex.test(d));
+    if (invalid.length) {
+      return new Response(JSON.stringify({ error: `Email(s) de destino inválido(s): ${invalid.join(", ")}` }), { status: 400 });
     }
 
     const existing = await getAlias(domain.id, alias);
