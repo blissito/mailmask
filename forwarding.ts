@@ -1,4 +1,4 @@
-import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, type Rule } from "./db.ts";
+import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, type Rule } from "./db.ts";
 import { forwardEmail, fetchEmailFromS3 } from "./ses.ts";
 
 // --- SNS notification types ---
@@ -80,6 +80,14 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     const domain = await getDomainByName(domainName);
     if (!domain || !domain.verified) continue;
 
+    // Determine log TTL from owner's plan
+    let logDays = 15; // default
+    const owner = await getUser(domain.ownerEmail);
+    if (owner) {
+      const planLimits = getUserPlanLimits(owner);
+      if (planLimits.logDays > 0) logDays = planLimits.logDays;
+    }
+
     // Step 1: Check rules first (higher priority)
     const rules = await listRules(domain.id);
     const matchedRule = evaluateRules(rules, { to: recipient, from, subject });
@@ -93,13 +101,13 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
           status: "discarded",
           forwardedTo: "",
           sizeBytes: rawContent.length,
-        });
+        }, logDays);
         discarded++;
         continue;
       }
 
       if (matchedRule.action === "forward" && matchedRule.target) {
-        await doForward(rawContent, from, matchedRule.target, domain.id, recipient, subject);
+        await doForward(rawContent, from, matchedRule.target, domain.id, recipient, subject, logDays);
         forwarded++;
         continue;
       }
@@ -119,7 +127,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
           status: "rule_matched",
           forwardedTo: matchedRule.target,
           sizeBytes: rawContent.length,
-        });
+        }, logDays);
         continue;
       }
     }
@@ -131,7 +139,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
 
     if (matched) {
       for (const dest of matched.destinations) {
-        await doForward(rawContent, from, dest, domain.id, recipient, subject);
+        await doForward(rawContent, from, dest, domain.id, recipient, subject, logDays);
         forwarded++;
       }
       bumpAliasStats(domain.id, matched.alias, from); // fire-and-forget
@@ -144,7 +152,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
         forwardedTo: "",
         sizeBytes: rawContent.length,
         error: "No matching alias",
-      });
+      }, logDays);
       discarded++;
     }
   }
@@ -184,7 +192,7 @@ function evaluateRules(rules: Rule[], email: { to: string; from: string; subject
 
 // --- Forward helper ---
 
-async function doForward(rawContent: string, from: string, to: string, domainId: string, originalTo: string, subject: string): Promise<void> {
+async function doForward(rawContent: string, from: string, to: string, domainId: string, originalTo: string, subject: string, logDays = 15): Promise<void> {
   try {
     if (rawContent) {
       await forwardEmail(rawContent, from, to);
@@ -196,7 +204,7 @@ async function doForward(rawContent: string, from: string, to: string, domainId:
       status: "forwarded",
       forwardedTo: to,
       sizeBytes: rawContent.length,
-    });
+    }, logDays);
   } catch (err) {
     await addLog({
       domainId,
@@ -206,6 +214,6 @@ async function doForward(rawContent: string, from: string, to: string, domainId:
       forwardedTo: to,
       sizeBytes: rawContent.length,
       error: err instanceof Error ? err.message : String(err),
-    });
+    }, logDays);
   }
 }

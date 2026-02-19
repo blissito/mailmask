@@ -2,10 +2,18 @@ const kv = await Deno.openKv();
 
 // --- Types ---
 
+export interface Subscription {
+  plan: "basico" | "pro" | "agencia";
+  status: "active" | "past_due" | "cancelled" | "none";
+  mpSubscriptionId?: string;
+  currentPeriodEnd?: string; // ISO date
+}
+
 export interface User {
   email: string;
   passwordHash: string;
   createdAt: string;
+  subscription?: Subscription;
 }
 
 export interface Domain {
@@ -57,12 +65,12 @@ export interface EmailLog {
   error?: string;
 }
 
-// --- Pricing ---
+// --- Plans ---
 
-export const PRICING = {
-  perDomain: 99_00, // $99 MXN in centavos
-  pack3: 199_00,
-  pack10: 499_00,
+export const PLANS = {
+  basico:  { price: 99_00, domains: 1, aliases: 10, rules: 10, logDays: 15 },
+  pro:     { price: 299_00, domains: 5, aliases: 20, rules: 20, logDays: 30 },
+  agencia: { price: 999_00, domains: 20, aliases: 100, rules: 100, logDays: 90 },
 } as const;
 
 // --- Users ---
@@ -243,11 +251,10 @@ export async function deleteRule(domainId: string, ruleId: string): Promise<bool
 
 // --- Logs ---
 
-export async function addLog(log: Omit<EmailLog, "id">): Promise<EmailLog> {
+export async function addLog(log: Omit<EmailLog, "id">, logDays = 30): Promise<EmailLog> {
   const id = crypto.randomUUID();
   const entry: EmailLog = { ...log, id };
-  // TTL 30 days
-  await kv.set(["logs", log.domainId, log.timestamp + ":" + id], entry, { expireIn: 30 * 24 * 60 * 60 * 1000 });
+  await kv.set(["logs", log.domainId, log.timestamp + ":" + id], entry, { expireIn: logDays * 24 * 60 * 60 * 1000 });
   return entry;
 }
 
@@ -257,6 +264,26 @@ export async function listLogs(domainId: string, limit = 50): Promise<EmailLog[]
     logs.push(entry.value);
   }
   return logs;
+}
+
+// --- Subscription helpers ---
+
+export async function updateUserSubscription(email: string, sub: Subscription): Promise<User | null> {
+  const user = await getUser(email);
+  if (!user) return null;
+  const updated = { ...user, subscription: sub };
+  await kv.set(["users", email], updated);
+  return updated;
+}
+
+export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number } {
+  const sub = user.subscription;
+  if (sub && sub.status === "active") {
+    const plan = PLANS[sub.plan];
+    return { domains: plan.domains, aliases: plan.aliases, rules: plan.rules, logDays: plan.logDays };
+  }
+  // Grace period: existing users with no subscription get basico read-only limits
+  return { domains: 0, aliases: 0, rules: 0, logDays: 0 };
 }
 
 // --- Test helpers ---

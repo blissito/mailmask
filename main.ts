@@ -3,7 +3,8 @@ import {
   getUser, createUser, createDomain, getDomain, listUserDomains,
   updateDomain, deleteDomain, countUserDomains, createAlias, getAlias,
   listAliases, updateAlias, deleteAlias, countAliases, createRule,
-  listRules, deleteRule, listLogs, PRICING,
+  listRules, deleteRule, listLogs, PLANS, updateUserSubscription,
+  getUserPlanLimits,
 } from "./db.ts";
 import {
   hashPassword, verifyPassword, signJwt, makeAuthCookie,
@@ -62,9 +63,6 @@ function rateLimitGuard(ip: string, limit: number, windowMs: number): Response |
   }
   return null;
 }
-
-const MAX_ALIASES_PER_DOMAIN = 3;
-const MAX_RULES_PER_DOMAIN = 3;
 
 // --- App ---
 
@@ -161,10 +159,18 @@ const app = new Elysia()
   })
 
   .get("/api/auth/me", async ({ request }) => {
-    const user = await getAuthUser(request);
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const user = await getUser(auth.email);
     if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
     const domains = await listUserDomains(user.email);
-    return new Response(JSON.stringify({ email: user.email, domainsCount: domains.length }), {
+    const limits = getUserPlanLimits(user);
+    return new Response(JSON.stringify({
+      email: user.email,
+      domainsCount: domains.length,
+      subscription: user.subscription ?? { plan: "basico", status: "none" },
+      limits,
+    }), {
       headers: { "content-type": "application/json" },
     });
   })
@@ -182,12 +188,23 @@ const app = new Elysia()
   })
 
   .post("/api/domains", async ({ request }) => {
-    const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const user = (await getUser(auth.email))!;
 
     const ip = getIp(request);
     const limited = rateLimitGuard(ip, 10, 60_000);
     if (limited) return limited;
+
+    // Check plan limits
+    const limits = getUserPlanLimits(user);
+    if (limits.domains === 0) {
+      return new Response(JSON.stringify({ error: "Necesitas un plan activo para agregar dominios" }), { status: 402 });
+    }
+    const currentCount = await countUserDomains(user.email);
+    if (currentCount >= limits.domains) {
+      return new Response(JSON.stringify({ error: `Tu plan permite máximo ${limits.domains} dominio(s)` }), { status: 400 });
+    }
 
     const { domain } = await request.json();
     if (!domain || typeof domain !== "string") {
@@ -319,17 +336,19 @@ const app = new Elysia()
   })
 
   .post("/api/domains/:id/aliases", async ({ request, params }) => {
-    const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const fullUser = (await getUser(auth.email))!;
 
     const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== user.email) {
+    if (!domain || domain.ownerEmail !== auth.email) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     }
 
+    const aliasLimits = getUserPlanLimits(fullUser);
     const count = await countAliases(domain.id);
-    if (count >= MAX_ALIASES_PER_DOMAIN) {
-      return new Response(JSON.stringify({ error: `Máximo ${MAX_ALIASES_PER_DOMAIN} aliases por dominio` }), { status: 400 });
+    if (count >= aliasLimits.aliases) {
+      return new Response(JSON.stringify({ error: `Tu plan permite máximo ${aliasLimits.aliases} máscaras por dominio` }), { status: 400 });
     }
 
     const { alias, destinations } = await request.json();
@@ -414,17 +433,19 @@ const app = new Elysia()
   })
 
   .post("/api/domains/:id/rules", async ({ request, params }) => {
-    const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const fullUser = (await getUser(auth.email))!;
 
     const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== user.email) {
+    if (!domain || domain.ownerEmail !== auth.email) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     }
 
+    const ruleLimits = getUserPlanLimits(fullUser);
     const existingRules = await listRules(domain.id);
-    if (existingRules.length >= MAX_RULES_PER_DOMAIN) {
-      return new Response(JSON.stringify({ error: `Máximo ${MAX_RULES_PER_DOMAIN} reglas por dominio` }), { status: 400 });
+    if (existingRules.length >= ruleLimits.rules) {
+      return new Response(JSON.stringify({ error: `Tu plan permite máximo ${ruleLimits.rules} reglas por dominio` }), { status: 400 });
     }
 
     const { field, match, value, action, target, priority = 0, enabled = true } = await request.json();
@@ -484,6 +505,133 @@ const app = new Elysia()
 
     const logs = await listLogs(domain.id, limit);
     return new Response(JSON.stringify(logs), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  // --- Billing ---
+
+  .post("/api/billing/checkout", async ({ request }) => {
+    const user = await getAuthUser(request);
+    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const { plan = "basico" } = await request.json().catch(() => ({ plan: "basico" }));
+    const planKey = plan as keyof typeof PLANS;
+    if (!PLANS[planKey]) {
+      return new Response(JSON.stringify({ error: "Plan inválido" }), { status: 400 });
+    }
+
+    const { PreApproval } = await import("mercadopago");
+    const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
+    if (!mpAccessToken) {
+      return new Response(JSON.stringify({ error: "MercadoPago no configurado" }), { status: 500 });
+    }
+
+    const preApproval = new PreApproval({ accessToken: mpAccessToken });
+    const backUrl = getMainDomainUrl() + "/app?billing=success";
+
+    const result = await preApproval.create({
+      body: {
+        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)}`,
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: "months",
+          transaction_amount: PLANS[planKey].price / 100,
+          currency_id: "MXN",
+        },
+        payer_email: user.email,
+        back_url: backUrl,
+        external_reference: user.email,
+      },
+    });
+
+    return new Response(JSON.stringify({ init_point: result.init_point }), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .post("/api/webhooks/mercadopago", async ({ request }) => {
+    // Validate HMAC signature
+    const secret = Deno.env.get("MP_WEBHOOK_SECRET");
+    if (secret) {
+      const xSignature = request.headers.get("x-signature") ?? "";
+      const xRequestId = request.headers.get("x-request-id") ?? "";
+      const url = new URL(request.url);
+      const dataId = url.searchParams.get("data.id") ?? "";
+
+      // Parse ts and v1 from x-signature
+      const parts = Object.fromEntries(
+        xSignature.split(",").map(p => {
+          const [k, ...v] = p.trim().split("=");
+          return [k, v.join("=")];
+        })
+      );
+      const ts = parts["ts"] ?? "";
+      const v1 = parts["v1"] ?? "";
+
+      const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+      const key = await crypto.subtle.importKey(
+        "raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+      );
+      const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
+      const computed = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+
+      if (computed !== v1) {
+        console.warn("MP webhook: invalid signature");
+        return new Response("OK", { status: 200 });
+      }
+    }
+
+    const body = await request.json();
+    console.log("MP webhook:", JSON.stringify(body));
+
+    // Handle subscription_preapproval events
+    if (body.type === "subscription_preapproval" && body.data?.id) {
+      try {
+        const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
+        if (!mpAccessToken) return new Response("OK", { status: 200 });
+
+        const subRes = await fetch(`https://api.mercadopago.com/preapproval/${body.data.id}`, {
+          headers: { "Authorization": `Bearer ${mpAccessToken}` },
+        });
+        const sub = await subRes.json();
+
+        if (sub.status === "authorized") {
+          const email = sub.external_reference ?? sub.payer_email;
+          if (email) {
+            // Determine plan from amount
+            const amount = sub.auto_recurring?.transaction_amount ?? 0;
+            let plan: "basico" | "pro" | "agencia" = "basico";
+            if (amount >= 999) plan = "agencia";
+            else if (amount >= 299) plan = "pro";
+
+            const periodEnd = new Date();
+            periodEnd.setDate(periodEnd.getDate() + 30);
+
+            await updateUserSubscription(email, {
+              plan,
+              status: "active",
+              mpSubscriptionId: body.data.id,
+              currentPeriodEnd: periodEnd.toISOString(),
+            });
+            console.log(`Subscription activated: ${email} -> ${plan}`);
+          }
+        }
+      } catch (err) {
+        console.error("MP webhook processing error:", err);
+      }
+    }
+
+    return new Response("OK", { status: 200 });
+  })
+
+  .get("/api/billing/status", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const user = await getUser(auth.email);
+    return new Response(JSON.stringify({
+      subscription: user?.subscription ?? { plan: "basico", status: "none" },
+    }), {
       headers: { "content-type": "application/json" },
     });
   })

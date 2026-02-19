@@ -18,6 +18,78 @@ async function checkAuth() {
   }
   currentUser = await res.json();
   document.getElementById("user-email").textContent = currentUser.email;
+  renderBillingBanner();
+
+  // Handle billing success redirect
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("billing") === "success") {
+    showToast("Plan activado exitosamente");
+    window.history.replaceState({}, "", "/app");
+  }
+}
+
+function renderBillingBanner() {
+  const container = document.getElementById("billing-banner");
+  if (!container) return;
+
+  const sub = currentUser.subscription;
+  const isActive = sub && sub.status === "active";
+  const planName = sub?.plan ? sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1) : "Ninguno";
+
+  if (isActive) {
+    container.innerHTML = `
+      <div class="bg-green-900/20 border border-green-800/50 rounded-lg px-4 py-3 flex items-center justify-between">
+        <span class="text-sm text-green-400">Plan ${planName} — Activo</span>
+        <span class="text-xs text-zinc-500">Hasta ${sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString("es-MX") : "—"}</span>
+      </div>`;
+  } else {
+    container.innerHTML = `
+      <div class="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 flex items-center justify-between">
+        <span class="text-sm text-zinc-400">Sin plan activo — Activa tu plan para agregar dominios</span>
+        <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+          Activar Plan — $99/mes
+        </button>
+      </div>`;
+    document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
+  }
+
+  // Disable add domain button if no active plan
+  const addDomainBtn = document.getElementById("btn-add-domain");
+  if (addDomainBtn && !isActive) {
+    addDomainBtn.disabled = true;
+    addDomainBtn.classList.add("opacity-50", "cursor-not-allowed");
+    addDomainBtn.title = "Necesitas un plan activo";
+  }
+}
+
+async function startCheckout() {
+  const btn = document.getElementById("btn-checkout");
+  if (btn) { btn.textContent = "Redirigiendo..."; btn.disabled = true; }
+  try {
+    const res = await fetch("/api/billing/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ plan: "basico" }),
+    });
+    const data = await res.json();
+    if (data.init_point) {
+      window.location.href = data.init_point;
+    } else {
+      showToast(data.error || "Error al iniciar pago", true);
+      if (btn) { btn.textContent = "Activar Plan — $99/mes"; btn.disabled = false; }
+    }
+  } catch {
+    showToast("Error de conexión", true);
+    if (btn) { btn.textContent = "Activar Plan — $99/mes"; btn.disabled = false; }
+  }
+}
+
+function showToast(message, isError = false) {
+  const toast = document.createElement("div");
+  toast.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg text-sm font-medium transition-opacity ${isError ? 'bg-red-900/90 text-red-200' : 'bg-green-900/90 text-green-200'}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = "0"; setTimeout(() => toast.remove(), 300); }, 3000);
 }
 
 // --- Domains ---
