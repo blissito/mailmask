@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crear cuenta — MailMask</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen flex items-center justify-center px-4">
+
+  <div class="w-full max-w-sm">
+    <div class="text-center mb-8">
+      <a href="/" class="inline-block">
+        <svg class="w-12 h-12 mx-auto" viewBox="0 0 80 80" fill="none">
+          <ellipse cx="40" cy="42" rx="28" ry="24" fill="#dc2626"/>
+          <ellipse cx="40" cy="38" rx="28" ry="22" fill="#ef4444"/>
+          <ellipse cx="28" cy="36" rx="8" ry="6" fill="#18181b"/>
+          <ellipse cx="52" cy="36" rx="8" ry="6" fill="#18181b"/>
+          <ellipse cx="30" cy="34" rx="2" ry="1.5" fill="#fafafa" opacity="0.6"/>
+          <ellipse cx="54" cy="34" rx="2" ry="1.5" fill="#fafafa" opacity="0.6"/>
+        </svg>
+      </a>
+      <h1 class="text-2xl font-bold mt-4">Crear cuenta</h1>
+      <p class="text-zinc-400 text-sm mt-1">Empieza a usar tu dominio en 2 minutos</p>
+    </div>
+
+    <form id="register-form" class="space-y-4">
+      <div>
+        <label class="block text-sm text-zinc-400 mb-1">Email</label>
+        <input type="email" name="email" required
+          class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none transition-colors"
+          placeholder="tu@email.com">
+      </div>
+      <div>
+        <label class="block text-sm text-zinc-400 mb-1">Contraseña</label>
+        <input type="password" name="password" required minlength="8"
+          class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none transition-colors"
+          placeholder="Mínimo 8 caracteres">
+      </div>
+      <div id="error" class="text-red-400 text-sm hidden"></div>
+      <button type="submit"
+        class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition-colors">
+        Crear cuenta
+      </button>
+    </form>
+
+    <p class="text-center text-sm text-zinc-500 mt-6">
+      ¿Ya tienes cuenta? <a href="/login" class="text-red-400 hover:text-red-300">Iniciar sesión</a>
+    </p>
+  </div>
+
+  <script>
+    document.getElementById("register-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const errEl = document.getElementById("error");
+      errEl.classList.add("hidden");
+
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: form.email.value,
+          password: form.password.value,
+        }),
+      });
+
+      if (res.ok) {
+        window.location.href = "/app";
+      } else {
+        const data = await res.json();
+        errEl.textContent = data.error || "Error al crear cuenta";
+        errEl.classList.remove("hidden");
+      }
+    });
+  </script>
+</body>
+</html>
