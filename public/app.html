@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — MailMask</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+
+  <!-- Nav -->
+  <nav class="border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2">
+        <svg class="w-7 h-7" viewBox="0 0 80 80" fill="none">
+          <ellipse cx="40" cy="42" rx="28" ry="24" fill="#dc2626"/>
+          <ellipse cx="40" cy="38" rx="28" ry="22" fill="#ef4444"/>
+          <ellipse cx="28" cy="36" rx="8" ry="6" fill="#18181b"/>
+          <ellipse cx="52" cy="36" rx="8" ry="6" fill="#18181b"/>
+        </svg>
+        <span class="font-bold text-lg">MailMask</span>
+      </a>
+    </div>
+    <div class="flex items-center gap-4">
+      <span id="user-email" class="text-sm text-zinc-400"></span>
+      <button id="btn-logout" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">Salir</button>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="max-w-4xl mx-auto px-4 py-8">
+
+    <!-- Domain list header -->
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold">Mis dominios</h1>
+      <button id="btn-add-domain" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm">
+        + Agregar dominio
+      </button>
+    </div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="hidden text-center py-16">
+      <div class="text-5xl mb-4">🎭</div>
+      <h2 class="text-xl font-semibold mb-2">Agrega tu primer dominio</h2>
+      <p class="text-zinc-400 mb-6">Configura email profesional en tu dominio en 2 minutos.</p>
+      <button onclick="showAddDomainModal()" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors">
+        Agregar dominio
+      </button>
+    </div>
+
+    <!-- Domain cards -->
+    <div id="domains-list" class="space-y-4"></div>
+
+    <!-- Domain detail (shown when a domain is selected) -->
+    <div id="domain-detail" class="hidden mt-8">
+      <div class="flex items-center gap-3 mb-6">
+        <button id="btn-back" class="text-zinc-400 hover:text-zinc-200 transition-colors">&larr; Volver</button>
+        <h2 id="detail-domain-name" class="text-xl font-bold"></h2>
+        <span id="detail-status" class="text-xs px-2 py-1 rounded-full"></span>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex gap-1 border-b border-zinc-800 mb-6">
+        <button class="tab-btn active-tab px-4 py-2 text-sm font-semibold" data-tab="aliases">Aliases</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="rules">Reglas</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="logs">Logs</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="dns">DNS</button>
+      </div>
+
+      <!-- Tab: Aliases -->
+      <div id="tab-aliases" class="tab-content">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold">Aliases</h3>
+          <button id="btn-add-alias" class="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors">+ Agregar alias</button>
+        </div>
+        <div id="aliases-list" class="space-y-2"></div>
+        <div id="aliases-empty" class="hidden text-center py-8 text-zinc-500">
+          No hay aliases. Crea uno para empezar a recibir email.
+        </div>
+      </div>
+
+      <!-- Tab: Rules -->
+      <div id="tab-rules" class="tab-content hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold">Reglas de routing</h3>
+          <button id="btn-add-rule" class="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors">+ Agregar regla</button>
+        </div>
+        <div id="rules-list" class="space-y-2"></div>
+        <div id="rules-empty" class="hidden text-center py-8 text-zinc-500">
+          No hay reglas. Los emails se procesan solo por aliases.
+        </div>
+      </div>
+
+      <!-- Tab: Logs -->
+      <div id="tab-logs" class="tab-content hidden">
+        <h3 class="font-semibold mb-4">Últimos emails</h3>
+        <div id="logs-list" class="space-y-1"></div>
+        <div id="logs-empty" class="hidden text-center py-8 text-zinc-500">
+          No hay logs aún. Cuando recibas emails, aparecerán aquí.
+        </div>
+      </div>
+
+      <!-- Tab: DNS -->
+      <div id="tab-dns" class="tab-content hidden">
+        <h3 class="font-semibold mb-4">Configuración DNS</h3>
+        <p class="text-sm text-zinc-400 mb-4">Configura estos registros en tu proveedor de DNS para activar tu dominio.</p>
+        <div id="dns-records" class="space-y-3"></div>
+        <button id="btn-verify-dns" class="mt-6 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm">
+          Verificar DNS
+        </button>
+        <span id="verify-result" class="ml-3 text-sm"></span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal: Add domain -->
+  <div id="modal-add-domain" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+      <h3 class="text-lg font-bold mb-4">Agregar dominio</h3>
+      <form id="form-add-domain">
+        <label class="block text-sm text-zinc-400 mb-1">Dominio</label>
+        <input type="text" name="domain" required placeholder="ejemplo.com"
+          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+        <div id="add-domain-error" class="text-red-400 text-sm mt-2 hidden"></div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button type="button" onclick="hideModal('modal-add-domain')" class="px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors">Cancelar</button>
+          <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Agregar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add alias -->
+  <div id="modal-add-alias" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+      <h3 class="text-lg font-bold mb-4">Agregar alias</h3>
+      <form id="form-add-alias">
+        <div class="mb-4">
+          <label class="block text-sm text-zinc-400 mb-1">Alias (parte local)</label>
+          <div class="flex items-center gap-2">
+            <input type="text" name="alias" required placeholder="ventas"
+              class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+            <span id="alias-domain-suffix" class="text-zinc-500 text-sm">@dominio.com</span>
+          </div>
+          <p class="text-xs text-zinc-500 mt-1">Usa * para catch-all (recibir todo)</p>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">Destino(s)</label>
+          <input type="text" name="destinations" required placeholder="tu@gmail.com, otro@gmail.com"
+            class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+          <p class="text-xs text-zinc-500 mt-1">Separa múltiples destinos con coma</p>
+        </div>
+        <div id="add-alias-error" class="text-red-400 text-sm mt-2 hidden"></div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button type="button" onclick="hideModal('modal-add-alias')" class="px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors">Cancelar</button>
+          <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear alias</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add rule -->
+  <div id="modal-add-rule" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+      <h3 class="text-lg font-bold mb-4">Agregar regla</h3>
+      <form id="form-add-rule">
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-sm text-zinc-400 mb-1">Campo</label>
+            <select name="field" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-zinc-100 focus:border-red-500 focus:outline-none">
+              <option value="from">De (from)</option>
+              <option value="to">Para (to)</option>
+              <option value="subject">Asunto (subject)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-zinc-400 mb-1">Condición</label>
+            <select name="match" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-zinc-100 focus:border-red-500 focus:outline-none">
+              <option value="contains">Contiene</option>
+              <option value="equals">Es igual a</option>
+              <option value="regex">Regex</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm text-zinc-400 mb-1">Valor</label>
+          <input type="text" name="value" required placeholder="@bancomer.com"
+            class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-sm text-zinc-400 mb-1">Acción</label>
+            <select name="action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-zinc-100 focus:border-red-500 focus:outline-none">
+              <option value="forward">Reenviar</option>
+              <option value="webhook">Webhook</option>
+              <option value="discard">Descartar</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-zinc-400 mb-1">Destino</label>
+            <input type="text" name="target" placeholder="email o URL"
+              class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+          </div>
+        </div>
+        <div id="add-rule-error" class="text-red-400 text-sm mt-2 hidden"></div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button type="button" onclick="hideModal('modal-add-rule')" class="px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors">Cancelar</button>
+          <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear regla</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

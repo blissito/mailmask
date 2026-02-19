@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MailMask — Email profesional en tu dominio. $99/mes.</title>
+  <meta name="description" content="Recibe y envía email desde tu dominio por $99 MXN/mes. Sin servidores, sin Google Workspace. Configura en 2 minutos.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            mask: { 50: '#fef2f2', 100: '#fee2e2', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 800: '#991b1b', 900: '#7f1d1d' },
+            gold: { 400: '#facc15', 500: '#eab308' }
+          }
+        }
+      }
+    }
+  </script>
+  <script type="module">
+    import { animate, stagger } from "https://cdn.jsdelivr.net/npm/motion@11.13.5/+esm";
+    document.addEventListener("DOMContentLoaded", () => {
+      animate(".hero-title", { opacity: [0, 1], y: [24, 0] }, { duration: 0.7, easing: "ease-out" });
+      animate(".hero-sub", { opacity: [0, 1], y: [16, 0] }, { duration: 0.6, delay: 0.15, easing: "ease-out" });
+      animate(".feature-card", { opacity: [0, 1], y: [20, 0] }, { duration: 0.5, delay: stagger(0.1, { start: 0.3 }), easing: "ease-out" });
+      animate(".pricing-card", { opacity: [0, 1], y: [30, 0] }, { duration: 0.5, delay: stagger(0.1, { start: 0.5 }), easing: "ease-out" });
+      animate(".comparison-row", { opacity: [0, 1], x: [-8, 0] }, { duration: 0.4, delay: stagger(0.06, { start: 0.8 }), easing: "ease-out" });
+    });
+  </script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 antialiased">
+
+  <!-- Hero -->
+  <section class="min-h-[70vh] flex flex-col items-center justify-center px-4 pt-16 pb-12 text-center">
+    <!-- Mascarita icon -->
+    <div class="mb-6">
+      <svg class="w-20 h-20 mx-auto" viewBox="0 0 80 80" fill="none">
+        <ellipse cx="40" cy="42" rx="28" ry="24" fill="#dc2626"/>
+        <ellipse cx="40" cy="38" rx="28" ry="22" fill="#ef4444"/>
+        <!-- Eye holes -->
+        <ellipse cx="28" cy="36" rx="8" ry="6" fill="#18181b"/>
+        <ellipse cx="52" cy="36" rx="8" ry="6" fill="#18181b"/>
+        <!-- Eye shine -->
+        <ellipse cx="30" cy="34" rx="2" ry="1.5" fill="#fafafa" opacity="0.6"/>
+        <ellipse cx="54" cy="34" rx="2" ry="1.5" fill="#fafafa" opacity="0.6"/>
+        <!-- Lacing detail -->
+        <path d="M40 18 L40 26" stroke="#facc15" stroke-width="2" stroke-linecap="round"/>
+        <path d="M36 19 L40 26 L44 19" stroke="#facc15" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <!-- Mouth area -->
+        <path d="M30 48 Q40 54 50 48" stroke="#991b1b" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <h1 class="hero-title text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight opacity-0">
+      Email profesional.<br>
+      <span class="text-mask-500">$99/mes.</span>
+    </h1>
+
+    <p class="hero-sub mt-6 text-lg sm:text-xl text-zinc-400 max-w-xl opacity-0">
+      Recibe y envía email desde tu dominio. Sin servidores, sin Google Workspace, sin complicaciones.
+    </p>
+
+    <div class="hero-sub mt-8 flex flex-col sm:flex-row gap-3 opacity-0">
+      <a href="/register" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors text-lg">
+        Crear cuenta gratis
+      </a>
+      <a href="#pricing" class="border border-zinc-700 hover:border-zinc-500 text-zinc-300 font-semibold px-8 py-3 rounded-lg transition-colors text-lg">
+        Ver precios
+      </a>
+    </div>
+
+    <p class="mt-4 text-sm text-zinc-500">Configura en 2 minutos. Sin tarjeta de crédito.</p>
+  </section>
+
+  <!-- How it works -->
+  <section class="max-w-4xl mx-auto px-4 py-16">
+    <h2 class="text-2xl font-bold text-center mb-12">Cómo funciona</h2>
+    <div class="grid md:grid-cols-3 gap-8">
+      <div class="feature-card text-center opacity-0">
+        <div class="w-12 h-12 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <span class="text-2xl">1</span>
+        </div>
+        <h3 class="font-semibold text-lg mb-2">Agrega tu dominio</h3>
+        <p class="text-zinc-400 text-sm">Ingresa tu dominio y te damos los registros DNS a configurar.</p>
+      </div>
+      <div class="feature-card text-center opacity-0">
+        <div class="w-12 h-12 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <span class="text-2xl">2</span>
+        </div>
+        <h3 class="font-semibold text-lg mb-2">Configura DNS</h3>
+        <p class="text-zinc-400 text-sm">Agrega el registro MX y los CNAME de DKIM en tu proveedor de DNS.</p>
+      </div>
+      <div class="feature-card text-center opacity-0">
+        <div class="w-12 h-12 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <span class="text-2xl">3</span>
+        </div>
+        <h3 class="font-semibold text-lg mb-2">Crea aliases</h3>
+        <p class="text-zinc-400 text-sm">ventas@, soporte@, info@ — todos llegan a tu Gmail o donde quieras.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Comparison -->
+  <section class="max-w-3xl mx-auto px-4 py-16">
+    <h2 class="text-2xl font-bold text-center mb-8">MailMask vs Google Workspace</h2>
+    <div class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+      <div class="grid grid-cols-3 text-sm font-semibold bg-zinc-800/50 px-4 py-3">
+        <div></div>
+        <div class="text-center text-zinc-400">Google Workspace</div>
+        <div class="text-center text-mask-500">MailMask</div>
+      </div>
+      <div class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 opacity-0">
+        <div class="text-zinc-400">1 persona</div>
+        <div class="text-center">$120 MXN/mes</div>
+        <div class="text-center text-mask-400 font-semibold">$99 MXN/mes</div>
+      </div>
+      <div class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 opacity-0">
+        <div class="text-zinc-400">3 personas</div>
+        <div class="text-center">$360 MXN/mes</div>
+        <div class="text-center text-mask-400 font-semibold">$99 MXN/mes</div>
+      </div>
+      <div class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 opacity-0">
+        <div class="text-zinc-400">10 personas</div>
+        <div class="text-center">$1,200 MXN/mes</div>
+        <div class="text-center text-mask-400 font-semibold">$99 MXN/mes</div>
+      </div>
+      <div class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 opacity-0">
+        <div class="text-zinc-400">Aliases</div>
+        <div class="text-center text-zinc-500">1 por usuario</div>
+        <div class="text-center text-mask-400 font-semibold">25 incluidos</div>
+      </div>
+      <div class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 opacity-0">
+        <div class="text-zinc-400">Configuración</div>
+        <div class="text-center text-zinc-500">30+ minutos</div>
+        <div class="text-center text-mask-400 font-semibold">2 minutos</div>
+      </div>
+      <div class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 opacity-0">
+        <div class="text-zinc-400">Reglas de routing</div>
+        <div class="text-center text-zinc-500">Limitadas</div>
+        <div class="text-center text-mask-400 font-semibold">10 por dominio</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="max-w-4xl mx-auto px-4 py-16">
+    <h2 class="text-2xl font-bold text-center mb-12">Todo incluido por $99/mes</h2>
+    <div class="grid sm:grid-cols-2 gap-6">
+      <div class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 opacity-0">
+        <h3 class="font-semibold text-lg mb-2">📬 Forwarding instantáneo</h3>
+        <p class="text-zinc-400 text-sm">Emails llegan a tu inbox en menos de 5 segundos. SES de Amazon como backbone.</p>
+      </div>
+      <div class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 opacity-0">
+        <h3 class="font-semibold text-lg mb-2">📤 Envía desde tu dominio</h3>
+        <p class="text-zinc-400 text-sm">SMTP incluido. Envía como ventas@tuempresa.com directamente.</p>
+      </div>
+      <div class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 opacity-0">
+        <h3 class="font-semibold text-lg mb-2">🎭 25 aliases</h3>
+        <p class="text-zinc-400 text-sm">ventas@, soporte@, info@, hola@... o catch-all (*) para recibir todo.</p>
+      </div>
+      <div class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 opacity-0">
+        <h3 class="font-semibold text-lg mb-2">⚡ Reglas inteligentes</h3>
+        <p class="text-zinc-400 text-sm">Filtra por remitente, asunto o destinatario. Reenvía, descarta o envía a webhook.</p>
+      </div>
+      <div class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 opacity-0">
+        <h3 class="font-semibold text-lg mb-2">📊 Logs de email</h3>
+        <p class="text-zinc-400 text-sm">Ve cada email que entra: quién envió, a dónde se reenvió, si falló.</p>
+      </div>
+      <div class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 opacity-0">
+        <h3 class="font-semibold text-lg mb-2">🔒 DKIM + SPF</h3>
+        <p class="text-zinc-400 text-sm">Tus emails no caen en spam. Verificación completa de autenticidad.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section id="pricing" class="max-w-4xl mx-auto px-4 py-16">
+    <h2 class="text-2xl font-bold text-center mb-4">Precios simples</h2>
+    <p class="text-center text-zinc-400 mb-12">Paga solo por lo que usas. Sin contratos ni sorpresas.</p>
+    <div class="grid md:grid-cols-3 gap-6">
+
+      <div class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 opacity-0">
+        <h3 class="font-semibold text-lg">1 dominio</h3>
+        <div class="mt-4">
+          <span class="text-4xl font-extrabold">$99</span>
+          <span class="text-zinc-400">/mes</span>
+        </div>
+        <ul class="mt-6 space-y-3 text-sm text-zinc-300">
+          <li>✓ 25 aliases</li>
+          <li>✓ SMTP (100 envíos/día)</li>
+          <li>✓ 10 reglas</li>
+          <li>✓ Logs 30 días</li>
+          <li>✓ DKIM + SPF</li>
+        </ul>
+        <a href="/register" class="mt-8 block text-center bg-mask-600 hover:bg-mask-700 text-white font-semibold py-3 rounded-lg transition-colors">
+          Empezar
+        </a>
+      </div>
+
+      <div class="pricing-card bg-zinc-900 border-2 border-mask-600 rounded-xl p-8 relative opacity-0">
+        <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-mask-600 text-white text-xs font-bold px-3 py-1 rounded-full">POPULAR</span>
+        <h3 class="font-semibold text-lg">3 dominios</h3>
+        <div class="mt-4">
+          <span class="text-4xl font-extrabold">$199</span>
+          <span class="text-zinc-400">/mes</span>
+        </div>
+        <p class="text-sm text-mask-400 mt-1">$66/dominio — ahorra 33%</p>
+        <ul class="mt-6 space-y-3 text-sm text-zinc-300">
+          <li>✓ Todo del plan individual</li>
+          <li>✓ 25 aliases por dominio</li>
+          <li>✓ SMTP por dominio</li>
+          <li>✓ 10 reglas por dominio</li>
+        </ul>
+        <a href="/register" class="mt-8 block text-center bg-mask-600 hover:bg-mask-700 text-white font-semibold py-3 rounded-lg transition-colors">
+          Empezar
+        </a>
+      </div>
+
+      <div class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 opacity-0">
+        <h3 class="font-semibold text-lg">10 dominios</h3>
+        <div class="mt-4">
+          <span class="text-4xl font-extrabold">$499</span>
+          <span class="text-zinc-400">/mes</span>
+        </div>
+        <p class="text-sm text-zinc-400 mt-1">$50/dominio — ahorra 50%</p>
+        <ul class="mt-6 space-y-3 text-sm text-zinc-300">
+          <li>✓ Todo del plan individual</li>
+          <li>✓ Ideal para agencias</li>
+          <li>✓ Un dominio por cliente</li>
+          <li>✓ Soporte prioritario</li>
+        </ul>
+        <a href="/register" class="mt-8 block text-center border border-zinc-700 hover:border-zinc-500 text-zinc-300 font-semibold py-3 rounded-lg transition-colors">
+          Empezar
+        </a>
+      </div>
+    </div>
+
+    <p class="text-center text-sm text-zinc-500 mt-8">
+      Todos los precios en MXN. Pago con MercadoPago. Anual: paga 10, llévate 12.
+    </p>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-zinc-800 py-8 mt-8">
+    <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-2 text-zinc-400 text-sm">
+        <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+          <ellipse cx="40" cy="40" rx="20" ry="18" fill="#ef4444"/>
+          <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b"/>
+          <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b"/>
+        </svg>
+        MailMask · easybits.cloud
+      </div>
+      <div class="text-zinc-500 text-sm">
+        <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
