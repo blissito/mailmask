@@ -296,7 +296,7 @@
           class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 opacity-0"
         >
           <h3 class="font-semibold text-lg mb-2">
-            🎭 Hasta 100 máscaras (alias) por dominio
+            🎭 Hasta 2000 máscaras (alias)
           </h3>
           <p class="text-zinc-400 text-sm">
             ventas@, soporte@, info@, hola@... o catch-all (*) para recibir
@@ -341,7 +341,10 @@
         <div
           class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 flex flex-col opacity-0"
         >
-          <span class="inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3">Primer mes gratis</span>
+          <span
+            class="inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3"
+            >Primer mes gratis</span
+          >
           <h3 class="font-semibold text-lg">Básico</h3>
           <p class="text-sm text-zinc-500 mt-1">1 dominio</p>
           <div class="mt-4">
@@ -366,7 +369,10 @@
             class="absolute -top-3 left-1/2 -translate-x-1/2 bg-mask-600 text-white text-xs font-bold px-3 py-1 rounded-full"
             >POPULAR</span
           >
-          <span class="inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3">Primer mes gratis</span>
+          <span
+            class="inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3"
+            >Primer mes gratis</span
+          >
           <h3 class="font-semibold text-lg">Pro</h3>
           <p class="text-sm text-mask-400 mt-1">5 dominios — $60/dominio</p>
           <div class="mt-4">
@@ -391,7 +397,10 @@
         <div
           class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 flex flex-col opacity-0"
         >
-          <span class="inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3">Primer mes gratis</span>
+          <span
+            class="inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3"
+            >Primer mes gratis</span
+          >
           <h3 class="font-semibold text-lg">Agencia</h3>
           <p class="text-sm text-zinc-400 mt-1">20 dominios — $50/dominio</p>
           <div class="mt-4">
@@ -424,6 +433,55 @@
       </p>
     </section>
 
+    <!-- FAQ -->
+    <section class="max-w-3xl mx-auto px-4 py-16">
+      <h2 class="text-2xl font-bold text-center mb-12">Preguntas frecuentes</h2>
+      <div class="space-y-6">
+        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
+          <summary class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center">
+            ¿Qué es una máscara de email?
+            <span class="text-zinc-500 group-open:rotate-45 transition-transform text-xl">+</span>
+          </summary>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">Una máscara (alias) es una dirección como ventas@tudominio.com que reenvía los emails a tu inbox personal (Gmail, Outlook, etc.). No necesitas crear cuentas de correo nuevas.</p>
+        </details>
+        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
+          <summary class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center">
+            ¿Necesito un servidor de correo?
+            <span class="text-zinc-500 group-open:rotate-45 transition-transform text-xl">+</span>
+          </summary>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">No. MailMask se encarga de todo. Solo necesitas configurar unos registros DNS en tu proveedor de dominio y listo. No hay servidores que mantener.</p>
+        </details>
+        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
+          <summary class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center">
+            ¿Puedo enviar emails desde mi dominio?
+            <span class="text-zinc-500 group-open:rotate-45 transition-transform text-xl">+</span>
+          </summary>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">Sí. Los planes Pro y Agencia incluyen envío autenticado con DKIM y SPF, para que tus emails no caigan en spam.</p>
+        </details>
+        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
+          <summary class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center">
+            ¿Qué pasa con mis emails si cancelo?
+            <span class="text-zinc-500 group-open:rotate-45 transition-transform text-xl">+</span>
+          </summary>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">Al cancelar, mantienes acceso hasta el fin del periodo pagado. Después, el reenvío se detiene pero no pierdes emails anteriores (ya están en tu inbox).</p>
+        </details>
+        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
+          <summary class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center">
+            ¿Es seguro? ¿Leen mis emails?
+            <span class="text-zinc-500 group-open:rotate-45 transition-transform text-xl">+</span>
+          </summary>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">No leemos ni almacenamos el contenido de tus emails. Se procesan en tiempo real y se reenvían inmediatamente. Usamos Amazon SES, la misma infraestructura que usan miles de empresas.</p>
+        </details>
+        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
+          <summary class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center">
+            ¿Cuánto tarda la configuración?
+            <span class="text-zinc-500 group-open:rotate-45 transition-transform text-xl">+</span>
+          </summary>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">Crear tu cuenta toma 1 minuto. Configurar los registros DNS depende de tu proveedor, pero generalmente toma entre 2 y 10 minutos. La propagación DNS puede tardar hasta 48 horas, aunque normalmente es mucho menos.</p>
+        </details>
+      </div>
+    </section>
+
     <!-- Footer -->
     <footer class="border-t border-zinc-800 py-8 mt-8">
       <div
@@ -437,10 +495,10 @@
           </svg>
           MailMask · easybits.cloud
         </div>
-        <div class="text-zinc-500 text-sm">
-          <a href="/login" class="hover:text-zinc-300 transition-colors"
-            >Iniciar sesión</a
-          >
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
         </div>
       </div>
     </footer>

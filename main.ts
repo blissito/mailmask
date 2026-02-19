@@ -55,8 +55,8 @@ function getIp(request: Request): string {
     request.headers.get("cf-connecting-ip") ?? "unknown";
 }
 
-function rateLimitGuard(ip: string, limit: number, windowMs: number): Response | null {
-  const result = checkRateLimit(ip, limit, windowMs);
+async function rateLimitGuard(ip: string, limit: number, windowMs: number): Promise<Response | null> {
+  const result = await checkRateLimit(ip, limit, windowMs);
   if (!result.allowed) {
     const retryAfter = Math.ceil((result.resetAt - Date.now()) / 1000);
     return new Response(JSON.stringify({ error: "Demasiadas solicitudes" }), {
@@ -68,6 +68,61 @@ function rateLimitGuard(ip: string, limit: number, windowMs: number): Response |
     });
   }
   return null;
+}
+
+// --- SNS signature verification ---
+
+const snscertCache = new Map<string, string>();
+
+async function fetchSnsCert(url: string): Promise<string> {
+  const cached = snscertCache.get(url);
+  if (cached) return cached;
+
+  const parsed = new URL(url);
+  if (!parsed.hostname.endsWith(".amazonaws.com") || parsed.protocol !== "https:") {
+    throw new Error("Invalid SNS certificate URL");
+  }
+
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  if (!res.ok) throw new Error(`Failed to fetch SNS cert: ${res.status}`);
+  const pem = await res.text();
+  snscertCache.set(url, pem);
+  return pem;
+}
+
+function buildSnsStringToSign(body: Record<string, string>): string {
+  const type = body.Type;
+  let fields: string[];
+  if (type === "Notification") {
+    fields = ["Message", "MessageId"];
+    if (body.Subject) fields.push("Subject");
+    fields.push("Timestamp", "TopicArn", "Type");
+  } else {
+    // SubscriptionConfirmation / UnsubscribeConfirmation
+    fields = ["Message", "MessageId", "SubscribeURL", "Timestamp", "TopicArn", "Type"];
+  }
+  return fields.map(f => `${f}\n${body[f]}`).join("\n") + "\n";
+}
+
+async function verifySnsSignature(body: Record<string, string>): Promise<boolean> {
+  const expectedTopicArn = Deno.env.get("SNS_TOPIC_ARN");
+  if (expectedTopicArn && body.TopicArn !== expectedTopicArn) return false;
+
+  const certUrl = body.SigningCertURL;
+  if (!certUrl) return false;
+
+  try {
+    const pem = await fetchSnsCert(certUrl);
+    const stringToSign = buildSnsStringToSign(body);
+
+    const { createVerify } = await import("node:crypto");
+    const verifier = createVerify("SHA1");
+    verifier.update(stringToSign);
+    return verifier.verify(pem, body.Signature, "base64");
+  } catch (err) {
+    console.error("SNS signature verification failed:", err);
+    return false;
+  }
 }
 
 const GRACE_PERIOD_MS = 15 * 24 * 60 * 60 * 1000; // 15 days
@@ -121,12 +176,14 @@ const app = new Elysia()
   .get("/app", () => serveStatic("/app.html"))
   .get("/js/*", ({ params }) => serveStatic(`/js/${params["*"]}`))
   .get("/favicon.svg", () => serveStatic("/favicon.svg"))
+  .get("/terms", () => serveStatic("/terms.html"))
+  .get("/privacy", () => serveStatic("/privacy.html"))
 
   // --- Auth ---
 
   .post("/api/auth/register", async ({ request }) => {
     const ip = getIp(request);
-    const limited = rateLimitGuard(ip, 5, 60_000);
+    const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
 
     const { email, password } = await request.json();
@@ -162,7 +219,7 @@ const app = new Elysia()
 
   .post("/api/auth/login", async ({ request }) => {
     const ip = getIp(request);
-    const limited = rateLimitGuard(ip, 10, 60_000);
+    const limited = await rateLimitGuard(ip, 10, 60_000);
     if (limited) return limited;
 
     const { email, password } = await request.json();
@@ -244,7 +301,7 @@ const app = new Elysia()
     const user = (await getUser(auth.email))!;
 
     const ip = getIp(request);
-    const limited = rateLimitGuard(ip, 10, 60_000);
+    const limited = await rateLimitGuard(ip, 10, 60_000);
     if (limited) return limited;
 
     // Check email verification grace period
@@ -760,6 +817,23 @@ const app = new Elysia()
 
   .post("/api/webhooks/ses-inbound", async ({ request }) => {
     const body = await request.json();
+
+    // Validate SNS signature
+    if (!body.Type || !body.Signature || !body.SigningCertURL) {
+      return new Response(JSON.stringify({ error: "Invalid SNS message" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    const valid = await verifySnsSignature(body);
+    if (!valid) {
+      console.warn("SES inbound: invalid SNS signature");
+      return new Response(JSON.stringify({ error: "Invalid signature" }), {
+        status: 403,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
     try {
       const result = await processInbound(body);
       return new Response(JSON.stringify(result), {

@@ -10,7 +10,8 @@
 - **Forwarding inteligente** — reenvio transparente via SES, conserva headers originales
 - **Descarta spam** — reglas para descartar emails no deseados antes de que lleguen
 - **Webhooks** — notifica a tu app cuando llega un email que matchea una regla
-- **Rate limiting** — proteccion contra abuso integrada
+- **Rate limiting persistente** — proteccion contra abuso con Deno KV (persiste entre deploys)
+- **SNS signature validation** — webhook SES autenticado criptograficamente
 - **100% en español** — UI y mensajes pensados para LATAM
 
 ## Stack
@@ -49,6 +50,8 @@ deno task test
 | `POST` | `/api/domains/:id/aliases` | Crear alias |
 | `POST` | `/api/domains/:id/rules` | Crear regla |
 | `GET`  | `/api/domains/:id/logs` | Ver logs de emails |
+| `GET`  | `/terms` | Términos de servicio |
+| `GET`  | `/privacy` | Política de privacidad |
 
 ## Infra
 

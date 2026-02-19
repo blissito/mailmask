@@ -1,51 +1,29 @@
-// --- In-memory sliding window rate limiter ---
+// --- Persistent rate limiter using Deno KV ---
 
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
+const kv = await Deno.openKv();
 
-const buckets = new Map<string, RateLimitEntry>();
-
-let cleanupTimer: ReturnType<typeof setInterval> | null = null;
-
-function startCleanup() {
-  if (cleanupTimer) return;
-  cleanupTimer = setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of buckets) {
-      if (entry.resetAt <= now) buckets.delete(key);
-    }
-  }, 60_000);
-  if (typeof (cleanupTimer as any).unref === "function") {
-    (cleanupTimer as any).unref();
-  }
-}
-
-startCleanup();
-
-export function checkRateLimit(
+export async function checkRateLimit(
   ip: string,
   limit: number,
   windowMs: number,
-): { allowed: boolean; remaining: number; resetAt: number } {
+): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
   const now = Date.now();
-  const key = `${ip}:${limit}:${windowMs}`;
-  const entry = buckets.get(key);
+  const key = ["rate", `${ip}:${limit}:${windowMs}`];
+  const entry = await kv.get<{ count: number; windowStart: number }>(key);
 
-  if (!entry || entry.resetAt <= now) {
-    buckets.set(key, { count: 1, resetAt: now + windowMs });
+  if (!entry.value || entry.value.windowStart + windowMs <= now) {
+    await kv.set(key, { count: 1, windowStart: now }, { expireIn: windowMs });
     return { allowed: true, remaining: limit - 1, resetAt: now + windowMs };
   }
 
-  entry.count++;
-  if (entry.count > limit) {
-    return { allowed: false, remaining: 0, resetAt: entry.resetAt };
+  const newCount = entry.value.count + 1;
+  const resetAt = entry.value.windowStart + windowMs;
+
+  await kv.set(key, { count: newCount, windowStart: entry.value.windowStart }, { expireIn: resetAt - now });
+
+  if (newCount > limit) {
+    return { allowed: false, remaining: 0, resetAt };
   }
 
-  return { allowed: true, remaining: limit - entry.count, resetAt: entry.resetAt };
-}
-
-export function _clearAll() {
-  buckets.clear();
+  return { allowed: true, remaining: limit - newCount, resetAt };
 }
