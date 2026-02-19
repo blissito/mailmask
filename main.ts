@@ -189,6 +189,7 @@ const app = new Elysia()
   .get("/favicon.svg", () => serveStatic("/favicon.svg"))
   .get("/landing", () => serveStatic("/landing.html"))
   .get("/set-password", () => serveStatic("/set-password.html"))
+  .get("/forgot-password", () => serveStatic("/forgot-password.html"))
   .get("/terms", () => serveStatic("/terms.html"))
   .get("/privacy", () => serveStatic("/privacy.html"))
   .get("/robots.txt", () => serveStatic("/robots.txt"))
@@ -295,6 +296,37 @@ const app = new Elysia()
     return new Response(null, {
       status: 302,
       headers: { "location": "/app?verified=true" },
+    });
+  })
+
+  .post("/api/auth/forgot-password", async ({ request }) => {
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 3, 60_000);
+    if (limited) return limited;
+
+    const { email } = await request.json();
+    if (!email) return new Response(JSON.stringify({ error: "Email requerido" }), { status: 400 });
+
+    const user = await getUser(email);
+    if (user) {
+      const token = crypto.randomUUID();
+      await setPasswordToken(email, token);
+      const resetUrl = `${getMainDomainUrl()}/set-password?token=${token}`;
+      const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+      try {
+        await sendFromDomain(
+          alertFrom,
+          email,
+          "Restablecer contraseña — MailMask",
+          `Hola,\n\nRecibimos una solicitud para restablecer tu contraseña.\n\nHaz clic en este enlace para crear una nueva contraseña:\n${resetUrl}\n\nEste enlace es válido por 7 días.\n\nSi no solicitaste esto, puedes ignorar este email.\n\n— MailMask`,
+        );
+      } catch (err) {
+        console.error("Failed to send password reset email:", err);
+      }
+    }
+
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "content-type": "application/json" },
     });
   })
 
