@@ -1,14 +1,28 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-MX">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MailMask — Email profesional en tu dominio. $99/mes.</title>
+    <title>MailMask — Email profesional en tu dominio. $99 MXN/mes.</title>
     <meta
       name="description"
       content="Recibe y envía email desde tu dominio por $99 MXN/mes. Sin servidores, sin Google Workspace. Configura en 2 minutos."
     />
+    <link rel="canonical" href="https://mailmask.easybits.cloud/" />
+    <link rel="alternate" hreflang="es-MX" href="https://mailmask.easybits.cloud/" />
+    <link rel="alternate" hreflang="x-default" href="https://mailmask.easybits.cloud/" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="MailMask — Email profesional en tu dominio" />
+    <meta property="og:description" content="Recibe y envía email desde tu dominio por $99 MXN/mes. Sin servidores, sin Google Workspace. Configura en 2 minutos." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mailmask.easybits.cloud/" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="MailMask — Email profesional en tu dominio" />
+    <meta name="twitter:description" content="Recibe y envía email desde tu dominio por $99 MXN/mes. Sin servidores, sin Google Workspace." />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -75,6 +89,44 @@
         );
       });
     </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Qué es una máscara de email?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Una máscara (alias) es una dirección como ventas@tudominio.com que reenvía los emails a tu inbox personal (Gmail, Outlook, etc.). No necesitas crear cuentas de correo nuevas." }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Necesito un servidor de correo?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. MailMask se encarga de todo. Solo necesitas configurar unos registros DNS en tu proveedor de dominio y listo. No hay servidores que mantener." }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Puedo enviar emails desde mi dominio?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Sí. Los planes Pro y Agencia incluyen envío autenticado con DKIM y SPF, para que tus emails no caigan en spam." }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué pasa con mis emails si cancelo?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Al cancelar, mantienes acceso hasta el fin del periodo pagado. Después, el reenvío se detiene pero no pierdes emails anteriores (ya están en tu inbox)." }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Es seguro? ¿Leen mis emails?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No leemos ni almacenamos el contenido de tus emails. Se procesan en tiempo real y se reenvían inmediatamente. Usamos Amazon SES, la misma infraestructura que usan miles de empresas." }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cuánto tarda la configuración?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Crear tu cuenta toma 1 minuto. Configurar los registros DNS depende de tu proveedor, pero generalmente toma entre 2 y 10 minutos. La propagación DNS puede tardar hasta 48 horas, aunque normalmente es mucho menos." }
+        }
+      ]
+    }
+    </script>
   </head>
   <body class="bg-zinc-950 text-zinc-100 antialiased">
     <!-- Hero -->
@@ -83,7 +135,7 @@
     >
       <!-- Mascarita icon -->
       <div class="mb-6">
-        <svg class="w-20 h-20 mx-auto" viewBox="0 0 80 80" fill="none">
+        <svg class="w-20 h-20 mx-auto" viewBox="0 0 80 80" fill="none" aria-label="MailMask"><title>MailMask</title>
           <ellipse cx="40" cy="42" rx="28" ry="24" fill="#dc2626" />
           <ellipse cx="40" cy="38" rx="28" ry="22" fill="#ef4444" />
           <!-- Eye holes -->
@@ -135,7 +187,7 @@
         class="hero-title text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight opacity-0"
       >
         Email profesional.<br />
-        <span class="text-mask-500">$99/mes.</span>
+        <span class="text-mask-500">$99 MXN/mes.</span>
       </h1>
 
       <p
@@ -278,7 +330,7 @@
     <!-- Features -->
     <section class="max-w-4xl mx-auto px-4 py-16">
       <h2 class="text-2xl font-bold text-center mb-12">
-        Todo incluido desde $99/mes
+        Todo incluido desde $99 MXN/mes
       </h2>
       <div class="grid sm:grid-cols-2 gap-6">
         <div

@@ -49,6 +49,8 @@ async function serveStatic(path: string): Promise<Response> {
       png: "image/png",
       svg: "image/svg+xml",
       ico: "image/x-icon",
+      xml: "application/xml; charset=utf-8",
+      txt: "text/plain; charset=utf-8",
     };
     return new Response(file, {
       headers: { "content-type": types[ext] ?? "application/octet-stream" },
@@ -189,6 +191,8 @@ const app = new Elysia()
   .get("/set-password", () => serveStatic("/set-password.html"))
   .get("/terms", () => serveStatic("/terms.html"))
   .get("/privacy", () => serveStatic("/privacy.html"))
+  .get("/robots.txt", () => serveStatic("/robots.txt"))
+  .get("/sitemap.xml", () => serveStatic("/sitemap.xml"))
 
   // --- Auth ---
 
