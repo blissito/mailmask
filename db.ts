@@ -309,6 +309,44 @@ export function getUserPlanLimits(user: User): { domains: number; aliases: numbe
   return { domains: 0, aliases: 0, rules: 0, logDays: 0 };
 }
 
+// --- Pending checkout (guest flow) ---
+
+export async function createPendingCheckout(token: string, plan: string): Promise<void> {
+  await kv.set(["pending-checkout", token], plan, { expireIn: 60 * 60 * 1000 }); // 1h TTL
+}
+
+export async function getPendingCheckout(token: string): Promise<string | null> {
+  const entry = await kv.get<string>(["pending-checkout", token]);
+  return entry.value;
+}
+
+export async function deletePendingCheckout(token: string): Promise<void> {
+  await kv.delete(["pending-checkout", token]);
+}
+
+// --- Password token (set-password flow) ---
+
+export async function setPasswordToken(email: string, token: string): Promise<void> {
+  await kv.set(["password-token", token], email, { expireIn: 7 * 24 * 60 * 60 * 1000 }); // 7d TTL
+}
+
+export async function getEmailByPasswordToken(token: string): Promise<string | null> {
+  const entry = await kv.get<string>(["password-token", token]);
+  return entry.value;
+}
+
+export async function deletePasswordToken(token: string): Promise<void> {
+  await kv.delete(["password-token", token]);
+}
+
+// --- Update user password ---
+
+export async function updateUserPassword(email: string, passwordHash: string): Promise<void> {
+  const user = await getUser(email);
+  if (!user) return;
+  await kv.set(["users", email], { ...user, passwordHash });
+}
+
 // --- Test helpers ---
 
 export function _getKv() {

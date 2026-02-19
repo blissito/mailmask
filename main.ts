@@ -5,6 +5,9 @@ import {
   listAliases, updateAlias, deleteAlias, countAliases, createRule,
   listRules, deleteRule, listLogs, PLANS, updateUserSubscription,
   getUserPlanLimits, setVerifyToken, getUserByVerifyToken, verifyUserEmail,
+  createPendingCheckout, getPendingCheckout, deletePendingCheckout,
+  setPasswordToken, getEmailByPasswordToken, deletePasswordToken,
+  updateUserPassword,
 } from "./db.ts";
 import {
   hashPassword, verifyPassword, signJwt, makeAuthCookie,
@@ -182,6 +185,8 @@ const app = new Elysia()
   .get("/app", () => serveStatic("/app.html"))
   .get("/js/*", ({ params }) => serveStatic(`/js/${params["*"]}`))
   .get("/favicon.svg", () => serveStatic("/favicon.svg"))
+  .get("/landing", () => serveStatic("/landing.html"))
+  .get("/set-password", () => serveStatic("/set-password.html"))
   .get("/terms", () => serveStatic("/terms.html"))
   .get("/privacy", () => serveStatic("/privacy.html"))
 
@@ -286,6 +291,32 @@ const app = new Elysia()
     return new Response(null, {
       status: 302,
       headers: { "location": "/app?verified=true" },
+    });
+  })
+
+  .post("/api/auth/set-password", async ({ request }) => {
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 5, 60_000);
+    if (limited) return limited;
+
+    const { token, password } = await request.json();
+    if (!token || !password) return new Response(JSON.stringify({ error: "Token y contraseña requeridos" }), { status: 400 });
+    if (password.length < 8) return new Response(JSON.stringify({ error: "Contraseña mínimo 8 caracteres" }), { status: 400 });
+
+    const email = await getEmailByPasswordToken(token);
+    if (!email) return new Response(JSON.stringify({ error: "Token inválido o expirado" }), { status: 400 });
+
+    const hash = await hashPassword(password);
+    await updateUserPassword(email, hash);
+    await verifyUserEmail(email);
+    await deletePasswordToken(token);
+
+    const jwt = await signJwt({ email });
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: {
+        "content-type": "application/json",
+        "set-cookie": makeAuthCookie(jwt),
+      },
     });
   })
 
@@ -632,6 +663,53 @@ const app = new Elysia()
 
   // --- Billing ---
 
+  .post("/api/billing/guest-checkout", async ({ request }) => {
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 5, 60_000);
+    if (limited) return limited;
+
+    const { plan = "basico" } = await request.json().catch(() => ({ plan: "basico" }));
+    const planKey = plan as keyof typeof PLANS;
+    if (!PLANS[planKey]) {
+      return new Response(JSON.stringify({ error: "Plan inválido" }), { status: 400 });
+    }
+
+    const token = crypto.randomUUID();
+    await createPendingCheckout(token, planKey);
+
+    const { PreApproval } = await import("mercadopago");
+    const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
+    if (!mpAccessToken) {
+      return new Response(JSON.stringify({ error: "MercadoPago no configurado" }), { status: 500 });
+    }
+
+    const preApproval = new PreApproval({ accessToken: mpAccessToken });
+    const backUrl = getMainDomainUrl() + "/landing?success=1";
+
+    // deno-lint-ignore no-explicit-any
+    const body: any = {
+      reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)}`,
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: "months",
+        transaction_amount: PLANS[planKey].price / 100,
+        currency_id: "MXN",
+        free_trial: {
+          frequency: 1,
+          frequency_type: "months",
+        },
+      },
+      payer_email: "guest@mailmask.app",
+      back_url: backUrl,
+      external_reference: token,
+    };
+    const result = await preApproval.create({ body });
+
+    return new Response(JSON.stringify({ init_point: result.init_point }), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
   .post("/api/billing/checkout", async ({ request }) => {
     const user = await getAuthUser(request);
     if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
@@ -724,16 +802,47 @@ const app = new Elysia()
         });
         const sub = await subRes.json();
 
-        const email = sub.external_reference ?? sub.payer_email;
+        const externalRef = sub.external_reference ?? "";
+        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const isGuestCheckout = UUID_RE.test(externalRef);
+
+        // Resolve email: for guest checkout use payer_email from MP, otherwise external_reference is the email
+        let email = isGuestCheckout ? sub.payer_email : externalRef;
+        if (!email) email = sub.payer_email;
+
         if (email) {
           if (sub.status === "authorized") {
-            // Determine plan from exact amount (MXN pesos)
-            const amount = sub.auto_recurring?.transaction_amount ?? 0;
-            const amountToPlan: Record<number, "basico" | "pro" | "agencia"> = { 99: "basico", 299: "pro", 999: "agencia" };
-            const plan = amountToPlan[amount];
+            // Determine plan: from pending checkout or from amount
+            let plan: "basico" | "pro" | "agencia" | undefined;
+
+            if (isGuestCheckout) {
+              const pendingPlan = await getPendingCheckout(externalRef);
+              if (pendingPlan && pendingPlan in PLANS) {
+                plan = pendingPlan as "basico" | "pro" | "agencia";
+              }
+              await deletePendingCheckout(externalRef);
+            }
+
             if (!plan) {
-              console.warn(`MP webhook: unexpected amount ${amount}, not activating`);
+              const amount = sub.auto_recurring?.transaction_amount ?? 0;
+              const amountToPlan: Record<number, "basico" | "pro" | "agencia"> = { 99: "basico", 299: "pro", 999: "agencia" };
+              plan = amountToPlan[amount];
+            }
+
+            if (!plan) {
+              console.warn(`MP webhook: could not determine plan, not activating`);
               return new Response("OK", { status: 200 });
+            }
+
+            // Guest checkout: create user if not exists
+            if (isGuestCheckout) {
+              const existing = await getUser(email);
+              if (!existing) {
+                const randomPass = crypto.randomUUID();
+                const hash = await hashPassword(randomPass);
+                await createUser(email, hash);
+                console.log(`Guest user created: ${email}`);
+              }
             }
 
             const periodEnd = new Date();
@@ -746,6 +855,25 @@ const app = new Elysia()
               currentPeriodEnd: periodEnd.toISOString(),
             });
             console.log(`Subscription activated: ${email} -> ${plan}`);
+
+            // Guest checkout: send welcome email with password-setup link
+            if (isGuestCheckout) {
+              const pwToken = crypto.randomUUID();
+              await setPasswordToken(email, pwToken);
+              const setPasswordUrl = `${getMainDomainUrl()}/set-password?token=${pwToken}`;
+              const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+              try {
+                await sendFromDomain(
+                  alertFrom,
+                  email,
+                  "¡Bienvenido a MailMask! Configura tu contraseña",
+                  `¡Hola!\n\nTu suscripción al plan ${plan.charAt(0).toUpperCase() + plan.slice(1)} está activa.\n\nConfigura tu contraseña para acceder a tu cuenta:\n${setPasswordUrl}\n\nEste enlace es válido por 7 días.\n\n— MailMask`,
+                );
+                console.log(`Welcome email sent to ${email}`);
+              } catch (err) {
+                console.error("Failed to send welcome email:", err);
+              }
+            }
           } else if (sub.status === "cancelled") {
             const existingUser = await getUser(email);
             const currentSub = existingUser?.subscription;
