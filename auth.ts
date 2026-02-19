@@ -1,7 +1,7 @@
 import { getUser } from "./db.ts";
 
 const encoder = new TextEncoder();
-const JWT_SECRET = Deno.env.get("JWT_SECRET") ?? "dev-secret-change-in-prod";
+const JWT_SECRET = Deno.env.get("JWT_SECRET") ?? (() => { throw new Error("JWT_SECRET required"); })();
 const JWT_EXPIRY = 3600; // 1 hour
 
 // --- Password hashing (PBKDF2 via Web Crypto) ---

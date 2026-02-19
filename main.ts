@@ -14,6 +14,12 @@ import { checkRateLimit } from "./rate-limit.ts";
 import { verifyDomain, checkDomainStatus, createReceiptRule, deleteReceiptRule, sendFromDomain } from "./ses.ts";
 import { processInbound } from "./forwarding.ts";
 
+// --- Fail-fast env validation ---
+const REQUIRED_ENV = ["JWT_SECRET", "MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"];
+for (const key of REQUIRED_ENV) {
+  if (!Deno.env.get(key)) throw new Error(`Missing required env var: ${key}`);
+}
+
 // --- Helpers ---
 
 function getMainDomainUrl(): string {
@@ -98,6 +104,9 @@ const app = new Elysia()
   .onAfterHandle(({ response }) => {
     if (response instanceof Response) {
       response.headers.set("access-control-allow-origin", "*");
+      response.headers.set("x-frame-options", "DENY");
+      response.headers.set("x-content-type-options", "nosniff");
+      response.headers.set("referrer-policy", "strict-origin-when-cross-origin");
     }
     return response;
   })
@@ -258,7 +267,7 @@ const app = new Elysia()
     }
 
     // Validate domain format
-    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$/;
+    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
     if (!domainRegex.test(domain)) {
       return new Response(JSON.stringify({ error: "Formato de dominio inválido" }), { status: 400 });
     }
@@ -411,7 +420,7 @@ const app = new Elysia()
     }
 
     // Validate destination emails
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     const invalid = destinations.filter((d: string) => !emailRegex.test(d));
     if (invalid.length) {
       return new Response(JSON.stringify({ error: `Email(s) de destino inválido(s): ${invalid.join(", ")}` }), { status: 400 });
@@ -606,33 +615,35 @@ const app = new Elysia()
   .post("/api/webhooks/mercadopago", async ({ request }) => {
     // Validate HMAC signature
     const secret = Deno.env.get("MP_WEBHOOK_SECRET");
-    if (secret) {
-      const xSignature = request.headers.get("x-signature") ?? "";
-      const xRequestId = request.headers.get("x-request-id") ?? "";
-      const url = new URL(request.url);
-      const dataId = url.searchParams.get("data.id") ?? "";
+    if (!secret) {
+      console.error("MP_WEBHOOK_SECRET not configured");
+      return new Response("Server misconfigured", { status: 500 });
+    }
+    const xSignature = request.headers.get("x-signature") ?? "";
+    const xRequestId = request.headers.get("x-request-id") ?? "";
+    const url = new URL(request.url);
+    const dataId = url.searchParams.get("data.id") ?? "";
 
-      // Parse ts and v1 from x-signature
-      const parts = Object.fromEntries(
-        xSignature.split(",").map(p => {
-          const [k, ...v] = p.trim().split("=");
-          return [k, v.join("=")];
-        })
-      );
-      const ts = parts["ts"] ?? "";
-      const v1 = parts["v1"] ?? "";
+    // Parse ts and v1 from x-signature
+    const parts = Object.fromEntries(
+      xSignature.split(",").map(p => {
+        const [k, ...v] = p.trim().split("=");
+        return [k, v.join("=")];
+      })
+    );
+    const ts = parts["ts"] ?? "";
+    const v1 = parts["v1"] ?? "";
 
-      const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
-      const key = await crypto.subtle.importKey(
-        "raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-      );
-      const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
-      const computed = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+    const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+    const key = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+    );
+    const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
+    const computed = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
 
-      if (computed !== v1) {
-        console.warn("MP webhook: invalid signature");
-        return new Response("Unauthorized", { status: 401 });
-      }
+    if (computed !== v1) {
+      console.warn("MP webhook: invalid signature");
+      return new Response("Unauthorized", { status: 401 });
     }
 
     const body = await request.json();
@@ -646,6 +657,7 @@ const app = new Elysia()
 
         const subRes = await fetch(`https://api.mercadopago.com/preapproval/${body.data.id}`, {
           headers: { "Authorization": `Bearer ${mpAccessToken}` },
+          signal: AbortSignal.timeout(10_000),
         });
         const sub = await subRes.json();
 
@@ -718,6 +730,7 @@ const app = new Elysia()
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ status: "cancelled" }),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!res.ok) {
@@ -747,10 +760,18 @@ const app = new Elysia()
 
   .post("/api/webhooks/ses-inbound", async ({ request }) => {
     const body = await request.json();
-    const result = await processInbound(body);
-    return new Response(JSON.stringify(result), {
-      headers: { "content-type": "application/json" },
-    });
+    try {
+      const result = await processInbound(body);
+      return new Response(JSON.stringify(result), {
+        headers: { "content-type": "application/json" },
+      });
+    } catch (err) {
+      console.error("SES inbound error:", err);
+      return new Response(JSON.stringify({ error: "Processing failed" }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      });
+    }
   })
 
 const port = parseInt(Deno.env.get("PORT") ?? "8000");

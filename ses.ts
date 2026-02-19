@@ -5,7 +5,7 @@ const ses = new SESClient({ region: Deno.env.get("AWS_REGION") ?? "us-east-1" })
 const s3 = new S3Client({ region: Deno.env.get("AWS_REGION") ?? "us-east-1" });
 
 const SNS_TOPIC_ARN = Deno.env.get("SNS_TOPIC_ARN") ?? "";
-const RECEIPT_RULE_SET = Deno.env.get("SES_RULE_SET") ?? "formmy-email-forwarding";
+const RECEIPT_RULE_SET = Deno.env.get("SES_RULE_SET") ?? "mailmask-email-forwarding";
 const S3_BUCKET = Deno.env.get("S3_BUCKET") ?? "mailmask-inbound";
 
 // --- Domain verification ---
