@@ -1,27 +1,66 @@
 import { Elysia } from "elysia";
 import {
-  getUser, createUser, createDomain, getDomain, listUserDomains,
-  updateDomain, deleteDomain, countUserDomains, createAlias, getAlias,
-  listAliases, updateAlias, deleteAlias, countAliases, createRule,
-  listRules, deleteRule, listLogs, PLANS, updateUserSubscription,
-  getUserPlanLimits, setVerifyToken, getUserByVerifyToken, verifyUserEmail,
-  createPendingCheckout, getPendingCheckout, deletePendingCheckout,
-  setPasswordToken, getEmailByPasswordToken, deletePasswordToken,
+  getUser,
+  createUser,
+  createDomain,
+  getDomain,
+  listUserDomains,
+  updateDomain,
+  deleteDomain,
+  countUserDomains,
+  createAlias,
+  getAlias,
+  listAliases,
+  updateAlias,
+  deleteAlias,
+  countAliases,
+  createRule,
+  listRules,
+  deleteRule,
+  listLogs,
+  PLANS,
+  updateUserSubscription,
+  getUserPlanLimits,
+  setVerifyToken,
+  getUserByVerifyToken,
+  verifyUserEmail,
+  createPendingCheckout,
+  getPendingCheckout,
+  deletePendingCheckout,
+  setPasswordToken,
+  getEmailByPasswordToken,
+  deletePasswordToken,
   updateUserPassword,
 } from "./db.ts";
 import {
-  hashPassword, verifyPassword, signJwt, makeAuthCookie,
-  clearAuthCookie, getAuthUser,
+  hashPassword,
+  verifyPassword,
+  signJwt,
+  makeAuthCookie,
+  clearAuthCookie,
+  getAuthUser,
 } from "./auth.ts";
 import { checkRateLimit } from "./rate-limit.ts";
-import { verifyDomain, checkDomainStatus, createReceiptRule, deleteReceiptRule, sendFromDomain } from "./ses.ts";
+import {
+  verifyDomain,
+  checkDomainStatus,
+  createReceiptRule,
+  deleteReceiptRule,
+  sendFromDomain,
+} from "./ses.ts";
 import { processInbound } from "./forwarding.ts";
 
 // --- Fail-fast env validation (deferred for Deno Deploy compatibility) ---
 let envChecked = false;
 function ensureEnv() {
   if (envChecked) return;
-  const REQUIRED_ENV = ["JWT_SECRET", "MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"];
+  const REQUIRED_ENV = [
+    "JWT_SECRET",
+    "MP_ACCESS_TOKEN",
+    "MP_WEBHOOK_SECRET",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+  ];
   for (const key of REQUIRED_ENV) {
     if (!Deno.env.get(key)) throw new Error(`Missing required env var: ${key}`);
   }
@@ -61,11 +100,18 @@ async function serveStatic(path: string): Promise<Response> {
 }
 
 function getIp(request: Request): string {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    request.headers.get("cf-connecting-ip") ?? "unknown";
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("cf-connecting-ip") ??
+    "unknown"
+  );
 }
 
-async function rateLimitGuard(ip: string, limit: number, windowMs: number): Promise<Response | null> {
+async function rateLimitGuard(
+  ip: string,
+  limit: number,
+  windowMs: number,
+): Promise<Response | null> {
   const result = await checkRateLimit(ip, limit, windowMs);
   if (!result.allowed) {
     const retryAfter = Math.ceil((result.resetAt - Date.now()) / 1000);
@@ -89,7 +135,10 @@ async function fetchSnsCert(url: string): Promise<string> {
   if (cached) return cached;
 
   const parsed = new URL(url);
-  if (!parsed.hostname.endsWith(".amazonaws.com") || parsed.protocol !== "https:") {
+  if (
+    !parsed.hostname.endsWith(".amazonaws.com") ||
+    parsed.protocol !== "https:"
+  ) {
     throw new Error("Invalid SNS certificate URL");
   }
 
@@ -109,12 +158,21 @@ function buildSnsStringToSign(body: Record<string, string>): string {
     fields.push("Timestamp", "TopicArn", "Type");
   } else {
     // SubscriptionConfirmation / UnsubscribeConfirmation
-    fields = ["Message", "MessageId", "SubscribeURL", "Timestamp", "TopicArn", "Type"];
+    fields = [
+      "Message",
+      "MessageId",
+      "SubscribeURL",
+      "Timestamp",
+      "TopicArn",
+      "Type",
+    ];
   }
-  return fields.map(f => `${f}\n${body[f]}`).join("\n") + "\n";
+  return fields.map((f) => `${f}\n${body[f]}`).join("\n") + "\n";
 }
 
-async function verifySnsSignature(body: Record<string, string>): Promise<boolean> {
+async function verifySnsSignature(
+  body: Record<string, string>,
+): Promise<boolean> {
   const expectedTopicArn = Deno.env.get("SNS_TOPIC_ARN");
   if (expectedTopicArn && body.TopicArn !== expectedTopicArn) return false;
 
@@ -143,10 +201,13 @@ async function checkEmailVerified(email: string): Promise<Response | null> {
   if (user.emailVerified) return null;
   const createdAt = new Date(user.createdAt).getTime();
   if (Date.now() - createdAt < GRACE_PERIOD_MS) return null;
-  return new Response(JSON.stringify({ error: "Verifica tu email para continuar" }), {
-    status: 403,
-    headers: { "content-type": "application/json" },
-  });
+  return new Response(
+    JSON.stringify({ error: "Verifica tu email para continuar" }),
+    {
+      status: 403,
+      headers: { "content-type": "application/json" },
+    },
+  );
 }
 
 // --- App ---
@@ -172,13 +233,20 @@ const app = new Elysia()
       response.headers.set("access-control-allow-origin", "*");
       response.headers.set("x-frame-options", "DENY");
       response.headers.set("x-content-type-options", "nosniff");
-      response.headers.set("referrer-policy", "strict-origin-when-cross-origin");
+      response.headers.set(
+        "referrer-policy",
+        "strict-origin-when-cross-origin",
+      );
     }
     return response;
   })
 
   // --- Health ---
-  .get("/health", () => ({ status: "ok", service: "mailmask", timestamp: new Date().toISOString() }))
+  .get("/health", () => ({
+    status: "ok",
+    service: "mailmask",
+    timestamp: new Date().toISOString(),
+  }))
 
   // --- Static pages ---
   .get("/", () => serveStatic("/landing.html"))
@@ -203,11 +271,23 @@ const app = new Elysia()
     if (limited) return limited;
 
     const { email, password } = await request.json();
-    if (!email || !password) return new Response(JSON.stringify({ error: "Email y contraseña requeridos" }), { status: 400 });
-    if (password.length < 8) return new Response(JSON.stringify({ error: "Contraseña mínimo 8 caracteres" }), { status: 400 });
+    if (!email || !password)
+      return new Response(
+        JSON.stringify({ error: "Email y contraseña requeridos" }),
+        { status: 400 },
+      );
+    if (password.length < 8)
+      return new Response(
+        JSON.stringify({ error: "Contraseña mínimo 8 caracteres" }),
+        { status: 400 },
+      );
 
     const existing = await getUser(email);
-    if (existing) return new Response(JSON.stringify({ error: "Este email ya está registrado" }), { status: 409 });
+    if (existing)
+      return new Response(
+        JSON.stringify({ error: "Este email ya está registrado" }),
+        { status: 409 },
+      );
 
     const hash = await hashPassword(password);
     await createUser(email, hash);
@@ -216,9 +296,15 @@ const app = new Elysia()
     const verifyToken = crypto.randomUUID();
     await setVerifyToken(email, verifyToken);
     const verifyUrl = `${getMainDomainUrl()}/api/auth/verify-email?token=${verifyToken}`;
-    const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+    const alertFrom =
+      Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
     try {
-      await sendFromDomain(alertFrom, email, "Verifica tu email — MailMask", `Hola,\n\nVerifica tu email haciendo clic en este enlace:\n${verifyUrl}\n\nTienes 15 días para verificar tu cuenta.\n\n— MailMask`);
+      await sendFromDomain(
+        alertFrom,
+        email,
+        "Verifica tu email — MailMask",
+        `Hola,\n\nVerifica tu email haciendo clic en este enlace:\n${verifyUrl}\n\nTienes 15 días para verificar tu cuenta.\n\n— MailMask`,
+      );
     } catch (err) {
       console.error("Failed to send verification email:", err);
     }
@@ -239,13 +325,23 @@ const app = new Elysia()
     if (limited) return limited;
 
     const { email, password } = await request.json();
-    if (!email || !password) return new Response(JSON.stringify({ error: "Email y contraseña requeridos" }), { status: 400 });
+    if (!email || !password)
+      return new Response(
+        JSON.stringify({ error: "Email y contraseña requeridos" }),
+        { status: 400 },
+      );
 
     const user = await getUser(email);
-    if (!user) return new Response(JSON.stringify({ error: "Credenciales inválidas" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "Credenciales inválidas" }), {
+        status: 401,
+      });
 
     const valid = await verifyPassword(password, user.passwordHash);
-    if (!valid) return new Response(JSON.stringify({ error: "Credenciales inválidas" }), { status: 401 });
+    if (!valid)
+      return new Response(JSON.stringify({ error: "Credenciales inválidas" }), {
+        status: 401,
+      });
 
     const token = await signJwt({ email });
     return new Response(JSON.stringify({ ok: true, email }), {
@@ -267,20 +363,29 @@ const app = new Elysia()
 
   .get("/api/auth/me", async ({ request }) => {
     const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!auth)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
     const user = await getUser(auth.email);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
     const domains = await listUserDomains(user.email);
     const limits = getUserPlanLimits(user);
-    return new Response(JSON.stringify({
-      email: user.email,
-      domainsCount: domains.length,
-      subscription: user.subscription ?? { plan: "basico", status: "none" },
-      limits,
-      emailVerified: user.emailVerified ?? false,
-    }), {
-      headers: { "content-type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        email: user.email,
+        domainsCount: domains.length,
+        subscription: user.subscription ?? { plan: "basico", status: "none" },
+        limits,
+        emailVerified: user.emailVerified ?? false,
+      }),
+      {
+        headers: { "content-type": "application/json" },
+      },
+    );
   })
 
   .get("/api/auth/verify-email", async ({ request }) => {
@@ -289,13 +394,14 @@ const app = new Elysia()
     if (!token) return new Response("Token inválido", { status: 400 });
 
     const user = await getUserByVerifyToken(token);
-    if (!user) return new Response("Token inválido o expirado", { status: 400 });
+    if (!user)
+      return new Response("Token inválido o expirado", { status: 400 });
 
     await verifyUserEmail(user.email);
     // Redirect to app with success message
     return new Response(null, {
       status: 302,
-      headers: { "location": "/app?verified=true" },
+      headers: { location: "/app?verified=true" },
     });
   })
 
@@ -305,7 +411,10 @@ const app = new Elysia()
     if (limited) return limited;
 
     const { email } = await request.json();
-    if (!email) return new Response(JSON.stringify({ error: "Email requerido" }), { status: 400 });
+    if (!email)
+      return new Response(JSON.stringify({ error: "Email requerido" }), {
+        status: 400,
+      });
 
     const emailLimited = await checkRateLimit(`forgot:${email}`, 1, 300_000);
     if (!emailLimited.allowed) {
@@ -319,13 +428,14 @@ const app = new Elysia()
       const token = crypto.randomUUID();
       await setPasswordToken(email, token);
       const resetUrl = `${getMainDomainUrl()}/set-password?token=${token}`;
-      const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+      const alertFrom =
+        Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
       try {
         await sendFromDomain(
           alertFrom,
           email,
           "Restablecer contraseña — MailMask",
-          `Hola,\n\nRecibimos una solicitud para restablecer tu contraseña.\n\nHaz clic en este enlace para crear una nueva contraseña:\n${resetUrl}\n\nEste enlace es válido por 7 días.\n\nSi no solicitaste esto, puedes ignorar este email.\n\n— MailMask`,
+          `Hola,\n\nRecibimos una solicitud para restablecer tu contraseña.\n\nHaz clic en este enlace para crear una nueva contraseña:\n${resetUrl}\n\nEste enlace es válido por 7 días.\n\nSi no solicitaste esto, puedes ignorar este email.\n\n— https://MailMask.deno.dev`,
         );
       } catch (err) {
         console.error("Failed to send password reset email:", err);
@@ -343,11 +453,23 @@ const app = new Elysia()
     if (limited) return limited;
 
     const { token, password } = await request.json();
-    if (!token || !password) return new Response(JSON.stringify({ error: "Token y contraseña requeridos" }), { status: 400 });
-    if (password.length < 8) return new Response(JSON.stringify({ error: "Contraseña mínimo 8 caracteres" }), { status: 400 });
+    if (!token || !password)
+      return new Response(
+        JSON.stringify({ error: "Token y contraseña requeridos" }),
+        { status: 400 },
+      );
+    if (password.length < 8)
+      return new Response(
+        JSON.stringify({ error: "Contraseña mínimo 8 caracteres" }),
+        { status: 400 },
+      );
 
     const email = await getEmailByPasswordToken(token);
-    if (!email) return new Response(JSON.stringify({ error: "Token inválido o expirado" }), { status: 400 });
+    if (!email)
+      return new Response(
+        JSON.stringify({ error: "Token inválido o expirado" }),
+        { status: 400 },
+      );
 
     const hash = await hashPassword(password);
     await updateUserPassword(email, hash);
@@ -367,7 +489,10 @@ const app = new Elysia()
 
   .get("/api/domains", async ({ request }) => {
     const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
 
     const domains = await listUserDomains(user.email);
     return new Response(JSON.stringify(domains), {
@@ -377,7 +502,10 @@ const app = new Elysia()
 
   .post("/api/domains", async ({ request }) => {
     const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!auth)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
     const user = (await getUser(auth.email))!;
 
     const ip = getIp(request);
@@ -391,28 +519,47 @@ const app = new Elysia()
     // Check plan limits
     const limits = getUserPlanLimits(user);
     if (limits.domains === 0) {
-      return new Response(JSON.stringify({ error: "Necesitas un plan activo para agregar dominios" }), { status: 402 });
+      return new Response(
+        JSON.stringify({
+          error: "Necesitas un plan activo para agregar dominios",
+        }),
+        { status: 402 },
+      );
     }
     const currentCount = await countUserDomains(user.email);
     if (currentCount >= limits.domains) {
-      return new Response(JSON.stringify({ error: `Tu plan permite máximo ${limits.domains} dominio(s)` }), { status: 400 });
+      return new Response(
+        JSON.stringify({
+          error: `Tu plan permite máximo ${limits.domains} dominio(s)`,
+        }),
+        { status: 400 },
+      );
     }
 
     const { domain } = await request.json();
     if (!domain || typeof domain !== "string") {
-      return new Response(JSON.stringify({ error: "Dominio requerido" }), { status: 400 });
+      return new Response(JSON.stringify({ error: "Dominio requerido" }), {
+        status: 400,
+      });
     }
 
     // Validate domain format
-    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
+    const domainRegex =
+      /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
     if (!domainRegex.test(domain)) {
-      return new Response(JSON.stringify({ error: "Formato de dominio inválido" }), { status: 400 });
+      return new Response(
+        JSON.stringify({ error: "Formato de dominio inválido" }),
+        { status: 400 },
+      );
     }
 
     // Check if domain already registered
     const existing = await (await import("./db.ts")).getDomainByName(domain);
     if (existing) {
-      return new Response(JSON.stringify({ error: "Este dominio ya está registrado" }), { status: 409 });
+      return new Response(
+        JSON.stringify({ error: "Este dominio ya está registrado" }),
+        { status: 409 },
+      );
     }
 
     // Verify with SES
@@ -420,7 +567,13 @@ const app = new Elysia()
     try {
       dnsRecords = await verifyDomain(domain);
     } catch (err) {
-      return new Response(JSON.stringify({ error: "Error verificando dominio con SES", details: String(err) }), { status: 500 });
+      return new Response(
+        JSON.stringify({
+          error: "Error verificando dominio con SES",
+          details: String(err),
+        }),
+        { status: 500 },
+      );
     }
 
     // Create receipt rule for inbound
@@ -438,30 +591,47 @@ const app = new Elysia()
     );
 
     // Return DNS records the customer needs to configure
-    return new Response(JSON.stringify({
-      domain: newDomain,
-      dnsRecords: {
-        mx: { type: "MX", name: domain, value: "10 inbound-smtp.us-east-1.amazonaws.com", priority: 10 },
-        verification: { type: "TXT", name: `_amazonses.${domain}`, value: dnsRecords.verificationToken },
-        dkim: dnsRecords.dkimTokens.map((token: string) => ({
-          type: "CNAME",
-          name: `${token}._domainkey.${domain}`,
-          value: `${token}.dkim.amazonses.com`,
-        })),
+    return new Response(
+      JSON.stringify({
+        domain: newDomain,
+        dnsRecords: {
+          mx: {
+            type: "MX",
+            name: domain,
+            value: "10 inbound-smtp.us-east-1.amazonaws.com",
+            priority: 10,
+          },
+          verification: {
+            type: "TXT",
+            name: `_amazonses.${domain}`,
+            value: dnsRecords.verificationToken,
+          },
+          dkim: dnsRecords.dkimTokens.map((token: string) => ({
+            type: "CNAME",
+            name: `${token}._domainkey.${domain}`,
+            value: `${token}.dkim.amazonses.com`,
+          })),
+        },
+      }),
+      {
+        status: 201,
+        headers: { "content-type": "application/json" },
       },
-    }), {
-      status: 201,
-      headers: { "content-type": "application/json" },
-    });
+    );
   })
 
   .get("/api/domains/:id", async ({ request, params }) => {
     const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
 
     const domain = await getDomain(params.id);
     if (!domain || domain.ownerEmail !== user.email) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
+        status: 404,
+      });
     }
 
     return new Response(JSON.stringify(domain), {
@@ -471,38 +641,53 @@ const app = new Elysia()
 
   .post("/api/domains/:id/verify", async ({ request, params }) => {
     const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
 
     const domain = await getDomain(params.id);
     if (!domain || domain.ownerEmail !== user.email) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
+        status: 404,
+      });
     }
 
     const status = await checkDomainStatus(domain.domain);
     await updateDomain(domain.id, { verified: status.verified });
 
-    return new Response(JSON.stringify({
-      domain: domain.domain,
-      verified: status.verified,
-      dkimVerified: status.dkimVerified,
-    }), {
-      headers: { "content-type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        domain: domain.domain,
+        verified: status.verified,
+        dkimVerified: status.dkimVerified,
+      }),
+      {
+        headers: { "content-type": "application/json" },
+      },
+    );
   })
 
   .delete("/api/domains/:id", async ({ request, params }) => {
     const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
 
     const domain = await getDomain(params.id);
     if (!domain || domain.ownerEmail !== user.email) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
+        status: 404,
+      });
     }
 
     // Clean up SES receipt rule
     try {
       await deleteReceiptRule(domain.domain);
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
 
     await deleteDomain(params.id);
     return new Response(JSON.stringify({ ok: true }), {
@@ -514,11 +699,16 @@ const app = new Elysia()
 
   .get("/api/domains/:id/aliases", async ({ request, params }) => {
     const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
 
     const domain = await getDomain(params.id);
     if (!domain || domain.ownerEmail !== user.email) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
+        status: 404,
+      });
     }
 
     const aliases = await listAliases(domain.id);
@@ -529,12 +719,17 @@ const app = new Elysia()
 
   .post("/api/domains/:id/aliases", async ({ request, params }) => {
     const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!auth)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
     const fullUser = (await getUser(auth.email))!;
 
     const domain = await getDomain(params.id);
     if (!domain || domain.ownerEmail !== auth.email) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
+        status: 404,
+      });
     }
 
     const verifyBlock = await checkEmailVerified(auth.email);
@@ -543,29 +738,47 @@ const app = new Elysia()
     const aliasLimits = getUserPlanLimits(fullUser);
     const count = await countAliases(domain.id);
     if (count >= aliasLimits.aliases) {
-      return new Response(JSON.stringify({ error: `Tu plan permite máximo ${aliasLimits.aliases} máscaras por dominio` }), { status: 400 });
+      return new Response(
+        JSON.stringify({
+          error: `Tu plan permite máximo ${aliasLimits.aliases} máscaras por dominio`,
+        }),
+        { status: 400 },
+      );
     }
 
     const { alias, destinations } = await request.json();
     if (!alias || !destinations?.length) {
-      return new Response(JSON.stringify({ error: "Alias y destinos requeridos" }), { status: 400 });
+      return new Response(
+        JSON.stringify({ error: "Alias y destinos requeridos" }),
+        { status: 400 },
+      );
     }
 
     // Validate alias format (alphanumeric, dots, hyphens, or * for catch-all)
     if (alias !== "*" && !/^[a-zA-Z0-9._-]+$/.test(alias)) {
-      return new Response(JSON.stringify({ error: "Formato de alias inválido" }), { status: 400 });
+      return new Response(
+        JSON.stringify({ error: "Formato de alias inválido" }),
+        { status: 400 },
+      );
     }
 
     // Validate destination emails
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     const invalid = destinations.filter((d: string) => !emailRegex.test(d));
     if (invalid.length) {
-      return new Response(JSON.stringify({ error: `Email(s) de destino inválido(s): ${invalid.join(", ")}` }), { status: 400 });
+      return new Response(
+        JSON.stringify({
+          error: `Email(s) de destino inválido(s): ${invalid.join(", ")}`,
+        }),
+        { status: 400 },
+      );
     }
 
     const existing = await getAlias(domain.id, alias);
     if (existing) {
-      return new Response(JSON.stringify({ error: "Este alias ya existe" }), { status: 409 });
+      return new Response(JSON.stringify({ error: "Este alias ya existe" }), {
+        status: 409,
+      });
     }
 
     const newAlias = await createAlias(domain.id, alias, destinations);
@@ -577,16 +790,24 @@ const app = new Elysia()
 
   .put("/api/domains/:id/aliases/:alias", async ({ request, params }) => {
     const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
 
     const domain = await getDomain(params.id);
     if (!domain || domain.ownerEmail !== user.email) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
+        status: 404,
+      });
     }
 
     const body = await request.json();
     const updated = await updateAlias(domain.id, params.alias, body);
-    if (!updated) return new Response(JSON.stringify({ error: "Alias no encontrado" }), { status: 404 });
+    if (!updated)
+      return new Response(JSON.stringify({ error: "Alias no encontrado" }), {
+        status: 404,
+      });
 
     return new Response(JSON.stringify(updated), {
       headers: { "content-type": "application/json" },
@@ -595,15 +816,23 @@ const app = new Elysia()
 
   .delete("/api/domains/:id/aliases/:alias", async ({ request, params }) => {
     const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
 
     const domain = await getDomain(params.id);
     if (!domain || domain.ownerEmail !== user.email) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
+        status: 404,
+      });
     }
 
     const deleted = await deleteAlias(domain.id, params.alias);
-    if (!deleted) return new Response(JSON.stringify({ error: "Alias no encontrado" }), { status: 404 });
+    if (!deleted)
+      return new Response(JSON.stringify({ error: "Alias no encontrado" }), {
+        status: 404,
+      });
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
@@ -614,11 +843,16 @@ const app = new Elysia()
 
   .get("/api/domains/:id/rules", async ({ request, params }) => {
     const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
 
     const domain = await getDomain(params.id);
     if (!domain || domain.ownerEmail !== user.email) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
+        status: 404,
+      });
     }
 
     const rules = await listRules(domain.id);
@@ -629,38 +863,83 @@ const app = new Elysia()
 
   .post("/api/domains/:id/rules", async ({ request, params }) => {
     const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!auth)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
     const fullUser = (await getUser(auth.email))!;
 
     const domain = await getDomain(params.id);
     if (!domain || domain.ownerEmail !== auth.email) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
+        status: 404,
+      });
     }
 
     const ruleLimits = getUserPlanLimits(fullUser);
     const existingRules = await listRules(domain.id);
     if (existingRules.length >= ruleLimits.rules) {
-      return new Response(JSON.stringify({ error: `Tu plan permite máximo ${ruleLimits.rules} reglas por dominio` }), { status: 400 });
+      return new Response(
+        JSON.stringify({
+          error: `Tu plan permite máximo ${ruleLimits.rules} reglas por dominio`,
+        }),
+        { status: 400 },
+      );
     }
 
-    const { field, match, value, action, target, priority = 0, enabled = true } = await request.json();
+    const {
+      field,
+      match,
+      value,
+      action,
+      target,
+      priority = 0,
+      enabled = true,
+    } = await request.json();
     if (!field || !match || !value || !action) {
-      return new Response(JSON.stringify({ error: "Campos requeridos: field, match, value, action" }), { status: 400 });
+      return new Response(
+        JSON.stringify({
+          error: "Campos requeridos: field, match, value, action",
+        }),
+        { status: 400 },
+      );
     }
 
     const validFields = ["to", "from", "subject"];
     const validMatches = ["contains", "equals", "regex"];
     const validActions = ["forward", "webhook", "discard"];
 
-    if (!validFields.includes(field) || !validMatches.includes(match) || !validActions.includes(action)) {
-      return new Response(JSON.stringify({ error: "Valores inválidos para field, match o action" }), { status: 400 });
+    if (
+      !validFields.includes(field) ||
+      !validMatches.includes(match) ||
+      !validActions.includes(action)
+    ) {
+      return new Response(
+        JSON.stringify({
+          error: "Valores inválidos para field, match o action",
+        }),
+        { status: 400 },
+      );
     }
 
     if (action !== "discard" && !target) {
-      return new Response(JSON.stringify({ error: "Target requerido para acciones forward y webhook" }), { status: 400 });
+      return new Response(
+        JSON.stringify({
+          error: "Target requerido para acciones forward y webhook",
+        }),
+        { status: 400 },
+      );
     }
 
-    const rule = await createRule(domain.id, { field, match, value, action, target: target ?? "", priority, enabled });
+    const rule = await createRule(domain.id, {
+      field,
+      match,
+      value,
+      action,
+      target: target ?? "",
+      priority,
+      enabled,
+    });
     return new Response(JSON.stringify(rule), {
       status: 201,
       headers: { "content-type": "application/json" },
@@ -669,15 +948,23 @@ const app = new Elysia()
 
   .delete("/api/domains/:id/rules/:ruleId", async ({ request, params }) => {
     const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
 
     const domain = await getDomain(params.id);
     if (!domain || domain.ownerEmail !== user.email) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
+        status: 404,
+      });
     }
 
     const deleted = await deleteRule(domain.id, params.ruleId);
-    if (!deleted) return new Response(JSON.stringify({ error: "Regla no encontrada" }), { status: 404 });
+    if (!deleted)
+      return new Response(JSON.stringify({ error: "Regla no encontrada" }), {
+        status: 404,
+      });
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
@@ -688,15 +975,23 @@ const app = new Elysia()
 
   .get("/api/domains/:id/logs", async ({ request, params }) => {
     const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
 
     const domain = await getDomain(params.id);
     if (!domain || domain.ownerEmail !== user.email) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
+        status: 404,
+      });
     }
 
     const url = new URL(request.url);
-    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50"), 100);
+    const limit = Math.min(
+      parseInt(url.searchParams.get("limit") ?? "50"),
+      100,
+    );
 
     const logs = await listLogs(domain.id, limit);
     return new Response(JSON.stringify(logs), {
@@ -711,10 +1006,14 @@ const app = new Elysia()
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
 
-    const { plan = "basico" } = await request.json().catch(() => ({ plan: "basico" }));
+    const { plan = "basico" } = await request
+      .json()
+      .catch(() => ({ plan: "basico" }));
     const planKey = plan as keyof typeof PLANS;
     if (!PLANS[planKey]) {
-      return new Response(JSON.stringify({ error: "Plan inválido" }), { status: 400 });
+      return new Response(JSON.stringify({ error: "Plan inválido" }), {
+        status: 400,
+      });
     }
 
     const token = crypto.randomUUID();
@@ -723,7 +1022,10 @@ const app = new Elysia()
     const { PreApproval } = await import("mercadopago");
     const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
     if (!mpAccessToken) {
-      return new Response(JSON.stringify({ error: "MercadoPago no configurado" }), { status: 500 });
+      return new Response(
+        JSON.stringify({ error: "MercadoPago no configurado" }),
+        { status: 500 },
+      );
     }
 
     const preApproval = new PreApproval({ accessToken: mpAccessToken });
@@ -754,27 +1056,40 @@ const app = new Elysia()
       });
     } catch (err) {
       console.error("MP guest-checkout error:", err);
-      return new Response(JSON.stringify({ error: "Error al crear suscripción en MercadoPago" }), {
-        status: 500,
-        headers: { "content-type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Error al crear suscripción en MercadoPago" }),
+        {
+          status: 500,
+          headers: { "content-type": "application/json" },
+        },
+      );
     }
   })
 
   .post("/api/billing/checkout", async ({ request }) => {
     const user = await getAuthUser(request);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
 
-    const { plan = "basico" } = await request.json().catch(() => ({ plan: "basico" }));
+    const { plan = "basico" } = await request
+      .json()
+      .catch(() => ({ plan: "basico" }));
     const planKey = plan as keyof typeof PLANS;
     if (!PLANS[planKey]) {
-      return new Response(JSON.stringify({ error: "Plan inválido" }), { status: 400 });
+      return new Response(JSON.stringify({ error: "Plan inválido" }), {
+        status: 400,
+      });
     }
 
     const { PreApproval } = await import("mercadopago");
     const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
     if (!mpAccessToken) {
-      return new Response(JSON.stringify({ error: "MercadoPago no configurado" }), { status: 500 });
+      return new Response(
+        JSON.stringify({ error: "MercadoPago no configurado" }),
+        { status: 500 },
+      );
     }
 
     const preApproval = new PreApproval({ accessToken: mpAccessToken });
@@ -805,10 +1120,13 @@ const app = new Elysia()
       });
     } catch (err) {
       console.error("MP checkout error:", err);
-      return new Response(JSON.stringify({ error: "Error al crear suscripción en MercadoPago" }), {
-        status: 500,
-        headers: { "content-type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Error al crear suscripción en MercadoPago" }),
+        {
+          status: 500,
+          headers: { "content-type": "application/json" },
+        },
+      );
     }
   })
 
@@ -826,20 +1144,30 @@ const app = new Elysia()
 
     // Parse ts and v1 from x-signature
     const parts = Object.fromEntries(
-      xSignature.split(",").map(p => {
+      xSignature.split(",").map((p) => {
         const [k, ...v] = p.trim().split("=");
         return [k, v.join("=")];
-      })
+      }),
     );
     const ts = parts["ts"] ?? "";
     const v1 = parts["v1"] ?? "";
 
     const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
     const key = await crypto.subtle.importKey(
-      "raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
     );
-    const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
-    const computed = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+    const sig = await crypto.subtle.sign(
+      "HMAC",
+      key,
+      new TextEncoder().encode(manifest),
+    );
+    const computed = Array.from(new Uint8Array(sig))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
 
     if (computed !== v1) {
       console.warn("MP webhook: invalid signature");
@@ -855,14 +1183,18 @@ const app = new Elysia()
         const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
         if (!mpAccessToken) return new Response("OK", { status: 200 });
 
-        const subRes = await fetch(`https://api.mercadopago.com/preapproval/${body.data.id}`, {
-          headers: { "Authorization": `Bearer ${mpAccessToken}` },
-          signal: AbortSignal.timeout(10_000),
-        });
+        const subRes = await fetch(
+          `https://api.mercadopago.com/preapproval/${body.data.id}`,
+          {
+            headers: { Authorization: `Bearer ${mpAccessToken}` },
+            signal: AbortSignal.timeout(10_000),
+          },
+        );
         const sub = await subRes.json();
 
         const externalRef = sub.external_reference ?? "";
-        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const UUID_RE =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         const isGuestCheckout = UUID_RE.test(externalRef);
 
         // Resolve email: for guest checkout use payer_email from MP, otherwise external_reference is the email
@@ -884,12 +1216,15 @@ const app = new Elysia()
 
             if (!plan) {
               const amount = sub.auto_recurring?.transaction_amount ?? 0;
-              const amountToPlan: Record<number, "basico" | "pro" | "agencia"> = { 99: "basico", 299: "pro", 999: "agencia" };
+              const amountToPlan: Record<number, "basico" | "pro" | "agencia"> =
+                { 99: "basico", 299: "pro", 999: "agencia" };
               plan = amountToPlan[amount];
             }
 
             if (!plan) {
-              console.warn(`MP webhook: could not determine plan, not activating`);
+              console.warn(
+                `MP webhook: could not determine plan, not activating`,
+              );
               return new Response("OK", { status: 200 });
             }
 
@@ -920,7 +1255,8 @@ const app = new Elysia()
               const pwToken = crypto.randomUUID();
               await setPasswordToken(email, pwToken);
               const setPasswordUrl = `${getMainDomainUrl()}/set-password?token=${pwToken}`;
-              const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+              const alertFrom =
+                Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
               try {
                 await sendFromDomain(
                   alertFrom,
@@ -937,14 +1273,20 @@ const app = new Elysia()
             const existingUser = await getUser(email);
             const currentSub = existingUser?.subscription;
             if (currentSub) {
-              await updateUserSubscription(email, { ...currentSub, status: "cancelled" });
+              await updateUserSubscription(email, {
+                ...currentSub,
+                status: "cancelled",
+              });
               console.log(`Subscription cancelled: ${email}`);
             }
           } else if (sub.status === "paused") {
             const existingUser = await getUser(email);
             const currentSub = existingUser?.subscription;
             if (currentSub) {
-              await updateUserSubscription(email, { ...currentSub, status: "past_due" });
+              await updateUserSubscription(email, {
+                ...currentSub,
+                status: "past_due",
+              });
               console.log(`Subscription paused (past_due): ${email}`);
             }
           }
@@ -959,37 +1301,58 @@ const app = new Elysia()
 
   .post("/api/billing/cancel", async ({ request }) => {
     const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!auth)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
     const user = await getUser(auth.email);
-    if (!user) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
 
     const subId = user.subscription?.mpSubscriptionId;
     if (!subId) {
-      return new Response(JSON.stringify({ error: "No hay suscripción activa" }), { status: 400 });
+      return new Response(
+        JSON.stringify({ error: "No hay suscripción activa" }),
+        { status: 400 },
+      );
     }
 
     const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
     if (!mpAccessToken) {
-      return new Response(JSON.stringify({ error: "MercadoPago no configurado" }), { status: 500 });
+      return new Response(
+        JSON.stringify({ error: "MercadoPago no configurado" }),
+        { status: 500 },
+      );
     }
 
-    const res = await fetch(`https://api.mercadopago.com/preapproval/${subId}`, {
-      method: "PUT",
-      headers: {
-        "Authorization": `Bearer ${mpAccessToken}`,
-        "Content-Type": "application/json",
+    const res = await fetch(
+      `https://api.mercadopago.com/preapproval/${subId}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${mpAccessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "cancelled" }),
+        signal: AbortSignal.timeout(10_000),
       },
-      body: JSON.stringify({ status: "cancelled" }),
-      signal: AbortSignal.timeout(10_000),
-    });
+    );
 
     if (!res.ok) {
       const err = await res.text();
       console.error("MP cancel error:", err);
-      return new Response(JSON.stringify({ error: "Error al cancelar en MercadoPago" }), { status: 500 });
+      return new Response(
+        JSON.stringify({ error: "Error al cancelar en MercadoPago" }),
+        { status: 500 },
+      );
     }
 
-    await updateUserSubscription(auth.email, { ...user.subscription!, status: "cancelled" });
+    await updateUserSubscription(auth.email, {
+      ...user.subscription!,
+      status: "cancelled",
+    });
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
     });
@@ -997,13 +1360,19 @@ const app = new Elysia()
 
   .get("/api/billing/status", async ({ request }) => {
     const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    if (!auth)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
     const user = await getUser(auth.email);
-    return new Response(JSON.stringify({
-      subscription: user?.subscription ?? { plan: "basico", status: "none" },
-    }), {
-      headers: { "content-type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        subscription: user?.subscription ?? { plan: "basico", status: "none" },
+      }),
+      {
+        headers: { "content-type": "application/json" },
+      },
+    );
   })
 
   // --- Webhook: SES inbound via SNS ---
@@ -1039,7 +1408,7 @@ const app = new Elysia()
         headers: { "content-type": "application/json" },
       });
     }
-  })
+  });
 
 const port = parseInt(Deno.env.get("PORT") ?? "8000");
 Deno.serve({ port }, (req) => app.fetch(req));
