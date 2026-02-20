@@ -1,4 +1,5 @@
 import { sendFromDomain } from "./ses.ts";
+import { log } from "./logger.ts";
 
 const kv = await Deno.openKv();
 
@@ -38,9 +39,9 @@ Deno.cron("expiry-warnings", "0 14 * * *", async () => {
       await kv.set(warnKey, true, { expireIn: threeDaysMs + 24 * 60 * 60 * 1000 });
       warned++;
     } catch (err) {
-      console.error(`Failed to send expiry warning to ${user.email}:`, err);
+      log("error", "cron", "Failed to send expiry warning", { email: user.email, error: String(err) });
     }
   }
 
-  if (warned > 0) console.log(`[cron] Sent ${warned} expiry warning(s)`);
+  if (warned > 0) log("info", "cron", "Sent expiry warnings", { count: warned });
 });

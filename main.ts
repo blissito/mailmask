@@ -57,6 +57,7 @@ import {
   sendAlert,
 } from "./ses.ts";
 import { processInbound } from "./forwarding.ts";
+import { log } from "./logger.ts";
 import "./cron.ts";
 
 // --- Fail-fast env validation (deferred for Deno Deploy compatibility) ---
@@ -197,7 +198,7 @@ async function verifySnsSignature(
     verifier.update(stringToSign);
     return verifier.verify(pem, body.Signature, "base64");
   } catch (err) {
-    console.error("SNS signature verification failed:", err);
+    log("error", "server", "SNS signature verification failed", { error: String(err) });
     return false;
   }
 }
@@ -258,7 +259,7 @@ const app = new Elysia()
       );
       response.headers.set(
         "content-security-policy",
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'",
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com",
       );
     }
     return response;
@@ -341,7 +342,7 @@ const app = new Elysia()
         `Hola,\n\nVerifica tu email haciendo clic en este enlace:\n${verifyUrl}\n\nTienes 15 días para verificar tu cuenta.\n\n— MailMask`,
       );
     } catch (err) {
-      console.error("Failed to send verification email:", err);
+      log("error", "auth", "Failed to send verification email", { error: String(err) });
     }
 
     const token = await signJwt({ email });
@@ -411,6 +412,17 @@ const app = new Elysia()
       });
     const domains = await listUserDomains(user.email);
     const limits = getUserPlanLimits(user);
+
+    // Build usage data
+    const aliasesPerDomain = await Promise.all(
+      domains.map(async (d) => ({
+        domain: d.domain,
+        domainId: d.id,
+        current: await countAliases(d.id),
+        limit: limits.aliases,
+      })),
+    );
+
     return new Response(
       JSON.stringify({
         email: user.email,
@@ -421,6 +433,10 @@ const app = new Elysia()
         },
         limits,
         emailVerified: user.emailVerified ?? false,
+        usage: {
+          domains: { current: domains.length, limit: limits.domains },
+          aliasesPerDomain,
+        },
       }),
       {
         headers: { "content-type": "application/json" },
@@ -484,7 +500,7 @@ const app = new Elysia()
           `Hola,\n\nRecibimos una solicitud para restablecer tu contraseña.\n\nHaz clic en este enlace para crear una nueva contraseña:\n${resetUrl}\n\nEste enlace es válido por 7 días.\n\nSi no solicitaste esto, puedes ignorar este email.\n\n— https://MailMask.deno.dev`,
         );
       } catch (err) {
-        console.error("Failed to send password reset email:", err);
+        log("error", "auth", "Failed to send password reset email", { error: String(err) });
       }
     }
 
@@ -626,7 +642,7 @@ const app = new Elysia()
     try {
       await createReceiptRule(domain);
     } catch (err) {
-      console.warn("Could not create receipt rule (may already exist):", err);
+      log("warn", "ses", "Could not create receipt rule (may already exist)", { error: String(err) });
     }
 
     const newDomain = await createDomain(
@@ -1105,7 +1121,7 @@ const app = new Elysia()
         headers: { "content-type": "application/json" },
       });
     } catch (err) {
-      console.error("MP guest-checkout error:", err);
+      log("error", "billing", "MP guest-checkout error", { error: String(err) });
       return new Response(
         JSON.stringify({ error: "Error al crear suscripción en MercadoPago" }),
         {
@@ -1174,7 +1190,7 @@ const app = new Elysia()
       });
     } catch (err: any) {
       const detail = String(err?.message ?? err?.cause ?? err);
-      console.error("MP checkout error:", detail);
+      log("error", "billing", "MP checkout error", { error: detail });
       const msg = detail.includes("same user")
         ? "No puedes suscribirte con la misma cuenta del proveedor de pagos. Usa otra cuenta de MercadoPago."
         : "Error al crear suscripción en MercadoPago";
@@ -1189,7 +1205,7 @@ const app = new Elysia()
     // Validate HMAC signature
     const secret = Deno.env.get("MP_WEBHOOK_SECRET");
     if (!secret) {
-      console.error("MP_WEBHOOK_SECRET not configured");
+      log("error", "webhook", "MP_WEBHOOK_SECRET not configured");
       return new Response("Server misconfigured", { status: 500 });
     }
     const xSignature = request.headers.get("x-signature") ?? "";
@@ -1225,12 +1241,12 @@ const app = new Elysia()
       .join("");
 
     if (computed !== v1) {
-      console.warn("MP webhook: invalid signature");
+      log("warn", "webhook", "MP webhook: invalid signature");
       return new Response("Unauthorized", { status: 401 });
     }
 
     const body = await request.json();
-    console.log("MP webhook:", JSON.stringify(body));
+    log("info", "webhook", "MP webhook received", { type: body.type, dataId: body.data?.id });
 
     // Handle subscription_preapproval events
     if (body.type === "subscription_preapproval" && body.data?.id) {
@@ -1242,7 +1258,7 @@ const app = new Elysia()
 
         const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
         if (!mpAccessToken) {
-          console.error("MP_ACCESS_TOKEN not configured");
+          log("error", "webhook", "MP_ACCESS_TOKEN not configured");
           return new Response("Server misconfigured", { status: 500 });
         }
 
@@ -1255,11 +1271,7 @@ const app = new Elysia()
         );
         const sub = await subRes.json();
 
-        console.log("[webhook] MP sub:", {
-          payer_email: sub.payer_email,
-          external_reference: sub.external_reference,
-          status: sub.status,
-        });
+        log("info", "webhook", "MP subscription fetched", { payer_email: sub.payer_email, external_reference: sub.external_reference, status: sub.status });
 
         const externalRef = sub.external_reference ?? "";
         const UUID_RE =
@@ -1282,7 +1294,7 @@ const app = new Elysia()
             if (existingSub && existingSub.mpSubscriptionId === body.data.id && existingSub.status === "active") {
               // Recurring charge — just extend the period
               await extendSubscriptionPeriod(email, bufferDays);
-              console.log(`Subscription renewed: ${email} (+${bufferDays}d)`);
+              log("info", "webhook", "Subscription renewed", { email, bufferDays });
             } else {
               // First activation — determine plan
               type PlanKey = "basico" | "freelancer" | "developer" | "pro" | "agencia";
@@ -1309,16 +1321,14 @@ const app = new Elysia()
               }
 
               if (!plan) {
-                console.warn(
-                  `MP webhook: could not determine plan, not activating`,
-                );
+                log("warn", "webhook", "Could not determine plan, not activating", { email, amount: sub.auto_recurring?.transaction_amount });
                 return new Response("OK", { status: 200 });
               }
 
               // Guest checkout: create user if not exists
               if (isGuestCheckout) {
                 const created = await createUserIfNotExists(email, await hashPassword(crypto.randomUUID()));
-                if (created) console.log(`Guest user created: ${email}`);
+                if (created) log("info", "webhook", "Guest user created", { email });
               }
 
               const periodEnd = new Date();
@@ -1330,7 +1340,7 @@ const app = new Elysia()
                 mpSubscriptionId: body.data.id,
                 currentPeriodEnd: periodEnd.toISOString(),
               });
-              console.log(`Subscription activated: ${email} -> ${plan}`);
+              log("info", "webhook", "Subscription activated", { email, plan });
 
               const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
 
@@ -1346,9 +1356,9 @@ const app = new Elysia()
                     "¡Bienvenido a MailMask! Configura tu contraseña",
                     `¡Hola!\n\nTu suscripción al plan ${plan.charAt(0).toUpperCase() + plan.slice(1)} está activa.\n\nConfigura tu contraseña para acceder a tu cuenta:\n${setPasswordUrl}\n\nEste enlace es válido por 7 días.\n\n— MailMask`,
                   );
-                  console.log(`Welcome email sent to ${email}`);
+                  log("info", "webhook", "Welcome email sent", { email });
                 } catch (err) {
-                  console.error("Failed to send welcome email:", err);
+                  log("error", "webhook", "Failed to send welcome email", { email, error: String(err) });
                 }
               } else {
                 // Authenticated checkout: send payment confirmation
@@ -1359,9 +1369,9 @@ const app = new Elysia()
                     "Confirmación de pago — MailMask",
                     `¡Hola!\n\nTu pago fue procesado exitosamente. Tu plan ${plan.charAt(0).toUpperCase() + plan.slice(1)} está activo.\n\nPuedes administrar tu cuenta en:\n${getMainDomainUrl()}/app\n\nGracias por usar MailMask.\n\n— MailMask`,
                   );
-                  console.log(`Payment confirmation sent to ${email}`);
+                  log("info", "webhook", "Payment confirmation sent", { email });
                 } catch (err) {
-                  console.error("Failed to send payment confirmation:", err);
+                  log("error", "webhook", "Failed to send payment confirmation", { email, error: String(err) });
                 }
               }
             }
@@ -1373,7 +1383,7 @@ const app = new Elysia()
                 ...currentSub,
                 status: "cancelled",
               });
-              console.log(`Subscription cancelled: ${email}`);
+              log("info", "webhook", "Subscription cancelled", { email });
             }
           } else if (sub.status === "paused") {
             const existingUser = await getUser(email);
@@ -1383,7 +1393,7 @@ const app = new Elysia()
                 ...currentSub,
                 status: "past_due",
               });
-              console.log(`Subscription paused (past_due): ${email}`);
+              log("info", "webhook", "Subscription paused (past_due)", { email });
             }
           }
 
@@ -1391,7 +1401,7 @@ const app = new Elysia()
           await markWebhookProcessed(body.data.id);
         }
       } catch (err) {
-        console.error("MP webhook processing error:", err);
+        log("error", "webhook", "MP webhook processing error", { error: String(err) });
         return new Response("Internal error", { status: 500 });
       }
     }
@@ -1442,7 +1452,7 @@ const app = new Elysia()
 
     if (!res.ok) {
       const err = await res.text();
-      console.error("MP cancel error:", err);
+      log("error", "billing", "MP cancel error", { error: err });
       return new Response(
         JSON.stringify({ error: "Error al cancelar en MercadoPago" }),
         { status: 500 },
@@ -1475,6 +1485,51 @@ const app = new Elysia()
     );
   })
 
+  // --- Export ---
+
+  .get("/api/export", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      });
+
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 5, 3600_000);
+    if (limited) return limited;
+
+    const domains = await listUserDomains(auth.email);
+    const exportData: Record<string, unknown>[] = [];
+
+    for (const domain of domains) {
+      const aliases = await listAliases(domain.id);
+      const rules = await listRules(domain.id);
+      const logs = await listLogs(domain.id, 100);
+      exportData.push({
+        domain: domain.domain,
+        domainId: domain.id,
+        verified: domain.verified,
+        aliases,
+        rules,
+        logs,
+      });
+    }
+
+    const payload = {
+      email: auth.email,
+      exportedAt: new Date().toISOString(),
+      domains: exportData,
+    };
+
+    return new Response(JSON.stringify(payload, null, 2), {
+      headers: {
+        "content-type": "application/json",
+        "content-disposition": `attachment; filename="mailmask-export-${Date.now()}.json"`,
+      },
+    });
+  })
+
   // --- Webhook: SES inbound via SNS ---
 
   .post("/api/webhooks/ses-inbound", async ({ request }) => {
@@ -1489,7 +1544,7 @@ const app = new Elysia()
     }
     const valid = await verifySnsSignature(body);
     if (!valid) {
-      console.warn("SES inbound: invalid SNS signature");
+      log("warn", "server", "SES inbound: invalid SNS signature");
       return new Response(JSON.stringify({ error: "Invalid signature" }), {
         status: 403,
         headers: { "content-type": "application/json" },
@@ -1502,7 +1557,7 @@ const app = new Elysia()
         headers: { "content-type": "application/json" },
       });
     } catch (err) {
-      console.error("SES inbound error:", err);
+      log("error", "server", "SES inbound processing error", { error: String(err) });
       return new Response(JSON.stringify({ error: "Processing failed" }), {
         status: 500,
         headers: { "content-type": "application/json" },

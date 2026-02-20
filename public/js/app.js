@@ -23,6 +23,7 @@ async function checkAuth() {
   currentUser = await res.json();
   document.getElementById("user-email").textContent = currentUser.email;
   renderBillingBanner();
+  renderUsage();
 
   // Handle query param redirects
   const params = new URLSearchParams(window.location.search);
@@ -93,6 +94,24 @@ function renderBillingBanner() {
     addDomainBtn.classList.add("opacity-50", "cursor-not-allowed");
     addDomainBtn.title = "Necesitas un plan activo";
   }
+}
+
+function renderUsage() {
+  const container = document.getElementById("usage-banner");
+  if (!container || !currentUser?.usage) return;
+
+  const u = currentUser.usage;
+  if (u.domains.limit === 0) { container.innerHTML = ""; return; }
+
+  const items = [`Dominios ${u.domains.current}/${u.domains.limit}`];
+  for (const a of u.aliasesPerDomain) {
+    items.push(`Aliases — ${esc(a.domain)} ${a.current}/${a.limit}`);
+  }
+
+  container.innerHTML = `
+    <div class="flex flex-wrap gap-3 text-xs text-zinc-400 px-1 py-2">
+      ${items.map(i => `<span class="bg-zinc-800/60 border border-zinc-800 rounded px-2 py-1">${i}</span>`).join("")}
+    </div>`;
 }
 
 async function startCheckout() {

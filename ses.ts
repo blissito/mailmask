@@ -1,3 +1,5 @@
+import { log } from "./logger.ts";
+
 const alertKv = await Deno.openKv();
 
 // Lazy-loaded AWS SDK clients to reduce cold start on Deno Deploy
@@ -221,7 +223,7 @@ export async function sendAlert(alertType: string, message: string): Promise<boo
     await alertKv.set(throttleKey, true, { expireIn: 60 * 60 * 1000 }); // 1h
     return true;
   } catch (err) {
-    console.error(`Failed to send alert (${alertType}):`, err);
+    log("error", "ses", "Failed to send alert", { alertType, error: String(err) });
     return false;
   }
 }

@@ -1,5 +1,7 @@
 import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, type Rule, type ForwardQueueItem } from "./db.ts";
 import { forwardEmail, fetchEmailFromS3, sendAlert } from "./ses.ts";
+import { checkRateLimit } from "./rate-limit.ts";
+import { log } from "./logger.ts";
 
 // --- SNS notification types ---
 
@@ -72,7 +74,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
         notification.receipt.action.objectKey,
       );
     } catch (err) {
-      console.error("Failed to fetch email from S3:", err);
+      log("error", "forwarding", "Failed to fetch email from S3", { error: String(err) });
     }
   }
 
@@ -88,14 +90,34 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
 
     // Check owner's plan — block forwarding if expired/no plan
     let logDays = 15; // default
+    let forwardPerHour = 100; // default
     const owner = await getUser(domain.ownerEmail);
     if (owner) {
       const planLimits = getUserPlanLimits(owner);
       if (planLimits.domains === 0) {
-        console.log(`Forwarding blocked for ${domain.ownerEmail}: no active plan`);
+        log("info", "forwarding", "Forwarding blocked: no active plan", { ownerEmail: domain.ownerEmail });
         continue;
       }
       if (planLimits.logDays > 0) logDays = planLimits.logDays;
+      forwardPerHour = planLimits.forwardPerHour;
+    }
+
+    // Rate limit: per-domain forwarding
+    const rlResult = await checkRateLimit(`fwd:${domain.id}`, forwardPerHour, 3600_000);
+    if (!rlResult.allowed) {
+      log("warn", "forwarding", "Forwarding rate limit exceeded", { domainId: domain.id, domainName, forwardPerHour });
+      await sendAlert("fwd-rate-limit", `Forwarding rate limit exceeded for domain ${domainName} (${forwardPerHour}/hr). Email from ${from} discarded.`);
+      await addLog({
+        domainId: domain.id,
+        timestamp: new Date().toISOString(),
+        from, to: recipient, subject,
+        status: "discarded",
+        forwardedTo: "",
+        sizeBytes: rawContent.length,
+        error: "Rate limit exceeded",
+      }, logDays);
+      discarded++;
+      continue;
     }
 
     // Step 1: Check rules first (higher priority)
@@ -241,9 +263,9 @@ async function doForward(rawContent: string, from: string, to: string, domainId:
     // Enqueue for retry
     try {
       await enqueueForward({ rawContent, from, to, domainId, domainName, originalTo, subject, logDays }, errorMsg);
-      console.log(`Enqueued forward retry: ${from} -> ${to} (${errorMsg})`);
+      log("info", "forwarding", "Enqueued forward retry", { from, to, error: errorMsg });
     } catch (enqErr) {
-      console.error("Failed to enqueue forward retry:", enqErr);
+      log("error", "forwarding", "Failed to enqueue forward retry", { error: String(enqErr) });
     }
   }
 }
@@ -273,14 +295,14 @@ Deno.cron("forward-retry", "*/5 * * * *", async () => {
       }, item.logDays);
       await dequeueForward(item.id);
       processed++;
-      console.log(`[retry] Forwarded on attempt ${attempt}: ${item.from} -> ${item.to}`);
+      log("info", "forwarding", "Retry forwarded successfully", { attempt, from: item.from, to: item.to });
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
 
       if (attempt >= MAX_ATTEMPTS) {
         await moveToDeadLetter({ ...item, attemptCount: attempt, lastError: errorMsg });
         deadLettered++;
-        console.error(`[retry] Dead-lettered after ${attempt} attempts: ${item.from} -> ${item.to}`);
+        log("error", "forwarding", "Dead-lettered after max attempts", { attempt, from: item.from, to: item.to, error: errorMsg });
         await sendAlert("dead-letter", `Email dead-lettered after ${attempt} attempts.\nFrom: ${item.from}\nTo: ${item.to}\nSubject: ${item.subject}\nError: ${errorMsg}`);
       } else {
         const delay = RETRY_DELAYS[Math.min(attempt, RETRY_DELAYS.length - 1)];
@@ -290,12 +312,12 @@ Deno.cron("forward-retry", "*/5 * * * *", async () => {
           nextRetryAt: new Date(now + delay).toISOString(),
           lastError: errorMsg,
         });
-        console.log(`[retry] Attempt ${attempt} failed, next retry in ${delay / 60_000}min: ${item.from} -> ${item.to}`);
+        log("warn", "forwarding", "Retry attempt failed", { attempt, from: item.from, to: item.to, nextRetryMin: delay / 60_000 });
       }
     }
   }
 
   if (processed > 0 || deadLettered > 0) {
-    console.log(`[retry] Processed: ${processed}, dead-lettered: ${deadLettered}`);
+    log("info", "forwarding", "Retry cron completed", { processed, deadLettered });
   }
 });

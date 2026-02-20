@@ -70,12 +70,12 @@ export interface EmailLog {
 // --- Plans ---
 
 export const PLANS = {
-  basico:     { price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 0,  sends: 0,     api: false, webhooks: false },
-  freelancer: { price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false },
-  developer:  { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true },
+  basico:     { price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 0,  sends: 0,     api: false, webhooks: false, forwardPerHour: 100 },
+  freelancer: { price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500 },
+  developer:  { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true,  forwardPerHour: 2000 },
   // Legacy plan mappings (kept for existing subscribers)
-  pro:     { price: 299_00, yearlyPrice: 2990_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false },
-  agencia: { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true },
+  pro:     { price: 299_00, yearlyPrice: 2990_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500 },
+  agencia: { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true,  forwardPerHour: 2000 },
 } as const;
 
 // --- Users ---
@@ -324,19 +324,19 @@ export async function updateUserSubscription(email: string, sub: Subscription): 
   return updated;
 }
 
-export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; api: boolean; webhooks: boolean } {
+export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; api: boolean; webhooks: boolean; forwardPerHour: number } {
   const sub = user.subscription;
   if (sub && (sub.status === "active" || sub.status === "cancelled")) {
     // Expired: period ended (applies to both active and cancelled)
     if (sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) < new Date()) {
-      return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, api: false, webhooks: false };
+      return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, api: false, webhooks: false, forwardPerHour: 0 };
     }
     // Active or cancelled-but-still-in-paid-period: grant plan limits
     const plan = PLANS[sub.plan];
-    return { domains: plan.domains, aliases: plan.aliases, rules: plan.rules, logDays: plan.logDays, sends: plan.sends, api: plan.api, webhooks: plan.webhooks };
+    return { domains: plan.domains, aliases: plan.aliases, rules: plan.rules, logDays: plan.logDays, sends: plan.sends, api: plan.api, webhooks: plan.webhooks, forwardPerHour: plan.forwardPerHour };
   }
   // Sin plan = sin acceso. Bloquear todo.
-  return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, api: false, webhooks: false };
+  return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, api: false, webhooks: false, forwardPerHour: 0 };
 }
 
 // --- Pending checkout (guest flow) ---
