@@ -1,3 +1,7 @@
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 // --- State ---
 let currentUser = null;
 let domains = [];
@@ -37,19 +41,40 @@ function renderBillingBanner() {
   if (!container) return;
 
   const sub = currentUser.subscription;
-  const isActive = sub && sub.status === "active";
   const planName = sub?.plan ? sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1) : "Ninguno";
+  const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
+  const isExpired = periodEnd && periodEnd < new Date();
+  const isActive = sub && sub.status === "active" && !isExpired;
+  const isCancelledWithAccess = sub && sub.status === "cancelled" && periodEnd && !isExpired;
 
   if (isActive) {
     container.innerHTML = `
       <div class="bg-green-900/20 border border-green-800/50 rounded-lg px-4 py-3 flex items-center justify-between">
-        <span class="text-sm text-green-400">Plan ${planName} — Activo</span>
+        <span class="text-sm text-green-400">Plan ${esc(planName)} — Activo</span>
         <div class="flex items-center gap-4">
-          <span class="text-xs text-zinc-500">Hasta ${sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString("es-MX") : "—"}</span>
+          <span class="text-xs text-zinc-500">Hasta ${periodEnd ? periodEnd.toLocaleDateString("es-MX") : "—"}</span>
           <button id="btn-cancel-sub" class="text-xs text-zinc-500 hover:text-red-400 transition-colors underline">Cancelar suscripción</button>
         </div>
       </div>`;
     document.getElementById("btn-cancel-sub")?.addEventListener("click", cancelSubscription);
+  } else if (isCancelledWithAccess) {
+    container.innerHTML = `
+      <div class="bg-yellow-900/20 border border-yellow-800/50 rounded-lg px-4 py-3 flex items-center justify-between">
+        <span class="text-sm text-yellow-400">Plan ${esc(planName)} — Tu plan se cancela el ${periodEnd.toLocaleDateString("es-MX")}</span>
+        <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+          Reactivar Plan
+        </button>
+      </div>`;
+    document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
+  } else if (isExpired) {
+    container.innerHTML = `
+      <div class="bg-red-900/20 border border-red-800/50 rounded-lg px-4 py-3 flex items-center justify-between">
+        <span class="text-sm text-red-400">Tu plan expiró — Reactiva para continuar</span>
+        <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+          Reactivar Plan
+        </button>
+      </div>`;
+    document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
   } else {
     container.innerHTML = `
       <div class="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 flex items-center justify-between">
@@ -61,9 +86,9 @@ function renderBillingBanner() {
     document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
   }
 
-  // Disable add domain button if no active plan
+  // Disable add domain button if no active/grace-period plan
   const addDomainBtn = document.getElementById("btn-add-domain");
-  if (addDomainBtn && !isActive) {
+  if (addDomainBtn && !isActive && !isCancelledWithAccess) {
     addDomainBtn.disabled = true;
     addDomainBtn.classList.add("opacity-50", "cursor-not-allowed");
     addDomainBtn.title = "Necesitas un plan activo";
@@ -138,9 +163,9 @@ function renderDomains() {
   empty.classList.add("hidden");
   list.innerHTML = domains.map(d => `
     <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-zinc-600 transition-colors"
-         onclick="selectDomain('${d.id}')">
+         onclick="selectDomain('${esc(d.id)}')">
       <div>
-        <span class="font-semibold text-lg">${d.domain}</span>
+        <span class="font-semibold text-lg">${esc(d.domain)}</span>
         <span class="ml-3 text-xs px-2 py-0.5 rounded-full ${d.verified ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}">
           ${d.verified ? 'Verificado' : 'Pendiente DNS'}
         </span>
@@ -206,15 +231,15 @@ function renderAliases(aliases) {
     <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg p-3 flex items-center justify-between">
       <div>
         <span class="font-mono text-sm ${a.enabled ? 'text-zinc-100' : 'text-zinc-500 line-through'}">
-          ${a.alias === '*' ? '*' : a.alias}@${selectedDomain.domain}
+          ${a.alias === '*' ? '*' : esc(a.alias)}@${esc(selectedDomain.domain)}
         </span>
         <span class="text-zinc-500 mx-2">→</span>
-        <span class="text-sm text-zinc-400">${a.destinations.join(", ")}</span>
-        ${a.forwardCount ? `<span class="text-xs text-zinc-500 ml-2">${a.forwardCount} reenviado${a.forwardCount === 1 ? '' : 's'}${a.lastFrom ? ` · último de ${a.lastFrom}` : ''}</span>` : ''}
+        <span class="text-sm text-zinc-400">${esc(a.destinations.join(", "))}</span>
+        ${a.forwardCount ? `<span class="text-xs text-zinc-500 ml-2">${a.forwardCount} reenviado${a.forwardCount === 1 ? '' : 's'}${a.lastFrom ? ` · último de ${esc(a.lastFrom)}` : ''}</span>` : ''}
       </div>
       <div class="flex items-center gap-2">
-        <button onclick="toggleAlias('${a.alias}', ${!a.enabled})" class="text-xs px-2 py-1 rounded ${a.enabled ? 'bg-green-900/30 text-green-400' : 'bg-zinc-700 text-zinc-400'}">${a.enabled ? 'Activo' : 'Inactivo'}</button>
-        <button onclick="removeAlias('${a.alias}')" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
+        <button onclick="toggleAlias('${esc(a.alias)}', ${!a.enabled})" class="text-xs px-2 py-1 rounded ${a.enabled ? 'bg-green-900/30 text-green-400' : 'bg-zinc-700 text-zinc-400'}">${a.enabled ? 'Activo' : 'Inactivo'}</button>
+        <button onclick="removeAlias('${esc(a.alias)}')" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
       </div>
     </div>
   `).join("");
@@ -266,12 +291,12 @@ function renderRules(rules) {
         <span class="text-zinc-400">Si</span>
         <span class="text-zinc-200 font-semibold">${fieldLabels[r.field]}</span>
         <span class="text-zinc-400">${matchLabels[r.match]}</span>
-        <span class="text-red-400 font-mono">"${r.value}"</span>
+        <span class="text-red-400 font-mono">"${esc(r.value)}"</span>
         <span class="text-zinc-400 mx-1">→</span>
         <span class="text-zinc-200">${actionLabels[r.action]}</span>
-        ${r.target ? `<span class="text-zinc-400 ml-1">${r.target}</span>` : ''}
+        ${r.target ? `<span class="text-zinc-400 ml-1">${esc(r.target)}</span>` : ''}
       </div>
-      <button onclick="removeRule('${r.id}')" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
+      <button onclick="removeRule('${esc(r.id)}')" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
     </div>
   `).join("");
 }
@@ -322,9 +347,9 @@ function renderLogs(logs) {
     return `
       <div class="grid grid-cols-[80px_1fr_1fr_80px_24px] gap-2 text-xs py-2 border-b border-zinc-800/50 items-center">
         <span class="text-zinc-500">${time}</span>
-        <span class="text-zinc-300 truncate" title="${l.from}">${l.from}</span>
-        <span class="text-zinc-400 truncate" title="${l.subject}">${l.subject}</span>
-        <span class="text-zinc-500 truncate">${l.forwardedTo || '—'}</span>
+        <span class="text-zinc-300 truncate" title="${esc(l.from)}">${esc(l.from)}</span>
+        <span class="text-zinc-400 truncate" title="${esc(l.subject)}">${esc(l.subject)}</span>
+        <span class="text-zinc-500 truncate">${l.forwardedTo ? esc(l.forwardedTo) : '—'}</span>
         <span class="${statusColors[l.status]}">${statusIcons[l.status]}</span>
       </div>
     `;
@@ -355,7 +380,7 @@ function renderDnsRecords() {
       </div>
       <div class="flex items-center gap-2">
         <code class="text-xs text-zinc-400 bg-zinc-900 px-2 py-1 rounded flex-1 truncate">${r.value}</code>
-        <button onclick="navigator.clipboard.writeText('${r.value}')" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Copiar</button>
+        <button onclick="navigator.clipboard.writeText('${esc(r.value)}')" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Copiar</button>
       </div>
     </div>
   `).join("");

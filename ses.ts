@@ -120,23 +120,31 @@ export async function fetchEmailFromS3(bucketName: string, objectKey: string): P
 
 // --- Email forwarding ---
 
-export async function forwardEmail(originalRaw: string, from: string, to: string): Promise<void> {
+export async function forwardEmail(originalRaw: string, from: string, to: string, aliasDomain: string): Promise<void> {
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
 
-  const headers = [
+  const forwardingAddress = `forwarded@${aliasDomain}`;
+
+  // Rewrite From header and add Reply-To so replies go to original sender
+  let rewrittenRaw = originalRaw.replace(
+    /^From:\s*.+$/mi,
+    `From: "${from}" <${forwardingAddress}>\r\nReply-To: ${from}`,
+  );
+
+  const extraHeaders = [
     `X-MailMask-Forwarded: true`,
     `X-Original-To: ${to}`,
   ].join("\r\n");
 
-  const firstNewline = originalRaw.indexOf("\r\n");
-  const rewrittenRaw = firstNewline >= 0
-    ? originalRaw.slice(0, firstNewline) + "\r\n" + headers + originalRaw.slice(firstNewline)
-    : headers + "\r\n" + originalRaw;
+  const firstNewline = rewrittenRaw.indexOf("\r\n");
+  rewrittenRaw = firstNewline >= 0
+    ? rewrittenRaw.slice(0, firstNewline) + "\r\n" + extraHeaders + rewrittenRaw.slice(firstNewline)
+    : extraHeaders + "\r\n" + rewrittenRaw;
 
   await ses.send(new SendRawEmailCommand({
     RawMessage: { Data: new TextEncoder().encode(rewrittenRaw) },
-    Source: from,
+    Source: forwardingAddress,
     Destinations: [to],
   }));
 }

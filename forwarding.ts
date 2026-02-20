@@ -1,4 +1,4 @@
-import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, type Rule } from "./db.ts";
+import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, type Rule } from "./db.ts";
 import { forwardEmail, fetchEmailFromS3 } from "./ses.ts";
 
 // --- SNS notification types ---
@@ -48,6 +48,12 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
   }
 
   const notification: SesMailNotification = JSON.parse(body.Message);
+
+  // SNS dedup: skip already-processed messages
+  const messageId = notification.mail.messageId;
+  if (messageId && await isMessageProcessed(messageId)) {
+    return { action: "skipped", details: "Duplicate SNS delivery" };
+  }
 
   if (notification.notificationType !== "Received") {
     return { action: "ignored", details: `Not a received email: ${notification.notificationType}` };
@@ -111,7 +117,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
       }
 
       if (matchedRule.action === "forward" && matchedRule.target) {
-        await doForward(rawContent, from, matchedRule.target, domain.id, recipient, subject, logDays);
+        await doForward(rawContent, from, matchedRule.target, domain.id, domainName, recipient, subject, logDays);
         forwarded++;
         continue;
       }
@@ -143,7 +149,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
 
     if (matched) {
       for (const dest of matched.destinations) {
-        await doForward(rawContent, from, dest, domain.id, recipient, subject, logDays);
+        await doForward(rawContent, from, dest, domain.id, domainName, recipient, subject, logDays);
         forwarded++;
       }
       bumpAliasStats(domain.id, matched.alias, from); // fire-and-forget
@@ -161,6 +167,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     }
   }
 
+  if (messageId) await markMessageProcessed(messageId);
   return { action: "processed", details: `forwarded=${forwarded} discarded=${discarded}` };
 }
 
@@ -196,11 +203,21 @@ function evaluateRules(rules: Rule[], email: { to: string; from: string; subject
 
 // --- Forward helper ---
 
-async function doForward(rawContent: string, from: string, to: string, domainId: string, originalTo: string, subject: string, logDays = 15): Promise<void> {
+async function doForward(rawContent: string, from: string, to: string, domainId: string, domainName: string, originalTo: string, subject: string, logDays = 15): Promise<void> {
+  if (!rawContent) {
+    await addLog({
+      domainId,
+      timestamp: new Date().toISOString(),
+      from, to: originalTo, subject,
+      status: "failed",
+      forwardedTo: to,
+      sizeBytes: 0,
+      error: "Email content unavailable (S3 fetch failed)",
+    }, logDays);
+    return;
+  }
   try {
-    if (rawContent) {
-      await forwardEmail(rawContent, from, to);
-    }
+    await forwardEmail(rawContent, from, to, domainName);
     await addLog({
       domainId,
       timestamp: new Date().toISOString(),

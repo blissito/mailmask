@@ -294,6 +294,28 @@ export async function listLogs(domainId: string, limit = 50): Promise<EmailLog[]
 
 // --- Subscription helpers ---
 
+export async function getUserBySubscriptionId(mpSubId: string): Promise<User | null> {
+  for await (const entry of kv.list<User>({ prefix: ["users"] })) {
+    if (entry.value.subscription?.mpSubscriptionId === mpSubId) return entry.value;
+  }
+  return null;
+}
+
+export async function extendSubscriptionPeriod(email: string, days: number): Promise<void> {
+  const user = await getUser(email);
+  if (!user?.subscription) return;
+  const existing = user.subscription.currentPeriodEnd
+    ? new Date(user.subscription.currentPeriodEnd)
+    : new Date();
+  const base = existing > new Date() ? existing : new Date();
+  base.setDate(base.getDate() + days);
+  await updateUserSubscription(email, {
+    ...user.subscription,
+    status: "active",
+    currentPeriodEnd: base.toISOString(),
+  });
+}
+
 export async function updateUserSubscription(email: string, sub: Subscription): Promise<User | null> {
   const user = await getUser(email);
   if (!user) return null;
@@ -375,6 +397,17 @@ export async function createUserIfNotExists(email: string, passwordHash: string)
     .set(["users", email], user)
     .commit();
   return result.ok;
+}
+
+// --- SNS message dedup ---
+
+export async function isMessageProcessed(messageId: string): Promise<boolean> {
+  const entry = await kv.get(["sns-processed", messageId]);
+  return entry.value !== null;
+}
+
+export async function markMessageProcessed(messageId: string): Promise<void> {
+  await kv.set(["sns-processed", messageId], true, { expireIn: 24 * 60 * 60 * 1000 });
 }
 
 // --- Test helpers ---

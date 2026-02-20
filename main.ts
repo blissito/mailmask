@@ -20,6 +20,8 @@ import {
   listLogs,
   PLANS,
   updateUserSubscription,
+  getUserBySubscriptionId,
+  extendSubscriptionPeriod,
   getUserPlanLimits,
   setVerifyToken,
   getUserByVerifyToken,
@@ -52,6 +54,7 @@ import {
   sendFromDomain,
 } from "./ses.ts";
 import { processInbound } from "./forwarding.ts";
+import "./cron.ts";
 
 // --- Fail-fast env validation (deferred for Deno Deploy compatibility) ---
 let envChecked = false;
@@ -220,10 +223,14 @@ const app = new Elysia()
   // --- CORS ---
   .onRequest(({ request }) => {
     ensureEnv();
+    const isDeploy = !!Deno.env.get("DENO_DEPLOYMENT_ID");
+    const corsOrigin = isDeploy
+      ? getMainDomainUrl()
+      : request.headers.get("origin") || "http://localhost:8000";
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
-          "access-control-allow-origin": getMainDomainUrl(),
+          "access-control-allow-origin": corsOrigin,
           "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
           "access-control-allow-headers": "content-type",
           "access-control-allow-credentials": "true",
@@ -232,15 +239,23 @@ const app = new Elysia()
       });
     }
   })
-  .onAfterHandle(({ response }) => {
+  .onAfterHandle(({ request, response }) => {
+    const isDeploy = !!Deno.env.get("DENO_DEPLOYMENT_ID");
+    const corsOrigin = isDeploy
+      ? getMainDomainUrl()
+      : request.headers.get("origin") || "http://localhost:8000";
     if (response instanceof Response) {
-      response.headers.set("access-control-allow-origin", getMainDomainUrl());
+      response.headers.set("access-control-allow-origin", corsOrigin);
       response.headers.set("access-control-allow-credentials", "true");
       response.headers.set("x-frame-options", "DENY");
       response.headers.set("x-content-type-options", "nosniff");
       response.headers.set(
         "referrer-policy",
         "strict-origin-when-cross-origin",
+      );
+      response.headers.set(
+        "content-security-policy",
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'",
       );
     }
     return response;
@@ -387,7 +402,10 @@ const app = new Elysia()
       JSON.stringify({
         email: user.email,
         domainsCount: domains.length,
-        subscription: user.subscription ?? { plan: "basico", status: "none" },
+        subscription: {
+          ...(user.subscription ?? { plan: "basico", status: "none" }),
+          currentPeriodEnd: user.subscription?.currentPeriodEnd ?? null,
+        },
         limits,
         emailVerified: user.emailVerified ?? false,
       }),
@@ -1242,74 +1260,83 @@ const app = new Elysia()
 
         if (email) {
           if (sub.status === "authorized") {
-            // Determine plan: from pending checkout or from amount
-            type PlanKey = "basico" | "freelancer" | "developer" | "pro" | "agencia";
-            let plan: PlanKey | undefined;
-
-            if (isGuestCheckout) {
-              const pendingPlan = await getPendingCheckout(externalRef);
-              if (pendingPlan) {
-                // pendingPlan may be "freelancer:yearly" or just "freelancer"
-                const basePlan = pendingPlan.split(":")[0];
-                if (basePlan in PLANS) {
-                  plan = basePlan as PlanKey;
-                }
-              }
-              await deletePendingCheckout(externalRef);
-            }
-
-            if (!plan) {
-              const amount = sub.auto_recurring?.transaction_amount ?? 0;
-              const amountToPlan: Record<number, PlanKey> = {
-                49: "basico", 449: "freelancer", 999: "developer", 299: "pro",
-                490: "basico", 4490: "freelancer", 9990: "developer",
-              };
-              plan = amountToPlan[amount];
-            }
-
-            if (!plan) {
-              console.warn(
-                `MP webhook: could not determine plan, not activating`,
-              );
-              return new Response("OK", { status: 200 });
-            }
-
-            // Guest checkout: create user if not exists (atomic to prevent race condition)
-            if (isGuestCheckout) {
-              const created = await createUserIfNotExists(email, await hashPassword(crypto.randomUUID()));
-              if (created) console.log(`Guest user created: ${email}`);
-            }
-
-            // Period end with buffer: yearly=370d, monthly=35d
+            // Check if this is a renewal for an existing active user
+            const existingUser = await getUser(email);
+            const existingSub = existingUser?.subscription;
             const isYearlyBilling = sub.auto_recurring?.frequency === 12;
-            const periodEnd = new Date();
-            periodEnd.setDate(periodEnd.getDate() + (isYearlyBilling ? 370 : 35));
+            const bufferDays = isYearlyBilling ? 370 : 35;
 
-            await updateUserSubscription(email, {
-              plan,
-              status: "active",
-              mpSubscriptionId: body.data.id,
-              currentPeriodEnd: periodEnd.toISOString(),
-            });
-            console.log(`Subscription activated: ${email} -> ${plan}`);
+            if (existingSub && existingSub.mpSubscriptionId === body.data.id && existingSub.status === "active") {
+              // Recurring charge — just extend the period
+              await extendSubscriptionPeriod(email, bufferDays);
+              console.log(`Subscription renewed: ${email} (+${bufferDays}d)`);
+            } else {
+              // First activation — determine plan
+              type PlanKey = "basico" | "freelancer" | "developer" | "pro" | "agencia";
+              let plan: PlanKey | undefined;
 
-            // Guest checkout: send welcome email with password-setup link
-            if (isGuestCheckout) {
-              const pwToken = crypto.randomUUID();
-              await setPasswordToken(email, pwToken);
-              const setPasswordUrl = `${getMainDomainUrl()}/set-password?token=${pwToken}`;
-              const alertFrom =
-                Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
-              try {
-                await sendFromDomain(
-                  alertFrom,
-                  email,
-                  "¡Bienvenido a MailMask! Configura tu contraseña",
-                  `¡Hola!\n\nTu suscripción al plan ${plan.charAt(0).toUpperCase() + plan.slice(1)} está activa.\n\nConfigura tu contraseña para acceder a tu cuenta:\n${setPasswordUrl}\n\nEste enlace es válido por 7 días.\n\n— MailMask`,
+              if (isGuestCheckout) {
+                const pendingPlan = await getPendingCheckout(externalRef);
+                if (pendingPlan) {
+                  const basePlan = pendingPlan.split(":")[0];
+                  if (basePlan in PLANS) {
+                    plan = basePlan as PlanKey;
+                  }
+                }
+                await deletePendingCheckout(externalRef);
+              }
+
+              if (!plan) {
+                const amount = sub.auto_recurring?.transaction_amount ?? 0;
+                const amountToPlan: Record<number, PlanKey> = {
+                  49: "basico", 449: "freelancer", 999: "developer", 299: "pro",
+                  490: "basico", 4490: "freelancer", 9990: "developer",
+                };
+                plan = amountToPlan[amount];
+              }
+
+              if (!plan) {
+                console.warn(
+                  `MP webhook: could not determine plan, not activating`,
                 );
-                console.log(`Welcome email sent to ${email}`);
-              } catch (err) {
-                console.error("Failed to send welcome email:", err);
+                return new Response("OK", { status: 200 });
+              }
+
+              // Guest checkout: create user if not exists
+              if (isGuestCheckout) {
+                const created = await createUserIfNotExists(email, await hashPassword(crypto.randomUUID()));
+                if (created) console.log(`Guest user created: ${email}`);
+              }
+
+              const periodEnd = new Date();
+              periodEnd.setDate(periodEnd.getDate() + bufferDays);
+
+              await updateUserSubscription(email, {
+                plan,
+                status: "active",
+                mpSubscriptionId: body.data.id,
+                currentPeriodEnd: periodEnd.toISOString(),
+              });
+              console.log(`Subscription activated: ${email} -> ${plan}`);
+
+              // Guest checkout: send welcome email with password-setup link
+              if (isGuestCheckout) {
+                const pwToken = crypto.randomUUID();
+                await setPasswordToken(email, pwToken);
+                const setPasswordUrl = `${getMainDomainUrl()}/set-password?token=${pwToken}`;
+                const alertFrom =
+                  Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+                try {
+                  await sendFromDomain(
+                    alertFrom,
+                    email,
+                    "¡Bienvenido a MailMask! Configura tu contraseña",
+                    `¡Hola!\n\nTu suscripción al plan ${plan.charAt(0).toUpperCase() + plan.slice(1)} está activa.\n\nConfigura tu contraseña para acceder a tu cuenta:\n${setPasswordUrl}\n\nEste enlace es válido por 7 días.\n\n— MailMask`,
+                  );
+                  console.log(`Welcome email sent to ${email}`);
+                } catch (err) {
+                  console.error("Failed to send welcome email:", err);
+                }
               }
             }
           } else if (sub.status === "cancelled") {
