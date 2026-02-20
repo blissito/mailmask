@@ -304,7 +304,12 @@ export async function updateUserSubscription(email: string, sub: Subscription): 
 
 export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; api: boolean; webhooks: boolean } {
   const sub = user.subscription;
-  if (sub && sub.status === "active") {
+  if (sub && (sub.status === "active" || sub.status === "cancelled")) {
+    // Expired: period ended (applies to both active and cancelled)
+    if (sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) < new Date()) {
+      return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, api: false, webhooks: false };
+    }
+    // Active or cancelled-but-still-in-paid-period: grant plan limits
     const plan = PLANS[sub.plan];
     return { domains: plan.domains, aliases: plan.aliases, rules: plan.rules, logDays: plan.logDays, sends: plan.sends, api: plan.api, webhooks: plan.webhooks };
   }
@@ -348,6 +353,28 @@ export async function updateUserPassword(email: string, passwordHash: string): P
   const user = await getUser(email);
   if (!user) return;
   await kv.set(["users", email], { ...user, passwordHash });
+}
+
+// --- Webhook idempotency ---
+
+export async function isWebhookProcessed(id: string): Promise<boolean> {
+  const entry = await kv.get(["webhook-processed", id]);
+  return entry.value !== null;
+}
+
+export async function markWebhookProcessed(id: string): Promise<void> {
+  await kv.set(["webhook-processed", id], true, { expireIn: 7 * 24 * 60 * 60 * 1000 });
+}
+
+// --- Atomic user creation (guest checkout) ---
+
+export async function createUserIfNotExists(email: string, passwordHash: string): Promise<boolean> {
+  const user: User = { email, passwordHash, createdAt: new Date().toISOString() };
+  const result = await kv.atomic()
+    .check({ key: ["users", email], versionstamp: null })
+    .set(["users", email], user)
+    .commit();
+  return result.ok;
 }
 
 // --- Test helpers ---

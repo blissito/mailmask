@@ -31,6 +31,9 @@ import {
   getEmailByPasswordToken,
   deletePasswordToken,
   updateUserPassword,
+  isWebhookProcessed,
+  markWebhookProcessed,
+  createUserIfNotExists,
 } from "./db.ts";
 import {
   hashPassword,
@@ -220,9 +223,10 @@ const app = new Elysia()
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
-          "access-control-allow-origin": "*",
+          "access-control-allow-origin": getMainDomainUrl(),
           "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
           "access-control-allow-headers": "content-type",
+          "access-control-allow-credentials": "true",
           "access-control-max-age": "86400",
         },
       });
@@ -230,7 +234,8 @@ const app = new Elysia()
   })
   .onAfterHandle(({ response }) => {
     if (response instanceof Response) {
-      response.headers.set("access-control-allow-origin", "*");
+      response.headers.set("access-control-allow-origin", getMainDomainUrl());
+      response.headers.set("access-control-allow-credentials", "true");
       response.headers.set("x-frame-options", "DENY");
       response.headers.set("x-content-type-options", "nosniff");
       response.headers.set(
@@ -270,7 +275,9 @@ const app = new Elysia()
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
 
-    const { email, password } = await request.json();
+    const body = await request.json();
+    const email = (body.email ?? "").toLowerCase().trim();
+    const password = body.password;
     if (!email || !password)
       return new Response(
         JSON.stringify({ error: "Email y contraseña requeridos" }),
@@ -324,7 +331,9 @@ const app = new Elysia()
     const limited = await rateLimitGuard(ip, 10, 60_000);
     if (limited) return limited;
 
-    const { email, password } = await request.json();
+    const loginBody = await request.json();
+    const email = (loginBody.email ?? "").toLowerCase().trim();
+    const password = loginBody.password;
     if (!email || !password)
       return new Response(
         JSON.stringify({ error: "Email y contraseña requeridos" }),
@@ -410,7 +419,8 @@ const app = new Elysia()
     const limited = await rateLimitGuard(ip, 3, 60_000);
     if (limited) return limited;
 
-    const { email } = await request.json();
+    const forgotBody = await request.json();
+    const email = (forgotBody.email ?? "").toLowerCase().trim();
     if (!email)
       return new Response(JSON.stringify({ error: "Email requerido" }), {
         status: 400,
@@ -1122,7 +1132,7 @@ const app = new Elysia()
             },
           }),
         },
-        payer_email: user.email,
+        payer_email: "guest@mailmask.app",
         back_url: backUrl,
         external_reference: user.email,
       };
@@ -1194,8 +1204,16 @@ const app = new Elysia()
     // Handle subscription_preapproval events
     if (body.type === "subscription_preapproval" && body.data?.id) {
       try {
+        // Idempotency: skip if already successfully processed
+        if (await isWebhookProcessed(body.data.id)) {
+          return new Response("OK", { status: 200 });
+        }
+
         const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
-        if (!mpAccessToken) return new Response("OK", { status: 200 });
+        if (!mpAccessToken) {
+          console.error("MP_ACCESS_TOKEN not configured");
+          return new Response("Server misconfigured", { status: 500 });
+        }
 
         const subRes = await fetch(
           `https://api.mercadopago.com/preapproval/${body.data.id}`,
@@ -1220,6 +1238,7 @@ const app = new Elysia()
         // Resolve email: for guest checkout use payer_email from MP, otherwise external_reference is the email
         let email = isGuestCheckout ? sub.payer_email : externalRef;
         if (!email) email = sub.payer_email;
+        if (email) email = email.toLowerCase().trim();
 
         if (email) {
           if (sub.status === "authorized") {
@@ -1255,19 +1274,16 @@ const app = new Elysia()
               return new Response("OK", { status: 200 });
             }
 
-            // Guest checkout: create user if not exists
+            // Guest checkout: create user if not exists (atomic to prevent race condition)
             if (isGuestCheckout) {
-              const existing = await getUser(email);
-              if (!existing) {
-                const randomPass = crypto.randomUUID();
-                const hash = await hashPassword(randomPass);
-                await createUser(email, hash);
-                console.log(`Guest user created: ${email}`);
-              }
+              const created = await createUserIfNotExists(email, await hashPassword(crypto.randomUUID()));
+              if (created) console.log(`Guest user created: ${email}`);
             }
 
+            // Period end with buffer: yearly=370d, monthly=35d
+            const isYearlyBilling = sub.auto_recurring?.frequency === 12;
             const periodEnd = new Date();
-            periodEnd.setDate(periodEnd.getDate() + 30);
+            periodEnd.setDate(periodEnd.getDate() + (isYearlyBilling ? 370 : 35));
 
             await updateUserSubscription(email, {
               plan,
@@ -1317,9 +1333,13 @@ const app = new Elysia()
               console.log(`Subscription paused (past_due): ${email}`);
             }
           }
+
+          // Mark as processed only after successful handling
+          await markWebhookProcessed(body.data.id);
         }
       } catch (err) {
         console.error("MP webhook processing error:", err);
+        return new Response("Internal error", { status: 500 });
       }
     }
 

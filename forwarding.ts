@@ -80,11 +80,15 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     const domain = await getDomainByName(domainName);
     if (!domain || !domain.verified) continue;
 
-    // Determine log TTL from owner's plan
+    // Check owner's plan — block forwarding if expired/no plan
     let logDays = 15; // default
     const owner = await getUser(domain.ownerEmail);
     if (owner) {
       const planLimits = getUserPlanLimits(owner);
+      if (planLimits.domains === 0) {
+        console.log(`Forwarding blocked for ${domain.ownerEmail}: no active plan`);
+        continue;
+      }
       if (planLimits.logDays > 0) logDays = planLimits.logDays;
     }
 
