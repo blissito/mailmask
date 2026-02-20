@@ -91,6 +91,8 @@ import {
   listBackups,
   getBackupFromS3,
   deleteBackupFromS3,
+  deleteConfigurationSet,
+  deleteDomainIdentity,
 } from "./ses.ts";
 import { processInbound } from "./forwarding.ts";
 import { log } from "./logger.ts";
@@ -761,7 +763,8 @@ const app = new Elysia()
       );
     }
 
-    // Create receipt rule for inbound
+    // Create receipt rule for inbound (clean up residual rule first)
+    try { await deleteReceiptRule(domain); } catch { /* ignore */ }
     try {
       await createReceiptRule(domain);
     } catch (err) {
@@ -874,12 +877,10 @@ const app = new Elysia()
       });
     }
 
-    // Clean up SES receipt rule
-    try {
-      await deleteReceiptRule(domain.domain);
-    } catch {
-      /* best effort */
-    }
+    // Clean up all SES resources (best effort)
+    try { await deleteReceiptRule(domain.domain); } catch { /* best effort */ }
+    try { await deleteConfigurationSet(domain.domain); } catch { /* best effort */ }
+    try { await deleteDomainIdentity(domain.domain); } catch { /* best effort */ }
 
     await deleteDomain(params.id);
     return new Response(JSON.stringify({ ok: true }), {

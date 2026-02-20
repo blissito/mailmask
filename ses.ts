@@ -177,6 +177,28 @@ export async function deleteReceiptRule(domain: string): Promise<void> {
   }
 }
 
+export async function deleteDomainIdentity(domain: string): Promise<void> {
+  try {
+    const ses = await getSesInbound();
+    const { DeleteIdentityCommand } = await import("@aws-sdk/client-ses");
+    await ses.send(new DeleteIdentityCommand({ Identity: domain }));
+  } catch (err) {
+    log("warn", "ses", "Could not delete domain identity", { domain, error: String(err) });
+  }
+}
+
+export async function deleteConfigurationSet(domain: string): Promise<void> {
+  try {
+    const ses = await getSesOutbound();
+    const { DeleteConfigurationSetCommand } = await import("@aws-sdk/client-ses");
+    await ses.send(new DeleteConfigurationSetCommand({
+      ConfigurationSetName: configSetName(domain),
+    }));
+  } catch (err) {
+    log("warn", "ses", "Could not delete configuration set", { domain, error: String(err) });
+  }
+}
+
 // --- Fetch raw email from S3 ---
 
 export async function fetchEmailFromS3(bucketName: string, objectKey: string): Promise<string> {
