@@ -254,6 +254,19 @@ function goBack() {
   renderDomains();
 }
 
+async function deleteDomain() {
+  if (!selectedDomain) return;
+  if (!confirm(`¿Eliminar dominio ${selectedDomain.domain}? Se borrarán todos los aliases y reglas.`)) return;
+  const res = await fetch(`/api/domains/${selectedDomain.id}`, { method: "DELETE" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    alert(data.error || "Error al eliminar dominio");
+    return;
+  }
+  goBack();
+  await loadDomains();
+}
+
 // --- Aliases ---
 
 async function loadAliases() {
@@ -510,6 +523,7 @@ function setupEventListeners() {
 
   // Back button
   document.getElementById("btn-back").addEventListener("click", goBack);
+  document.getElementById("btn-delete-domain").addEventListener("click", deleteDomain);
 
   // Tab buttons
   document.querySelectorAll(".tab-btn").forEach(btn => {
