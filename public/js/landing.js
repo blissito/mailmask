@@ -117,13 +117,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// Expose functions for onclick handlers
-window.toggleBilling = toggleBilling;
-window.startCheckout = startCheckout;
-window.currentBilling = "monthly";
-
-// Keep window.currentBilling in sync
-Object.defineProperty(window, "currentBilling", {
-  get: () => currentBilling,
-  set: (v) => { currentBilling = v; },
+// Bind billing toggle and checkout buttons
+document.getElementById("billing-toggle").addEventListener("click", toggleBilling);
+document.querySelectorAll(".checkout-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const plan = btn.closest("[data-plan]").dataset.plan;
+    startCheckout(plan, currentBilling, btn);
+  });
 });

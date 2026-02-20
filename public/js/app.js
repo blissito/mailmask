@@ -182,7 +182,7 @@ function renderDomains() {
   empty.classList.add("hidden");
   list.innerHTML = domains.map(d => `
     <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-zinc-600 transition-colors"
-         onclick="selectDomain('${esc(d.id)}')">
+         data-action="select-domain" data-domain-id="${esc(d.id)}">
       <div>
         <span class="font-semibold text-lg">${esc(d.domain)}</span>
         <span class="ml-3 text-xs px-2 py-0.5 rounded-full ${d.verified ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}">
@@ -257,8 +257,8 @@ function renderAliases(aliases) {
         ${a.forwardCount ? `<span class="text-xs text-zinc-500 ml-2">${a.forwardCount} reenviado${a.forwardCount === 1 ? '' : 's'}${a.lastFrom ? ` · último de ${esc(a.lastFrom)}` : ''}</span>` : ''}
       </div>
       <div class="flex items-center gap-2">
-        <button onclick="toggleAlias('${esc(a.alias)}', ${!a.enabled})" class="text-xs px-2 py-1 rounded ${a.enabled ? 'bg-green-900/30 text-green-400' : 'bg-zinc-700 text-zinc-400'}">${a.enabled ? 'Activo' : 'Inactivo'}</button>
-        <button onclick="removeAlias('${esc(a.alias)}')" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
+        <button data-action="toggle-alias" data-alias="${esc(a.alias)}" data-enabled="${!a.enabled}" class="text-xs px-2 py-1 rounded ${a.enabled ? 'bg-green-900/30 text-green-400' : 'bg-zinc-700 text-zinc-400'}">${a.enabled ? 'Activo' : 'Inactivo'}</button>
+        <button data-action="remove-alias" data-alias="${esc(a.alias)}" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
       </div>
     </div>
   `).join("");
@@ -315,7 +315,7 @@ function renderRules(rules) {
         <span class="text-zinc-200">${actionLabels[r.action]}</span>
         ${r.target ? `<span class="text-zinc-400 ml-1">${esc(r.target)}</span>` : ''}
       </div>
-      <button onclick="removeRule('${esc(r.id)}')" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
+      <button data-action="remove-rule" data-rule-id="${esc(r.id)}" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
     </div>
   `).join("");
 }
@@ -399,7 +399,7 @@ function renderDnsRecords() {
       </div>
       <div class="flex items-center gap-2">
         <code class="text-xs text-zinc-400 bg-zinc-900 px-2 py-1 rounded flex-1 truncate">${r.value}</code>
-        <button onclick="navigator.clipboard.writeText('${esc(r.value)}')" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Copiar</button>
+        <button data-action="copy" data-copy-value="${esc(r.value)}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Copiar</button>
       </div>
     </div>
   `).join("");
@@ -585,6 +585,43 @@ function setupEventListeners() {
       errEl.textContent = data.error || "Error al crear regla";
       errEl.classList.remove("hidden");
     }
+  });
+
+  // Empty state add domain button
+  document.getElementById("btn-add-domain-empty")?.addEventListener("click", showAddDomainModal);
+
+  // Cancel modal buttons
+  document.querySelectorAll(".btn-cancel-modal").forEach(btn => {
+    btn.addEventListener("click", () => hideModal(btn.dataset.modal));
+  });
+
+  // Event delegation: domains list
+  document.getElementById("domains-list").addEventListener("click", (e) => {
+    const el = e.target.closest("[data-action='select-domain']");
+    if (el) selectDomain(el.dataset.domainId);
+  });
+
+  // Event delegation: aliases list
+  document.getElementById("aliases-list").addEventListener("click", (e) => {
+    const toggle = e.target.closest("[data-action='toggle-alias']");
+    if (toggle) {
+      toggleAlias(toggle.dataset.alias, toggle.dataset.enabled === "true");
+      return;
+    }
+    const remove = e.target.closest("[data-action='remove-alias']");
+    if (remove) removeAlias(remove.dataset.alias);
+  });
+
+  // Event delegation: rules list
+  document.getElementById("rules-list").addEventListener("click", (e) => {
+    const remove = e.target.closest("[data-action='remove-rule']");
+    if (remove) removeRule(remove.dataset.ruleId);
+  });
+
+  // Event delegation: DNS copy buttons
+  document.getElementById("dns-records").addEventListener("click", (e) => {
+    const copy = e.target.closest("[data-action='copy']");
+    if (copy) navigator.clipboard.writeText(copy.dataset.copyValue);
   });
 
   // Close modals on backdrop click
