@@ -17,11 +17,11 @@
 
 ## Planes
 
-| Plan | Precio | Dominios | Aliases | Reglas | Logs |
-|------|--------|----------|---------|--------|------|
-| Basico | $99/mes | 1 | 10 | — | — |
-| Pro | $299/mes | 5 | 20 | 20 | 15 dias |
-| Agencia | $999/mes | 20 | 100 | 100 | 90 dias |
+| Plan    | Precio   | Dominios | Aliases | Reglas | Logs    |
+| ------- | -------- | -------- | ------- | ------ | ------- |
+| Basico  | $99/mes  | 1        | 10      | —      | —       |
+| Pro     | $299/mes | 5        | 20      | 20     | 15 dias |
+| Agencia | $999/mes | 20       | 100     | 100    | 90 dias |
 
 ## Stack
 
@@ -55,49 +55,54 @@ public/          — Frontend (HTML + vanilla JS)
 ## API
 
 ### Auth
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `POST` | `/api/auth/register` | Crear cuenta |
-| `POST` | `/api/auth/login` | Login (JWT cookie) |
-| `POST` | `/api/auth/logout` | Logout |
-| `GET`  | `/api/auth/me` | Usuario actual |
-| `GET`  | `/api/auth/verify-email` | Verificar email (token) |
-| `POST` | `/api/auth/forgot-password` | Recuperar password |
-| `POST` | `/api/auth/set-password` | Establecer nuevo password |
+
+| Metodo | Ruta                        | Descripcion               |
+| ------ | --------------------------- | ------------------------- |
+| `POST` | `/api/auth/register`        | Crear cuenta              |
+| `POST` | `/api/auth/login`           | Login (JWT cookie)        |
+| `POST` | `/api/auth/logout`          | Logout                    |
+| `GET`  | `/api/auth/me`              | Usuario actual            |
+| `GET`  | `/api/auth/verify-email`    | Verificar email (token)   |
+| `POST` | `/api/auth/forgot-password` | Recuperar password        |
+| `POST` | `/api/auth/set-password`    | Establecer nuevo password |
 
 ### Domains y aliases
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `GET`  | `/api/domains` | Listar dominios |
-| `POST` | `/api/domains` | Agregar dominio |
-| `GET`  | `/api/domains/:id` | Detalle de dominio |
-| `POST` | `/api/domains/:id/verify` | Verificar DNS |
-| `DELETE`| `/api/domains/:id` | Eliminar dominio |
-| `GET`  | `/api/domains/:id/aliases` | Listar aliases |
-| `POST` | `/api/domains/:id/aliases` | Crear alias |
-| `PUT`  | `/api/domains/:id/aliases/:alias` | Actualizar alias |
-| `DELETE`| `/api/domains/:id/aliases/:alias` | Eliminar alias |
+
+| Metodo   | Ruta                              | Descripcion        |
+| -------- | --------------------------------- | ------------------ |
+| `GET`    | `/api/domains`                    | Listar dominios    |
+| `POST`   | `/api/domains`                    | Agregar dominio    |
+| `GET`    | `/api/domains/:id`                | Detalle de dominio |
+| `POST`   | `/api/domains/:id/verify`         | Verificar DNS      |
+| `DELETE` | `/api/domains/:id`                | Eliminar dominio   |
+| `GET`    | `/api/domains/:id/aliases`        | Listar aliases     |
+| `POST`   | `/api/domains/:id/aliases`        | Crear alias        |
+| `PUT`    | `/api/domains/:id/aliases/:alias` | Actualizar alias   |
+| `DELETE` | `/api/domains/:id/aliases/:alias` | Eliminar alias     |
 
 ### Reglas y logs
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `GET`  | `/api/domains/:id/rules` | Listar reglas |
-| `POST` | `/api/domains/:id/rules` | Crear regla |
-| `DELETE`| `/api/domains/:id/rules/:ruleId` | Eliminar regla |
-| `GET`  | `/api/domains/:id/logs` | Ver logs de emails |
+
+| Metodo   | Ruta                             | Descripcion        |
+| -------- | -------------------------------- | ------------------ |
+| `GET`    | `/api/domains/:id/rules`         | Listar reglas      |
+| `POST`   | `/api/domains/:id/rules`         | Crear regla        |
+| `DELETE` | `/api/domains/:id/rules/:ruleId` | Eliminar regla     |
+| `GET`    | `/api/domains/:id/logs`          | Ver logs de emails |
 
 ### Billing
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| `POST` | `/api/billing/guest-checkout` | Checkout sin cuenta |
-| `POST` | `/api/billing/checkout` | Checkout autenticado |
-| `POST` | `/api/billing/cancel` | Cancelar suscripcion |
-| `GET`  | `/api/billing/status` | Estado de suscripcion |
-| `POST` | `/api/webhooks/mercadopago` | Webhook de MP |
+
+| Metodo | Ruta                          | Descripcion           |
+| ------ | ----------------------------- | --------------------- |
+| `POST` | `/api/billing/guest-checkout` | Checkout sin cuenta   |
+| `POST` | `/api/billing/checkout`       | Checkout autenticado  |
+| `POST` | `/api/billing/cancel`         | Cancelar suscripcion  |
+| `GET`  | `/api/billing/status`         | Estado de suscripcion |
+| `POST` | `/api/webhooks/mercadopago`   | Webhook de MP         |
 
 ### Webhooks
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
+
+| Metodo | Ruta                        | Descripcion        |
+| ------ | --------------------------- | ------------------ |
 | `POST` | `/api/webhooks/ses-inbound` | Webhook de SES/SNS |
 
 ## Quickstart
@@ -116,6 +121,6 @@ Deployado en [Deno Deploy](https://dash.deno.com). Push a `main` triggerea deplo
 
 ---
 
-Hecho con cafe por [**@blissito**](https://github.com/blissito)
+Hecho con 🫁 por [**@blissito**](https://github.com/blissito)
 
 [fixtergeek.com](https://www.fixtergeek.com) | [formmy.app](https://formmy.app)
