@@ -1,3 +1,5 @@
+const alertKv = await Deno.openKv();
+
 // Lazy-loaded AWS SDK clients to reduce cold start on Deno Deploy
 let _sesOutbound: any;
 let _sesInbound: any;
@@ -177,4 +179,49 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
     Source: from,
     Destinations: [to],
   }));
+}
+
+// --- Admin alerts with throttle ---
+
+export async function sendAlert(alertType: string, message: string): Promise<boolean> {
+  const alertEmail = Deno.env.get("ALERT_EMAIL") ?? "brenda@fixter.org,contacto@fixter.org";
+  if (!alertEmail) return false;
+
+  // Throttle: max 1 alert of same type per hour
+  const throttleKey = ["alert-throttle", alertType];
+  const existing = await alertKv.get(throttleKey);
+  if (existing.value) return false;
+
+  const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+  const recipients = alertEmail.split(",").map((e) => e.trim()).filter(Boolean);
+  try {
+    const ses = await getSesOutbound();
+    const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
+    const boundary = `----=_Part_${Date.now()}`;
+    const rawEmail = [
+      `From: ${alertFrom}`,
+      `To: ${recipients.join(", ")}`,
+      `Subject: [MailMask Alert] ${alertType}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      ``,
+      `--${boundary}`,
+      `Content-Type: text/plain; charset=UTF-8`,
+      `Content-Transfer-Encoding: 7bit`,
+      ``,
+      message,
+      ``,
+      `--${boundary}--`,
+    ].join("\r\n");
+    await ses.send(new SendRawEmailCommand({
+      RawMessage: { Data: new TextEncoder().encode(rawEmail) },
+      Source: alertFrom,
+      Destinations: recipients,
+    }));
+    await alertKv.set(throttleKey, true, { expireIn: 60 * 60 * 1000 }); // 1h
+    return true;
+  } catch (err) {
+    console.error(`Failed to send alert (${alertType}):`, err);
+    return false;
+  }
 }

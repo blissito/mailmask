@@ -36,6 +36,8 @@ import {
   isWebhookProcessed,
   markWebhookProcessed,
   createUserIfNotExists,
+  getQueueDepth,
+  getDeadLetterCount,
 } from "./db.ts";
 import {
   hashPassword,
@@ -52,6 +54,7 @@ import {
   createReceiptRule,
   deleteReceiptRule,
   sendFromDomain,
+  sendAlert,
 } from "./ses.ts";
 import { processInbound } from "./forwarding.ts";
 import "./cron.ts";
@@ -262,11 +265,21 @@ const app = new Elysia()
   })
 
   // --- Health ---
-  .get("/health", () => ({
-    status: "ok",
-    service: "mailmask",
-    timestamp: new Date().toISOString(),
-  }))
+  .get("/health", async () => {
+    const queueDepth = await getQueueDepth();
+    const deadLetterCount = await getDeadLetterCount();
+    const healthy = queueDepth <= 50 && deadLetterCount === 0;
+    return new Response(JSON.stringify({
+      status: healthy ? "ok" : "degraded",
+      service: "mailmask",
+      timestamp: new Date().toISOString(),
+      queueDepth,
+      deadLetterCount,
+    }), {
+      status: healthy ? 200 : 503,
+      headers: { "content-type": "application/json" },
+    });
+  })
 
   // --- Static pages ---
   .get("/", () => serveStatic("/landing.html"))
@@ -1319,13 +1332,13 @@ const app = new Elysia()
               });
               console.log(`Subscription activated: ${email} -> ${plan}`);
 
-              // Guest checkout: send welcome email with password-setup link
+              const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+
               if (isGuestCheckout) {
+                // Guest checkout: send welcome email with password-setup link
                 const pwToken = crypto.randomUUID();
                 await setPasswordToken(email, pwToken);
                 const setPasswordUrl = `${getMainDomainUrl()}/set-password?token=${pwToken}`;
-                const alertFrom =
-                  Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
                 try {
                   await sendFromDomain(
                     alertFrom,
@@ -1336,6 +1349,19 @@ const app = new Elysia()
                   console.log(`Welcome email sent to ${email}`);
                 } catch (err) {
                   console.error("Failed to send welcome email:", err);
+                }
+              } else {
+                // Authenticated checkout: send payment confirmation
+                try {
+                  await sendFromDomain(
+                    alertFrom,
+                    email,
+                    "Confirmación de pago — MailMask",
+                    `¡Hola!\n\nTu pago fue procesado exitosamente. Tu plan ${plan.charAt(0).toUpperCase() + plan.slice(1)} está activo.\n\nPuedes administrar tu cuenta en:\n${getMainDomainUrl()}/app\n\nGracias por usar MailMask.\n\n— MailMask`,
+                  );
+                  console.log(`Payment confirmation sent to ${email}`);
+                } catch (err) {
+                  console.error("Failed to send payment confirmation:", err);
                 }
               }
             }
@@ -1483,6 +1509,19 @@ const app = new Elysia()
       });
     }
   });
+
+// --- Monitoring cron (every 5 minutes) ---
+
+Deno.cron("queue-monitor", "*/5 * * * *", async () => {
+  const queueDepth = await getQueueDepth();
+  const deadLetterCount = await getDeadLetterCount();
+
+  if (deadLetterCount > 0) {
+    await sendAlert("dead-letter-queue", `Dead-letter queue has ${deadLetterCount} item(s). Emails failed permanently after max retries.\nQueue depth: ${queueDepth}`);
+  } else if (queueDepth > 10) {
+    await sendAlert("queue-backlog", `Forward queue backlog: ${queueDepth} items pending retry.`);
+  }
+});
 
 const port = parseInt(Deno.env.get("PORT") ?? "8000");
 Deno.serve({ port }, (req) => app.fetch(req));

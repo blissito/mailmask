@@ -410,6 +410,87 @@ export async function markMessageProcessed(messageId: string): Promise<void> {
   await kv.set(["sns-processed", messageId], true, { expireIn: 24 * 60 * 60 * 1000 });
 }
 
+// --- Forward queue (retry on SES failure) ---
+
+export interface ForwardQueueItem {
+  id: string;
+  rawContent: string;
+  from: string;
+  to: string;
+  domainId: string;
+  domainName: string;
+  originalTo: string;
+  subject: string;
+  logDays: number;
+  attemptCount: number;
+  nextRetryAt: string; // ISO date
+  createdAt: string;
+  lastError?: string;
+}
+
+const RETRY_DELAYS = [5 * 60_000, 30 * 60_000, 2 * 60 * 60_000]; // 5min, 30min, 2hrs
+const MAX_ATTEMPTS = 3;
+const QUEUE_TTL = 48 * 60 * 60 * 1000; // 48h
+
+export { RETRY_DELAYS, MAX_ATTEMPTS };
+
+export async function enqueueForward(item: Omit<ForwardQueueItem, "id" | "createdAt" | "attemptCount" | "nextRetryAt">, error?: string): Promise<ForwardQueueItem> {
+  const id = crypto.randomUUID();
+  const now = new Date();
+  const entry: ForwardQueueItem = {
+    ...item,
+    id,
+    attemptCount: 0,
+    nextRetryAt: new Date(now.getTime() + RETRY_DELAYS[0]).toISOString(),
+    createdAt: now.toISOString(),
+    lastError: error,
+  };
+  await kv.set(["forward-queue", id], entry, { expireIn: QUEUE_TTL });
+  return entry;
+}
+
+export async function getForwardQueueItem(id: string): Promise<ForwardQueueItem | null> {
+  const entry = await kv.get<ForwardQueueItem>(["forward-queue", id]);
+  return entry.value;
+}
+
+export async function updateForwardQueueItem(item: ForwardQueueItem): Promise<void> {
+  await kv.set(["forward-queue", item.id], item, { expireIn: QUEUE_TTL });
+}
+
+export async function dequeueForward(id: string): Promise<void> {
+  await kv.delete(["forward-queue", id]);
+}
+
+export async function listForwardQueue(): Promise<ForwardQueueItem[]> {
+  const items: ForwardQueueItem[] = [];
+  for await (const entry of kv.list<ForwardQueueItem>({ prefix: ["forward-queue"] })) {
+    items.push(entry.value);
+  }
+  return items;
+}
+
+export async function moveToDeadLetter(item: ForwardQueueItem): Promise<void> {
+  await kv.set(["dead-letter", item.id], item, { expireIn: 30 * 24 * 60 * 60 * 1000 }); // 30d
+  await kv.delete(["forward-queue", item.id]);
+}
+
+export async function getQueueDepth(): Promise<number> {
+  let count = 0;
+  for await (const _ of kv.list({ prefix: ["forward-queue"] })) {
+    count++;
+  }
+  return count;
+}
+
+export async function getDeadLetterCount(): Promise<number> {
+  let count = 0;
+  for await (const _ of kv.list({ prefix: ["dead-letter"] })) {
+    count++;
+  }
+  return count;
+}
+
 // --- Test helpers ---
 
 export function _getKv() {

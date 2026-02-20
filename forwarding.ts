@@ -1,5 +1,5 @@
-import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, type Rule } from "./db.ts";
-import { forwardEmail, fetchEmailFromS3 } from "./ses.ts";
+import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, type Rule, type ForwardQueueItem } from "./db.ts";
+import { forwardEmail, fetchEmailFromS3, sendAlert } from "./ses.ts";
 
 // --- SNS notification types ---
 
@@ -173,7 +173,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
 
 // --- Rule evaluation ---
 
-function evaluateRules(rules: Rule[], email: { to: string; from: string; subject: string }): Rule | null {
+export function evaluateRules(rules: Rule[], email: { to: string; from: string; subject: string }): Rule | null {
   for (const rule of rules) {
     if (!rule.enabled) continue;
 
@@ -227,6 +227,7 @@ async function doForward(rawContent: string, from: string, to: string, domainId:
       sizeBytes: rawContent.length,
     }, logDays);
   } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
     await addLog({
       domainId,
       timestamp: new Date().toISOString(),
@@ -234,7 +235,67 @@ async function doForward(rawContent: string, from: string, to: string, domainId:
       status: "failed",
       forwardedTo: to,
       sizeBytes: rawContent.length,
-      error: err instanceof Error ? err.message : String(err),
+      error: errorMsg,
     }, logDays);
+
+    // Enqueue for retry
+    try {
+      await enqueueForward({ rawContent, from, to, domainId, domainName, originalTo, subject, logDays }, errorMsg);
+      console.log(`Enqueued forward retry: ${from} -> ${to} (${errorMsg})`);
+    } catch (enqErr) {
+      console.error("Failed to enqueue forward retry:", enqErr);
+    }
   }
 }
+
+// --- Retry cron (every 5 minutes) ---
+
+Deno.cron("forward-retry", "*/5 * * * *", async () => {
+  const now = Date.now();
+  const items = await listForwardQueue();
+  let processed = 0;
+  let deadLettered = 0;
+
+  for (const item of items) {
+    if (new Date(item.nextRetryAt).getTime() > now) continue;
+
+    const attempt = item.attemptCount + 1;
+
+    try {
+      await forwardEmail(item.rawContent, item.from, item.to, item.domainName);
+      await addLog({
+        domainId: item.domainId,
+        timestamp: new Date().toISOString(),
+        from: item.from, to: item.originalTo, subject: item.subject,
+        status: "forwarded",
+        forwardedTo: item.to,
+        sizeBytes: item.rawContent.length,
+      }, item.logDays);
+      await dequeueForward(item.id);
+      processed++;
+      console.log(`[retry] Forwarded on attempt ${attempt}: ${item.from} -> ${item.to}`);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+
+      if (attempt >= MAX_ATTEMPTS) {
+        await moveToDeadLetter({ ...item, attemptCount: attempt, lastError: errorMsg });
+        deadLettered++;
+        console.error(`[retry] Dead-lettered after ${attempt} attempts: ${item.from} -> ${item.to}`);
+        await sendAlert("dead-letter", `Email dead-lettered after ${attempt} attempts.\nFrom: ${item.from}\nTo: ${item.to}\nSubject: ${item.subject}\nError: ${errorMsg}`);
+      } else {
+        const delay = RETRY_DELAYS[Math.min(attempt, RETRY_DELAYS.length - 1)];
+        await updateForwardQueueItem({
+          ...item,
+          attemptCount: attempt,
+          nextRetryAt: new Date(now + delay).toISOString(),
+          lastError: errorMsg,
+        });
+        console.log(`[retry] Attempt ${attempt} failed, next retry in ${delay / 60_000}min: ${item.from} -> ${item.to}`);
+      }
+    }
+  }
+
+  if (processed > 0 || deadLettered > 0) {
+    console.log(`[retry] Processed: ${processed}, dead-lettered: ${deadLettered}`);
+  }
+});

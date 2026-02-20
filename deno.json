@@ -2,7 +2,7 @@
   "tasks": {
     "dev": "deno run --allow-net --allow-env --allow-read --env --watch --unstable-kv main.ts",
     "start": "deno run --allow-net --allow-env --allow-read --unstable-kv main.ts",
-    "test": "deno test --allow-net --allow-env --allow-read --unstable-kv"
+    "test": "deno test --allow-net --allow-env --allow-read --unstable-kv --unstable-cron"
   },
   "imports": {
     "elysia": "npm:elysia@^1.2",
