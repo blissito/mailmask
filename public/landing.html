@@ -69,6 +69,7 @@
         animate,
         stagger,
       } from "https://cdn.jsdelivr.net/npm/motion@11.13.5/+esm";
+      window._motionAnimate = animate;
       document.addEventListener("DOMContentLoaded", () => {
         animate(
           ".hero-title",
@@ -466,7 +467,7 @@
           <span id="toggle-dot" class="absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform"></span>
         </button>
         <span id="label-yearly" class="text-sm font-semibold text-zinc-500">Anual</span>
-        <span id="yearly-badge" class="hidden text-xs bg-green-900/50 text-green-400 font-bold px-2 py-1 rounded-full">2 meses gratis</span>
+        <span id="promo-badge" class="text-xs bg-green-900/50 text-green-400 font-bold px-2 py-1 rounded-full">Primer mes gratis</span>
       </div>
 
       <div class="grid md:grid-cols-3 gap-6">
@@ -475,10 +476,7 @@
           class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 flex flex-col opacity-0"
           data-plan="basico" data-monthly="49" data-yearly="490" data-savings="98"
         >
-          <span
-            class="plan-trial inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3"
-            >Primer mes gratis</span
-          >
+
           <h3 class="font-semibold text-lg">Básico</h3>
           <p class="text-sm text-zinc-500 mt-1">Solo reenvío — 1 dominio</p>
           <div class="mt-4">
@@ -509,10 +507,7 @@
             class="absolute -top-3 left-1/2 -translate-x-1/2 bg-mask-600 text-white text-xs font-bold px-3 py-1 rounded-full"
             >POPULAR</span
           >
-          <span
-            class="plan-trial inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3"
-            >Primer mes gratis</span
-          >
+
           <h3 class="font-semibold text-lg">Freelancer</h3>
           <p class="text-sm text-zinc-400 mt-1">Ideal para agencias y diseñadores web</p>
           <div class="mt-4">
@@ -544,10 +539,7 @@
           class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 flex flex-col opacity-0"
           data-plan="developer" data-monthly="999" data-yearly="9,990" data-savings="1,998"
         >
-          <span
-            class="plan-trial inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3"
-            >Primer mes gratis</span
-          >
+
           <h3 class="font-semibold text-lg">Developer</h3>
           <p class="text-sm text-zinc-400 mt-1">API & SDK para tu SaaS</p>
           <div class="mt-4">
@@ -729,33 +721,34 @@
         const toggle = document.getElementById("billing-toggle");
         const labelM = document.getElementById("label-monthly");
         const labelY = document.getElementById("label-yearly");
-        const badge = document.getElementById("yearly-badge");
+        const badge = document.getElementById("promo-badge");
 
         dot.style.transform = isYearly ? "translateX(28px)" : "translateX(0)";
         toggle.className = `relative w-14 h-7 ${isYearly ? "bg-green-600" : "bg-zinc-700"} rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-mask-500`;
         labelM.className = `text-sm font-semibold ${isYearly ? "text-zinc-500" : "text-zinc-100"}`;
         labelY.className = `text-sm font-semibold ${isYearly ? "text-zinc-100" : "text-zinc-500"}`;
-        badge.classList.toggle("hidden", !isYearly);
+        badge.textContent = isYearly ? "2 meses gratis" : "Primer mes gratis";
 
+        const anim = window._motionAnimate;
         document.querySelectorAll(".pricing-card[data-plan]").forEach(card => {
           const price = card.querySelector(".plan-price");
           const period = card.querySelector(".plan-period");
           const savings = card.querySelector(".plan-savings");
-          const trial = card.querySelector(".plan-trial");
 
           if (isYearly) {
             price.textContent = `$${card.dataset.yearly}`;
             period.textContent = "/año";
             savings.textContent = `Ahorras $${card.dataset.savings}`;
             savings.classList.remove("hidden");
-            if (trial) trial.classList.add("hidden");
+            if (anim) anim(savings, { opacity: [0, 1], y: [6, 0] }, { duration: 0.3, easing: "ease-out" });
           } else {
             price.textContent = `$${card.dataset.monthly}`;
             period.textContent = "/mes";
             savings.classList.add("hidden");
-            if (trial) trial.classList.remove("hidden");
           }
+          if (anim) anim(price, { opacity: [0, 1], y: [8, 0] }, { duration: 0.3, easing: "ease-out" });
         });
+        if (anim) anim(badge, { opacity: [0, 1], scale: [0.9, 1] }, { duration: 0.25, easing: "ease-out" });
       }
 
       async function startCheckout(plan, billing, btn) {
