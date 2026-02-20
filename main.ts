@@ -38,6 +38,33 @@ import {
   createUserIfNotExists,
   getQueueDepth,
   getDeadLetterCount,
+  // Mesa + outbound
+  listConversations,
+  getConversation,
+  updateConversation,
+  listMessages,
+  addMessage,
+  addNote,
+  listNotes,
+  createAgent,
+  getAgentByEmail,
+  listAgents,
+  deleteAgent,
+  countAgents,
+  createAgentInvite,
+  getAgentInvite,
+  deleteAgentInvite,
+  addSuppression,
+  isSuppressed,
+  incrementSendCount,
+  getSendCount,
+  createBulkJob,
+  getBulkJob,
+  updateBulkJob,
+  listPendingBulkJobs,
+  getDomainMesaSettings,
+  setDomainMesaEnabled,
+  PLAN_MESA_LIMITS,
 } from "./db.ts";
 import {
   hashPassword,
@@ -58,6 +85,7 @@ import {
   checkSesHealth,
   putBackupToS3,
   deleteOldBackups,
+  getConfigSetName,
 } from "./ses.ts";
 import { processInbound } from "./forwarding.ts";
 import { log } from "./logger.ts";
@@ -403,6 +431,16 @@ const app = new Elysia()
         JSON.stringify({ error: "Email y contraseña requeridos" }),
         { status: 400 },
       );
+
+    // Per-email rate limit: 5 attempts per 15 minutes (prevents credential stuffing across IPs)
+    const emailRl = await checkRateLimit(`login:${email}`, 5, 15 * 60_000);
+    if (!emailRl.allowed) {
+      const waitMin = Math.max(1, Math.ceil((emailRl.resetAt - Date.now()) / 60_000));
+      return new Response(
+        JSON.stringify({ error: `Demasiados intentos. Esperá ${waitMin} minuto${waitMin > 1 ? "s" : ""}.` }),
+        { status: 429, headers: { "content-type": "application/json", "retry-after": String(Math.ceil((emailRl.resetAt - Date.now()) / 1000)) } },
+      );
+    }
 
     const user = await getUser(email);
     if (!user)
