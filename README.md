@@ -20,8 +20,8 @@
 | Plan       | Precio    | Dominios | Aliases/dom | Envíos/día | Reglas/dom | Logs     |
 | ---------- | --------- | -------- | ----------- | ---------- | ---------- | -------- |
 | Basico     | $49/mes   | 1        | 5           | —          | —          | —        |
-| Freelancer | $449/mes  | 15       | 50          | 5,000      | 50         | 30 dias  |
-| Developer  | $999/mes  | 20       | 100         | 10,000     | 100        | 90 dias  |
+| Freelancer | $449/mes  | 15       | 50          | 500        | 50         | 30 dias  |
+| Developer  | $999/mes  | 20       | 100         | 2,000      | 100        | 90 dias  |
 
 ## Stack
 
