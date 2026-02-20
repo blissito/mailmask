@@ -10,19 +10,39 @@
       content="Recibe y envía email desde tu dominio por $99 MXN/mes. Sin servidores, sin Google Workspace. Configura en 2 minutos."
     />
     <link rel="canonical" href="https://mailmask.easybits.cloud/" />
-    <link rel="alternate" hreflang="es-MX" href="https://mailmask.easybits.cloud/" />
-    <link rel="alternate" hreflang="x-default" href="https://mailmask.easybits.cloud/" />
+    <link
+      rel="alternate"
+      hreflang="es-MX"
+      href="https://mailmask.easybits.cloud/"
+    />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://mailmask.easybits.cloud/"
+    />
     <!-- Open Graph -->
-    <meta property="og:title" content="MailMask — Email profesional en tu dominio" />
-    <meta property="og:description" content="Recibe y envía email desde tu dominio por $99 MXN/mes. Sin servidores, sin Google Workspace. Configura en 2 minutos." />
+    <meta
+      property="og:title"
+      content="MailMask — Email profesional en tu dominio"
+    />
+    <meta
+      property="og:description"
+      content="Recibe y envía email desde tu dominio por $99 MXN/mes. Sin servidores, sin Google Workspace. Configura en 2 minutos."
+    />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://mailmask.easybits.cloud/" />
     <meta property="og:locale" content="es_MX" />
     <meta property="og:site_name" content="MailMask" />
     <!-- Twitter -->
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="MailMask — Email profesional en tu dominio" />
-    <meta name="twitter:description" content="Recibe y envía email desde tu dominio por $99 MXN/mes. Sin servidores, sin Google Workspace." />
+    <meta
+      name="twitter:title"
+      content="MailMask — Email profesional en tu dominio"
+    />
+    <meta
+      name="twitter:description"
+      content="Recibe y envía email desde tu dominio por $99 MXN/mes. Sin servidores, sin Google Workspace."
+    />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -90,48 +110,70 @@
       });
     </script>
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "¿Qué es una máscara de email?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Una máscara (alias) es una dirección como ventas@tudominio.com que reenvía los emails a tu inbox personal (Gmail, Outlook, etc.). No necesitas crear cuentas de correo nuevas." }
-        },
-        {
-          "@type": "Question",
-          "name": "¿Necesito un servidor de correo?",
-          "acceptedAnswer": { "@type": "Answer", "text": "No. MailMask se encarga de todo. Solo necesitas configurar unos registros DNS en tu proveedor de dominio y listo. No hay servidores que mantener." }
-        },
-        {
-          "@type": "Question",
-          "name": "¿Puedo enviar emails desde mi dominio?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Sí. Los planes Pro y Agencia incluyen envío autenticado con DKIM y SPF, para que tus emails no caigan en spam." }
-        },
-        {
-          "@type": "Question",
-          "name": "¿Qué pasa con mis emails si cancelo?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Al cancelar, mantienes acceso hasta el fin del periodo pagado. Después, el reenvío se detiene pero no pierdes emails anteriores (ya están en tu inbox)." }
-        },
-        {
-          "@type": "Question",
-          "name": "¿Es seguro? ¿Leen mis emails?",
-          "acceptedAnswer": { "@type": "Answer", "text": "No leemos ni almacenamos el contenido de tus emails. Se procesan en tiempo real y se reenvían inmediatamente. Usamos Amazon SES, la misma infraestructura que usan miles de empresas." }
-        },
-        {
-          "@type": "Question",
-          "name": "¿Cuánto tarda la configuración?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Crear tu cuenta toma 1 minuto. Configurar los registros DNS depende de tu proveedor, pero generalmente toma entre 2 y 10 minutos. La propagación DNS puede tardar hasta 48 horas, aunque normalmente es mucho menos." }
-        }
-      ]
-    }
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "¿Qué es una máscara de email?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Una máscara (alias) es una dirección como ventas@tudominio.com que reenvía los emails a tu inbox personal (Gmail, Outlook, etc.). No necesitas crear cuentas de correo nuevas."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "¿Necesito un servidor de correo?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. MailMask se encarga de todo. Solo necesitas configurar unos registros DNS en tu proveedor de dominio y listo. No hay servidores que mantener."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "¿Puedo enviar emails desde mi dominio?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Sí. Los planes Pro y Agencia incluyen envío autenticado con DKIM y SPF, para que tus emails no caigan en spam."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "¿Qué pasa con mis emails si cancelo?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Al cancelar, mantienes acceso hasta el fin del periodo pagado. Después, el reenvío se detiene pero no pierdes emails anteriores (ya están en tu inbox)."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "¿Es seguro? ¿Leen mis emails?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No leemos ni almacenamos el contenido de tus emails. Se procesan en tiempo real y se reenvían inmediatamente. Usamos Amazon SES, la misma infraestructura que usan miles de empresas."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "¿Cuánto tarda la configuración?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Crear tu cuenta toma 1 minuto. Configurar los registros DNS depende de tu proveedor, pero generalmente toma entre 2 y 10 minutos. La propagación DNS puede tardar hasta 48 horas, aunque normalmente es mucho menos."
+            }
+          }
+        ]
+      }
     </script>
   </head>
   <body class="bg-zinc-950 text-zinc-100 antialiased">
     <!-- Success banner (guest checkout redirect) -->
-    <div id="success-banner" class="hidden fixed top-0 inset-x-0 z-50 bg-emerald-600 text-white text-center py-3 px-4 text-sm font-medium shadow-lg">
-      ¡Listo! Revisa tu email para configurar tu contraseña y empezar a usar MailMask.
+    <div
+      id="success-banner"
+      class="hidden fixed top-0 inset-x-0 z-50 bg-emerald-600 text-white text-center py-3 px-4 text-sm font-medium shadow-lg"
+    >
+      ¡Listo! Revisa tu email para configurar tu contraseña y empezar a usar
+      MailMask.
     </div>
     <script>
       if (new URLSearchParams(window.location.search).get("success") === "1") {
@@ -144,7 +186,13 @@
     >
       <!-- Mascarita icon -->
       <div class="mb-6">
-        <svg class="w-20 h-20 mx-auto" viewBox="0 0 80 80" fill="none" aria-label="MailMask"><title>MailMask</title>
+        <svg
+          class="w-20 h-20 mx-auto"
+          viewBox="0 0 80 80"
+          fill="none"
+          aria-label="MailMask"
+        >
+          <title>MailMask</title>
           <ellipse cx="40" cy="42" rx="28" ry="24" fill="#dc2626" />
           <ellipse cx="40" cy="38" rx="28" ry="22" fill="#ef4444" />
           <!-- Eye holes -->
@@ -226,9 +274,15 @@
       </p>
 
       <!-- Success banner after MP payment -->
-      <div id="success-banner" class="hidden mt-6 bg-green-900/50 border border-green-700 text-green-300 px-6 py-4 rounded-xl max-w-lg">
+      <div
+        id="success-banner"
+        class="hidden mt-6 bg-green-900/50 border border-green-700 text-green-300 px-6 py-4 rounded-xl max-w-lg"
+      >
         <p class="font-semibold text-lg">¡Pago recibido!</p>
-        <p class="text-sm mt-1">Revisa tu correo electrónico para configurar tu contraseña y acceder a tu cuenta.</p>
+        <p class="text-sm mt-1">
+          Revisa tu correo electrónico para configurar tu contraseña y acceder a
+          tu cuenta.
+        </p>
       </div>
     </section>
 
@@ -314,7 +368,7 @@
           <div class="text-zinc-400">Máscaras (alias)</div>
           <div class="text-center text-zinc-500">1 por usuario</div>
           <div class="text-center text-mask-400 font-semibold">
-            3 — 25 según plan
+            3 — 2000 según plan
           </div>
         </div>
         <div
@@ -330,7 +384,7 @@
           <div class="text-zinc-400">Reglas de routing</div>
           <div class="text-center text-zinc-500">Limitadas</div>
           <div class="text-center text-mask-400 font-semibold">
-            3 — 10 según plan
+            3 — 2000 según plan
           </div>
         </div>
       </div>
@@ -505,46 +559,100 @@
       <h2 class="text-2xl font-bold text-center mb-12">Preguntas frecuentes</h2>
       <div class="space-y-6">
         <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center">
+          <summary
+            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
+          >
             ¿Qué es una máscara de email?
-            <span class="text-zinc-500 group-open:rotate-45 transition-transform text-xl">+</span>
+            <span
+              class="text-zinc-500 group-open:rotate-45 transition-transform text-xl"
+              >+</span
+            >
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">Una máscara (alias) es una dirección como ventas@tudominio.com que reenvía los emails a tu inbox personal (Gmail, Outlook, etc.). No necesitas crear cuentas de correo nuevas.</p>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">
+            Una máscara (alias) es una dirección como ventas@tudominio.com que
+            reenvía los emails a tu inbox personal (Gmail, Outlook, etc.). No
+            necesitas crear cuentas de correo nuevas.
+          </p>
         </details>
         <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center">
+          <summary
+            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
+          >
             ¿Necesito un servidor de correo?
-            <span class="text-zinc-500 group-open:rotate-45 transition-transform text-xl">+</span>
+            <span
+              class="text-zinc-500 group-open:rotate-45 transition-transform text-xl"
+              >+</span
+            >
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">No. MailMask se encarga de todo. Solo necesitas configurar unos registros DNS en tu proveedor de dominio y listo. No hay servidores que mantener.</p>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">
+            No. MailMask se encarga de todo. Solo necesitas configurar unos
+            registros DNS en tu proveedor de dominio y listo. No hay servidores
+            que mantener.
+          </p>
         </details>
         <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center">
+          <summary
+            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
+          >
             ¿Puedo enviar emails desde mi dominio?
-            <span class="text-zinc-500 group-open:rotate-45 transition-transform text-xl">+</span>
+            <span
+              class="text-zinc-500 group-open:rotate-45 transition-transform text-xl"
+              >+</span
+            >
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">Sí. Los planes Pro y Agencia incluyen envío autenticado con DKIM y SPF, para que tus emails no caigan en spam.</p>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">
+            Sí. Los planes Pro y Agencia incluyen envío autenticado con DKIM y
+            SPF, para que tus emails no caigan en spam.
+          </p>
         </details>
         <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center">
+          <summary
+            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
+          >
             ¿Qué pasa con mis emails si cancelo?
-            <span class="text-zinc-500 group-open:rotate-45 transition-transform text-xl">+</span>
+            <span
+              class="text-zinc-500 group-open:rotate-45 transition-transform text-xl"
+              >+</span
+            >
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">Al cancelar, mantienes acceso hasta el fin del periodo pagado. Después, el reenvío se detiene pero no pierdes emails anteriores (ya están en tu inbox).</p>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">
+            Al cancelar, mantienes acceso hasta el fin del periodo pagado.
+            Después, el reenvío se detiene pero no pierdes emails anteriores (ya
+            están en tu inbox).
+          </p>
         </details>
         <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center">
+          <summary
+            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
+          >
             ¿Es seguro? ¿Leen mis emails?
-            <span class="text-zinc-500 group-open:rotate-45 transition-transform text-xl">+</span>
+            <span
+              class="text-zinc-500 group-open:rotate-45 transition-transform text-xl"
+              >+</span
+            >
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">No leemos ni almacenamos el contenido de tus emails. Se procesan en tiempo real y se reenvían inmediatamente. Usamos Amazon SES, la misma infraestructura que usan miles de empresas.</p>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">
+            No leemos ni almacenamos el contenido de tus emails. Se procesan en
+            tiempo real y se reenvían inmediatamente. Usamos Amazon SES, la
+            misma infraestructura que usan miles de empresas.
+          </p>
         </details>
         <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center">
+          <summary
+            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
+          >
             ¿Cuánto tarda la configuración?
-            <span class="text-zinc-500 group-open:rotate-45 transition-transform text-xl">+</span>
+            <span
+              class="text-zinc-500 group-open:rotate-45 transition-transform text-xl"
+              >+</span
+            >
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">Crear tu cuenta toma 1 minuto. Configurar los registros DNS depende de tu proveedor, pero generalmente toma entre 2 y 10 minutos. La propagación DNS puede tardar hasta 48 horas, aunque normalmente es mucho menos.</p>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">
+            Crear tu cuenta toma 1 minuto. Configurar los registros DNS depende
+            de tu proveedor, pero generalmente toma entre 2 y 10 minutos. La
+            propagación DNS puede tardar hasta 48 horas, aunque normalmente es
+            mucho menos.
+          </p>
         </details>
       </div>
     </section>
@@ -563,9 +671,15 @@
           MailMask · easybits.cloud
         </div>
         <div class="text-zinc-500 text-sm flex gap-4">
-          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
-          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
-          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+          <a href="/terms" class="hover:text-zinc-300 transition-colors"
+            >Términos</a
+          >
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors"
+            >Privacidad</a
+          >
+          <a href="/login" class="hover:text-zinc-300 transition-colors"
+            >Iniciar sesión</a
+          >
         </div>
       </div>
     </footer>
