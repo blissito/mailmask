@@ -765,7 +765,14 @@ const app = new Elysia()
     try {
       await createReceiptRule(domain);
     } catch (err) {
-      log("warn", "ses", "Could not create receipt rule (may already exist)", { error: String(err) });
+      const errStr = String(err);
+      if (!errStr.includes("AlreadyExists")) {
+        log("error", "ses", "Failed to create receipt rule", { domain, error: errStr });
+        return new Response(
+          JSON.stringify({ error: "No se pudo configurar la recepción de emails. Intenta de nuevo." }),
+          { status: 500 },
+        );
+      }
     }
 
     const newDomain = await createDomain(

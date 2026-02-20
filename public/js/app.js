@@ -421,14 +421,19 @@ function renderDnsRecords() {
   ];
 
   records.innerHTML = dnsItems.map(r => `
-    <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg p-3">
-      <div class="flex items-center gap-2 mb-1">
-        <span class="text-xs font-mono bg-zinc-700 px-2 py-0.5 rounded">${r.type}</span>
-        <span class="text-sm text-zinc-300 font-mono truncate">${r.name}</span>
+    <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg p-3 space-y-2">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-mono bg-zinc-700 px-2 py-0.5 rounded shrink-0">${r.type}</span>
       </div>
       <div class="flex items-center gap-2">
-        <code class="text-xs text-zinc-400 bg-zinc-900 px-2 py-1 rounded flex-1 truncate">${r.value}</code>
-        <button data-action="copy" data-copy-value="${esc(r.value)}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Copiar</button>
+        <span class="text-xs text-zinc-500 shrink-0 w-12">Nombre</span>
+        <code class="text-xs text-zinc-300 bg-zinc-900 px-2 py-1 rounded flex-1 truncate">${esc(r.name)}</code>
+        <button data-action="copy" data-copy-value="${esc(r.name)}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors shrink-0">Copiar</button>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-zinc-500 shrink-0 w-12">Valor</span>
+        <code class="text-xs text-zinc-400 bg-zinc-900 px-2 py-1 rounded flex-1 truncate">${esc(r.value)}</code>
+        <button data-action="copy" data-copy-value="${esc(r.value)}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors shrink-0">Copiar</button>
       </div>
     </div>
   `).join("");
