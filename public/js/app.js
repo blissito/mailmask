@@ -7,6 +7,13 @@ let currentUser = null;
 let domains = [];
 let selectedDomain = null;
 
+async function refreshUsage() {
+  const res = await fetch("/api/auth/me");
+  if (!res.ok) return;
+  currentUser = await res.json();
+  renderUsage();
+}
+
 // --- Init ---
 document.addEventListener("DOMContentLoaded", async () => {
   await checkAuth();
@@ -265,6 +272,7 @@ async function deleteDomain() {
   }
   goBack();
   await loadDomains();
+  await refreshUsage();
 }
 
 // --- Aliases ---
@@ -319,6 +327,7 @@ async function removeAlias(alias) {
   if (!confirm(`¿Eliminar alias ${alias}@${selectedDomain.domain}?`)) return;
   await fetch(`/api/domains/${selectedDomain.id}/aliases/${alias}`, { method: "DELETE" });
   await loadAliases();
+  await refreshUsage();
 }
 
 // --- Rules ---
@@ -557,6 +566,7 @@ function setupEventListeners() {
       hideModal("modal-add-domain");
       form.reset();
       await loadDomains();
+      await refreshUsage();
       // Auto-select the new domain and show DNS tab
       selectDomain(data.domain.id);
       switchTab("dns");
@@ -598,6 +608,7 @@ function setupEventListeners() {
       hideModal("modal-add-alias");
       form.reset();
       await loadAliases();
+      await refreshUsage();
     } else {
       const data = await res.json();
       errEl.textContent = data.error || "Error al crear alias";
