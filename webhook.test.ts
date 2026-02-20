@@ -1,4 +1,10 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { _setKv } from "./db.ts";
+
+// Use in-memory KV for test isolation
+const testKv = await Deno.openKv(":memory:");
+_setKv(testKv);
+
 import { isWebhookProcessed, markWebhookProcessed, isMessageProcessed, markMessageProcessed, _getKv } from "./db.ts";
 
 // --- HMAC signature computation (extracted from main.ts for testing) ---

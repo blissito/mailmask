@@ -10,60 +10,75 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
+// --- Tab switching ---
+
+function switchTab(tab) {
+  document.querySelectorAll(".admin-tab").forEach(btn => {
+    const active = btn.dataset.tab === tab;
+    btn.classList.toggle("border-red-500", active);
+    btn.classList.toggle("text-zinc-100", active);
+    btn.classList.toggle("border-transparent", !active);
+    btn.classList.toggle("text-zinc-500", !active);
+  });
+  document.getElementById("tab-backups").classList.toggle("hidden", tab !== "backups");
+  document.getElementById("tab-users").classList.toggle("hidden", tab !== "users");
+  if (tab === "users" && !usersLoaded) loadUsers();
+}
+
+// --- Init ---
+
 async function init() {
+  document.querySelectorAll(".admin-tab").forEach(btn =>
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab))
+  );
+  switchTab("backups");
+
   const res = await fetch("/api/admin/backups");
-  if (res.status === 401 || res.status === 403) {
-    window.location.href = "/app";
-    return;
-  }
+  if (res.status === 401 || res.status === 403) { window.location.href = "/app"; return; }
 
   const me = await fetch("/api/auth/me");
   if (me.ok) {
-    const user = await me.json();
-    document.getElementById("user-email").textContent = user.email;
+    const u = await me.json();
+    document.getElementById("user-email").textContent = u.email;
   }
 
-  const backups = await res.json();
-  render(backups);
+  renderBackups(await res.json());
 
   document.getElementById("backups-list").addEventListener("click", async (e) => {
     const btn = e.target.closest(".btn-delete-backup");
     if (!btn) return;
-    const key = btn.dataset.key;
-    if (!confirm(`¿Eliminar backup "${key}"?`)) return;
-    btn.disabled = true;
-    btn.textContent = "Eliminando...";
-    try {
-      const delRes = await fetch(`/api/admin/backups/${encodeURIComponent(key)}`, { method: "DELETE" });
-      if (delRes.ok) {
-        const listRes = await fetch("/api/admin/backups");
-        if (listRes.ok) render(await listRes.json());
-      } else {
-        const data = await delRes.json();
-        alert(data.error || "Error al eliminar");
-      }
-    } catch {
-      alert("Error de conexión");
-    }
+    if (!confirm(`¿Eliminar backup "${btn.dataset.key}"?`)) return;
+    btn.disabled = true; btn.textContent = "Eliminando...";
+    const r = await fetch(`/api/admin/backups/${encodeURIComponent(btn.dataset.key)}`, { method: "DELETE" });
+    if (r.ok) { const lr = await fetch("/api/admin/backups"); if (lr.ok) renderBackups(await lr.json()); }
+    else { const d = await r.json(); alert(d.error || "Error"); }
   });
 
   document.getElementById("btn-trigger").addEventListener("click", triggerBackup);
-
   document.getElementById("btn-logout").addEventListener("click", async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login";
+    await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login";
   });
+
+  // Users
+  document.getElementById("user-search").addEventListener("input", filterUsers);
+  document.getElementById("users-list").addEventListener("click", (e) => {
+    const row = e.target.closest(".user-row");
+    if (row) openUserDetail(row.dataset.email);
+  });
+  document.getElementById("btn-close-detail").addEventListener("click", closeDetail);
+  document.getElementById("btn-save-user").addEventListener("click", saveUser);
+  document.getElementById("btn-delete-user").addEventListener("click", deleteUserHandler);
 }
 
-function render(backups) {
-  document.getElementById("loading").classList.add("hidden");
+// --- Backups ---
 
+function renderBackups(backups) {
+  document.getElementById("loading").classList.add("hidden");
   if (backups.length === 0) {
     document.getElementById("backups-empty").classList.remove("hidden");
     document.getElementById("backups-list").classList.add("hidden");
     return;
   }
-
   document.getElementById("backups-empty").classList.add("hidden");
   const list = document.getElementById("backups-list");
   list.classList.remove("hidden");
@@ -75,14 +90,8 @@ function render(backups) {
         <span class="text-zinc-600 text-xs ml-2">${formatBytes(b.sizeBytes)}</span>
       </div>
       <div class="flex items-center gap-3">
-        <a href="/api/admin/backups/${encodeURIComponent(b.key)}"
-           class="text-sm text-red-400 hover:text-red-300 transition-colors">
-          Descargar
-        </a>
-        <button data-key="${esc(b.key)}"
-                class="btn-delete-backup text-sm text-zinc-500 hover:text-red-400 transition-colors">
-          Eliminar
-        </button>
+        <a href="/api/admin/backups/${encodeURIComponent(b.key)}" class="text-sm text-red-400 hover:text-red-300 transition-colors">Descargar</a>
+        <button data-key="${esc(b.key)}" class="btn-delete-backup text-sm text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
       </div>
     </div>
   `).join("");
@@ -90,32 +99,149 @@ function render(backups) {
 
 async function triggerBackup() {
   const btn = document.getElementById("btn-trigger");
-  const status = document.getElementById("trigger-status");
-  btn.disabled = true;
-  btn.textContent = "Creando...";
-  status.classList.add("hidden");
-
+  const st = document.getElementById("trigger-status");
+  btn.disabled = true; btn.textContent = "Creando..."; st.classList.add("hidden");
   try {
     const res = await fetch("/api/admin/backups/trigger", { method: "POST" });
     const data = await res.json();
-
     if (res.ok) {
-      status.className = "mt-4 p-3 rounded-lg text-sm bg-green-900/50 border border-green-800 text-green-300";
-      status.textContent = "Backup creado: " + data.key + " (" + data.users + " usuarios)";
-      const listRes = await fetch("/api/admin/backups");
-      if (listRes.ok) render(await listRes.json());
+      st.className = "mt-4 p-3 rounded-lg text-sm bg-green-900/50 border border-green-800 text-green-300";
+      st.textContent = "Backup creado: " + data.key + " (" + data.users + " usuarios)";
+      const lr = await fetch("/api/admin/backups"); if (lr.ok) renderBackups(await lr.json());
     } else {
-      status.className = "mt-4 p-3 rounded-lg text-sm bg-red-900/50 border border-red-800 text-red-300";
-      status.textContent = data.error || "Error al crear backup";
+      st.className = "mt-4 p-3 rounded-lg text-sm bg-red-900/50 border border-red-800 text-red-300";
+      st.textContent = data.error || "Error al crear backup";
     }
   } catch {
-    status.className = "mt-4 p-3 rounded-lg text-sm bg-red-900/50 border border-red-800 text-red-300";
-    status.textContent = "Error de conexion";
+    st.className = "mt-4 p-3 rounded-lg text-sm bg-red-900/50 border border-red-800 text-red-300";
+    st.textContent = "Error de conexion";
   }
+  st.classList.remove("hidden"); btn.disabled = false; btn.textContent = "Crear backup ahora";
+}
 
-  status.classList.remove("hidden");
-  btn.disabled = false;
-  btn.textContent = "Crear backup ahora";
+// --- Users ---
+
+let usersLoaded = false;
+let allUsers = [];
+let selectedEmail = null;
+
+async function loadUsers() {
+  const res = await fetch("/api/admin/users");
+  if (!res.ok) return;
+  allUsers = await res.json();
+  usersLoaded = true;
+  document.getElementById("users-loading").classList.add("hidden");
+  renderUsers(allUsers);
+}
+
+function filterUsers() {
+  const q = document.getElementById("user-search").value.toLowerCase();
+  renderUsers(q ? allUsers.filter(u => u.email.toLowerCase().includes(q)) : allUsers);
+}
+
+function renderUsers(users) {
+  const list = document.getElementById("users-list");
+  list.classList.remove("hidden");
+  if (users.length === 0) {
+    list.innerHTML = '<p class="text-zinc-500 text-sm py-4">Sin resultados.</p>';
+    return;
+  }
+  list.innerHTML = users.map(u => `
+    <div class="user-row flex items-center justify-between rounded-lg px-3 py-2 cursor-pointer transition-colors
+                ${u.email === selectedEmail ? 'bg-zinc-800 border border-zinc-700' : 'hover:bg-zinc-900 border border-transparent'}"
+         data-email="${esc(u.email)}">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="text-sm font-medium truncate">${esc(u.email)}</span>
+        ${u.emailVerified ? '<span class="text-green-500 text-xs shrink-0">✓</span>' : '<span class="text-zinc-600 text-xs shrink-0">✗</span>'}
+      </div>
+      <div class="flex items-center gap-3 text-xs text-zinc-500 shrink-0 ml-2">
+        <span>${u.plan || '—'}</span>
+        <span class="${u.status === 'active' ? 'text-green-500' : u.status === 'cancelled' ? 'text-red-400' : ''}">${esc(u.status)}</span>
+        <span>${u.domainsCount}d</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function openUserDetail(email) {
+  selectedEmail = email;
+  renderUsers(document.getElementById("user-search").value.toLowerCase()
+    ? allUsers.filter(u => u.email.toLowerCase().includes(document.getElementById("user-search").value.toLowerCase()))
+    : allUsers);
+
+  const res = await fetch(`/api/admin/users/${encodeURIComponent(email)}`);
+  if (!res.ok) return;
+  const user = await res.json();
+
+  document.getElementById("detail-email").textContent = user.email;
+  document.getElementById("detail-plan").value = user.subscription?.plan ?? "basico";
+  document.getElementById("detail-status").value = user.subscription?.status ?? "none";
+  document.getElementById("detail-verified").checked = user.emailVerified ?? false;
+  const pe = user.subscription?.currentPeriodEnd;
+  document.getElementById("detail-period-end").value = pe ? pe.split("T")[0] : "";
+
+  const dd = document.getElementById("detail-domains");
+  dd.innerHTML = user.domains?.length
+    ? user.domains.map(d => `
+        <div class="flex items-center justify-between bg-zinc-800 rounded px-3 py-1.5">
+          <span>${esc(d.domain)} ${d.verified ? '<span class="text-green-500">✓</span>' : '<span class="text-zinc-600">✗</span>'}</span>
+          <span class="text-zinc-500">${d.aliasCount} aliases</span>
+        </div>`).join("")
+    : '<p class="text-zinc-600">Sin dominios</p>';
+
+  document.getElementById("detail-save-status").classList.add("hidden");
+  document.getElementById("user-detail").classList.remove("hidden");
+}
+
+function closeDetail() {
+  document.getElementById("user-detail").classList.add("hidden");
+  selectedEmail = null;
+  filterUsers();
+}
+
+async function saveUser() {
+  if (!selectedEmail) return;
+  const btn = document.getElementById("btn-save-user");
+  btn.disabled = true; btn.textContent = "Guardando...";
+
+  const body = {
+    plan: document.getElementById("detail-plan").value,
+    status: document.getElementById("detail-status").value,
+    currentPeriodEnd: document.getElementById("detail-period-end").value || null,
+    emailVerified: document.getElementById("detail-verified").checked,
+  };
+
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(selectedEmail)}`, {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    });
+    const st = document.getElementById("detail-save-status");
+    if (res.ok) {
+      st.className = "mb-3 p-2 rounded text-sm bg-green-900/50 border border-green-800 text-green-300";
+      st.textContent = "Guardado";
+      usersLoaded = false; loadUsers();
+    } else {
+      const d = await res.json();
+      st.className = "mb-3 p-2 rounded text-sm bg-red-900/50 border border-red-800 text-red-300";
+      st.textContent = d.error || "Error al guardar";
+    }
+    st.classList.remove("hidden");
+  } catch { alert("Error de conexión"); }
+
+  btn.disabled = false; btn.textContent = "Guardar";
+}
+
+async function deleteUserHandler() {
+  if (!selectedEmail) return;
+  if (!confirm(`¿Eliminar "${selectedEmail}" y todos sus datos?`)) return;
+  const btn = document.getElementById("btn-delete-user");
+  btn.disabled = true; btn.textContent = "Eliminando...";
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(selectedEmail)}`, { method: "DELETE" });
+    if (res.ok) { closeDetail(); usersLoaded = false; loadUsers(); }
+    else { const d = await res.json(); alert(d.error || "Error"); }
+  } catch { alert("Error de conexión"); }
+  btn.disabled = false; btn.textContent = "Eliminar";
 }
 
 document.addEventListener("DOMContentLoaded", init);

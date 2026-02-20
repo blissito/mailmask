@@ -65,6 +65,8 @@ import {
   getDomainMesaSettings,
   setDomainMesaEnabled,
   PLAN_MESA_LIMITS,
+  listAllUsers,
+  deleteUser,
 } from "./db.ts";
 import {
   hashPassword,
@@ -86,6 +88,9 @@ import {
   putBackupToS3,
   deleteOldBackups,
   getConfigSetName,
+  listBackups,
+  getBackupFromS3,
+  deleteBackupFromS3,
 } from "./ses.ts";
 import { processInbound } from "./forwarding.ts";
 import { log } from "./logger.ts";
@@ -165,6 +170,45 @@ async function rateLimitGuard(
     });
   }
   return null;
+}
+
+// --- Admin check ---
+
+function isAdmin(email: string): boolean {
+  const admins = (Deno.env.get("ADMIN_EMAILS") ?? "").split(",").map(e => e.trim().toLowerCase());
+  return admins.includes(email.toLowerCase());
+}
+
+// --- Backup logic (shared by cron + admin endpoint) ---
+
+async function runBackup(): Promise<{ key: string; users: number }> {
+  const backupData: Record<string, unknown>[] = [];
+  const { _getKv } = await import("./db.ts");
+  const kv = _getKv();
+
+  for await (const entry of kv.list<any>({ prefix: ["users"] })) {
+    const user = entry.value;
+    const domains = await listUserDomains(user.email);
+    const domainsData = [];
+    for (const d of domains) {
+      const aliases = await listAliases(d.id);
+      const rules = await listRules(d.id);
+      domainsData.push({ domain: d.domain, domainId: d.id, verified: d.verified, aliases, rules });
+    }
+    backupData.push({
+      email: user.email,
+      subscription: user.subscription,
+      emailVerified: user.emailVerified,
+      createdAt: user.createdAt,
+      domains: domainsData,
+    });
+  }
+
+  const dateStr = new Date().toISOString().split("T")[0];
+  const key = `mailmask-backup-${dateStr}.json`;
+  await putBackupToS3(key, JSON.stringify(backupData, null, 2));
+  await deleteOldBackups();
+  return { key, users: backupData.length };
 }
 
 // --- SNS signature verification ---
@@ -353,6 +397,12 @@ const app = new Elysia()
   .get("/js/*", ({ params }) => serveStatic(`/js/${params["*"]}`))
   .get("/favicon.svg", () => serveStatic("/favicon.svg"))
   .get("/landing", () => serveStatic("/landing.html"))
+  .get("/mesa", () => serveStatic("/mesa.html"))
+  .get("/admin", async ({ request }) => {
+    const user = await getAuthUser(request);
+    if (!user || !isAdmin(user.email)) return new Response("Not found", { status: 404 });
+    return serveStatic("/admin.html");
+  })
   .get("/set-password", () => serveStatic("/set-password.html"))
   .get("/forgot-password", () => serveStatic("/forgot-password.html"))
   .get("/terms", () => serveStatic("/terms.html"))
@@ -1651,6 +1701,549 @@ const app = new Elysia()
     });
   })
 
+  // --- Outbound send ---
+
+  .post("/api/domains/:id/send", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const user = (await getUser(auth.email))!;
+    const limits = getUserPlanLimits(user);
+
+    if (limits.sends === 0) {
+      return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails" }), { status: 403 });
+    }
+
+    const domain = await getDomain(params.id);
+    if (!domain || domain.ownerEmail !== auth.email) {
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    }
+    if (!domain.verified) {
+      return new Response(JSON.stringify({ error: "Dominio no verificado" }), { status: 400 });
+    }
+
+    const { to, subject, html, body, replyTo, from: fromLocal } = await request.json();
+    if (!to || !subject || (!html && !body)) {
+      return new Response(JSON.stringify({ error: "to, subject y body/html requeridos" }), { status: 400 });
+    }
+
+    if (await isSuppressed(domain.id, to)) {
+      return new Response(JSON.stringify({ error: "Destinatario en lista de supresión (bounce/complaint previo)" }), { status: 422 });
+    }
+
+    const currentSends = await getSendCount(domain.id);
+    if (currentSends >= limits.sends) {
+      return new Response(JSON.stringify({ error: `Límite mensual de envíos alcanzado (${limits.sends})` }), { status: 429 });
+    }
+
+    const fromAddress = `${fromLocal ?? "noreply"}@${domain.domain}`;
+    try {
+      const messageId = await sendFromDomain(fromAddress, to, subject, body ?? html, {
+        html,
+        replyTo,
+        configSet: getConfigSetName(domain.domain),
+      });
+      await incrementSendCount(domain.id);
+      return new Response(JSON.stringify({ ok: true, messageId }), {
+        headers: { "content-type": "application/json" },
+      });
+    } catch (err) {
+      log("error", "ses", "Outbound send failed", { error: String(err), domainId: domain.id });
+      return new Response(JSON.stringify({ error: "Error enviando email" }), { status: 500 });
+    }
+  })
+
+  // --- Bulk send ---
+
+  .post("/api/domains/:id/send-bulk", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const user = (await getUser(auth.email))!;
+    const limits = getUserPlanLimits(user);
+
+    if (limits.sends === 0) {
+      return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails" }), { status: 403 });
+    }
+
+    const domain = await getDomain(params.id);
+    if (!domain || domain.ownerEmail !== auth.email) {
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    }
+    if (!domain.verified) {
+      return new Response(JSON.stringify({ error: "Dominio no verificado" }), { status: 400 });
+    }
+
+    const { recipients, subject, html, from: fromLocal } = await request.json();
+    if (!recipients?.length || !subject || !html) {
+      return new Response(JSON.stringify({ error: "recipients[], subject y html requeridos" }), { status: 400 });
+    }
+    if (!Array.isArray(recipients) || recipients.length > 10000) {
+      return new Response(JSON.stringify({ error: "Máximo 10,000 destinatarios por lote" }), { status: 400 });
+    }
+
+    const fromAddress = `${fromLocal ?? "noreply"}@${domain.domain}`;
+    const job = await createBulkJob({
+      domainId: domain.id,
+      recipients,
+      subject,
+      html,
+      from: fromAddress,
+      totalRecipients: recipients.length,
+    });
+
+    return new Response(JSON.stringify({ ok: true, jobId: job.id }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .get("/api/domains/:id/bulk/:jobId", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const domain = await getDomain(params.id);
+    if (!domain || domain.ownerEmail !== auth.email) {
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    }
+
+    const job = await getBulkJob(domain.id, params.jobId);
+    if (!job) return new Response(JSON.stringify({ error: "Job no encontrado" }), { status: 404 });
+
+    return new Response(JSON.stringify(job), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  // --- Mesa: conversations ---
+
+  .get("/api/mesa/conversations", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const url = new URL(request.url);
+    const domainId = url.searchParams.get("domainId");
+    const status = url.searchParams.get("status") ?? undefined;
+    const assignedTo = url.searchParams.get("assignedTo") ?? undefined;
+
+    if (!domainId) {
+      return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
+    }
+
+    const domain = await getDomain(domainId);
+    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const isOwner = domain.ownerEmail === auth.email;
+    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
+    if (!isOwner && !agent) {
+      return new Response(JSON.stringify({ error: "Sin acceso a este dominio" }), { status: 403 });
+    }
+
+    const convs = await listConversations(domainId, { status, assignedTo });
+    return new Response(JSON.stringify(convs), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .get("/api/mesa/conversations/:id", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const url = new URL(request.url);
+    const domainId = url.searchParams.get("domainId");
+    if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
+
+    const domain = await getDomain(domainId);
+    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const isOwner = domain.ownerEmail === auth.email;
+    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
+    if (!isOwner && !agent) {
+      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
+    }
+
+    const conv = await getConversation(domainId, params.id);
+    if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    const [messages, notes] = await Promise.all([
+      listMessages(conv.id),
+      listNotes(conv.id),
+    ]);
+
+    return new Response(JSON.stringify({ ...conv, messages, notes }), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .post("/api/mesa/conversations/:id/reply", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const { domainId, body: replyBody, html } = await request.json();
+    if (!domainId || (!replyBody && !html)) {
+      return new Response(JSON.stringify({ error: "domainId y body/html requeridos" }), { status: 400 });
+    }
+
+    const domain = await getDomain(domainId);
+    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const user = (await getUser(auth.email))!;
+    const plan = user.subscription?.plan ?? "basico";
+    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
+    if (!mesaLimits.mesaActions) {
+      return new Response(JSON.stringify({ error: "Tu plan no permite responder desde Mesa. Actualiza a Freelancer o superior." }), { status: 403 });
+    }
+
+    const isOwner = domain.ownerEmail === auth.email;
+    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
+    if (!isOwner && !agent) {
+      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
+    }
+
+    const conv = await getConversation(domainId, params.id);
+    if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    const fromAddress = `${conv.to.split("@")[0]}@${domain.domain}`;
+    const lastRef = conv.threadReferences[conv.threadReferences.length - 1];
+
+    try {
+      const messageId = await sendFromDomain(fromAddress, conv.from, `Re: ${conv.subject}`, replyBody ?? html, {
+        html,
+        configSet: getConfigSetName(domain.domain),
+        inReplyTo: lastRef,
+        references: conv.threadReferences.join(" "),
+      });
+      await incrementSendCount(domain.id);
+
+      await addMessage({
+        conversationId: conv.id,
+        from: fromAddress,
+        body: replyBody ?? "",
+        html: html ?? "",
+        direction: "outbound",
+        createdAt: new Date().toISOString(),
+        messageId,
+      });
+
+      await updateConversation(domainId, conv.id, {
+        threadReferences: [...conv.threadReferences, messageId],
+        lastMessageAt: new Date().toISOString(),
+        messageCount: conv.messageCount + 1,
+      });
+
+      return new Response(JSON.stringify({ ok: true, messageId }), {
+        headers: { "content-type": "application/json" },
+      });
+    } catch (err) {
+      log("error", "ses", "Mesa reply failed", { error: String(err) });
+      return new Response(JSON.stringify({ error: "Error enviando respuesta" }), { status: 500 });
+    }
+  })
+
+  .post("/api/mesa/conversations/:id/assign", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const { domainId, assignedTo } = await request.json();
+    if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
+
+    const domain = await getDomain(domainId);
+    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const user = (await getUser(auth.email))!;
+    const plan = user.subscription?.plan ?? "basico";
+    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
+    if (!mesaLimits.mesaActions) {
+      return new Response(JSON.stringify({ error: "Tu plan no permite asignar conversaciones" }), { status: 403 });
+    }
+
+    const isOwner = domain.ownerEmail === auth.email;
+    if (!isOwner) {
+      return new Response(JSON.stringify({ error: "Solo el dueño puede asignar conversaciones" }), { status: 403 });
+    }
+
+    const updated = await updateConversation(domainId, params.id, { assignedTo: assignedTo ?? undefined });
+    if (!updated) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    return new Response(JSON.stringify(updated), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .post("/api/mesa/conversations/:id/note", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const { domainId, body: noteBody } = await request.json();
+    if (!domainId || !noteBody) return new Response(JSON.stringify({ error: "domainId y body requeridos" }), { status: 400 });
+
+    const domain = await getDomain(domainId);
+    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const user = (await getUser(auth.email))!;
+    const plan = user.subscription?.plan ?? "basico";
+    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
+    if (!mesaLimits.mesaActions) {
+      return new Response(JSON.stringify({ error: "Tu plan no permite agregar notas" }), { status: 403 });
+    }
+
+    const isOwner = domain.ownerEmail === auth.email;
+    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
+    if (!isOwner && !agent) {
+      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
+    }
+
+    const conv = await getConversation(domainId, params.id);
+    if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    const note = await addNote({
+      conversationId: conv.id,
+      author: auth.email,
+      body: noteBody,
+      createdAt: new Date().toISOString(),
+    });
+
+    return new Response(JSON.stringify(note), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .patch("/api/mesa/conversations/:id", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const patchBody = await request.json();
+    const { domainId, status: newStatus, tags, priority } = patchBody;
+    if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
+
+    const domain = await getDomain(domainId);
+    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const user = (await getUser(auth.email))!;
+    const plan = user.subscription?.plan ?? "basico";
+    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
+    if (!mesaLimits.mesaActions) {
+      return new Response(JSON.stringify({ error: "Tu plan no permite modificar conversaciones" }), { status: 403 });
+    }
+
+    const isOwner = domain.ownerEmail === auth.email;
+    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
+    if (!isOwner && !agent) {
+      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (newStatus && ["open", "snoozed", "closed"].includes(newStatus)) updates.status = newStatus;
+    if (tags && Array.isArray(tags)) updates.tags = tags;
+    if (priority && ["normal", "urgent"].includes(priority)) updates.priority = priority;
+
+    const updated = await updateConversation(domainId, params.id, updates);
+    if (!updated) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    return new Response(JSON.stringify(updated), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  // --- Mesa settings ---
+
+  .post("/api/domains/:id/mesa", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const domain = await getDomain(params.id);
+    if (!domain || domain.ownerEmail !== auth.email) {
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    }
+
+    const { enabled, forwardAlso } = await request.json();
+    await setDomainMesaEnabled(domain.id, enabled ?? false, forwardAlso ?? true);
+
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .get("/api/domains/:id/mesa", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const domain = await getDomain(params.id);
+    if (!domain || domain.ownerEmail !== auth.email) {
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    }
+
+    const settings = await getDomainMesaSettings(domain.id);
+    return new Response(JSON.stringify(settings), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  // --- Agents ---
+
+  .post("/api/domains/:id/agents/invite", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const domain = await getDomain(params.id);
+    if (!domain || domain.ownerEmail !== auth.email) {
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    }
+
+    const user = (await getUser(auth.email))!;
+    const plan = user.subscription?.plan ?? "basico";
+    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
+    if (mesaLimits.agents === 0) {
+      return new Response(JSON.stringify({ error: "Tu plan no incluye agentes" }), { status: 403 });
+    }
+
+    const currentAgents = await countAgents(domain.id);
+    if (currentAgents >= mesaLimits.agents) {
+      return new Response(JSON.stringify({ error: `Límite de agentes alcanzado (${mesaLimits.agents})` }), { status: 400 });
+    }
+
+    const { email, name, role = "agent" } = await request.json();
+    if (!email || !name) return new Response(JSON.stringify({ error: "email y name requeridos" }), { status: 400 });
+    if (!["admin", "agent"].includes(role)) return new Response(JSON.stringify({ error: "role inválido" }), { status: 400 });
+
+    const existing = await getAgentByEmail(domain.id, email);
+    if (existing) return new Response(JSON.stringify({ error: "Este email ya es agente de este dominio" }), { status: 409 });
+
+    const token = await createAgentInvite(domain.id, email, name, role);
+    const inviteUrl = `${getMainDomainUrl()}/api/agents/accept?token=${token}`;
+
+    const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+    try {
+      await sendFromDomain(alertFrom, email, `Invitación a Mesa — ${domain.domain}`,
+        `Hola ${name},\n\n${auth.email} te invita como ${role} en Mesa para el dominio ${domain.domain}.\n\nAcepta la invitación aquí:\n${inviteUrl}\n\nEste enlace es válido por 7 días.\n\n— MailMask`);
+    } catch (err) {
+      log("error", "ses", "Failed to send agent invite", { error: String(err) });
+    }
+
+    return new Response(JSON.stringify({ ok: true, inviteUrl }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .get("/api/agents/accept", async ({ request }) => {
+    const url = new URL(request.url);
+    const token = url.searchParams.get("token");
+    if (!token) return new Response("Token inválido", { status: 400 });
+
+    const invite = await getAgentInvite(token);
+    if (!invite) return new Response("Token inválido o expirado", { status: 400 });
+
+    const existingUser = await getUser(invite.email);
+    if (!existingUser) {
+      const { hashPassword: hp } = await import("./auth.ts");
+      await createUserIfNotExists(invite.email, await hp(crypto.randomUUID()));
+    }
+
+    await createAgent({
+      domainId: invite.domainId,
+      email: invite.email,
+      name: invite.name,
+      role: invite.role,
+    });
+    await deleteAgentInvite(token);
+
+    return new Response(null, {
+      status: 302,
+      headers: { location: "/mesa?welcome=1" },
+    });
+  })
+
+  .get("/api/domains/:id/agents", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const domain = await getDomain(params.id);
+    if (!domain || domain.ownerEmail !== auth.email) {
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    }
+
+    const agents = await listAgents(domain.id);
+    return new Response(JSON.stringify(agents), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .delete("/api/domains/:id/agents/:agentId", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const domain = await getDomain(params.id);
+    if (!domain || domain.ownerEmail !== auth.email) {
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    }
+
+    const deleted = await deleteAgent(domain.id, params.agentId);
+    if (!deleted) return new Response(JSON.stringify({ error: "Agente no encontrado" }), { status: 404 });
+
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  // --- SES bounce/complaint events ---
+
+  .post("/api/webhooks/ses-events", async ({ request }) => {
+    const body = await request.json();
+
+    if (body.Type === "SubscriptionConfirmation" && body.SubscribeURL) {
+      const parsed = new URL(body.SubscribeURL);
+      if (parsed.hostname.endsWith(".amazonaws.com") && parsed.protocol === "https:") {
+        await fetch(body.SubscribeURL);
+      }
+      return new Response("OK", { status: 200 });
+    }
+
+    if (body.Type !== "Notification") return new Response("OK", { status: 200 });
+
+    try {
+      const message = JSON.parse(body.Message);
+      const eventType = message.eventType ?? message.notificationType;
+
+      if (eventType === "Bounce" || eventType === "bounce") {
+        const bounce = message.bounce ?? message;
+        const recipients = bounce.bouncedRecipients ?? [];
+        for (const r of recipients) {
+          const email = r.emailAddress;
+          const configSet = message.mail?.tags?.["ses:configuration-set"]?.[0] ?? "";
+          const domainName = configSet.replace("mailmask-", "").replace(/-/g, ".");
+          if (domainName) {
+            const { getDomainByName } = await import("./db.ts");
+            const domainRecord = await getDomainByName(domainName);
+            if (domainRecord) {
+              await addSuppression(domainRecord.id, email, `bounce:${bounce.bounceType}`);
+              log("info", "ses", "Added to suppression (bounce)", { email, domain: domainName });
+            }
+          }
+        }
+      } else if (eventType === "Complaint" || eventType === "complaint") {
+        const complaint = message.complaint ?? message;
+        const recipients = complaint.complainedRecipients ?? [];
+        for (const r of recipients) {
+          const email = r.emailAddress;
+          const configSet = message.mail?.tags?.["ses:configuration-set"]?.[0] ?? "";
+          const domainName = configSet.replace("mailmask-", "").replace(/-/g, ".");
+          if (domainName) {
+            const { getDomainByName } = await import("./db.ts");
+            const domainRecord = await getDomainByName(domainName);
+            if (domainRecord) {
+              await addSuppression(domainRecord.id, email, "complaint");
+              log("info", "ses", "Added to suppression (complaint)", { email, domain: domainName });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      log("error", "ses", "SES event processing error", { error: String(err) });
+    }
+
+    return new Response("OK", { status: 200 });
+  })
+
   // --- Webhook: SES inbound via SNS ---
 
   .post("/api/webhooks/ses-inbound", async ({ request }) => {
@@ -1684,7 +2277,220 @@ const app = new Elysia()
         headers: { "content-type": "application/json" },
       });
     }
+  })
+
+  // --- Admin: backups ---
+
+  .get("/api/admin/backups", async ({ request }) => {
+    const user = await getAuthUser(request);
+    if (!user || !isAdmin(user.email))
+      return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
+
+    const backups = await listBackups();
+    return new Response(JSON.stringify(backups), { headers: { "content-type": "application/json" } });
+  })
+
+  .get("/api/admin/backups/:key", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user || !isAdmin(user.email))
+      return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
+
+    try {
+      const content = await getBackupFromS3(params.key);
+      return new Response(content, {
+        headers: {
+          "content-type": "application/json",
+          "content-disposition": `attachment; filename="${params.key}"`,
+        },
+      });
+    } catch {
+      return new Response(JSON.stringify({ error: "Backup no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
+    }
+  })
+
+  .delete("/api/admin/backups/:key", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user || !isAdmin(user.email))
+      return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
+
+    try {
+      await deleteBackupFromS3(params.key);
+      log("info", "backup", "Backup deleted by admin", { email: user.email, key: params.key });
+      return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+    } catch {
+      return new Response(JSON.stringify({ error: "No se pudo eliminar el backup" }), { status: 500, headers: { "content-type": "application/json" } });
+    }
+  })
+
+  .post("/api/admin/backups/trigger", async ({ request }) => {
+    const user = await getAuthUser(request);
+    if (!user || !isAdmin(user.email))
+      return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
+
+    try {
+      const result = await runBackup();
+      log("info", "backup", "Manual backup triggered by admin", { email: user.email, key: result.key });
+      return new Response(JSON.stringify({ ok: true, key: result.key, users: result.users }), { headers: { "content-type": "application/json" } });
+    } catch (err) {
+      log("error", "backup", "Manual backup failed", { error: String(err) });
+      return new Response(JSON.stringify({ error: "Backup falló" }), { status: 500, headers: { "content-type": "application/json" } });
+    }
+  })
+
+  // --- Admin: Users CRUD ---
+
+  .get("/api/admin/users", async ({ request }) => {
+    const user = await getAuthUser(request);
+    if (!user || !isAdmin(user.email))
+      return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
+
+    const users = await listAllUsers();
+    const result = [];
+    for (const u of users) {
+      const domainsCount = await countUserDomains(u.email);
+      result.push({
+        email: u.email,
+        plan: u.subscription?.plan ?? null,
+        status: u.subscription?.status ?? "none",
+        currentPeriodEnd: u.subscription?.currentPeriodEnd ?? null,
+        emailVerified: u.emailVerified ?? false,
+        createdAt: u.createdAt,
+        domainsCount,
+      });
+    }
+    return new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } });
+  })
+
+  .get("/api/admin/users/:email", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || !isAdmin(auth.email))
+      return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
+
+    const target = await getUser(decodeURIComponent(params.email));
+    if (!target)
+      return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
+
+    const domains = await listUserDomains(target.email);
+    const domainsWithAliases = [];
+    for (const d of domains) {
+      const aliasCount = await countAliases(d.id);
+      domainsWithAliases.push({ id: d.id, domain: d.domain, verified: d.verified, aliasCount });
+    }
+
+    const { passwordHash: _, ...safe } = target;
+    return new Response(JSON.stringify({ ...safe, domains: domainsWithAliases }), { headers: { "content-type": "application/json" } });
+  })
+
+  .patch("/api/admin/users/:email", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || !isAdmin(auth.email))
+      return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
+
+    const email = decodeURIComponent(params.email);
+    const target = await getUser(email);
+    if (!target)
+      return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
+
+    const body = await request.json();
+    const validPlans = ["basico", "freelancer", "developer", "pro", "agencia"];
+    const validStatuses = ["active", "past_due", "cancelled", "none"];
+
+    // Update subscription fields
+    if (body.plan !== undefined || body.status !== undefined || body.currentPeriodEnd !== undefined) {
+      const sub = target.subscription ?? { plan: "basico", status: "none" as const };
+      if (body.plan !== undefined && validPlans.includes(body.plan)) sub.plan = body.plan;
+      if (body.status !== undefined && validStatuses.includes(body.status)) sub.status = body.status;
+      if (body.currentPeriodEnd !== undefined) sub.currentPeriodEnd = body.currentPeriodEnd || undefined;
+      await updateUserSubscription(email, sub);
+    }
+
+    // Update emailVerified
+    if (body.emailVerified !== undefined) {
+      const fresh = await getUser(email);
+      if (fresh) {
+        const { _getKv } = await import("./db.ts");
+        const kv = _getKv();
+        await kv.set(["users", email], { ...fresh, emailVerified: !!body.emailVerified });
+      }
+    }
+
+    log("info", "admin", "User updated by admin", { admin: auth.email, target: email, changes: body });
+    const updated = await getUser(email);
+    const { passwordHash: _, ...safe } = updated!;
+    return new Response(JSON.stringify(safe), { headers: { "content-type": "application/json" } });
+  })
+
+  .delete("/api/admin/users/:email", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || !isAdmin(auth.email))
+      return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
+
+    const email = decodeURIComponent(params.email);
+    if (email === auth.email)
+      return new Response(JSON.stringify({ error: "No puedes eliminarte a ti mismo" }), { status: 400, headers: { "content-type": "application/json" } });
+
+    const deleted = await deleteUser(email);
+    if (!deleted)
+      return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
+
+    log("info", "admin", "User deleted by admin", { admin: auth.email, target: email });
+    return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
   });
+
+// --- Bulk send cron (every minute, processes 14 emails/sec) ---
+
+Deno.cron("bulk-send", "* * * * *", async () => {
+  const jobs = await listPendingBulkJobs();
+  if (jobs.length === 0) return;
+
+  for (const job of jobs) {
+    if (job.status === "queued") {
+      job.status = "processing";
+      await updateBulkJob(job);
+    }
+
+    const configSet = getConfigSetName(job.from.split("@")[1] ?? "");
+    const batchSize = 14; // SES rate limit ~14/sec
+    const startIdx = job.sent + job.failed + job.skippedSuppressed;
+    const batch = job.recipients.slice(startIdx, startIdx + batchSize);
+
+    if (batch.length === 0) {
+      job.status = "completed";
+      job.completedAt = new Date().toISOString();
+      await updateBulkJob(job);
+      continue;
+    }
+
+    for (const recipient of batch) {
+      // Check suppression
+      if (await isSuppressed(job.domainId, recipient)) {
+        job.skippedSuppressed++;
+        continue;
+      }
+
+      try {
+        await sendFromDomain(job.from, recipient, job.subject, job.html, {
+          html: job.html,
+          configSet,
+        });
+        job.sent++;
+        await incrementSendCount(job.domainId);
+      } catch (err) {
+        job.failed++;
+        job.lastError = String(err);
+        log("warn", "ses", "Bulk send failed for recipient", { recipient, error: String(err) });
+      }
+    }
+
+    // Check if done
+    if (job.sent + job.failed + job.skippedSuppressed >= job.totalRecipients) {
+      job.status = job.failed > 0 && job.sent === 0 ? "failed" : "completed";
+      job.completedAt = new Date().toISOString();
+    }
+
+    await updateBulkJob(job);
+  }
+});
 
 // --- Monitoring cron (every 5 minutes) ---
 
@@ -1703,33 +2509,8 @@ Deno.cron("queue-monitor", "*/5 * * * *", async () => {
 
 Deno.cron("daily-backup", "0 4 * * *", async () => {
   try {
-    const backupData: Record<string, unknown>[] = [];
-    const { _getKv } = await import("./db.ts");
-    const kv = _getKv();
-
-    for await (const entry of kv.list<any>({ prefix: ["users"] })) {
-      const user = entry.value;
-      const domains = await listUserDomains(user.email);
-      const domainsData = [];
-      for (const d of domains) {
-        const aliases = await listAliases(d.id);
-        const rules = await listRules(d.id);
-        domainsData.push({ domain: d.domain, domainId: d.id, verified: d.verified, aliases, rules });
-      }
-      backupData.push({
-        email: user.email,
-        subscription: user.subscription,
-        emailVerified: user.emailVerified,
-        createdAt: user.createdAt,
-        domains: domainsData,
-      });
-    }
-
-    const dateStr = new Date().toISOString().split("T")[0];
-    const key = `mailmask-backup-${dateStr}.json`;
-    await putBackupToS3(key, JSON.stringify(backupData, null, 2));
-    await deleteOldBackups();
-    log("info", "backup", "Daily backup completed", { users: backupData.length, key });
+    const result = await runBackup();
+    log("info", "backup", "Daily backup completed", { users: result.users, key: result.key });
   } catch (err) {
     log("error", "backup", "Daily backup failed", { error: String(err) });
     await sendAlert("backup-failure", `Daily backup failed: ${String(err)}`);

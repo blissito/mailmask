@@ -1,7 +1,7 @@
 {
   "tasks": {
-    "dev": "deno run --allow-net --allow-env --allow-read --env --watch --unstable-kv main.ts",
-    "start": "deno run --allow-net --allow-env --allow-read --unstable-kv main.ts",
+    "dev": "deno run --allow-net --allow-env --allow-read --allow-sys --env --watch --unstable-kv --unstable-cron main.ts",
+    "start": "deno run --allow-net --allow-env --allow-read --unstable-kv --unstable-cron main.ts",
     "test": "JWT_SECRET=test-secret-key MP_ACCESS_TOKEN=test MP_WEBHOOK_SECRET=test AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test deno test --allow-net --allow-env --allow-read --unstable-kv --unstable-cron",
     "build:css": "npx tailwindcss -i public/css/input.css -o public/css/styles.css --minify"
   },

@@ -1,4 +1,10 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { _setKv } from "./db.ts";
+
+// Use in-memory KV for test isolation (must be set before importing main.ts)
+const testKv = await Deno.openKv(":memory:");
+_setKv(testKv);
+
 import { app } from "./main.ts";
 
 const testOpts = { sanitizeResources: false, sanitizeOps: false };

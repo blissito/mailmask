@@ -1,4 +1,4 @@
-const kv = await Deno.openKv();
+let kv = await Deno.openKv();
 
 // --- Types ---
 
@@ -507,8 +507,332 @@ export async function getDeadLetterCount(): Promise<number> {
   return count;
 }
 
+// --- Mesa: Conversations ---
+
+export interface Conversation {
+  id: string;
+  domainId: string;
+  from: string;
+  to: string;
+  subject: string;
+  status: "open" | "snoozed" | "closed";
+  assignedTo?: string;
+  priority: "normal" | "urgent";
+  lastMessageAt: string;
+  messageCount: number;
+  tags: string[];
+  threadReferences: string[]; // Message-ID / In-Reply-To for threading
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  from: string;
+  body: string;
+  html: string;
+  direction: "inbound" | "outbound";
+  createdAt: string;
+  messageId?: string; // SMTP Message-ID header
+}
+
+export interface Note {
+  id: string;
+  conversationId: string;
+  author: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface Agent {
+  id: string;
+  domainId: string;
+  email: string;
+  name: string;
+  role: "admin" | "agent";
+  createdAt: string;
+}
+
+export interface BulkJob {
+  id: string;
+  domainId: string;
+  recipients: string[];
+  subject: string;
+  html: string;
+  from: string;
+  status: "queued" | "processing" | "completed" | "failed";
+  totalRecipients: number;
+  sent: number;
+  failed: number;
+  skippedSuppressed: number;
+  createdAt: string;
+  completedAt?: string;
+  lastError?: string;
+}
+
+// --- Mesa CRUD ---
+
+export async function createConversation(conv: Omit<Conversation, "id">): Promise<Conversation> {
+  const id = crypto.randomUUID();
+  const c: Conversation = { ...conv, id };
+  await kv.atomic()
+    .set(["conversations", conv.domainId, id], c)
+    .commit();
+  return c;
+}
+
+export async function getConversation(domainId: string, id: string): Promise<Conversation | null> {
+  const entry = await kv.get<Conversation>(["conversations", domainId, id]);
+  return entry.value;
+}
+
+export async function listConversations(domainId: string, opts?: { status?: string; assignedTo?: string }): Promise<Conversation[]> {
+  const convs: Conversation[] = [];
+  for await (const entry of kv.list<Conversation>({ prefix: ["conversations", domainId] })) {
+    const c = entry.value;
+    if (opts?.status && c.status !== opts.status) continue;
+    if (opts?.assignedTo && c.assignedTo !== opts.assignedTo) continue;
+    convs.push(c);
+  }
+  return convs.sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
+}
+
+export async function updateConversation(domainId: string, id: string, updates: Partial<Pick<Conversation, "status" | "assignedTo" | "priority" | "tags" | "lastMessageAt" | "messageCount" | "threadReferences">>): Promise<Conversation | null> {
+  const conv = await getConversation(domainId, id);
+  if (!conv) return null;
+  const updated = { ...conv, ...updates };
+  await kv.set(["conversations", domainId, id], updated);
+  return updated;
+}
+
+export async function findConversationByThread(domainId: string, from: string, references: string[]): Promise<Conversation | null> {
+  // Try to match by thread references first
+  for await (const entry of kv.list<Conversation>({ prefix: ["conversations", domainId] })) {
+    const c = entry.value;
+    // Match by In-Reply-To / References overlap
+    if (references.length > 0 && c.threadReferences.some(ref => references.includes(ref))) {
+      return c;
+    }
+  }
+  return null;
+}
+
+// --- Messages ---
+
+export async function addMessage(msg: Omit<Message, "id">): Promise<Message> {
+  const id = crypto.randomUUID();
+  const m: Message = { ...msg, id };
+  await kv.set(["messages", msg.conversationId, msg.createdAt + ":" + id], m);
+  return m;
+}
+
+export async function listMessages(conversationId: string): Promise<Message[]> {
+  const msgs: Message[] = [];
+  for await (const entry of kv.list<Message>({ prefix: ["messages", conversationId] })) {
+    msgs.push(entry.value);
+  }
+  return msgs.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+// --- Notes ---
+
+export async function addNote(note: Omit<Note, "id">): Promise<Note> {
+  const id = crypto.randomUUID();
+  const n: Note = { ...note, id };
+  await kv.set(["notes", note.conversationId, note.createdAt + ":" + id], n);
+  return n;
+}
+
+export async function listNotes(conversationId: string): Promise<Note[]> {
+  const notes: Note[] = [];
+  for await (const entry of kv.list<Note>({ prefix: ["notes", conversationId] })) {
+    notes.push(entry.value);
+  }
+  return notes.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+// --- Agents ---
+
+export async function createAgent(agent: Omit<Agent, "id" | "createdAt">): Promise<Agent> {
+  const id = crypto.randomUUID();
+  const a: Agent = { ...agent, id, createdAt: new Date().toISOString() };
+  await kv.atomic()
+    .set(["agents", agent.domainId, id], a)
+    .set(["agent-lookup", agent.domainId, agent.email], id)
+    .commit();
+  return a;
+}
+
+export async function getAgent(domainId: string, agentId: string): Promise<Agent | null> {
+  const entry = await kv.get<Agent>(["agents", domainId, agentId]);
+  return entry.value;
+}
+
+export async function getAgentByEmail(domainId: string, email: string): Promise<Agent | null> {
+  const lookup = await kv.get<string>(["agent-lookup", domainId, email]);
+  if (!lookup.value) return null;
+  return getAgent(domainId, lookup.value);
+}
+
+export async function listAgents(domainId: string): Promise<Agent[]> {
+  const agents: Agent[] = [];
+  for await (const entry of kv.list<Agent>({ prefix: ["agents", domainId] })) {
+    agents.push(entry.value);
+  }
+  return agents;
+}
+
+export async function deleteAgent(domainId: string, agentId: string): Promise<boolean> {
+  const agent = await getAgent(domainId, agentId);
+  if (!agent) return false;
+  await kv.atomic()
+    .delete(["agents", domainId, agentId])
+    .delete(["agent-lookup", domainId, agent.email])
+    .commit();
+  return true;
+}
+
+export async function countAgents(domainId: string): Promise<number> {
+  return listAgents(domainId).then(a => a.length);
+}
+
+// --- Suppression list ---
+
+export async function addSuppression(domainId: string, email: string, reason: string): Promise<void> {
+  await kv.set(["suppression", domainId, email], { reason, createdAt: new Date().toISOString() });
+}
+
+export async function isSuppressed(domainId: string, email: string): Promise<boolean> {
+  const entry = await kv.get(["suppression", domainId, email]);
+  return entry.value !== null;
+}
+
+export async function removeSuppression(domainId: string, email: string): Promise<void> {
+  await kv.delete(["suppression", domainId, email]);
+}
+
+// --- Send counter (monthly) ---
+
+export async function incrementSendCount(domainId: string): Promise<number> {
+  const month = new Date().toISOString().slice(0, 7); // "2026-02"
+  const key: Deno.KvKey = ["sends", domainId, month];
+  const entry = await kv.get<number>(key);
+  const count = (entry.value ?? 0) + 1;
+  await kv.set(key, count, { expireIn: 45 * 24 * 60 * 60 * 1000 }); // 45d TTL
+  return count;
+}
+
+export async function getSendCount(domainId: string): Promise<number> {
+  const month = new Date().toISOString().slice(0, 7);
+  const entry = await kv.get<number>(["sends", domainId, month]);
+  return entry.value ?? 0;
+}
+
+// --- Bulk jobs ---
+
+export async function createBulkJob(job: Omit<BulkJob, "id" | "createdAt" | "sent" | "failed" | "skippedSuppressed" | "status">): Promise<BulkJob> {
+  const id = crypto.randomUUID();
+  const j: BulkJob = { ...job, id, status: "queued", sent: 0, failed: 0, skippedSuppressed: 0, createdAt: new Date().toISOString() };
+  await kv.set(["bulk", job.domainId, id], j, { expireIn: 7 * 24 * 60 * 60 * 1000 }); // 7d
+  return j;
+}
+
+export async function getBulkJob(domainId: string, jobId: string): Promise<BulkJob | null> {
+  const entry = await kv.get<BulkJob>(["bulk", domainId, jobId]);
+  return entry.value;
+}
+
+export async function updateBulkJob(job: BulkJob): Promise<void> {
+  await kv.set(["bulk", job.domainId, job.id], job, { expireIn: 7 * 24 * 60 * 60 * 1000 });
+}
+
+export async function listPendingBulkJobs(): Promise<BulkJob[]> {
+  const jobs: BulkJob[] = [];
+  // We need to scan across all domains — use a broader prefix approach
+  // Since bulk jobs have TTL, this list stays small
+  for await (const entry of kv.list<BulkJob>({ prefix: ["bulk"] })) {
+    if (entry.value.status === "queued" || entry.value.status === "processing") {
+      jobs.push(entry.value);
+    }
+  }
+  return jobs.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+// --- Agent invite tokens ---
+
+export async function createAgentInvite(domainId: string, email: string, name: string, role: "admin" | "agent"): Promise<string> {
+  const token = crypto.randomUUID();
+  await kv.set(["agent-invite", token], { domainId, email, name, role }, { expireIn: 7 * 24 * 60 * 60 * 1000 });
+  return token;
+}
+
+export async function getAgentInvite(token: string): Promise<{ domainId: string; email: string; name: string; role: "admin" | "agent" } | null> {
+  const entry = await kv.get<{ domainId: string; email: string; name: string; role: "admin" | "agent" }>(["agent-invite", token]);
+  return entry.value;
+}
+
+export async function deleteAgentInvite(token: string): Promise<void> {
+  await kv.delete(["agent-invite", token]);
+}
+
+// --- Domain Mesa setting ---
+
+export async function setDomainMesaEnabled(domainId: string, enabled: boolean, forwardAlso: boolean = true): Promise<void> {
+  await kv.set(["domain-mesa", domainId], { enabled, forwardAlso });
+}
+
+export async function getDomainMesaSettings(domainId: string): Promise<{ enabled: boolean; forwardAlso: boolean }> {
+  const entry = await kv.get<{ enabled: boolean; forwardAlso: boolean }>(["domain-mesa", domainId]);
+  return entry.value ?? { enabled: false, forwardAlso: true };
+}
+
+// --- Plan limits extension for Mesa/agents ---
+
+export const PLAN_MESA_LIMITS = {
+  basico:     { mesaActions: false, agents: 0 },
+  freelancer: { mesaActions: true,  agents: 3 },
+  developer:  { mesaActions: true,  agents: 10 },
+  pro:        { mesaActions: true,  agents: 3 },
+  agencia:    { mesaActions: true,  agents: 10 },
+} as const;
+
+// --- Admin: list all users ---
+
+export async function listAllUsers(): Promise<Omit<User, "passwordHash">[]> {
+  const users: Omit<User, "passwordHash">[] = [];
+  for await (const entry of kv.list<User>({ prefix: ["users"] })) {
+    const { passwordHash: _, ...safe } = entry.value;
+    users.push(safe);
+  }
+  return users;
+}
+
+export async function deleteUser(email: string): Promise<boolean> {
+  const user = await getUser(email);
+  if (!user) return false;
+
+  // Delete all user domains (which cascades to aliases, rules, logs)
+  const domains = await listUserDomains(email);
+  for (const d of domains) {
+    await deleteDomain(d.id);
+  }
+
+  // Delete the user record
+  await kv.delete(["users", email]);
+
+  // Clean up verify token if exists
+  if (user.verifyToken) {
+    await kv.delete(["verify-tokens", user.verifyToken]);
+  }
+
+  return true;
+}
+
 // --- Test helpers ---
 
 export function _getKv() {
   return kv;
+}
+
+export function _setKv(newKv: Deno.Kv) {
+  kv = newKv;
 }

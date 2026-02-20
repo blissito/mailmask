@@ -65,7 +65,58 @@ export async function verifyDomain(domain: string): Promise<DnsRecords> {
   const dkimRes = await ses.send(new VerifyDomainDkimCommand({ Domain: domain }));
   const dkimTokens = dkimRes.DkimTokens ?? [];
 
+  // Create configuration set for outbound tracking (bounces/complaints)
+  try {
+    await createConfigurationSet(domain);
+  } catch (err) {
+    log("warn", "ses", "Could not create configuration set (may already exist)", { domain, error: String(err) });
+  }
+
   return { verificationToken, dkimTokens };
+}
+
+// --- Configuration sets (outbound tracking) ---
+
+function configSetName(domain: string): string {
+  return `mailmask-${domain.replace(/\./g, "-")}`;
+}
+
+async function createConfigurationSet(domain: string): Promise<void> {
+  const ses = await getSesOutbound();
+  const { CreateConfigurationSetCommand, CreateConfigurationSetEventDestinationCommand } = await import("@aws-sdk/client-ses");
+  const name = configSetName(domain);
+
+  try {
+    await ses.send(new CreateConfigurationSetCommand({
+      ConfigurationSet: { Name: name },
+    }));
+  } catch (err: any) {
+    // AlreadyExists is fine
+    if (!String(err).includes("AlreadyExists")) throw err;
+  }
+
+  const snsTopicArn = Deno.env.get("SNS_OUTBOUND_TOPIC_ARN");
+  if (snsTopicArn) {
+    try {
+      await ses.send(new CreateConfigurationSetEventDestinationCommand({
+        ConfigurationSetName: name,
+        EventDestination: {
+          Name: `${name}-events`,
+          Enabled: true,
+          MatchingEventTypes: ["bounce", "complaint"],
+          SNSDestination: { TopicARN: snsTopicArn },
+        },
+      }));
+    } catch (err: any) {
+      if (!String(err).includes("AlreadyExists")) {
+        log("warn", "ses", "Could not create event destination", { domain, error: String(err) });
+      }
+    }
+  }
+}
+
+export function getConfigSetName(domain: string): string {
+  return configSetName(domain);
 }
 
 export async function checkDomainStatus(domain: string): Promise<{ verified: boolean; dkimVerified: boolean }> {
@@ -168,32 +219,55 @@ export async function forwardEmail(originalRaw: string, from: string, to: string
 
 // --- Send from domain (SMTP outbound) ---
 
-export async function sendFromDomain(from: string, to: string, subject: string, body: string): Promise<void> {
+export async function sendFromDomain(from: string, to: string, subject: string, body: string, opts?: { html?: string; replyTo?: string; configSet?: string; inReplyTo?: string; references?: string }): Promise<string> {
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
 
+  const messageId = `<${crypto.randomUUID()}@${from.split("@")[1] ?? "mailmask.app"}>`;
   const boundary = `----=_Part_${Date.now()}`;
-  const rawEmail = [
+  const headers = [
     `From: ${from}`,
     `To: ${to}`,
     `Subject: ${subject}`,
+    `Message-ID: ${messageId}`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    ``,
+  ];
+  if (opts?.replyTo) headers.push(`Reply-To: ${opts.replyTo}`);
+  if (opts?.inReplyTo) headers.push(`In-Reply-To: ${opts.inReplyTo}`);
+  if (opts?.references) headers.push(`References: ${opts.references}`);
+
+  const parts = [
     `--${boundary}`,
     `Content-Type: text/plain; charset=UTF-8`,
     `Content-Transfer-Encoding: 7bit`,
     ``,
     body,
-    ``,
-    `--${boundary}--`,
-  ].join("\r\n");
+  ];
+  if (opts?.html) {
+    parts.push(
+      ``,
+      `--${boundary}`,
+      `Content-Type: text/html; charset=UTF-8`,
+      `Content-Transfer-Encoding: 7bit`,
+      ``,
+      opts.html,
+    );
+  }
+  parts.push(``, `--${boundary}--`);
 
-  await ses.send(new SendRawEmailCommand({
+  const rawEmail = [...headers, ``, ...parts].join("\r\n");
+
+  // deno-lint-ignore no-explicit-any
+  const cmd: any = {
     RawMessage: { Data: new TextEncoder().encode(rawEmail) },
     Source: from,
     Destinations: [to],
-  }));
+  };
+  if (opts?.configSet) cmd.ConfigurationSetName = opts.configSet;
+
+  await ses.send(new SendRawEmailCommand(cmd));
+  return messageId;
 }
 
 // --- S3 backup helpers ---
@@ -229,6 +303,44 @@ export async function deleteOldBackups(): Promise<void> {
       await s3.send(new DeleteObjectCommand({ Bucket: BACKUP_BUCKET, Key: obj.Key }));
     }
   }
+}
+
+// --- Admin backup listing/download ---
+
+export async function listBackups(): Promise<{ key: string; date: string; sizeBytes: number }[]> {
+  const s3 = await getS3();
+  const { ListObjectsV2Command } = await import("@aws-sdk/client-s3");
+  const res = await s3.send(new ListObjectsV2Command({
+    Bucket: BACKUP_BUCKET,
+    Prefix: BACKUP_PREFIX,
+  }));
+  const objects = res.Contents ?? [];
+  return objects
+    .map((obj: any) => ({
+      key: (obj.Key ?? "").replace(BACKUP_PREFIX, ""),
+      date: obj.LastModified?.toISOString() ?? "",
+      sizeBytes: obj.Size ?? 0,
+    }))
+    .sort((a: any, b: any) => b.date.localeCompare(a.date));
+}
+
+export async function getBackupFromS3(key: string): Promise<string> {
+  const s3 = await getS3();
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  const res = await s3.send(new GetObjectCommand({
+    Bucket: BACKUP_BUCKET,
+    Key: `${BACKUP_PREFIX}${key}`,
+  }));
+  return await res.Body!.transformToString("utf-8");
+}
+
+export async function deleteBackupFromS3(key: string): Promise<void> {
+  const s3 = await getS3();
+  const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new DeleteObjectCommand({
+    Bucket: BACKUP_BUCKET,
+    Key: `${BACKUP_PREFIX}${key}`,
+  }));
 }
 
 // --- Admin alerts with throttle ---

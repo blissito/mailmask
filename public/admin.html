@@ -30,31 +30,100 @@
     </div>
   </nav>
 
-  <main class="max-w-4xl mx-auto px-4 py-8">
+  <main class="mx-auto px-6 py-6" style="max-width:1400px">
 
-    <!-- Backups -->
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold">Backups</h1>
-      <button id="btn-trigger" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm">
-        Crear backup ahora
-      </button>
+    <!-- Tabs -->
+    <div class="flex gap-1 mb-6 border-b border-zinc-800">
+      <button class="admin-tab px-4 py-2 text-sm font-medium border-b-2 transition-colors" data-tab="backups">Backups</button>
+      <button class="admin-tab px-4 py-2 text-sm font-medium border-b-2 transition-colors" data-tab="users">Usuarios</button>
     </div>
 
-    <div id="loading" class="text-zinc-500 text-sm">Cargando...</div>
+    <!-- Backups section -->
+    <section id="tab-backups">
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold">Backups</h1>
+        <button id="btn-trigger" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm">
+          Crear backup ahora
+        </button>
+      </div>
+      <div id="loading" class="text-zinc-500 text-sm">Cargando...</div>
+      <div id="backups-empty" class="hidden text-center py-16">
+        <div class="text-5xl mb-4">📦</div>
+        <h2 class="text-xl font-semibold mb-2">Sin backups</h2>
+        <p class="text-zinc-400">Crea el primer backup con el boton de arriba.</p>
+      </div>
+      <div id="backups-list" class="hidden space-y-2"></div>
+      <div id="trigger-status" class="hidden mt-4 p-3 rounded-lg text-sm"></div>
+    </section>
 
-    <div id="backups-empty" class="hidden text-center py-16">
-      <div class="text-5xl mb-4">📦</div>
-      <h2 class="text-xl font-semibold mb-2">Sin backups</h2>
-      <p class="text-zinc-400">Crea el primer backup con el boton de arriba.</p>
-    </div>
+    <!-- Users section: two-column layout -->
+    <section id="tab-users" class="hidden">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold">Usuarios</h1>
+        <input id="user-search" type="text" placeholder="Buscar por email..."
+               class="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-red-500 w-64">
+      </div>
 
-    <div id="backups-list" class="hidden space-y-2"></div>
+      <div class="flex gap-4">
+        <div class="w-2/5 min-w-0">
+          <div id="users-loading" class="text-zinc-500 text-sm">Cargando...</div>
+          <div id="users-list" class="hidden space-y-0.5 max-h-[75vh] overflow-y-auto"></div>
+        </div>
 
-    <div id="trigger-status" class="hidden mt-4 p-3 rounded-lg text-sm"></div>
+        <div id="user-detail" class="w-3/5 min-w-0 hidden">
+          <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-5 sticky top-8">
+            <div class="flex items-center justify-between mb-4">
+              <h2 id="detail-email" class="text-base font-semibold truncate mr-3"></h2>
+              <button id="btn-close-detail" class="text-zinc-500 hover:text-zinc-300 text-xs">cerrar</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label class="block text-xs text-zinc-500 mb-1">Plan</label>
+                <select id="detail-plan" class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm">
+                  <option value="basico">Basico</option>
+                  <option value="freelancer">Freelancer</option>
+                  <option value="developer">Developer</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-zinc-500 mb-1">Status</label>
+                <select id="detail-status" class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm">
+                  <option value="active">Active</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="past_due">Past due</option>
+                  <option value="none">None</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-zinc-500 mb-1">Periodo termina</label>
+                <input id="detail-period-end" type="date" class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm">
+              </div>
+              <div>
+                <label class="block text-xs text-zinc-500 mb-1">Email verificado</label>
+                <label class="flex items-center gap-2 mt-1.5">
+                  <input id="detail-verified" type="checkbox" class="accent-red-500">
+                  <span class="text-sm">Verificado</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="flex gap-2 mb-4">
+              <button id="btn-save-user" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-1.5 rounded-lg text-sm transition-colors">Guardar</button>
+              <button id="btn-delete-user" class="bg-zinc-800 hover:bg-red-900 text-red-400 hover:text-red-300 font-semibold px-4 py-1.5 rounded-lg text-sm transition-colors border border-zinc-700">Eliminar</button>
+            </div>
+
+            <div id="detail-save-status" class="hidden mb-3 p-2 rounded text-sm"></div>
+
+            <h3 class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">Dominios</h3>
+            <div id="detail-domains" class="space-y-1 text-sm"></div>
+          </div>
+        </div>
+      </div>
+    </section>
 
   </main>
 
   <script src="/js/admin.js"></script>
-
 </body>
 </html>

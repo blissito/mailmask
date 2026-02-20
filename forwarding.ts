@@ -1,4 +1,4 @@
-import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, type Rule, type ForwardQueueItem } from "./db.ts";
+import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, getDomainMesaSettings, findConversationByThread, createConversation, updateConversation, addMessage, type Rule, type ForwardQueueItem } from "./db.ts";
 import { forwardEmail, fetchEmailFromS3, sendAlert } from "./ses.ts";
 import { checkRateLimit } from "./rate-limit.ts";
 import { log } from "./logger.ts";
@@ -34,6 +34,131 @@ interface SesMailNotification {
     messageId: string;
   };
   content?: string; // raw email if included via SNS
+}
+
+// --- Email header parsing helpers ---
+
+function extractHeader(raw: string, name: string): string {
+  const re = new RegExp(`^${name}:\\s*(.+)$`, "mi");
+  const match = raw.match(re);
+  return match?.[1]?.trim() ?? "";
+}
+
+function extractReferences(raw: string): string[] {
+  const refs: string[] = [];
+  const inReplyTo = extractHeader(raw, "In-Reply-To");
+  if (inReplyTo) refs.push(inReplyTo);
+  const references = extractHeader(raw, "References");
+  if (references) {
+    // References header can contain multiple message-ids separated by whitespace
+    refs.push(...references.split(/\s+/).filter(r => r.startsWith("<")));
+  }
+  const msgId = extractHeader(raw, "Message-ID");
+  if (msgId) refs.push(msgId);
+  return [...new Set(refs)];
+}
+
+function extractPlainBody(raw: string): string {
+  // Simple extraction: find text/plain content in MIME
+  const headerBodySplit = raw.indexOf("\r\n\r\n");
+  if (headerBodySplit === -1) return raw;
+  const body = raw.slice(headerBodySplit + 4);
+
+  // If multipart, try to find text/plain part
+  const contentType = extractHeader(raw, "Content-Type");
+  if (contentType.includes("multipart")) {
+    const boundaryMatch = contentType.match(/boundary="?([^";\s]+)"?/);
+    if (boundaryMatch) {
+      const boundary = boundaryMatch[1];
+      const parts = body.split(`--${boundary}`);
+      for (const part of parts) {
+        if (part.toLowerCase().includes("content-type: text/plain")) {
+          const partBody = part.indexOf("\r\n\r\n");
+          if (partBody !== -1) return part.slice(partBody + 4).replace(/--$/, "").trim();
+        }
+      }
+    }
+  }
+  return body.trim();
+}
+
+function extractHtmlBody(raw: string): string {
+  const headerBodySplit = raw.indexOf("\r\n\r\n");
+  if (headerBodySplit === -1) return "";
+  const body = raw.slice(headerBodySplit + 4);
+  const contentType = extractHeader(raw, "Content-Type");
+  if (contentType.includes("multipart")) {
+    const boundaryMatch = contentType.match(/boundary="?([^";\s]+)"?/);
+    if (boundaryMatch) {
+      const boundary = boundaryMatch[1];
+      const parts = body.split(`--${boundary}`);
+      for (const part of parts) {
+        if (part.toLowerCase().includes("content-type: text/html")) {
+          const partBody = part.indexOf("\r\n\r\n");
+          if (partBody !== -1) return part.slice(partBody + 4).replace(/--$/, "").trim();
+        }
+      }
+    }
+  }
+  return "";
+}
+
+// --- Mesa integration ---
+
+async function saveToMesa(rawContent: string, from: string, recipient: string, subject: string, domainId: string): Promise<void> {
+  const references = rawContent ? extractReferences(rawContent) : [];
+  const messageIdHeader = rawContent ? extractHeader(rawContent, "Message-ID") : "";
+  const plainBody = rawContent ? extractPlainBody(rawContent) : "";
+  const htmlBody = rawContent ? extractHtmlBody(rawContent) : "";
+
+  // Try to find existing conversation by threading
+  let conv = await findConversationByThread(domainId, from, references);
+
+  if (conv) {
+    // Add message to existing conversation
+    await addMessage({
+      conversationId: conv.id,
+      from,
+      body: plainBody,
+      html: htmlBody,
+      direction: "inbound",
+      createdAt: new Date().toISOString(),
+      messageId: messageIdHeader,
+    });
+    const newRefs = [...new Set([...conv.threadReferences, ...references])];
+    await updateConversation(domainId, conv.id, {
+      lastMessageAt: new Date().toISOString(),
+      messageCount: conv.messageCount + 1,
+      status: "open", // Re-open on new inbound message
+      threadReferences: newRefs,
+    });
+  } else {
+    // Create new conversation — include messageIdHeader so replies can thread
+    const initialRefs = messageIdHeader
+      ? [...new Set([...references, messageIdHeader])]
+      : references;
+    conv = await createConversation({
+      domainId,
+      from,
+      to: recipient,
+      subject,
+      status: "open",
+      priority: "normal",
+      lastMessageAt: new Date().toISOString(),
+      messageCount: 1,
+      tags: [],
+      threadReferences: initialRefs,
+    });
+    await addMessage({
+      conversationId: conv.id,
+      from,
+      body: plainBody,
+      html: htmlBody,
+      direction: "inbound",
+      createdAt: new Date().toISOString(),
+      messageId: messageIdHeader,
+    });
+  }
 }
 
 // --- Process inbound email ---
@@ -119,6 +244,29 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
       }, logDays);
       discarded++;
       continue;
+    }
+
+    // Mesa integration: save to conversation if enabled
+    const mesaSettings = await getDomainMesaSettings(domain.id);
+    if (mesaSettings.enabled && rawContent) {
+      try {
+        await saveToMesa(rawContent, from, recipient, subject, domain.id);
+      } catch (err) {
+        log("error", "forwarding", "Failed to save to Mesa", { error: String(err), domainId: domain.id });
+      }
+      // If Mesa-only mode (no forwarding), skip the rest
+      if (!mesaSettings.forwardAlso) {
+        await addLog({
+          domainId: domain.id,
+          timestamp: new Date().toISOString(),
+          from, to: recipient, subject,
+          status: "forwarded",
+          forwardedTo: "mesa",
+          sizeBytes: rawContent.length,
+        }, logDays);
+        forwarded++;
+        continue;
+      }
     }
 
     // Step 1: Check rules first (higher priority)

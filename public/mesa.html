@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mesa — MailMask</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/mesa.css">
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav class="mesa-nav">
+    <div class="mesa-nav-left">
+      <a href="/" class="mesa-logo">
+        <svg width="24" height="24" viewBox="0 0 80 80" fill="none">
+          <ellipse cx="40" cy="42" rx="28" ry="24" fill="#dc2626"/>
+          <ellipse cx="40" cy="38" rx="28" ry="22" fill="#ef4444"/>
+          <ellipse cx="28" cy="36" rx="8" ry="6" fill="#18181b"/>
+          <ellipse cx="52" cy="36" rx="8" ry="6" fill="#18181b"/>
+        </svg>
+        Mesa
+      </a>
+      <span class="mesa-badge">beta</span>
+    </div>
+    <div class="mesa-nav-right">
+      <a href="/app" class="mesa-nav-link">Dashboard</a>
+      <span id="user-email" class="mesa-user-email"></span>
+      <button id="btn-logout" class="mesa-nav-link">Salir</button>
+    </div>
+  </nav>
+
+  <!-- Toolbar -->
+  <div class="mesa-toolbar">
+    <select id="domain-select" class="mesa-select">
+      <option value="">Cargando dominios...</option>
+    </select>
+    <select id="status-filter" class="mesa-select">
+      <option value="">Todas</option>
+      <option value="open">Abiertas</option>
+      <option value="snoozed">Pospuestas</option>
+      <option value="closed">Cerradas</option>
+    </select>
+    <span id="conv-count" class="mesa-toolbar-count"></span>
+    <div class="mesa-toolbar-spacer"></div>
+    <input type="text" id="search-input" class="mesa-search" placeholder="Buscar...">
+  </div>
+
+  <!-- Main content -->
+  <div class="mesa-main">
+
+    <!-- Conversation list -->
+    <div class="mesa-list" id="conv-list">
+      <div class="mesa-empty" id="list-empty">
+        <div class="mesa-empty-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div class="mesa-empty-title">Sin conversaciones</div>
+        <div class="mesa-empty-desc">Activa Mesa en la configuración de tu dominio para ver los emails entrantes aquí.</div>
+      </div>
+    </div>
+
+    <!-- Detail pane -->
+    <div class="mesa-detail" id="detail-pane">
+      <div class="mesa-empty" id="detail-empty">
+        <div class="mesa-empty-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </div>
+        <div class="mesa-empty-title">Selecciona una conversación</div>
+        <div class="mesa-empty-desc">Usa <kbd>j</kbd>/<kbd>k</kbd> para navegar y <kbd>Enter</kbd> para abrir.</div>
+      </div>
+
+      <!-- Loaded conversation detail (hidden by default) -->
+      <div id="detail-loaded" class="mesa-detail-loaded">
+        <div class="mesa-detail-header">
+          <div class="mesa-detail-subject" id="detail-subject"></div>
+          <div class="mesa-detail-meta">
+            <span id="detail-from"></span>
+            <span>&rarr;</span>
+            <span id="detail-to"></span>
+            <span>&middot;</span>
+            <span id="detail-count"></span> mensajes
+          </div>
+          <div class="mesa-detail-actions">
+            <button class="mesa-action-btn" id="btn-reply" title="Responder"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg> Responder <span class="kbd">R</span></button>
+            <button class="mesa-action-btn" id="btn-assign" title="Asignar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Asignar <span class="kbd">A</span></button>
+            <button class="mesa-action-btn" id="btn-close-conv" title="Cerrar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Cerrar <span class="kbd">E</span></button>
+            <button class="mesa-action-btn" id="btn-urgent" title="Urgente"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
+          </div>
+        </div>
+
+        <!-- Upgrade banner (shown for basico plan) -->
+        <div id="upgrade-banner" class="mesa-upgrade mesa-hidden">
+          Tu plan Básico solo permite lectura. <a href="/app">Actualiza a Freelancer</a> para responder, asignar y agregar notas.
+        </div>
+
+        <div class="mesa-messages" id="messages-container"></div>
+
+        <div class="mesa-composer mesa-hidden" id="composer">
+          <textarea class="mesa-composer-textarea" id="composer-textarea" placeholder="Escribe tu respuesta..."></textarea>
+          <div class="mesa-composer-footer">
+            <div class="mesa-composer-mode">
+              <button class="mesa-mode-btn active" id="mode-reply" data-mode="reply">Responder</button>
+              <button class="mesa-mode-btn note-mode" id="mode-note" data-mode="note">Nota interna</button>
+            </div>
+            <div class="mesa-composer-right">
+              <span class="mesa-composer-hint">
+                <kbd class="mesa-composer-kbd">Ctrl+Enter</kbd> enviar
+              </span>
+              <button class="mesa-send-btn" id="btn-send">Enviar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assign modal -->
+  <div class="mesa-modal-overlay hidden" id="modal-assign">
+    <div class="mesa-modal">
+      <h3>Asignar conversación</h3>
+      <input type="email" id="assign-email" placeholder="email del agente">
+      <div class="mesa-modal-actions">
+        <button class="mesa-modal-cancel" id="assign-cancel">Cancelar</button>
+        <button class="mesa-modal-confirm" id="assign-confirm">Asignar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard shortcut bar -->
+  <div class="mesa-shortcuts">
+    <div class="mesa-shortcut"><kbd>j</kbd><kbd>k</kbd> navegar</div>
+    <div class="mesa-shortcut"><kbd>o</kbd> abrir</div>
+    <div class="mesa-shortcut"><kbd>r</kbd> responder</div>
+    <div class="mesa-shortcut"><kbd>n</kbd> nota</div>
+    <div class="mesa-shortcut"><kbd>a</kbd> asignar</div>
+    <div class="mesa-shortcut"><kbd>e</kbd> cerrar</div>
+    <div class="mesa-shortcut"><kbd>Esc</kbd> volver</div>
+    <div class="mesa-shortcut mesa-shortcut-end"><kbd>/</kbd> buscar</div>
+  </div>
+
+  <!-- Toast -->
+  <div class="mesa-toast" id="toast"></div>
+
+  <script src="/js/mesa.js"></script>
+</body>
+</html>

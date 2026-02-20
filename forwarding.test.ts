@@ -1,4 +1,10 @@
 import { assertEquals, assertExists } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { _setKv } from "./db.ts";
+
+// Use in-memory KV for test isolation
+const testKv = await Deno.openKv(":memory:");
+_setKv(testKv);
+
 import { evaluateRules } from "./forwarding.ts";
 import { enqueueForward, dequeueForward, listForwardQueue, moveToDeadLetter, getQueueDepth, getDeadLetterCount, _getKv, type ForwardQueueItem } from "./db.ts";
 import type { Rule } from "./db.ts";
