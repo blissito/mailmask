@@ -1124,10 +1124,13 @@ const app = new Elysia()
         headers: { "content-type": "application/json" },
       });
     } catch (err: any) {
-      const detail = err?.message ?? err?.cause ?? String(err);
-      console.error("MP checkout error:", JSON.stringify({ detail, raw: err }, null, 2));
+      const detail = String(err?.message ?? err?.cause ?? err);
+      console.error("MP checkout error:", detail);
+      const msg = detail.includes("same user")
+        ? "No puedes suscribirte con la misma cuenta del proveedor de pagos. Usa otra cuenta de MercadoPago."
+        : "Error al crear suscripción en MercadoPago";
       return new Response(
-        JSON.stringify({ error: "Error al crear suscripción en MercadoPago", detail }),
+        JSON.stringify({ error: msg }),
         { status: 500, headers: { "content-type": "application/json" } },
       );
     }
