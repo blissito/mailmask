@@ -1114,6 +1114,7 @@ const app = new Elysia()
             frequency_type: "months",
           },
         },
+        payer_email: user.email,
         back_url: backUrl,
         external_reference: user.email,
       };
@@ -1124,12 +1125,12 @@ const app = new Elysia()
       });
     } catch (err) {
       console.error("MP checkout error:", err);
+      const msg = String(err).includes("payer_email")
+        ? "No puedes suscribirte con la misma cuenta del proveedor. Usa otra cuenta de MercadoPago."
+        : "Error al crear suscripción en MercadoPago";
       return new Response(
-        JSON.stringify({ error: "Error al crear suscripción en MercadoPago" }),
-        {
-          status: 500,
-          headers: { "content-type": "application/json" },
-        },
+        JSON.stringify({ error: msg }),
+        { status: 500, headers: { "content-type": "application/json" } },
       );
     }
   })
