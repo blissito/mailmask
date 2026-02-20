@@ -35,6 +35,19 @@ const SNS_TOPIC_ARN = Deno.env.get("SNS_TOPIC_ARN") ?? "";
 const RECEIPT_RULE_SET = Deno.env.get("SES_RULE_SET") ?? "mailmask-email-forwarding";
 const S3_BUCKET = Deno.env.get("S3_BUCKET") ?? "mailmask-inbound";
 
+// --- Health check ---
+
+export async function checkSesHealth(): Promise<boolean> {
+  try {
+    const ses = await getSesOutbound();
+    const { GetSendQuotaCommand } = await import("@aws-sdk/client-ses");
+    await ses.send(new GetSendQuotaCommand({}));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // --- Domain verification ---
 
 export interface DnsRecords {

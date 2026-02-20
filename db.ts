@@ -16,6 +16,7 @@ export interface User {
   subscription?: Subscription;
   emailVerified?: boolean;
   verifyToken?: string;
+  passwordChangedAt?: string; // ISO date
 }
 
 export interface Domain {
@@ -167,26 +168,39 @@ export async function deleteDomain(id: string): Promise<boolean> {
   const domain = await getDomain(id);
   if (!domain) return false;
 
-  // Delete all aliases
+  // Collect all keys to delete
+  const keysToDelete: Deno.KvKey[] = [];
   for await (const entry of kv.list({ prefix: ["aliases", id] })) {
-    await kv.delete(entry.key);
+    keysToDelete.push(entry.key);
   }
-  // Delete all rules
   for await (const entry of kv.list({ prefix: ["rules", id] })) {
-    await kv.delete(entry.key);
+    keysToDelete.push(entry.key);
   }
-  // Delete logs (fire-and-forget)
+
+  // Delete domain + aliases + rules in a single atomic batch
+  // Deno KV atomic ops limited to ~10 mutations per call, batch if needed
+  const coreKeys: Deno.KvKey[] = [
+    ["domains", id],
+    ["domain-lookup", domain.domain],
+    ["user-domains", domain.ownerEmail, id],
+  ];
+  const allKeys = [...coreKeys, ...keysToDelete];
+
+  // Deno KV supports up to ~1000 mutations per atomic, batch in chunks of 500
+  for (let i = 0; i < allKeys.length; i += 500) {
+    const batch = allKeys.slice(i, i + 500);
+    const op = kv.atomic();
+    for (const key of batch) op.delete(key);
+    await op.commit();
+  }
+
+  // Delete logs in background (can be large, non-critical)
   (async () => {
     for await (const entry of kv.list({ prefix: ["logs", id] })) {
       await kv.delete(entry.key);
     }
   })();
 
-  await kv.atomic()
-    .delete(["domains", id])
-    .delete(["domain-lookup", domain.domain])
-    .delete(["user-domains", domain.ownerEmail, id])
-    .commit();
   return true;
 }
 
@@ -374,7 +388,7 @@ export async function deletePasswordToken(token: string): Promise<void> {
 export async function updateUserPassword(email: string, passwordHash: string): Promise<void> {
   const user = await getUser(email);
   if (!user) return;
-  await kv.set(["users", email], { ...user, passwordHash });
+  await kv.set(["users", email], { ...user, passwordHash, passwordChangedAt: new Date().toISOString() });
 }
 
 // --- Webhook idempotency ---
@@ -426,6 +440,8 @@ export interface ForwardQueueItem {
   nextRetryAt: string; // ISO date
   createdAt: string;
   lastError?: string;
+  s3Bucket?: string;
+  s3Key?: string;
 }
 
 const RETRY_DELAYS = [5 * 60_000, 30 * 60_000, 2 * 60 * 60_000]; // 5min, 30min, 2hrs

@@ -21,61 +21,61 @@ function makeRule(overrides: Partial<Rule>): Rule {
   };
 }
 
-Deno.test("evaluateRules - contains match", () => {
+Deno.test("evaluateRules - contains match", async () => {
   const rules = [makeRule({ field: "from", match: "contains", value: "spam" })];
-  const result = evaluateRules(rules, { to: "a@b.com", from: "spammer@evil.com", subject: "hi" });
+  const result = await evaluateRules(rules, { to: "a@b.com", from: "spammer@evil.com", subject: "hi" });
   assertExists(result);
   assertEquals(result!.id, "r1");
 });
 
-Deno.test("evaluateRules - contains no match", () => {
+Deno.test("evaluateRules - contains no match", async () => {
   const rules = [makeRule({ field: "from", match: "contains", value: "spam" })];
-  const result = evaluateRules(rules, { to: "a@b.com", from: "friend@good.com", subject: "hi" });
+  const result = await evaluateRules(rules, { to: "a@b.com", from: "friend@good.com", subject: "hi" });
   assertEquals(result, null);
 });
 
-Deno.test("evaluateRules - equals match (case insensitive)", () => {
+Deno.test("evaluateRules - equals match (case insensitive)", async () => {
   const rules = [makeRule({ field: "subject", match: "equals", value: "HELLO" })];
-  const result = evaluateRules(rules, { to: "a@b.com", from: "x@y.com", subject: "hello" });
+  const result = await evaluateRules(rules, { to: "a@b.com", from: "x@y.com", subject: "hello" });
   assertExists(result);
 });
 
-Deno.test("evaluateRules - equals no match (partial)", () => {
+Deno.test("evaluateRules - equals no match (partial)", async () => {
   const rules = [makeRule({ field: "subject", match: "equals", value: "hello" })];
-  const result = evaluateRules(rules, { to: "a@b.com", from: "x@y.com", subject: "hello world" });
+  const result = await evaluateRules(rules, { to: "a@b.com", from: "x@y.com", subject: "hello world" });
   assertEquals(result, null);
 });
 
-Deno.test("evaluateRules - regex match", () => {
+Deno.test("evaluateRules - regex match", async () => {
   const rules = [makeRule({ field: "from", match: "regex", value: "^admin@" })];
-  const result = evaluateRules(rules, { to: "a@b.com", from: "admin@example.com", subject: "hi" });
+  const result = await evaluateRules(rules, { to: "a@b.com", from: "admin@example.com", subject: "hi" });
   assertExists(result);
 });
 
-Deno.test("evaluateRules - regex no match", () => {
+Deno.test("evaluateRules - regex no match", async () => {
   const rules = [makeRule({ field: "from", match: "regex", value: "^admin@" })];
-  const result = evaluateRules(rules, { to: "a@b.com", from: "user@example.com", subject: "hi" });
+  const result = await evaluateRules(rules, { to: "a@b.com", from: "user@example.com", subject: "hi" });
   assertEquals(result, null);
 });
 
-Deno.test("evaluateRules - invalid regex doesn't crash", () => {
+Deno.test("evaluateRules - invalid regex doesn't crash", async () => {
   const rules = [makeRule({ field: "from", match: "regex", value: "[invalid" })];
-  const result = evaluateRules(rules, { to: "a@b.com", from: "admin@example.com", subject: "hi" });
+  const result = await evaluateRules(rules, { to: "a@b.com", from: "admin@example.com", subject: "hi" });
   assertEquals(result, null);
 });
 
-Deno.test("evaluateRules - disabled rule skipped", () => {
+Deno.test("evaluateRules - disabled rule skipped", async () => {
   const rules = [makeRule({ field: "from", match: "contains", value: "spam", enabled: false })];
-  const result = evaluateRules(rules, { to: "a@b.com", from: "spammer@evil.com", subject: "hi" });
+  const result = await evaluateRules(rules, { to: "a@b.com", from: "spammer@evil.com", subject: "hi" });
   assertEquals(result, null);
 });
 
-Deno.test("evaluateRules - priority order (first match wins)", () => {
+Deno.test("evaluateRules - priority order (first match wins)", async () => {
   const rules = [
     makeRule({ id: "r1", field: "from", match: "contains", value: "user", priority: 0, action: "discard" }),
     makeRule({ id: "r2", field: "from", match: "contains", value: "user", priority: 1, action: "forward" }),
   ];
-  const result = evaluateRules(rules, { to: "a@b.com", from: "user@x.com", subject: "hi" });
+  const result = await evaluateRules(rules, { to: "a@b.com", from: "user@x.com", subject: "hi" });
   assertEquals(result!.id, "r1");
   assertEquals(result!.action, "discard");
 });

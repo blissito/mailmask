@@ -1,4 +1,4 @@
-import { getUser } from "./db.ts";
+import { getUser, type User } from "./db.ts";
 
 const encoder = new TextEncoder();
 const JWT_SECRET = Deno.env.get("JWT_SECRET") ?? (() => { throw new Error("JWT_SECRET required"); })();
@@ -41,7 +41,10 @@ export async function verifyPassword(password: string, stored: string): Promise<
     key,
     256,
   );
-  return toHex(new Uint8Array(bits)) === hashHex;
+  const computed = new Uint8Array(bits);
+  const expected = fromHex(hashHex);
+  if (computed.byteLength !== expected.byteLength) return false;
+  return timingSafeEqual(computed, expected);
 }
 
 // --- JWT (HMAC-SHA256 via Web Crypto) ---
@@ -119,10 +122,25 @@ export async function getAuthUser(request: Request): Promise<{ email: string } |
   const user = await getUser(payload.email as string);
   if (!user) return null;
 
+  // Reject tokens issued before password change (C4: JWT revocation)
+  if (user.passwordChangedAt && payload.iat) {
+    const changedAtSec = Math.floor(new Date(user.passwordChangedAt).getTime() / 1000);
+    if ((payload.iat as number) < changedAtSec) return null;
+  }
+
   return { email: user.email };
 }
 
 // --- Internal helpers ---
+
+function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.byteLength !== b.byteLength) return false;
+  let diff = 0;
+  for (let i = 0; i < a.byteLength; i++) {
+    diff |= a[i] ^ b[i];
+  }
+  return diff === 0;
+}
 
 function toHex(buf: Uint8Array): string {
   return [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");

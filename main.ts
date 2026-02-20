@@ -55,6 +55,7 @@ import {
   deleteReceiptRule,
   sendFromDomain,
   sendAlert,
+  checkSesHealth,
 } from "./ses.ts";
 import { processInbound } from "./forwarding.ts";
 import { log } from "./logger.ts";
@@ -220,6 +221,33 @@ async function checkEmailVerified(email: string): Promise<Response | null> {
   );
 }
 
+// --- SSRF protection ---
+
+function isPrivateUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return true;
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "[::1]") return true;
+    // IPv6 private ranges
+    if (hostname.startsWith("[fc") || hostname.startsWith("[fd") || hostname.startsWith("[fe80")) return true;
+    // IPv4 checks
+    const ipv4Match = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+    if (ipv4Match) {
+      const [, a, b] = ipv4Match.map(Number);
+      if (a === 127) return true; // loopback
+      if (a === 10) return true; // 10.x.x.x
+      if (a === 172 && b >= 16 && b <= 31) return true; // 172.16-31.x.x
+      if (a === 192 && b === 168) return true; // 192.168.x.x
+      if (a === 169 && b === 254) return true; // link-local
+      if (a === 0) return true; // 0.x.x.x
+    }
+    return false;
+  } catch {
+    return true; // invalid URL = reject
+  }
+}
+
 // --- App ---
 
 const app = new Elysia()
@@ -267,15 +295,19 @@ const app = new Elysia()
 
   // --- Health ---
   .get("/health", async () => {
-    const queueDepth = await getQueueDepth();
-    const deadLetterCount = await getDeadLetterCount();
-    const healthy = queueDepth <= 50 && deadLetterCount === 0;
+    const [queueDepth, deadLetterCount, sesOk] = await Promise.all([
+      getQueueDepth(),
+      getDeadLetterCount(),
+      checkSesHealth(),
+    ]);
+    const healthy = queueDepth <= 50 && deadLetterCount === 0 && sesOk;
     return new Response(JSON.stringify({
       status: healthy ? "ok" : "degraded",
       service: "mailmask",
       timestamp: new Date().toISOString(),
       queueDepth,
       deadLetterCount,
+      ses: sesOk ? "ok" : "unreachable",
     }), {
       status: healthy ? 200 : 503,
       headers: { "content-type": "application/json" },
@@ -866,7 +898,29 @@ const app = new Elysia()
     }
 
     const body = await request.json();
-    const updated = await updateAlias(domain.id, params.alias, body);
+
+    // Whitelist allowed fields
+    const updates: Record<string, unknown> = {};
+    if (typeof body.enabled === "boolean") updates.enabled = body.enabled;
+    if (Array.isArray(body.destinations)) {
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      const invalid = body.destinations.filter((d: string) => typeof d !== "string" || !emailRegex.test(d));
+      if (invalid.length) {
+        return new Response(
+          JSON.stringify({ error: `Email(s) de destino inválido(s): ${invalid.join(", ")}` }),
+          { status: 400 },
+        );
+      }
+      if (body.destinations.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "Se requiere al menos un destino" }),
+          { status: 400 },
+        );
+      }
+      updates.destinations = body.destinations;
+    }
+
+    const updated = await updateAlias(domain.id, params.alias, updates);
     if (!updated)
       return new Response(JSON.stringify({ error: "Alias no encontrado" }), {
         status: 404,
@@ -992,6 +1046,32 @@ const app = new Elysia()
         }),
         { status: 400 },
       );
+    }
+
+    // SSRF: validate webhook targets aren't private IPs
+    if (action === "webhook" && target && isPrivateUrl(target)) {
+      return new Response(
+        JSON.stringify({ error: "URL de webhook no permitida (dirección privada)" }),
+        { status: 400 },
+      );
+    }
+
+    // ReDoS: limit regex pattern length
+    if (match === "regex") {
+      if (value.length > 200) {
+        return new Response(
+          JSON.stringify({ error: "Patrón regex demasiado largo (máx 200 caracteres)" }),
+          { status: 400 },
+        );
+      }
+      try {
+        new RegExp(value);
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Patrón regex inválido" }),
+          { status: 400 },
+        );
+      }
     }
 
     const rule = await createRule(domain.id, {
@@ -1379,7 +1459,7 @@ const app = new Elysia()
           } else if (sub.status === "cancelled") {
             const existingUser = await getUser(email);
             const currentSub = existingUser?.subscription;
-            if (currentSub) {
+            if (currentSub && currentSub.mpSubscriptionId === body.data.id) {
               await updateUserSubscription(email, {
                 ...currentSub,
                 status: "cancelled",
@@ -1389,7 +1469,7 @@ const app = new Elysia()
           } else if (sub.status === "paused") {
             const existingUser = await getUser(email);
             const currentSub = existingUser?.subscription;
-            if (currentSub) {
+            if (currentSub && currentSub.mpSubscriptionId === body.data.id) {
               await updateUserSubscription(email, {
                 ...currentSub,
                 status: "past_due",

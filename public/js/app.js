@@ -87,12 +87,23 @@ function renderBillingBanner() {
     document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
   }
 
-  // Disable add domain button if no active/grace-period plan
+  // Hide header add-domain button when no domains (empty state handles it)
   const addDomainBtn = document.getElementById("btn-add-domain");
-  if (addDomainBtn && !isActive && !isCancelledWithAccess) {
-    addDomainBtn.disabled = true;
-    addDomainBtn.classList.add("opacity-50", "cursor-not-allowed");
-    addDomainBtn.title = "Necesitas un plan activo";
+  if (addDomainBtn) {
+    if (domains.length === 0) {
+      addDomainBtn.classList.add("hidden");
+    } else {
+      addDomainBtn.classList.remove("hidden");
+      if (!isActive && !isCancelledWithAccess) {
+        addDomainBtn.disabled = true;
+        addDomainBtn.classList.add("opacity-50", "cursor-not-allowed");
+        addDomainBtn.title = "Necesitas un plan activo";
+      } else {
+        addDomainBtn.disabled = false;
+        addDomainBtn.classList.remove("opacity-50", "cursor-not-allowed");
+        addDomainBtn.title = "";
+      }
+    }
   }
 }
 
@@ -176,6 +187,23 @@ function renderDomains() {
   if (domains.length === 0) {
     list.innerHTML = "";
     empty.classList.remove("hidden");
+
+    // Style empty-state CTA based on plan status
+    const emptyBtn = document.getElementById("btn-add-domain-empty");
+    if (emptyBtn) {
+      const sub = currentUser?.subscription;
+      const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
+      const isExpired = periodEnd && periodEnd < new Date();
+      const hasActivePlan = sub && (sub.status === "active" || sub.status === "cancelled") && !isExpired;
+
+      if (hasActivePlan) {
+        // Primary CTA: user has plan, needs to add domain
+        emptyBtn.className = "bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-6 py-3 rounded-lg transition-colors";
+      } else {
+        // Ghost/secondary: billing banner is the primary CTA
+        emptyBtn.className = "border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 text-sm px-6 py-3 rounded-lg transition-colors";
+      }
+    }
     return;
   }
 
