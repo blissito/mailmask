@@ -2527,4 +2527,16 @@ Deno.cron("daily-backup", "0 4 * * *", async () => {
 
 const port = parseInt(Deno.env.get("PORT") ?? "8000");
 Deno.serve({ port }, (req) => app.fetch(req));
+
+// Repair receipt rules missing SNS TopicArn (one-time fix for rules created before SNS_TOPIC_ARN was set)
+import { repairReceiptRules } from "./ses.ts";
+(async () => {
+  try {
+    const repaired = await repairReceiptRules();
+    if (repaired > 0) log("info", "startup", `Repaired ${repaired} receipt rule(s) with missing TopicArn`);
+  } catch (err) {
+    log("error", "startup", "Failed to repair receipt rules", { error: String(err) });
+  }
+})();
+
 export { app };

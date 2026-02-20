@@ -139,6 +139,8 @@ export async function checkDomainStatus(domain: string): Promise<{ verified: boo
 // --- Receipt rule (SES inbound) ---
 
 export async function createReceiptRule(domain: string): Promise<void> {
+  if (!SNS_TOPIC_ARN) throw new Error("SNS_TOPIC_ARN is required to create receipt rules");
+
   const ses = await getSesInbound();
   const { CreateReceiptRuleCommand } = await import("@aws-sdk/client-ses");
   const ruleName = `mailmask-${domain.replace(/\./g, "-")}`;
@@ -154,13 +156,50 @@ export async function createReceiptRule(domain: string): Promise<void> {
           S3Action: {
             BucketName: S3_BUCKET,
             ObjectKeyPrefix: `inbound/${domain}/`,
-            ...(SNS_TOPIC_ARN ? { TopicArn: SNS_TOPIC_ARN } : {}),
+            TopicArn: SNS_TOPIC_ARN,
           },
         },
       ],
       ScanEnabled: true,
     },
   }));
+}
+
+export async function repairReceiptRules(): Promise<number> {
+  if (!SNS_TOPIC_ARN) {
+    log("warn", "ses", "SNS_TOPIC_ARN not set, skipping receipt rule repair");
+    return 0;
+  }
+
+  const ses = await getSesInbound();
+  const { DescribeReceiptRuleSetCommand, UpdateReceiptRuleCommand } = await import("@aws-sdk/client-ses");
+
+  const res = await ses.send(new DescribeReceiptRuleSetCommand({ RuleSetName: RECEIPT_RULE_SET }));
+  const rules = res.Rules ?? [];
+  let repaired = 0;
+
+  for (const rule of rules) {
+    const actions = rule.Actions ?? [];
+    let needsUpdate = false;
+
+    for (const action of actions) {
+      if (action.S3Action && !action.S3Action.TopicArn) {
+        action.S3Action.TopicArn = SNS_TOPIC_ARN;
+        needsUpdate = true;
+      }
+    }
+
+    if (needsUpdate) {
+      await ses.send(new UpdateReceiptRuleCommand({
+        RuleSetName: RECEIPT_RULE_SET,
+        Rule: rule,
+      }));
+      log("info", "ses", `Repaired receipt rule: ${rule.Name}`, { ruleName: rule.Name });
+      repaired++;
+    }
+  }
+
+  return repaired;
 }
 
 export async function deleteReceiptRule(domain: string): Promise<void> {
