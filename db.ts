@@ -70,12 +70,12 @@ export interface EmailLog {
 // --- Plans ---
 
 export const PLANS = {
-  basico:     { price: 49_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 0,  sends: 0,     api: false, webhooks: false },
-  freelancer: { price: 449_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false },
-  developer:  { price: 999_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true },
+  basico:     { price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 0,  sends: 0,     api: false, webhooks: false },
+  freelancer: { price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false },
+  developer:  { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true },
   // Legacy plan mappings (kept for existing subscribers)
-  pro:     { price: 299_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false },
-  agencia: { price: 999_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true },
+  pro:     { price: 299_00, yearlyPrice: 2990_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false },
+  agencia: { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true },
 } as const;
 
 // --- Users ---

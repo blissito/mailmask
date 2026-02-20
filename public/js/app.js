@@ -77,7 +77,7 @@ async function startCheckout() {
     const res = await fetch("/api/billing/checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ plan: "basico" }),
+      body: JSON.stringify({ plan: "basico", billing: "monthly" }),
     });
     const data = await res.json();
     if (data.init_point) {

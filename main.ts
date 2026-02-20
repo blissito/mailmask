@@ -1011,18 +1011,19 @@ const app = new Elysia()
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
 
-    const { plan = "basico" } = await request
+    const { plan = "basico", billing = "monthly" } = await request
       .json()
-      .catch(() => ({ plan: "basico" }));
+      .catch(() => ({ plan: "basico", billing: "monthly" }));
     const planKey = plan as keyof typeof PLANS;
     if (!PLANS[planKey]) {
       return new Response(JSON.stringify({ error: "Plan inválido" }), {
         status: 400,
       });
     }
+    const isYearly = billing === "yearly";
 
     const token = crypto.randomUUID();
-    await createPendingCheckout(token, planKey);
+    await createPendingCheckout(token, isYearly ? `${planKey}:yearly` : planKey);
 
     const { PreApproval } = await import("mercadopago");
     const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
@@ -1037,18 +1038,21 @@ const app = new Elysia()
     const backUrl = getMainDomainUrl() + "/landing?success=1";
 
     try {
+      const billingLabel = isYearly ? "Anual" : "Mensual";
       // deno-lint-ignore no-explicit-any
       const body: any = {
-        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)}`,
+        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)} (${billingLabel})`,
         auto_recurring: {
-          frequency: 1,
+          frequency: isYearly ? 12 : 1,
           frequency_type: "months",
-          transaction_amount: PLANS[planKey].price / 100,
+          transaction_amount: isYearly ? PLANS[planKey].yearlyPrice / 100 : PLANS[planKey].price / 100,
           currency_id: "MXN",
-          free_trial: {
-            frequency: 1,
-            frequency_type: "months",
-          },
+          ...(isYearly ? {} : {
+            free_trial: {
+              frequency: 1,
+              frequency_type: "months",
+            },
+          }),
         },
         payer_email: "guest@mailmask.app",
         back_url: backUrl,
@@ -1078,15 +1082,16 @@ const app = new Elysia()
         status: 401,
       });
 
-    const { plan = "basico" } = await request
+    const { plan = "basico", billing = "monthly" } = await request
       .json()
-      .catch(() => ({ plan: "basico" }));
+      .catch(() => ({ plan: "basico", billing: "monthly" }));
     const planKey = plan as keyof typeof PLANS;
     if (!PLANS[planKey]) {
       return new Response(JSON.stringify({ error: "Plan inválido" }), {
         status: 400,
       });
     }
+    const isYearly = billing === "yearly";
 
     const { PreApproval } = await import("mercadopago");
     const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
@@ -1101,18 +1106,21 @@ const app = new Elysia()
     const backUrl = getMainDomainUrl() + "/app?billing=success";
 
     try {
+      const billingLabel = isYearly ? "Anual" : "Mensual";
       // deno-lint-ignore no-explicit-any
       const body: any = {
-        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)}`,
+        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)} (${billingLabel})`,
         auto_recurring: {
-          frequency: 1,
+          frequency: isYearly ? 12 : 1,
           frequency_type: "months",
-          transaction_amount: PLANS[planKey].price / 100,
+          transaction_amount: isYearly ? PLANS[planKey].yearlyPrice / 100 : PLANS[planKey].price / 100,
           currency_id: "MXN",
-          free_trial: {
-            frequency: 1,
-            frequency_type: "months",
-          },
+          ...(isYearly ? {} : {
+            free_trial: {
+              frequency: 1,
+              frequency_type: "months",
+            },
+          }),
         },
         payer_email: user.email,
         back_url: backUrl,
@@ -1221,16 +1229,22 @@ const app = new Elysia()
 
             if (isGuestCheckout) {
               const pendingPlan = await getPendingCheckout(externalRef);
-              if (pendingPlan && pendingPlan in PLANS) {
-                plan = pendingPlan as PlanKey;
+              if (pendingPlan) {
+                // pendingPlan may be "freelancer:yearly" or just "freelancer"
+                const basePlan = pendingPlan.split(":")[0];
+                if (basePlan in PLANS) {
+                  plan = basePlan as PlanKey;
+                }
               }
               await deletePendingCheckout(externalRef);
             }
 
             if (!plan) {
               const amount = sub.auto_recurring?.transaction_amount ?? 0;
-              const amountToPlan: Record<number, PlanKey> =
-                { 49: "basico", 449: "freelancer", 999: "developer", 299: "pro" };
+              const amountToPlan: Record<number, PlanKey> = {
+                49: "basico", 449: "freelancer", 999: "developer", 299: "pro",
+                490: "basico", 4490: "freelancer", 9990: "developer",
+              };
               plan = amountToPlan[amount];
             }
 

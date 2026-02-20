@@ -455,24 +455,37 @@
     <!-- Pricing -->
     <section id="pricing" class="max-w-4xl mx-auto px-4 py-16">
       <h2 class="text-2xl font-bold text-center mb-4">Precios simples</h2>
-      <p class="text-center text-zinc-400 mb-12">
+      <p class="text-center text-zinc-400 mb-8">
         Paga solo por lo que usas. Sin contratos ni sorpresas.
       </p>
+
+      <!-- Billing toggle -->
+      <div class="flex items-center justify-center gap-3 mb-12">
+        <span id="label-monthly" class="text-sm font-semibold text-zinc-100">Mensual</span>
+        <button id="billing-toggle" onclick="toggleBilling()" class="relative w-14 h-7 bg-zinc-700 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-mask-500">
+          <span id="toggle-dot" class="absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform"></span>
+        </button>
+        <span id="label-yearly" class="text-sm font-semibold text-zinc-500">Anual</span>
+        <span id="yearly-badge" class="hidden text-xs bg-green-900/50 text-green-400 font-bold px-2 py-1 rounded-full">2 meses gratis</span>
+      </div>
+
       <div class="grid md:grid-cols-3 gap-6">
         <!-- Básico -->
         <div
           class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 flex flex-col opacity-0"
+          data-plan="basico" data-monthly="49" data-yearly="490" data-savings="98"
         >
           <span
-            class="inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3"
+            class="plan-trial inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3"
             >Primer mes gratis</span
           >
           <h3 class="font-semibold text-lg">Básico</h3>
           <p class="text-sm text-zinc-500 mt-1">Solo reenvío — 1 dominio</p>
           <div class="mt-4">
-            <span class="text-4xl font-extrabold">$49</span>
-            <span class="text-zinc-400">/mes</span>
+            <span class="plan-price text-4xl font-extrabold">$49</span>
+            <span class="plan-period text-zinc-400">/mes</span>
           </div>
+          <p class="plan-savings text-xs text-green-400 mt-1 hidden"></p>
           <ul class="mt-6 space-y-3 text-sm text-zinc-300">
             <li>✓ 5 máscaras (alias)</li>
             <li class="text-zinc-500">✗ Sin envíos</li>
@@ -480,7 +493,7 @@
             <li class="text-zinc-500">✗ Sin historial</li>
           </ul>
           <button
-            onclick="startCheckout('basico', this)"
+            onclick="startCheckout('basico', currentBilling, this)"
             class="mt-auto block w-full text-center border border-zinc-700 hover:border-zinc-500 text-zinc-300 font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
           >
             Empezar
@@ -490,22 +503,24 @@
         <!-- Freelancer (FEATURED) -->
         <div
           class="pricing-card bg-zinc-900 border-2 border-mask-600 rounded-xl p-8 relative flex flex-col opacity-0"
+          data-plan="freelancer" data-monthly="449" data-yearly="4,490" data-savings="898"
         >
           <span
             class="absolute -top-3 left-1/2 -translate-x-1/2 bg-mask-600 text-white text-xs font-bold px-3 py-1 rounded-full"
             >POPULAR</span
           >
           <span
-            class="inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3"
+            class="plan-trial inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3"
             >Primer mes gratis</span
           >
           <h3 class="font-semibold text-lg">Freelancer</h3>
           <p class="text-sm text-zinc-400 mt-1">Ideal para agencias y diseñadores web</p>
           <div class="mt-4">
-            <span class="text-4xl font-extrabold">$449</span>
-            <span class="text-zinc-400">/mes</span>
+            <span class="plan-price text-4xl font-extrabold">$449</span>
+            <span class="plan-period text-zinc-400">/mes</span>
           </div>
-          <p class="text-xs text-mask-400 mt-1">15 dominios — $30/dominio</p>
+          <p class="plan-savings text-xs text-green-400 mt-1 hidden"></p>
+          <p class="plan-per-domain text-xs text-mask-400 mt-1">15 dominios — $30/dominio</p>
           <ul class="mt-6 space-y-3 text-sm text-zinc-300">
             <li>✓ 50 máscaras por dominio</li>
             <li>✓ Enviar como tu@dominio (500/día)</li>
@@ -517,7 +532,7 @@
             <li>✓ Soporte por email</li>
           </ul>
           <button
-            onclick="startCheckout('freelancer', this)"
+            onclick="startCheckout('freelancer', currentBilling, this)"
             class="mt-auto block w-full text-center bg-mask-600 hover:bg-mask-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
           >
             Empezar
@@ -527,18 +542,20 @@
         <!-- Developer -->
         <div
           class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 flex flex-col opacity-0"
+          data-plan="developer" data-monthly="999" data-yearly="9,990" data-savings="1,998"
         >
           <span
-            class="inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3"
+            class="plan-trial inline-block bg-green-900/50 text-green-400 text-xs font-bold px-2 py-1 rounded-full mb-3"
             >Primer mes gratis</span
           >
           <h3 class="font-semibold text-lg">Developer</h3>
           <p class="text-sm text-zinc-400 mt-1">API & SDK para tu SaaS</p>
           <div class="mt-4">
-            <span class="text-4xl font-extrabold">$999</span>
-            <span class="text-zinc-400">/mes</span>
+            <span class="plan-price text-4xl font-extrabold">$999</span>
+            <span class="plan-period text-zinc-400">/mes</span>
           </div>
-          <p class="text-xs text-mask-400 mt-1">20 dominios — $50/dominio</p>
+          <p class="plan-savings text-xs text-green-400 mt-1 hidden"></p>
+          <p class="plan-per-domain text-xs text-mask-400 mt-1">20 dominios — $50/dominio</p>
           <ul class="mt-6 space-y-3 text-sm text-zinc-300">
             <li>✓ 100 máscaras por dominio</li>
             <li>✓ Enviar como tu@dominio (2,000/día)</li>
@@ -553,7 +570,7 @@
             <li>✓ Soporte prioritario</li>
           </ul>
           <button
-            onclick="startCheckout('developer', this)"
+            onclick="startCheckout('developer', currentBilling, this)"
             class="mt-auto block w-full text-center bg-mask-600 hover:bg-mask-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
           >
             Empezar
@@ -562,8 +579,8 @@
       </div>
 
       <p class="text-center text-sm text-zinc-500 mt-8">
-        Todos los precios en MXN. Pago con MercadoPago. Anual: paga 10, llévate
-        12.
+        Todos los precios en MXN. Pago con MercadoPago.<br/>
+        Anual: Básico $490/año (ahorras $98) · Freelancer $4,490/año (ahorras $898) · Developer $9,990/año (ahorras $1,998)
       </p>
     </section>
 
@@ -703,14 +720,52 @@
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
 
-      async function startCheckout(plan, btn) {
+      let currentBilling = "monthly";
+
+      function toggleBilling() {
+        currentBilling = currentBilling === "monthly" ? "yearly" : "monthly";
+        const isYearly = currentBilling === "yearly";
+        const dot = document.getElementById("toggle-dot");
+        const toggle = document.getElementById("billing-toggle");
+        const labelM = document.getElementById("label-monthly");
+        const labelY = document.getElementById("label-yearly");
+        const badge = document.getElementById("yearly-badge");
+
+        dot.style.transform = isYearly ? "translateX(28px)" : "translateX(0)";
+        toggle.className = `relative w-14 h-7 ${isYearly ? "bg-green-600" : "bg-zinc-700"} rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-mask-500`;
+        labelM.className = `text-sm font-semibold ${isYearly ? "text-zinc-500" : "text-zinc-100"}`;
+        labelY.className = `text-sm font-semibold ${isYearly ? "text-zinc-100" : "text-zinc-500"}`;
+        badge.classList.toggle("hidden", !isYearly);
+
+        document.querySelectorAll(".pricing-card[data-plan]").forEach(card => {
+          const price = card.querySelector(".plan-price");
+          const period = card.querySelector(".plan-period");
+          const savings = card.querySelector(".plan-savings");
+          const trial = card.querySelector(".plan-trial");
+
+          if (isYearly) {
+            price.textContent = `$${card.dataset.yearly}`;
+            period.textContent = "/año";
+            savings.textContent = `Ahorras $${card.dataset.savings}`;
+            savings.classList.remove("hidden");
+            if (trial) trial.classList.add("hidden");
+          } else {
+            price.textContent = `$${card.dataset.monthly}`;
+            period.textContent = "/mes";
+            savings.classList.add("hidden");
+            if (trial) trial.classList.remove("hidden");
+          }
+        });
+      }
+
+      async function startCheckout(plan, billing, btn) {
         btn.disabled = true;
         btn.textContent = "Redirigiendo...";
         try {
           const res = await fetch("/api/billing/guest-checkout", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ plan }),
+            body: JSON.stringify({ plan, billing }),
           });
           const data = await res.json();
           if (data.init_point) {
