@@ -55,7 +55,7 @@ function renderBillingBanner() {
       <div class="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 flex items-center justify-between">
         <span class="text-sm text-zinc-400">Sin plan activo — Activa tu plan para agregar dominios</span>
         <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-          Activar Plan — $99/mes
+          Activar Plan — $49/mes
         </button>
       </div>`;
     document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
@@ -84,11 +84,11 @@ async function startCheckout() {
       window.location.href = data.init_point;
     } else {
       showToast(data.error || "Error al iniciar pago", true);
-      if (btn) { btn.textContent = "Activar Plan — $99/mes"; btn.disabled = false; }
+      if (btn) { btn.textContent = "Activar Plan — $49/mes"; btn.disabled = false; }
     }
   } catch {
     showToast("Error de conexión", true);
-    if (btn) { btn.textContent = "Activar Plan — $99/mes"; btn.disabled = false; }
+    if (btn) { btn.textContent = "Activar Plan — $49/mes"; btn.disabled = false; }
   }
 }
 

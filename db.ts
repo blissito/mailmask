@@ -3,7 +3,7 @@ const kv = await Deno.openKv();
 // --- Types ---
 
 export interface Subscription {
-  plan: "basico" | "pro" | "agencia";
+  plan: "basico" | "freelancer" | "developer" | "pro" | "agencia";
   status: "active" | "past_due" | "cancelled" | "none";
   mpSubscriptionId?: string;
   currentPeriodEnd?: string; // ISO date
@@ -70,9 +70,12 @@ export interface EmailLog {
 // --- Plans ---
 
 export const PLANS = {
-  basico:  { price: 99_00, domains: 1, aliases: 10, rules: 0, logDays: 0 },
-  pro:     { price: 299_00, domains: 5, aliases: 20, rules: 20, logDays: 15 },
-  agencia: { price: 999_00, domains: 20, aliases: 100, rules: 100, logDays: 90 },
+  basico:     { price: 49_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 0,  sends: 0,     api: false, webhooks: false },
+  freelancer: { price: 449_00, domains: 15, aliases: 50,  rules: 50,  logDays: 30, sends: 5000,  api: false, webhooks: false },
+  developer:  { price: 999_00, domains: 20, aliases: 100, rules: 100, logDays: 90, sends: 10000, api: true,  webhooks: true },
+  // Legacy plan mappings (kept for existing subscribers)
+  pro:     { price: 299_00, domains: 15, aliases: 50,  rules: 50,  logDays: 30, sends: 5000,  api: false, webhooks: false },
+  agencia: { price: 999_00, domains: 20, aliases: 100, rules: 100, logDays: 90, sends: 10000, api: true,  webhooks: true },
 } as const;
 
 // --- Users ---
@@ -299,14 +302,14 @@ export async function updateUserSubscription(email: string, sub: Subscription): 
   return updated;
 }
 
-export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number } {
+export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; api: boolean; webhooks: boolean } {
   const sub = user.subscription;
   if (sub && sub.status === "active") {
     const plan = PLANS[sub.plan];
-    return { domains: plan.domains, aliases: plan.aliases, rules: plan.rules, logDays: plan.logDays };
+    return { domains: plan.domains, aliases: plan.aliases, rules: plan.rules, logDays: plan.logDays, sends: plan.sends, api: plan.api, webhooks: plan.webhooks };
   }
   // Sin plan = sin acceso. Bloquear todo.
-  return { domains: 0, aliases: 0, rules: 0, logDays: 0 };
+  return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, api: false, webhooks: false };
 }
 
 // --- Pending checkout (guest flow) ---

@@ -1216,20 +1216,21 @@ const app = new Elysia()
         if (email) {
           if (sub.status === "authorized") {
             // Determine plan: from pending checkout or from amount
-            let plan: "basico" | "pro" | "agencia" | undefined;
+            type PlanKey = "basico" | "freelancer" | "developer" | "pro" | "agencia";
+            let plan: PlanKey | undefined;
 
             if (isGuestCheckout) {
               const pendingPlan = await getPendingCheckout(externalRef);
               if (pendingPlan && pendingPlan in PLANS) {
-                plan = pendingPlan as "basico" | "pro" | "agencia";
+                plan = pendingPlan as PlanKey;
               }
               await deletePendingCheckout(externalRef);
             }
 
             if (!plan) {
               const amount = sub.auto_recurring?.transaction_amount ?? 0;
-              const amountToPlan: Record<number, "basico" | "pro" | "agencia"> =
-                { 99: "basico", 299: "pro", 999: "agencia" };
+              const amountToPlan: Record<number, PlanKey> =
+                { 49: "basico", 449: "freelancer", 999: "developer", 299: "pro" };
               plan = amountToPlan[amount];
             }
 
