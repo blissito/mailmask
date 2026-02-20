@@ -56,6 +56,8 @@ import {
   sendFromDomain,
   sendAlert,
   checkSesHealth,
+  putBackupToS3,
+  deleteOldBackups,
 } from "./ses.ts";
 import { processInbound } from "./forwarding.ts";
 import { log } from "./logger.ts";
@@ -1656,6 +1658,43 @@ Deno.cron("queue-monitor", "*/5 * * * *", async () => {
     await sendAlert("dead-letter-queue", `Dead-letter queue has ${deadLetterCount} item(s). Emails failed permanently after max retries.\nQueue depth: ${queueDepth}`);
   } else if (queueDepth > 10) {
     await sendAlert("queue-backlog", `Forward queue backlog: ${queueDepth} items pending retry.`);
+  }
+});
+
+// --- Daily backup cron (4:00 UTC) ---
+
+Deno.cron("daily-backup", "0 4 * * *", async () => {
+  try {
+    const backupData: Record<string, unknown>[] = [];
+    const { _getKv } = await import("./db.ts");
+    const kv = _getKv();
+
+    for await (const entry of kv.list<any>({ prefix: ["users"] })) {
+      const user = entry.value;
+      const domains = await listUserDomains(user.email);
+      const domainsData = [];
+      for (const d of domains) {
+        const aliases = await listAliases(d.id);
+        const rules = await listRules(d.id);
+        domainsData.push({ domain: d.domain, domainId: d.id, verified: d.verified, aliases, rules });
+      }
+      backupData.push({
+        email: user.email,
+        subscription: user.subscription,
+        emailVerified: user.emailVerified,
+        createdAt: user.createdAt,
+        domains: domainsData,
+      });
+    }
+
+    const dateStr = new Date().toISOString().split("T")[0];
+    const key = `mailmask-backup-${dateStr}.json`;
+    await putBackupToS3(key, JSON.stringify(backupData, null, 2));
+    await deleteOldBackups();
+    log("info", "backup", "Daily backup completed", { users: backupData.length, key });
+  } catch (err) {
+    log("error", "backup", "Daily backup failed", { error: String(err) });
+    await sendAlert("backup-failure", `Daily backup failed: ${String(err)}`);
   }
 });
 

@@ -196,6 +196,41 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
   }));
 }
 
+// --- S3 backup helpers ---
+
+const BACKUP_BUCKET = Deno.env.get("S3_BACKUP_BUCKET") ?? "mailmask-inbound";
+const BACKUP_PREFIX = "backups/";
+const BACKUP_RETENTION = 7;
+
+export async function putBackupToS3(key: string, data: string): Promise<void> {
+  const s3 = await getS3();
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new PutObjectCommand({
+    Bucket: BACKUP_BUCKET,
+    Key: `${BACKUP_PREFIX}${key}`,
+    Body: new TextEncoder().encode(data),
+    ContentType: "application/json",
+  }));
+}
+
+export async function deleteOldBackups(): Promise<void> {
+  const s3 = await getS3();
+  const { ListObjectsV2Command, DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+  const res = await s3.send(new ListObjectsV2Command({
+    Bucket: BACKUP_BUCKET,
+    Prefix: BACKUP_PREFIX,
+  }));
+  const objects = res.Contents ?? [];
+  // Sort by key (date-based), oldest first
+  objects.sort((a: any, b: any) => (a.Key ?? "").localeCompare(b.Key ?? ""));
+  const toDelete = objects.slice(0, Math.max(0, objects.length - BACKUP_RETENTION));
+  for (const obj of toDelete) {
+    if (obj.Key) {
+      await s3.send(new DeleteObjectCommand({ Bucket: BACKUP_BUCKET, Key: obj.Key }));
+    }
+  }
+}
+
 // --- Admin alerts with throttle ---
 
 export async function sendAlert(alertType: string, message: string): Promise<boolean> {

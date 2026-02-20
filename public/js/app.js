@@ -198,10 +198,11 @@ function renderDomains() {
 
       if (hasActivePlan) {
         // Primary CTA: user has plan, needs to add domain
+        emptyBtn.classList.remove("hidden");
         emptyBtn.className = "bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-6 py-3 rounded-lg transition-colors";
       } else {
-        // Ghost/secondary: billing banner is the primary CTA
-        emptyBtn.className = "border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 text-sm px-6 py-3 rounded-lg transition-colors";
+        // No plan: hide entirely — billing banner is the sole CTA
+        emptyBtn.classList.add("hidden");
       }
     }
     return;
