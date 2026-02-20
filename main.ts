@@ -2529,13 +2529,17 @@ const port = parseInt(Deno.env.get("PORT") ?? "8000");
 Deno.serve({ port }, (req) => app.fetch(req));
 
 // Repair receipt rules missing SNS TopicArn (one-time fix for rules created before SNS_TOPIC_ARN was set)
-import { repairReceiptRules } from "./ses.ts";
+import { repairReceiptRules, ensureSnsSubscription } from "./ses.ts";
 (async () => {
   try {
     const repaired = await repairReceiptRules();
     if (repaired > 0) log("info", "startup", `Repaired ${repaired} receipt rule(s) with missing TopicArn`);
+
+    const appUrl = Deno.env.get("APP_URL") ?? "https://mailmask.deno.dev";
+    const subStatus = await ensureSnsSubscription(appUrl);
+    log("info", "startup", `SNS subscription: ${subStatus}`);
   } catch (err) {
-    log("error", "startup", "Failed to repair receipt rules", { error: String(err) });
+    log("error", "startup", "Startup repair failed", { error: String(err) });
   }
 })();
 

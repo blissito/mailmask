@@ -404,6 +404,49 @@ export async function deleteBackupFromS3(key: string): Promise<void> {
   }));
 }
 
+// --- SNS subscription verification ---
+
+let _sns: any;
+async function getSns() {
+  if (!_sns) {
+    const { SNSClient } = await import("@aws-sdk/client-sns");
+    _sns = new SNSClient({ region: Deno.env.get("AWS_SES_INBOUND_REGION") ?? "us-east-1" });
+  }
+  return _sns;
+}
+
+export async function ensureSnsSubscription(appUrl: string): Promise<string> {
+  if (!SNS_TOPIC_ARN) {
+    log("warn", "ses", "SNS_TOPIC_ARN not set, skipping SNS subscription check");
+    return "skipped";
+  }
+
+  const endpoint = `${appUrl.replace(/\/+$/, "")}/api/webhooks/ses-inbound`;
+  const sns = await getSns();
+  const { ListSubscriptionsByTopicCommand, SubscribeCommand } = await import("@aws-sdk/client-sns");
+
+  const res = await sns.send(new ListSubscriptionsByTopicCommand({ TopicArn: SNS_TOPIC_ARN }));
+  const subscriptions = res.Subscriptions ?? [];
+
+  const existing = subscriptions.find(
+    (s: any) => s.Protocol === "https" && s.Endpoint === endpoint,
+  );
+
+  if (existing) {
+    log("info", "ses", "SNS subscription already exists", { endpoint, arn: existing.SubscriptionArn });
+    return "exists";
+  }
+
+  await sns.send(new SubscribeCommand({
+    TopicArn: SNS_TOPIC_ARN,
+    Protocol: "https",
+    Endpoint: endpoint,
+  }));
+
+  log("info", "ses", "Created SNS subscription", { endpoint });
+  return "created";
+}
+
 // --- Admin alerts with throttle ---
 
 export async function sendAlert(alertType: string, message: string): Promise<boolean> {
