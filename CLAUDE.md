@@ -32,7 +32,7 @@ deno task test    # Run tests
 - **Validation**: Inline validation, only add zod if schemas are reused across endpoints
 - **Error responses**: Always JSON `{ error: "message" }` with appropriate status code
 - **Auth**: JWT in HttpOnly cookie named `token`, verified via `verifyJwt()` from `auth.ts`
-- **Plans**: Defined in `db.ts` as `PLANS` constant (basico, pro, agencia)
+- **Plans**: Defined in `db.ts` as `PLANS` constant (basico, freelancer, developer; legacy: pro, agencia)
 
 ## Billing
 - MercadoPago PreApproval API for subscriptions
