@@ -261,6 +261,10 @@ export async function forwardEmail(originalRaw: string, from: string, to: string
     `From: "${from}" <${forwardingAddress}>\r\nReply-To: ${from}`,
   );
 
+  // Remove/rewrite headers that SES validates against verified identities
+  rewrittenRaw = rewrittenRaw.replace(/^Return-Path:\s*.+$/mi, `Return-Path: <${forwardingAddress}>`);
+  rewrittenRaw = rewrittenRaw.replace(/^Sender:\s*.+$/mi, "");
+
   const extraHeaders = [
     `X-MailMask-Forwarded: true`,
     `X-Original-To: ${to}`,
