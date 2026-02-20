@@ -714,6 +714,22 @@
 
       let currentBilling = "monthly";
 
+      function animatePrice(el, from, to, duration = 1500) {
+        const start = performance.now();
+        const step = (now) => {
+          const t = Math.min((now - start) / duration, 1);
+          const ease = 1 - Math.pow(1 - t, 3); // easeOutCubic
+          const current = Math.round(from + (to - from) * ease);
+          el.textContent = `$${current.toLocaleString("es-MX")}`;
+          if (t < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+
+      function parsePrice(text) {
+        return parseInt(text.replace(/[$,\.]/g, ""), 10) || 0;
+      }
+
       function toggleBilling() {
         currentBilling = currentBilling === "monthly" ? "yearly" : "monthly";
         const isYearly = currentBilling === "yearly";
@@ -735,18 +751,22 @@
           const period = card.querySelector(".plan-period");
           const savings = card.querySelector(".plan-savings");
 
+          const oldNum = parsePrice(price.textContent);
+          const newNum = isYearly
+            ? parsePrice(card.dataset.yearly)
+            : parseInt(card.dataset.monthly, 10);
+
+          animatePrice(price, oldNum, newNum);
+
           if (isYearly) {
-            price.textContent = `$${card.dataset.yearly}`;
             period.textContent = "/año";
             savings.textContent = `Ahorras $${card.dataset.savings}`;
             savings.classList.remove("hidden");
             if (anim) anim(savings, { opacity: [0, 1], y: [6, 0] }, { duration: 0.3, easing: "ease-out" });
           } else {
-            price.textContent = `$${card.dataset.monthly}`;
             period.textContent = "/mes";
             savings.classList.add("hidden");
           }
-          if (anim) anim(price, { opacity: [0, 1], y: [8, 0] }, { duration: 0.3, easing: "ease-out" });
         });
         if (anim) anim(badge, { opacity: [0, 1], scale: [0.9, 1] }, { duration: 0.25, easing: "ease-out" });
       }
