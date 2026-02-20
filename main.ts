@@ -418,9 +418,14 @@ const app = new Elysia()
 
     const emailLimited = await checkRateLimit(`forgot:${email}`, 1, 300_000);
     if (!emailLimited.allowed) {
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { "content-type": "application/json" },
-      });
+      const waitMs = emailLimited.resetAt - Date.now();
+      const waitMin = Math.max(1, Math.ceil(waitMs / 60_000));
+      return new Response(
+        JSON.stringify({
+          error: `Ya enviamos un enlace. Esperá ${waitMin} minuto${waitMin > 1 ? "s" : ""} antes de intentar de nuevo.`,
+        }),
+        { status: 429, headers: { "content-type": "application/json" } },
+      );
     }
 
     const user = await getUser(email);
