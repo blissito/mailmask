@@ -1,9 +1,31 @@
-import { SESClient, VerifyDomainIdentityCommand, VerifyDomainDkimCommand, GetIdentityVerificationAttributesCommand, SendRawEmailCommand, CreateReceiptRuleCommand, DeleteReceiptRuleCommand, DescribeReceiptRuleSetCommand } from "@aws-sdk/client-ses";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+// Lazy-loaded AWS SDK clients to reduce cold start on Deno Deploy
+let _sesOutbound: any;
+let _sesInbound: any;
+let _s3: any;
 
-const sesOutbound = new SESClient({ region: Deno.env.get("AWS_REGION") ?? "us-east-2" });
-const sesInbound = new SESClient({ region: Deno.env.get("AWS_SES_INBOUND_REGION") ?? "us-east-1" });
-const s3 = new S3Client({ region: Deno.env.get("AWS_SES_INBOUND_REGION") ?? "us-east-1" });
+async function getSesOutbound() {
+  if (!_sesOutbound) {
+    const { SESClient } = await import("@aws-sdk/client-ses");
+    _sesOutbound = new SESClient({ region: Deno.env.get("AWS_REGION") ?? "us-east-2" });
+  }
+  return _sesOutbound;
+}
+
+async function getSesInbound() {
+  if (!_sesInbound) {
+    const { SESClient } = await import("@aws-sdk/client-ses");
+    _sesInbound = new SESClient({ region: Deno.env.get("AWS_SES_INBOUND_REGION") ?? "us-east-1" });
+  }
+  return _sesInbound;
+}
+
+async function getS3() {
+  if (!_s3) {
+    const { S3Client } = await import("@aws-sdk/client-s3");
+    _s3 = new S3Client({ region: Deno.env.get("AWS_SES_INBOUND_REGION") ?? "us-east-1" });
+  }
+  return _s3;
+}
 
 const SNS_TOPIC_ARN = Deno.env.get("SNS_TOPIC_ARN") ?? "";
 const RECEIPT_RULE_SET = Deno.env.get("SES_RULE_SET") ?? "mailmask-email-forwarding";
@@ -17,12 +39,13 @@ export interface DnsRecords {
 }
 
 export async function verifyDomain(domain: string): Promise<DnsRecords> {
-  // Step 1: Verify domain identity (TXT record)
-  const verifyRes = await sesInbound.send(new VerifyDomainIdentityCommand({ Domain: domain }));
+  const ses = await getSesInbound();
+  const { VerifyDomainIdentityCommand, VerifyDomainDkimCommand } = await import("@aws-sdk/client-ses");
+
+  const verifyRes = await ses.send(new VerifyDomainIdentityCommand({ Domain: domain }));
   const verificationToken = verifyRes.VerificationToken ?? "";
 
-  // Step 2: Enable DKIM (CNAME records)
-  const dkimRes = await sesInbound.send(new VerifyDomainDkimCommand({ Domain: domain }));
+  const dkimRes = await ses.send(new VerifyDomainDkimCommand({ Domain: domain }));
   const dkimTokens = dkimRes.DkimTokens ?? [];
 
   return { verificationToken, dkimTokens };
@@ -30,13 +53,15 @@ export async function verifyDomain(domain: string): Promise<DnsRecords> {
 
 export async function checkDomainStatus(domain: string): Promise<{ verified: boolean; dkimVerified: boolean }> {
   try {
-    const res = await sesInbound.send(new GetIdentityVerificationAttributesCommand({ Identities: [domain] }));
+    const ses = await getSesInbound();
+    const { GetIdentityVerificationAttributesCommand } = await import("@aws-sdk/client-ses");
+    const res = await ses.send(new GetIdentityVerificationAttributesCommand({ Identities: [domain] }));
     const attrs = res.VerificationAttributes?.[domain];
     if (!attrs) return { verified: false, dkimVerified: false };
 
     return {
       verified: attrs.VerificationStatus === "Success",
-      dkimVerified: false, // DKIM status needs separate check via SESv2 if needed
+      dkimVerified: false,
     };
   } catch {
     return { verified: false, dkimVerified: false };
@@ -46,9 +71,11 @@ export async function checkDomainStatus(domain: string): Promise<{ verified: boo
 // --- Receipt rule (SES inbound) ---
 
 export async function createReceiptRule(domain: string): Promise<void> {
+  const ses = await getSesInbound();
+  const { CreateReceiptRuleCommand } = await import("@aws-sdk/client-ses");
   const ruleName = `mailmask-${domain.replace(/\./g, "-")}`;
 
-  await sesInbound.send(new CreateReceiptRuleCommand({
+  await ses.send(new CreateReceiptRuleCommand({
     RuleSetName: RECEIPT_RULE_SET,
     Rule: {
       Name: ruleName,
@@ -69,9 +96,11 @@ export async function createReceiptRule(domain: string): Promise<void> {
 }
 
 export async function deleteReceiptRule(domain: string): Promise<void> {
+  const ses = await getSesInbound();
+  const { DeleteReceiptRuleCommand } = await import("@aws-sdk/client-ses");
   const ruleName = `mailmask-${domain.replace(/\./g, "-")}`;
   try {
-    await sesInbound.send(new DeleteReceiptRuleCommand({
+    await ses.send(new DeleteReceiptRuleCommand({
       RuleSetName: RECEIPT_RULE_SET,
       RuleName: ruleName,
     }));
@@ -83,6 +112,8 @@ export async function deleteReceiptRule(domain: string): Promise<void> {
 // --- Fetch raw email from S3 ---
 
 export async function fetchEmailFromS3(bucketName: string, objectKey: string): Promise<string> {
+  const s3 = await getS3();
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
   const res = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: objectKey }));
   return await res.Body!.transformToString("utf-8");
 }
@@ -90,20 +121,20 @@ export async function fetchEmailFromS3(bucketName: string, objectKey: string): P
 // --- Email forwarding ---
 
 export async function forwardEmail(originalRaw: string, from: string, to: string): Promise<void> {
-  // Rewrite envelope: keep original headers but change envelope recipient
-  // Add X-Forwarded-For and X-Forwarded-To headers
+  const ses = await getSesOutbound();
+  const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
+
   const headers = [
     `X-MailMask-Forwarded: true`,
     `X-Original-To: ${to}`,
   ].join("\r\n");
 
-  // Insert our headers after the first line of the raw email
   const firstNewline = originalRaw.indexOf("\r\n");
   const rewrittenRaw = firstNewline >= 0
     ? originalRaw.slice(0, firstNewline) + "\r\n" + headers + originalRaw.slice(firstNewline)
     : headers + "\r\n" + originalRaw;
 
-  await sesOutbound.send(new SendRawEmailCommand({
+  await ses.send(new SendRawEmailCommand({
     RawMessage: { Data: new TextEncoder().encode(rewrittenRaw) },
     Source: from,
     Destinations: [to],
@@ -113,6 +144,9 @@ export async function forwardEmail(originalRaw: string, from: string, to: string
 // --- Send from domain (SMTP outbound) ---
 
 export async function sendFromDomain(from: string, to: string, subject: string, body: string): Promise<void> {
+  const ses = await getSesOutbound();
+  const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
+
   const boundary = `----=_Part_${Date.now()}`;
   const rawEmail = [
     `From: ${from}`,
@@ -130,16 +164,9 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
     `--${boundary}--`,
   ].join("\r\n");
 
-  await sesOutbound.send(new SendRawEmailCommand({
+  await ses.send(new SendRawEmailCommand({
     RawMessage: { Data: new TextEncoder().encode(rawEmail) },
     Source: from,
     Destinations: [to],
   }));
-}
-
-// --- Test helpers ---
-
-let _sesClient = sesOutbound;
-export function _injectSesClient(client: any) {
-  _sesClient = client;
 }
