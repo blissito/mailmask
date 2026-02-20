@@ -2,7 +2,8 @@
   "tasks": {
     "dev": "deno run --allow-net --allow-env --allow-read --env --watch --unstable-kv main.ts",
     "start": "deno run --allow-net --allow-env --allow-read --unstable-kv main.ts",
-    "test": "deno test --allow-net --allow-env --allow-read --unstable-kv --unstable-cron"
+    "test": "deno test --allow-net --allow-env --allow-read --unstable-kv --unstable-cron",
+    "build:css": "npx tailwindcss -i public/css/input.css -o public/css/styles.css --minify"
   },
   "imports": {
     "elysia": "npm:elysia@^1.2",

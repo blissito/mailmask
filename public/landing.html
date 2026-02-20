@@ -43,73 +43,7 @@
       name="twitter:description"
       content="Recibe y envía email desde tu dominio desde $49 MXN/mes. Sin servidores, sin Google Workspace."
     />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              mask: {
-                50: "#fef2f2",
-                100: "#fee2e2",
-                500: "#ef4444",
-                600: "#dc2626",
-                700: "#b91c1c",
-                800: "#991b1b",
-                900: "#7f1d1d",
-              },
-              gold: { 400: "#facc15", 500: "#eab308" },
-            },
-          },
-        },
-      };
-    </script>
-    <script type="module">
-      import {
-        animate,
-        stagger,
-      } from "https://cdn.jsdelivr.net/npm/motion@11.13.5/+esm";
-      window._motionAnimate = animate;
-      document.addEventListener("DOMContentLoaded", () => {
-        animate(
-          ".hero-title",
-          { opacity: [0, 1], y: [24, 0] },
-          { duration: 0.7, easing: "ease-out" },
-        );
-        animate(
-          ".hero-sub",
-          { opacity: [0, 1], y: [16, 0] },
-          { duration: 0.6, delay: 0.15, easing: "ease-out" },
-        );
-        animate(
-          ".feature-card",
-          { opacity: [0, 1], y: [20, 0] },
-          {
-            duration: 0.5,
-            delay: stagger(0.1, { start: 0.3 }),
-            easing: "ease-out",
-          },
-        );
-        animate(
-          ".pricing-card",
-          { opacity: [0, 1], y: [30, 0] },
-          {
-            duration: 0.5,
-            delay: stagger(0.1, { start: 0.5 }),
-            easing: "ease-out",
-          },
-        );
-        animate(
-          ".comparison-row",
-          { opacity: [0, 1], x: [-8, 0] },
-          {
-            duration: 0.4,
-            delay: stagger(0.06, { start: 0.8 }),
-            easing: "ease-out",
-          },
-        );
-      });
-    </script>
+    <link rel="stylesheet" href="/css/styles.css" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -176,11 +110,6 @@
       ¡Listo! Revisa tu email para configurar tu contraseña y empezar a usar
       MailMask.
     </div>
-    <script>
-      if (new URLSearchParams(window.location.search).get("success") === "1") {
-        document.getElementById("success-banner").classList.remove("hidden");
-      }
-    </script>
     <!-- Hero -->
     <section
       class="min-h-[70vh] flex flex-col items-center justify-center px-4 pt-16 pb-12 text-center"
@@ -242,20 +171,20 @@
       </div>
 
       <h1
-        class="hero-title text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight opacity-0"
+        class="hero-title text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight animate-fade-up opacity-0"
       >
         Email profesional.<br />
         <span class="text-mask-500">Desde $49 MXN/mes.</span>
       </h1>
 
       <p
-        class="hero-sub mt-6 text-lg sm:text-xl text-zinc-400 max-w-xl opacity-0"
+        class="hero-sub mt-6 text-lg sm:text-xl text-zinc-400 max-w-xl animate-fade-up opacity-0 anim-delay-200"
       >
         Recibe y envía email desde tu dominio. Sin servidores, sin Google
         Workspace, sin complicaciones.
       </p>
 
-      <div class="hero-sub mt-8 flex flex-col sm:flex-row gap-3 opacity-0">
+      <div class="hero-sub mt-8 flex flex-col sm:flex-row gap-3 animate-fade-up opacity-0 anim-delay-300">
         <a
           href="#pricing"
           class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors text-lg"
@@ -291,7 +220,7 @@
     <section class="max-w-4xl mx-auto px-4 py-16">
       <h2 class="text-2xl font-bold text-center mb-12">Cómo funciona</h2>
       <div class="grid md:grid-cols-3 gap-8">
-        <div class="feature-card text-center opacity-0">
+        <div class="feature-card text-center animate-fade-up opacity-0 anim-delay-400">
           <div
             class="w-12 h-12 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
           >
@@ -302,7 +231,7 @@
             Ingresa tu dominio y te damos los registros DNS a configurar.
           </p>
         </div>
-        <div class="feature-card text-center opacity-0">
+        <div class="feature-card text-center animate-fade-up opacity-0 anim-delay-500">
           <div
             class="w-12 h-12 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
           >
@@ -313,7 +242,7 @@
             Agrega el registro MX y los CNAME de DKIM en tu proveedor de DNS.
           </p>
         </div>
-        <div class="feature-card text-center opacity-0">
+        <div class="feature-card text-center animate-fade-up opacity-0 anim-delay-600">
           <div
             class="w-12 h-12 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
           >
@@ -343,28 +272,28 @@
           <div class="text-center text-mask-500">MailMask</div>
         </div>
         <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 opacity-0"
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-500"
         >
           <div class="text-zinc-400">1 dominio</div>
           <div class="text-center">$120 MXN/mes</div>
           <div class="text-center text-mask-400 font-semibold">$49 MXN/mes</div>
         </div>
         <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 opacity-0"
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-600"
         >
           <div class="text-zinc-400">5 dominios</div>
           <div class="text-center">$600 MXN/mes</div>
           <div class="text-center text-mask-400 font-semibold">$449 MXN/mes</div>
         </div>
         <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 opacity-0"
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-700"
         >
           <div class="text-zinc-400">15+ dominios</div>
           <div class="text-center">$1,800+ MXN/mes</div>
           <div class="text-center text-mask-400 font-semibold">$999 MXN/mes</div>
         </div>
         <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 opacity-0"
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-800"
         >
           <div class="text-zinc-400">Máscaras (alias)</div>
           <div class="text-center text-zinc-500">1 por usuario</div>
@@ -373,14 +302,14 @@
           </div>
         </div>
         <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 opacity-0"
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-900"
         >
           <div class="text-zinc-400">Configuración</div>
           <div class="text-center text-zinc-500">30+ minutos</div>
           <div class="text-center text-mask-400 font-semibold">2 minutos</div>
         </div>
         <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 opacity-0"
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-1000"
         >
           <div class="text-zinc-400">Reglas de routing</div>
           <div class="text-center text-zinc-500">Limitadas</div>
@@ -398,7 +327,7 @@
       </h2>
       <div class="grid sm:grid-cols-2 gap-6">
         <div
-          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 opacity-0"
+          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-up opacity-0 anim-delay-400"
         >
           <h3 class="font-semibold text-lg mb-2">📬 Forwarding instantáneo</h3>
           <p class="text-zinc-400 text-sm">
@@ -407,7 +336,7 @@
           </p>
         </div>
         <div
-          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 opacity-0"
+          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-up opacity-0 anim-delay-500"
         >
           <h3 class="font-semibold text-lg mb-2">📤 Envía desde tu dominio</h3>
           <p class="text-zinc-400 text-sm">
@@ -415,7 +344,7 @@
           </p>
         </div>
         <div
-          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 opacity-0"
+          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-up opacity-0 anim-delay-600"
         >
           <h3 class="font-semibold text-lg mb-2">
             🎭 Hasta 2000 máscaras (alias)
@@ -426,7 +355,7 @@
           </p>
         </div>
         <div
-          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 opacity-0"
+          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-up opacity-0 anim-delay-700"
         >
           <h3 class="font-semibold text-lg mb-2">⚡ Reglas inteligentes</h3>
           <p class="text-zinc-400 text-sm">
@@ -435,7 +364,7 @@
           </p>
         </div>
         <div
-          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 opacity-0"
+          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-up opacity-0 anim-delay-800"
         >
           <h3 class="font-semibold text-lg mb-2">📊 Logs de email</h3>
           <p class="text-zinc-400 text-sm">
@@ -443,7 +372,7 @@
           </p>
         </div>
         <div
-          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 opacity-0"
+          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-up opacity-0 anim-delay-900"
         >
           <h3 class="font-semibold text-lg mb-2">🔒 DKIM + SPF</h3>
           <p class="text-zinc-400 text-sm">
@@ -473,7 +402,7 @@
       <div class="grid md:grid-cols-3 gap-6">
         <!-- Básico -->
         <div
-          class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 flex flex-col opacity-0"
+          class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 flex flex-col animate-fade-up opacity-0 anim-delay-600"
           data-plan="basico" data-monthly="49" data-yearly="490" data-savings="98"
         >
 
@@ -500,7 +429,7 @@
 
         <!-- Freelancer (FEATURED) -->
         <div
-          class="pricing-card bg-zinc-900 border-2 border-mask-600 rounded-xl p-8 relative flex flex-col opacity-0"
+          class="pricing-card bg-zinc-900 border-2 border-mask-600 rounded-xl p-8 relative flex flex-col animate-fade-up opacity-0 anim-delay-700"
           data-plan="freelancer" data-monthly="449" data-yearly="4,490" data-savings="898"
         >
           <span
@@ -536,7 +465,7 @@
 
         <!-- Developer -->
         <div
-          class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 flex flex-col opacity-0"
+          class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 flex flex-col animate-fade-up opacity-0 anim-delay-800"
           data-plan="developer" data-monthly="999" data-yearly="9,990" data-savings="1,998"
         >
 
@@ -706,95 +635,6 @@
         </div>
       </div>
     </footer>
-    <script>
-      // Show success banner if redirected from MP
-      if (new URLSearchParams(location.search).get("success") === "1") {
-        document.getElementById("success-banner")?.classList.remove("hidden");
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-
-      let currentBilling = "monthly";
-
-      function animatePrice(el, from, to, duration = 1500) {
-        const start = performance.now();
-        const step = (now) => {
-          const t = Math.min((now - start) / duration, 1);
-          const ease = 1 - Math.pow(1 - t, 3); // easeOutCubic
-          const current = Math.round(from + (to - from) * ease);
-          el.textContent = `$${current.toLocaleString("es-MX")}`;
-          if (t < 1) requestAnimationFrame(step);
-        };
-        requestAnimationFrame(step);
-      }
-
-      function parsePrice(text) {
-        return parseInt(text.replace(/[$,\.]/g, ""), 10) || 0;
-      }
-
-      function toggleBilling() {
-        currentBilling = currentBilling === "monthly" ? "yearly" : "monthly";
-        const isYearly = currentBilling === "yearly";
-        const dot = document.getElementById("toggle-dot");
-        const toggle = document.getElementById("billing-toggle");
-        const labelM = document.getElementById("label-monthly");
-        const labelY = document.getElementById("label-yearly");
-        const badge = document.getElementById("promo-badge");
-
-        dot.style.transform = isYearly ? "translateX(28px)" : "translateX(0)";
-        toggle.className = `relative w-14 h-7 ${isYearly ? "bg-green-600" : "bg-zinc-700"} rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-mask-500`;
-        labelM.className = `text-sm font-semibold ${isYearly ? "text-zinc-500" : "text-zinc-100"}`;
-        labelY.className = `text-sm font-semibold ${isYearly ? "text-zinc-100" : "text-zinc-500"}`;
-        badge.textContent = isYearly ? "2 meses gratis" : "Primer mes gratis";
-
-        const anim = window._motionAnimate;
-        document.querySelectorAll(".pricing-card[data-plan]").forEach(card => {
-          const price = card.querySelector(".plan-price");
-          const period = card.querySelector(".plan-period");
-          const savings = card.querySelector(".plan-savings");
-
-          const oldNum = parsePrice(price.textContent);
-          const newNum = isYearly
-            ? parsePrice(card.dataset.yearly)
-            : parseInt(card.dataset.monthly, 10);
-
-          animatePrice(price, oldNum, newNum);
-
-          if (isYearly) {
-            period.textContent = "/año";
-            savings.textContent = `Ahorras $${card.dataset.savings}`;
-            savings.classList.remove("hidden");
-            if (anim) anim(savings, { opacity: [0, 1], y: [6, 0] }, { duration: 0.3, easing: "ease-out" });
-          } else {
-            period.textContent = "/mes";
-            savings.classList.add("hidden");
-          }
-        });
-        if (anim) anim(badge, { opacity: [0, 1], scale: [0.9, 1] }, { duration: 0.25, easing: "ease-out" });
-      }
-
-      async function startCheckout(plan, billing, btn) {
-        btn.disabled = true;
-        btn.textContent = "Redirigiendo...";
-        try {
-          const res = await fetch("/api/billing/guest-checkout", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ plan, billing }),
-          });
-          const data = await res.json();
-          if (data.init_point) {
-            location.href = data.init_point;
-          } else {
-            alert(data.error || "Error al iniciar el pago");
-            btn.disabled = false;
-            btn.textContent = "Empezar";
-          }
-        } catch {
-          alert("Error de conexión");
-          btn.disabled = false;
-          btn.textContent = "Empezar";
-        }
-      }
-    </script>
+    <script src="/js/landing.js"></script>
   </body>
 </html>

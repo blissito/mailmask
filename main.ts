@@ -259,7 +259,7 @@ const app = new Elysia()
       );
       response.headers.set(
         "content-security-policy",
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com",
+        "default-src 'self'; style-src 'self'; img-src 'self' data:; script-src 'self'",
       );
     }
     return response;
@@ -287,6 +287,7 @@ const app = new Elysia()
   .get("/login", () => serveStatic("/login.html"))
   .get("/register", () => serveStatic("/register.html"))
   .get("/app", () => serveStatic("/app.html"))
+  .get("/css/*", ({ params }) => serveStatic(`/css/${params["*"]}`))
   .get("/js/*", ({ params }) => serveStatic(`/js/${params["*"]}`))
   .get("/favicon.svg", () => serveStatic("/favicon.svg"))
   .get("/landing", () => serveStatic("/landing.html"))

@@ -1283,6 +1283,11 @@
       "npm:elysia@^1.2.0",
       "npm:mercadopago@2",
       "npm:postal-mime@2"
-    ]
+    ],
+    "packageJson": {
+      "dependencies": [
+        "npm:tailwindcss@^3.4.19"
+      ]
+    }
   }
 }

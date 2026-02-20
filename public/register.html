@@ -5,7 +5,7 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Crear cuenta — MailMask</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen flex items-center justify-center px-4">
 
@@ -50,30 +50,6 @@
     </p>
   </div>
 
-  <script>
-    document.getElementById("register-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const form = e.target;
-      const errEl = document.getElementById("error");
-      errEl.classList.add("hidden");
-
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email: form.email.value,
-          password: form.password.value,
-        }),
-      });
-
-      if (res.ok) {
-        window.location.href = "/app";
-      } else {
-        const data = await res.json();
-        errEl.textContent = data.error || "Error al crear cuenta";
-        errEl.classList.remove("hidden");
-      }
-    });
-  </script>
+  <script src="/js/register.js"></script>
 </body>
 </html>
