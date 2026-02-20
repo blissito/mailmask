@@ -1114,7 +1114,6 @@ const app = new Elysia()
             frequency_type: "months",
           },
         },
-        payer_email: user.email,
         back_url: backUrl,
         external_reference: user.email,
       };
