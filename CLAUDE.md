@@ -42,9 +42,24 @@ deno task test    # Run tests
 - Known: `payer_email` cannot match the MP collector account ("Payer and collector cannot be the same user")
 
 ## TODO
-- [ ] Probar checkout autenticado con email diferente al collector de MP
+
+### Crítico — bloquea lanzamiento público
+- [ ] **Monitoreo/alerting**: health check externo + alertas (email/Slack) en errores de forwarding. Si SES/S3/MP webhook falla, nadie se entera hoy.
+- [ ] **Retry en forwarding**: si `forwardEmail` falla (SES throttle, error transitorio) el email se pierde. Implementar cola de reintentos o dead-letter queue en Deno KV.
+- [ ] **Revisar `cron.ts`**: está importado en `main.ts` pero no trackeado en git. Verificar qué hace y si es correcto.
+
+### Alto — primeras semanas
+- [ ] Pagina de pricing publica en landing
 - [ ] Agregar endpoint PUT para editar reglas
 - [ ] Dashboard: mostrar uso actual vs limites del plan
+- [ ] Email de confirmación de pago para usuarios autenticados (hoy solo guests reciben welcome email)
+
+### Medio — primer mes
+- [ ] Tests: no hay archivos de test. Cubrir al menos forwarding (Source rewrite, dedup) y webhook billing.
+- [ ] Logs centralizados: todo va a `console.error`. Dificulta depurar problemas de un usuario específico en prod.
+- [ ] Backup/export de datos de usuario (aliases, reglas)
 - [ ] Notificaciones por email cuando un alias recibe su primer email
 - [ ] Soporte para multiple destinatarios en un alias
-- [ ] Pagina de pricing publica en landing
+
+### Backlog
+- [ ] Probar checkout autenticado con email diferente al collector de MP
