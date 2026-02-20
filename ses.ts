@@ -154,7 +154,7 @@ export async function createReceiptRule(domain: string): Promise<void> {
           S3Action: {
             BucketName: S3_BUCKET,
             ObjectKeyPrefix: `inbound/${domain}/`,
-            TopicArn: SNS_TOPIC_ARN,
+            ...(SNS_TOPIC_ARN ? { TopicArn: SNS_TOPIC_ARN } : {}),
           },
         },
       ],
