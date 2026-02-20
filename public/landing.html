@@ -129,6 +129,15 @@
     </script>
   </head>
   <body class="bg-zinc-950 text-zinc-100 antialiased">
+    <!-- Success banner (guest checkout redirect) -->
+    <div id="success-banner" class="hidden fixed top-0 inset-x-0 z-50 bg-emerald-600 text-white text-center py-3 px-4 text-sm font-medium shadow-lg">
+      ¡Listo! Revisa tu email para configurar tu contraseña y empezar a usar MailMask.
+    </div>
+    <script>
+      if (new URLSearchParams(window.location.search).get("success") === "1") {
+        document.getElementById("success-banner").classList.remove("hidden");
+      }
+    </script>
     <!-- Hero -->
     <section
       class="min-h-[70vh] flex flex-col items-center justify-center px-4 pt-16 pb-12 text-center"

@@ -312,7 +312,7 @@ export function getUserPlanLimits(user: User): { domains: number; aliases: numbe
 // --- Pending checkout (guest flow) ---
 
 export async function createPendingCheckout(token: string, plan: string): Promise<void> {
-  await kv.set(["pending-checkout", token], plan, { expireIn: 60 * 60 * 1000 }); // 1h TTL
+  await kv.set(["pending-checkout", token], plan, { expireIn: 24 * 60 * 60 * 1000 }); // 24h TTL
 }
 
 export async function getPendingCheckout(token: string): Promise<string | null> {

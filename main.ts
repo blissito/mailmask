@@ -1192,6 +1192,12 @@ const app = new Elysia()
         );
         const sub = await subRes.json();
 
+        console.log("[webhook] MP sub:", {
+          payer_email: sub.payer_email,
+          external_reference: sub.external_reference,
+          status: sub.status,
+        });
+
         const externalRef = sub.external_reference ?? "";
         const UUID_RE =
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
