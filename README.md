@@ -16,4 +16,4 @@ deno task test
 
 ---
 
-Hecho con 🫁 por [@blissito](https://github.com/blissito) · [fixtergeek.com](https://www.fixtergeek.com)
+Hecho con 🚬🫁 por [@blissito](https://github.com/blissito) · [fixtergeek.com](https://www.fixtergeek.com)
