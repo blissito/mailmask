@@ -3,4 +3,4 @@ Allow: /
 Disallow: /api/
 Disallow: /app
 Disallow: /set-password
-Sitemap: https://mailmask.easybits.cloud/sitemap.xml
+Sitemap: https://fancybit.dev/sitemap.xml
