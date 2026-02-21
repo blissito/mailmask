@@ -70,6 +70,11 @@ import {
   restoreConversation,
   listAllUsers,
   deleteUser,
+  getCoupon,
+  createCoupon,
+  listCoupons,
+  deleteCoupon,
+  markCouponUsed,
 } from "./db.ts";
 import {
   hashPassword,
@@ -102,11 +107,8 @@ import { fetchEmailFromS3, repairReceiptRules, ensureSnsSubscription } from "./s
 import { log } from "./logger.ts";
 import "./cron.ts";
 
-// --- Coupons ---
+// --- Coupons (dynamic, from DB) ---
 type PlanKeyTop = "basico" | "freelancer" | "developer" | "pro" | "agencia";
-const COUPONS: Record<string, { plan: PlanKeyTop; fixedPrice: number; description: string }> = {
-  FREE_50: { plan: "freelancer", fixedPrice: 50_00, description: "Plan Freelancer a $50 MXN/mes" },
-};
 
 // --- Fail-fast env validation (deferred for Deno Deploy compatibility) ---
 let envChecked = false;
@@ -1448,7 +1450,7 @@ const app = new Elysia()
 
   .get("/api/coupons/:code", async ({ params }) => {
     const code = params.code.toUpperCase().trim();
-    const coupon = COUPONS[code];
+    const coupon = await getCoupon(code);
     if (!coupon) {
       return new Response(JSON.stringify({ error: "Cupón no encontrado" }), {
         status: 404,
@@ -1482,10 +1484,16 @@ const app = new Elysia()
 
     // Validate coupon
     const couponCode = typeof coupon === "string" ? coupon.toUpperCase().trim() : undefined;
-    const activeCoupon = couponCode && COUPONS[couponCode]?.plan === planKey ? COUPONS[couponCode] : undefined;
+    const couponData = couponCode ? await getCoupon(couponCode) : null;
+    const activeCoupon = couponData && couponData.plan === planKey ? couponData : undefined;
 
     const token = crypto.randomUUID();
     await createPendingCheckout(token, isYearly ? `${planKey}:yearly` : planKey);
+
+    // Mark single-use coupon as used
+    if (activeCoupon?.singleUse && couponCode) {
+      await markCouponUsed(couponCode);
+    }
 
     const { PreApproval } = await import("mercadopago");
     const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
@@ -1561,7 +1569,13 @@ const app = new Elysia()
 
     // Validate coupon
     const couponCode = typeof coupon === "string" ? coupon.toUpperCase().trim() : undefined;
-    const activeCoupon = couponCode && COUPONS[couponCode]?.plan === planKey ? COUPONS[couponCode] : undefined;
+    const couponData2 = couponCode ? await getCoupon(couponCode) : null;
+    const activeCoupon = couponData2 && couponData2.plan === planKey ? couponData2 : undefined;
+
+    // Mark single-use coupon as used
+    if (activeCoupon?.singleUse && couponCode) {
+      await markCouponUsed(couponCode);
+    }
 
     const { PreApproval } = await import("mercadopago");
     const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
@@ -2824,6 +2838,65 @@ const app = new Elysia()
       return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
 
     log("info", "admin", "User deleted by admin", { admin: auth.email, target: email });
+    return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  })
+
+  // --- Admin: Coupons ---
+
+  .get("/api/admin/coupons", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || !isAdmin(auth.email))
+      return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
+
+    const coupons = await listCoupons();
+    return new Response(JSON.stringify(coupons), { headers: { "content-type": "application/json" } });
+  })
+
+  .post("/api/admin/coupons", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || !isAdmin(auth.email))
+      return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
+
+    const body = await request.json().catch(() => null);
+    if (!body?.code || !body?.plan || !body?.fixedPrice || !body?.description) {
+      return new Response(JSON.stringify({ error: "Campos requeridos: code, plan, fixedPrice, description" }), { status: 400, headers: { "content-type": "application/json" } });
+    }
+
+    const validPlans = ["basico", "freelancer", "developer", "pro", "agencia"];
+    if (!validPlans.includes(body.plan)) {
+      return new Response(JSON.stringify({ error: "Plan inválido" }), { status: 400, headers: { "content-type": "application/json" } });
+    }
+
+    try {
+      const coupon = await createCoupon({
+        code: String(body.code).toUpperCase().trim(),
+        plan: body.plan,
+        fixedPrice: Number(body.fixedPrice),
+        description: String(body.description),
+        singleUse: Boolean(body.singleUse),
+        expiresAt: body.expiresAt || undefined,
+      });
+      log("info", "admin", "Coupon created", { admin: auth.email, code: coupon.code });
+      return new Response(JSON.stringify(coupon), { status: 201, headers: { "content-type": "application/json" } });
+    } catch (err: any) {
+      if (String(err).includes("duplicate key")) {
+        return new Response(JSON.stringify({ error: "Ya existe un cupón con ese código" }), { status: 409, headers: { "content-type": "application/json" } });
+      }
+      throw err;
+    }
+  })
+
+  .delete("/api/admin/coupons/:code", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || !isAdmin(auth.email))
+      return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
+
+    const code = decodeURIComponent(params.code).toUpperCase().trim();
+    const deleted = await deleteCoupon(code);
+    if (!deleted)
+      return new Response(JSON.stringify({ error: "Cupón no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
+
+    log("info", "admin", "Coupon deleted", { admin: auth.email, code });
     return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
   });
 

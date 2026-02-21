@@ -204,6 +204,18 @@ CREATE TABLE IF NOT EXISTS bulk_jobs (
   expires_at         TIMESTAMPTZ NOT NULL
 );
 
+-- Coupons
+CREATE TABLE IF NOT EXISTS coupons (
+  code          TEXT PRIMARY KEY,
+  plan          TEXT NOT NULL,
+  fixed_price   INTEGER NOT NULL,
+  description   TEXT NOT NULL,
+  single_use    BOOLEAN NOT NULL DEFAULT FALSE,
+  used          BOOLEAN NOT NULL DEFAULT FALSE,
+  expires_at    TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Rate limits
 CREATE TABLE IF NOT EXISTS rate_limits (
   key          TEXT PRIMARY KEY,

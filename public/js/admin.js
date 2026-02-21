@@ -22,7 +22,9 @@ function switchTab(tab) {
   });
   document.getElementById("tab-backups").classList.toggle("hidden", tab !== "backups");
   document.getElementById("tab-users").classList.toggle("hidden", tab !== "users");
+  document.getElementById("tab-coupons").classList.toggle("hidden", tab !== "coupons");
   if (tab === "users" && !usersLoaded) loadUsers();
+  if (tab === "coupons" && !couponsLoaded) loadCoupons();
 }
 
 // --- Init ---
@@ -68,6 +70,7 @@ async function init() {
   document.getElementById("btn-close-detail").addEventListener("click", closeDetail);
   document.getElementById("btn-save-user").addEventListener("click", saveUser);
   document.getElementById("btn-delete-user").addEventListener("click", deleteUserHandler);
+  initCoupons();
 }
 
 // --- Backups ---
@@ -242,6 +245,136 @@ async function deleteUserHandler() {
     else { const d = await res.json(); alert(d.error || "Error"); }
   } catch { alert("Error de conexión"); }
   btn.disabled = false; btn.textContent = "Eliminar";
+}
+
+// --- Coupons ---
+
+let couponsLoaded = false;
+let allCoupons = [];
+
+async function loadCoupons() {
+  const res = await fetch("/api/admin/coupons");
+  if (!res.ok) return;
+  allCoupons = await res.json();
+  couponsLoaded = true;
+  document.getElementById("coupons-loading").classList.add("hidden");
+  renderCoupons();
+}
+
+function renderCoupons() {
+  if (allCoupons.length === 0) {
+    document.getElementById("coupons-empty").classList.remove("hidden");
+    document.getElementById("coupons-list").classList.add("hidden");
+    return;
+  }
+  document.getElementById("coupons-empty").classList.add("hidden");
+  const list = document.getElementById("coupons-list");
+  list.classList.remove("hidden");
+  const baseUrl = window.location.origin;
+  list.innerHTML = allCoupons.map(c => {
+    const link = `${baseUrl}/pricing?coupon=${encodeURIComponent(c.code)}`;
+    const expired = c.expiresAt && new Date(c.expiresAt) < new Date();
+    const statusBadge = c.used
+      ? '<span class="text-xs bg-zinc-700 text-zinc-400 px-2 py-0.5 rounded">Usado</span>'
+      : expired
+        ? '<span class="text-xs bg-red-900/50 text-red-400 px-2 py-0.5 rounded">Expirado</span>'
+        : '<span class="text-xs bg-green-900/50 text-green-400 px-2 py-0.5 rounded">Activo</span>';
+    return `
+      <div class="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="font-mono text-sm font-bold">${esc(c.code)}</span>
+          ${statusBadge}
+          <span class="text-zinc-400 text-sm">${esc(c.plan)}</span>
+          <span class="text-zinc-500 text-sm">$${(c.fixedPrice / 100).toFixed(0)} MXN</span>
+          ${c.singleUse ? '<span class="text-xs text-zinc-600">1 uso</span>' : ''}
+          ${c.expiresAt ? '<span class="text-xs text-zinc-600">exp ' + new Date(c.expiresAt).toLocaleDateString("es-MX") + '</span>' : ''}
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+          <button data-link="${esc(link)}" class="btn-copy-link text-sm text-mask-400 hover:text-mask-300 transition-colors">Copiar link</button>
+          <button data-code="${esc(c.code)}" class="btn-delete-coupon text-sm text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function initCoupons() {
+  document.getElementById("btn-create-coupon").addEventListener("click", () => {
+    document.getElementById("coupon-modal").classList.remove("hidden");
+    document.getElementById("coupon-modal-error").classList.add("hidden");
+    document.getElementById("coupon-code").value = "";
+    document.getElementById("coupon-desc").value = "";
+    document.getElementById("coupon-price").value = "5000";
+    document.getElementById("coupon-plan").value = "freelancer";
+    document.getElementById("coupon-single").checked = false;
+    document.getElementById("coupon-expires").value = "";
+  });
+
+  document.getElementById("btn-cancel-coupon").addEventListener("click", () => {
+    document.getElementById("coupon-modal").classList.add("hidden");
+  });
+
+  document.getElementById("btn-gen-code").addEventListener("click", () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    document.getElementById("coupon-code").value = code;
+  });
+
+  document.getElementById("btn-save-coupon").addEventListener("click", async () => {
+    const btn = document.getElementById("btn-save-coupon");
+    const errEl = document.getElementById("coupon-modal-error");
+    btn.disabled = true; btn.textContent = "Creando...";
+    errEl.classList.add("hidden");
+
+    const body = {
+      code: document.getElementById("coupon-code").value,
+      plan: document.getElementById("coupon-plan").value,
+      fixedPrice: Number(document.getElementById("coupon-price").value),
+      description: document.getElementById("coupon-desc").value,
+      singleUse: document.getElementById("coupon-single").checked,
+      expiresAt: document.getElementById("coupon-expires").value || undefined,
+    };
+
+    if (!body.code || !body.fixedPrice || !body.description) {
+      errEl.textContent = "Completa todos los campos requeridos";
+      errEl.classList.remove("hidden");
+      btn.disabled = false; btn.textContent = "Crear";
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/coupons", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        document.getElementById("coupon-modal").classList.add("hidden");
+        couponsLoaded = false; loadCoupons();
+      } else {
+        const d = await res.json();
+        errEl.textContent = d.error || "Error al crear";
+        errEl.classList.remove("hidden");
+      }
+    } catch { errEl.textContent = "Error de conexion"; errEl.classList.remove("hidden"); }
+    btn.disabled = false; btn.textContent = "Crear";
+  });
+
+  document.getElementById("coupons-list").addEventListener("click", async (e) => {
+    const copyBtn = e.target.closest(".btn-copy-link");
+    if (copyBtn) {
+      await navigator.clipboard.writeText(copyBtn.dataset.link);
+      copyBtn.textContent = "Copiado!";
+      setTimeout(() => copyBtn.textContent = "Copiar link", 1500);
+      return;
+    }
+    const delBtn = e.target.closest(".btn-delete-coupon");
+    if (delBtn) {
+      if (!confirm(`Eliminar cupon "${delBtn.dataset.code}"?`)) return;
+      delBtn.disabled = true; delBtn.textContent = "...";
+      const res = await fetch(`/api/admin/coupons/${encodeURIComponent(delBtn.dataset.code)}`, { method: "DELETE" });
+      if (res.ok) { couponsLoaded = false; loadCoupons(); }
+      else { const d = await res.json(); alert(d.error || "Error"); }
+    }
+  });
 }
 
 document.addEventListener("DOMContentLoaded", init);

@@ -1008,6 +1008,63 @@ export async function deleteUser(email: string): Promise<boolean> {
   return true;
 }
 
+// --- Coupons ---
+
+export interface Coupon {
+  code: string;
+  plan: string;
+  fixedPrice: number;
+  description: string;
+  singleUse: boolean;
+  used: boolean;
+  expiresAt?: string;
+  createdAt: string;
+}
+
+function rowToCoupon(r: any): Coupon {
+  return {
+    code: r.code,
+    plan: r.plan,
+    fixedPrice: r.fixed_price,
+    description: r.description,
+    singleUse: r.single_use,
+    used: r.used,
+    expiresAt: r.expires_at ? (r.expires_at instanceof Date ? r.expires_at.toISOString() : r.expires_at) : undefined,
+    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
+  };
+}
+
+export async function getCoupon(code: string): Promise<Coupon | null> {
+  const rows = await sql`SELECT * FROM coupons WHERE code = ${code}`;
+  if (!rows.length) return null;
+  const coupon = rowToCoupon(rows[0]);
+  if (coupon.singleUse && coupon.used) return null;
+  if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) return null;
+  return coupon;
+}
+
+export async function createCoupon(coupon: Omit<Coupon, "used" | "createdAt">): Promise<Coupon> {
+  const rows = await sql`
+    INSERT INTO coupons (code, plan, fixed_price, description, single_use, expires_at)
+    VALUES (${coupon.code}, ${coupon.plan}, ${coupon.fixedPrice}, ${coupon.description}, ${coupon.singleUse}, ${coupon.expiresAt ?? null})
+    RETURNING *`;
+  return rowToCoupon(rows[0]);
+}
+
+export async function listCoupons(): Promise<Coupon[]> {
+  const rows = await sql`SELECT * FROM coupons ORDER BY created_at DESC`;
+  return rows.map(rowToCoupon);
+}
+
+export async function deleteCoupon(code: string): Promise<boolean> {
+  const res = await sql`DELETE FROM coupons WHERE code = ${code}`;
+  return res.count > 0;
+}
+
+export async function markCouponUsed(code: string): Promise<void> {
+  await sql`UPDATE coupons SET used = TRUE WHERE code = ${code}`;
+}
+
 // --- Test helpers ---
 
 export function _getSql() {
