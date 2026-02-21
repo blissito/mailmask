@@ -99,7 +99,7 @@ function renderList() {
   }
 
   document.getElementById("conv-count").textContent =
-    `${filtered.length} conversación${filtered.length !== 1 ? "es" : ""}`;
+    `${filtered.length} ${filtered.length !== 1 ? "conversaciones" : "conversación"}`;
 
   if (filtered.length === 0) {
     // Clear any rendered items but keep the empty state
