@@ -3,7 +3,7 @@
     "dev": "deno run --allow-net --allow-env --allow-read --allow-sys --env --watch --unstable-cron main.ts",
     "start": "deno run --allow-net --allow-env --allow-read --unstable-cron main.ts",
     "test": "JWT_SECRET=test-secret-key MP_ACCESS_TOKEN=test MP_WEBHOOK_SECRET=test AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test DATABASE_URL=postgres://localhost/mailmask_test deno test --allow-net --allow-env --allow-read --unstable-cron",
-    "build:css": "npx tailwindcss -i public/css/input.css -o public/css/styles.css --minify"
+    "build:css": "npx tailwindcss -c tailwind.config.ts -i public/css/input.css -o public/css/styles.css --minify"
   },
   "imports": {
     "elysia": "npm:elysia@^1.2",
