@@ -6,45 +6,49 @@ const JWT_EXPIRY = 3600; // 1 hour
 
 // --- Password hashing (PBKDF2 via Web Crypto) ---
 
-const PBKDF2_ITERATIONS = 1_000;
+const PBKDF2_ITERATIONS = 600_000;
+const LEGACY_ITERATIONS = 1_000;
+
+async function deriveKey(password: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations },
+    key,
+    256,
+  );
+  return new Uint8Array(bits);
+}
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations: PBKDF2_ITERATIONS },
-    key,
-    256,
-  );
-  const hash = new Uint8Array(bits);
+  const hash = await deriveKey(password, salt, PBKDF2_ITERATIONS);
   return `${toHex(salt)}:${toHex(hash)}`;
 }
 
-export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+export async function verifyPassword(password: string, stored: string): Promise<{ valid: boolean; needsRehash: boolean }> {
   const [saltHex, hashHex] = stored.split(":");
   const salt = fromHex(saltHex);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations: PBKDF2_ITERATIONS },
-    key,
-    256,
-  );
-  const computed = new Uint8Array(bits);
   const expected = fromHex(hashHex);
-  if (computed.byteLength !== expected.byteLength) return false;
-  return timingSafeEqual(computed, expected);
+
+  // Try current iterations first
+  const computed = await deriveKey(password, salt, PBKDF2_ITERATIONS);
+  if (computed.byteLength === expected.byteLength && timingSafeEqual(computed, expected)) {
+    return { valid: true, needsRehash: false };
+  }
+
+  // Fall back to legacy iterations for existing passwords
+  const legacy = await deriveKey(password, salt, LEGACY_ITERATIONS);
+  if (legacy.byteLength === expected.byteLength && timingSafeEqual(legacy, expected)) {
+    return { valid: true, needsRehash: true };
+  }
+
+  return { valid: false, needsRehash: false };
 }
 
 // --- JWT (HMAC-SHA256 via Web Crypto) ---

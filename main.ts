@@ -579,11 +579,17 @@ const app = new Elysia({ adapter: node() })
         status: 401,
       });
 
-    const valid = await verifyPassword(password, user.passwordHash);
+    const { valid, needsRehash } = await verifyPassword(password, user.passwordHash);
     if (!valid)
       return new Response(JSON.stringify({ error: "Credenciales inválidas" }), {
         status: 401,
       });
+
+    // Re-hash with stronger iterations if password was stored with legacy settings
+    if (needsRehash) {
+      const newHash = await hashPassword(password);
+      updateUserPassword(email, newHash);
+    }
 
     const token = await signJwt({ email });
     return new Response(JSON.stringify({ ok: true, email }), {
