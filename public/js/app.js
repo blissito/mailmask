@@ -444,32 +444,52 @@ function renderDnsRecords() {
   const records = document.getElementById("dns-records");
 
   const dnsItems = [
-    { type: "MX", name: selectedDomain.domain, value: "10 inbound-smtp.us-east-1.amazonaws.com" },
-    { type: "TXT", name: `_amazonses.${selectedDomain.domain}`, value: selectedDomain.verificationToken },
-    ...selectedDomain.dkimTokens.map(token => ({
+    { type: "MX", label: "Recibir email", name: selectedDomain.domain, value: "10 inbound-smtp.us-east-1.amazonaws.com", color: "blue" },
+    { type: "TXT", label: "Verificación", name: `_amazonses.${selectedDomain.domain}`, value: selectedDomain.verificationToken, color: "yellow" },
+    ...selectedDomain.dkimTokens.map((token, i) => ({
       type: "CNAME",
+      label: `DKIM ${i + 1}/3`,
       name: `${token}._domainkey.${selectedDomain.domain}`,
       value: `${token}.dkim.amazonses.com`,
+      color: "green",
     })),
   ];
 
-  records.innerHTML = dnsItems.map(r => `
-    <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg p-3 space-y-2">
-      <div class="flex items-center gap-2">
-        <span class="text-xs font-mono bg-zinc-700 px-2 py-0.5 rounded shrink-0">${r.type}</span>
+  const badgeColors = {
+    blue: "bg-blue-900/50 text-blue-400 border-blue-800",
+    yellow: "bg-yellow-900/50 text-yellow-400 border-yellow-800",
+    green: "bg-green-900/50 text-green-400 border-green-800",
+  };
+
+  const copyIcon = `<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>`;
+  const checkIcon = `<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
+
+  // Table header
+  let html = `
+    <div class="grid grid-cols-[auto_1fr_1fr] text-xs font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-900/80 px-4 py-2.5 border-b border-zinc-800">
+      <div class="w-28">Tipo</div>
+      <div>Nombre</div>
+      <div>Valor</div>
+    </div>`;
+
+  html += dnsItems.map((r, i) => `
+    <div class="grid grid-cols-[auto_1fr_1fr] items-start px-4 py-3 ${i < dnsItems.length - 1 ? 'border-b border-zinc-800/60' : ''} hover:bg-zinc-800/30 transition-colors">
+      <div class="w-28 flex flex-col gap-1">
+        <span class="text-xs font-mono font-bold text-zinc-200">${r.type}</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded border w-fit ${badgeColors[r.color]}">${r.label}</span>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="text-xs text-zinc-500 shrink-0 w-12">Nombre</span>
-        <code class="text-xs text-zinc-300 bg-zinc-900 px-2 py-1 rounded flex-1 truncate">${esc(r.name)}</code>
-        <button data-action="copy" data-copy-value="${esc(r.name)}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors shrink-0">Copiar</button>
+      <div class="flex items-center gap-2 min-w-0 pr-3">
+        <code class="text-xs text-zinc-300 bg-zinc-900 px-2 py-1.5 rounded border border-zinc-800 flex-1 truncate font-mono">${esc(r.name)}</code>
+        <button data-action="copy" data-copy-value="${esc(r.name)}" class="dns-copy-btn text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 p-1 rounded hover:bg-zinc-700/50" title="Copiar nombre">${copyIcon}</button>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="text-xs text-zinc-500 shrink-0 w-12">Valor</span>
-        <code class="text-xs text-zinc-400 bg-zinc-900 px-2 py-1 rounded flex-1 truncate">${esc(r.value)}</code>
-        <button data-action="copy" data-copy-value="${esc(r.value)}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors shrink-0">Copiar</button>
+      <div class="flex items-center gap-2 min-w-0">
+        <code class="text-xs text-zinc-400 bg-zinc-900 px-2 py-1.5 rounded border border-zinc-800 flex-1 truncate font-mono">${esc(r.value)}</code>
+        <button data-action="copy" data-copy-value="${esc(r.value)}" class="dns-copy-btn text-zinc-500 hover:text-zinc-200 transition-colors shrink-0 p-1 rounded hover:bg-zinc-700/50" title="Copiar valor">${copyIcon}</button>
       </div>
     </div>
   `).join("");
+
+  records.innerHTML = html;
 }
 
 async function verifyDns() {
@@ -688,10 +708,15 @@ function setupEventListeners() {
     if (remove) removeRule(remove.dataset.ruleId);
   });
 
-  // Event delegation: DNS copy buttons
+  // Event delegation: DNS copy buttons with feedback
   document.getElementById("dns-records").addEventListener("click", (e) => {
     const copy = e.target.closest("[data-action='copy']");
-    if (copy) navigator.clipboard.writeText(copy.dataset.copyValue);
+    if (!copy) return;
+    navigator.clipboard.writeText(copy.dataset.copyValue);
+    const checkIcon = `<svg class="w-3.5 h-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
+    const original = copy.innerHTML;
+    copy.innerHTML = checkIcon;
+    setTimeout(() => { copy.innerHTML = original; }, 1500);
   });
 
   // Close modals on backdrop click
