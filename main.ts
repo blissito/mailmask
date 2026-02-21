@@ -847,8 +847,18 @@ const app = new Elysia()
       });
     }
 
+    // If already verified in DB, don't re-check SES (avoids accidentally unverifying)
+    if (domain.verified) {
+      return new Response(
+        JSON.stringify({ domain: domain.domain, verified: true, dkimVerified: true }),
+        { headers: { "content-type": "application/json" } },
+      );
+    }
+
     const status = await checkDomainStatus(domain.domain);
-    await updateDomain(domain.id, { verified: status.verified });
+    if (status.verified) {
+      await updateDomain(domain.id, { verified: true });
+    }
 
     return new Response(
       JSON.stringify({
