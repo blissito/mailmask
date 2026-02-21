@@ -225,6 +225,29 @@ body {
   background: var(--mesa-accent-dim);
   color: rgb(var(--mask-400));
 }
+.mesa-tag-deleted {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+.mesa-conv.deleted {
+  opacity: 0.55;
+}
+.mesa-action-danger {
+  color: #f87171;
+}
+.mesa-action-danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #f87171;
+  color: #f87171;
+}
+.mesa-action-restore {
+  color: #34d399;
+}
+.mesa-action-restore:hover {
+  background: rgba(52, 211, 153, 0.1);
+  border-color: #34d399;
+  color: #34d399;
+}
 
 /* --- Empty state --- */
 .mesa-empty {

@@ -377,6 +377,14 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
   return messageId;
 }
 
+// --- Delete S3 object (for purge) ---
+
+export async function deleteEmailFromS3(bucket: string, key: string): Promise<void> {
+  const s3 = await getS3();
+  const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+}
+
 // --- S3 backup helpers ---
 
 const BACKUP_BUCKET = Deno.env.get("S3_BACKUP_BUCKET") ?? "mailmask-inbound";

@@ -604,6 +604,7 @@ export interface Conversation {
   messageCount: number;
   tags: string[];
   threadReferences: string[];
+  deletedAt?: string;
 }
 
 export interface Message {
@@ -667,6 +668,7 @@ function rowToConversation(r: any): Conversation {
     messageCount: r.message_count,
     tags: r.tags ?? [],
     threadReferences: r.thread_refs ?? [],
+    deletedAt: r.deleted_at ? (r.deleted_at instanceof Date ? r.deleted_at.toISOString() : r.deleted_at) : undefined,
   };
 }
 
@@ -741,19 +743,29 @@ export async function getConversation(domainId: string, id: string): Promise<Con
 }
 
 export async function listConversations(domainId: string, opts?: { status?: string; assignedTo?: string }): Promise<Conversation[]> {
+  // status=deleted → show soft-deleted conversations
+  if (opts?.status === "deleted") {
+    if (opts?.assignedTo) {
+      const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND deleted_at IS NOT NULL AND assigned_to = ${opts.assignedTo} ORDER BY last_message_at DESC`;
+      return rows.map(rowToConversation);
+    }
+    const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND deleted_at IS NOT NULL ORDER BY last_message_at DESC`;
+    return rows.map(rowToConversation);
+  }
+  // Default: exclude deleted
   if (opts?.status && opts?.assignedTo) {
-    const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND status = ${opts.status} AND assigned_to = ${opts.assignedTo} ORDER BY last_message_at DESC`;
+    const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND deleted_at IS NULL AND status = ${opts.status} AND assigned_to = ${opts.assignedTo} ORDER BY last_message_at DESC`;
     return rows.map(rowToConversation);
   }
   if (opts?.status) {
-    const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND status = ${opts.status} ORDER BY last_message_at DESC`;
+    const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND deleted_at IS NULL AND status = ${opts.status} ORDER BY last_message_at DESC`;
     return rows.map(rowToConversation);
   }
   if (opts?.assignedTo) {
-    const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND assigned_to = ${opts.assignedTo} ORDER BY last_message_at DESC`;
+    const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND deleted_at IS NULL AND assigned_to = ${opts.assignedTo} ORDER BY last_message_at DESC`;
     return rows.map(rowToConversation);
   }
-  const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} ORDER BY last_message_at DESC`;
+  const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND deleted_at IS NULL ORDER BY last_message_at DESC`;
   return rows.map(rowToConversation);
 }
 
@@ -782,6 +794,31 @@ export async function findConversationByThread(domainId: string, _from: string, 
     WHERE domain_id = ${domainId} AND thread_refs && ${references}::text[]
     LIMIT 1`;
   return rows.length ? rowToConversation(rows[0]) : null;
+}
+
+export async function softDeleteConversation(domainId: string, id: string): Promise<boolean> {
+  const res = await sql`UPDATE conversations SET deleted_at = NOW() WHERE domain_id = ${domainId} AND id = ${id} AND deleted_at IS NULL`;
+  return res.count > 0;
+}
+
+export async function restoreConversation(domainId: string, id: string): Promise<boolean> {
+  const res = await sql`UPDATE conversations SET deleted_at = NULL WHERE domain_id = ${domainId} AND id = ${id} AND deleted_at IS NOT NULL`;
+  return res.count > 0;
+}
+
+export async function purgeDeletedConversations(days: number): Promise<{ s3Bucket: string; s3Key: string }[]> {
+  // Collect S3 keys from messages belonging to conversations that will be purged
+  const s3Rows = await sql`
+    SELECT m.s3_bucket, m.s3_key FROM messages m
+    JOIN conversations c ON m.conversation_id = c.id
+    WHERE c.deleted_at IS NOT NULL AND c.deleted_at < NOW() - ${days + ' days'}::interval
+      AND m.s3_bucket IS NOT NULL AND m.s3_key IS NOT NULL`;
+  const s3Keys = s3Rows.map((r: any) => ({ s3Bucket: r.s3_bucket, s3Key: r.s3_key }));
+
+  // Delete conversations (CASCADE handles messages + notes)
+  await sql`DELETE FROM conversations WHERE deleted_at IS NOT NULL AND deleted_at < NOW() - ${days + ' days'}::interval`;
+
+  return s3Keys;
 }
 
 // --- Messages ---

@@ -1,6 +1,7 @@
-import { sendFromDomain } from "./ses.ts";
+import { sendFromDomain, deleteEmailFromS3 } from "./ses.ts";
 import { log } from "./logger.ts";
 import { sql } from "./pg.ts";
+import { purgeDeletedConversations } from "./db.ts";
 
 // Daily at 14:00 UTC — warn users whose subscription expires within 3 days
 Deno.cron("expiry-warnings", "0 14 * * *", async () => {
@@ -57,5 +58,22 @@ Deno.cron("cleanup-expired", "*/15 * * * *", async () => {
     if (total > 0) log("info", "cron", "Cleaned expired rows", { count: total });
   } catch (err) {
     log("error", "cron", "Cleanup failed", { error: String(err) });
+  }
+});
+
+// Daily at 3:00 UTC — purge conversations deleted >15 days ago + their S3 objects
+Deno.cron("purge-deleted-conversations", "0 3 * * *", async () => {
+  try {
+    const s3Keys = await purgeDeletedConversations(15);
+    for (const { s3Bucket, s3Key } of s3Keys) {
+      try {
+        await deleteEmailFromS3(s3Bucket, s3Key);
+      } catch (err) {
+        log("warn", "cron", "Failed to delete S3 object during purge", { s3Key, error: String(err) });
+      }
+    }
+    if (s3Keys.length > 0) log("info", "cron", "Purged deleted conversations", { s3Objects: s3Keys.length });
+  } catch (err) {
+    log("error", "cron", "Purge deleted conversations failed", { error: String(err) });
   }
 });

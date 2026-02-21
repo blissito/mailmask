@@ -75,6 +75,9 @@ CREATE TABLE IF NOT EXISTS conversations (
 CREATE INDEX IF NOT EXISTS idx_conversations_domain ON conversations (domain_id, last_message_at DESC);
 CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations USING GIN (thread_refs);
 
+-- Soft-delete support
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
 -- Messages
 CREATE TABLE IF NOT EXISTS messages (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

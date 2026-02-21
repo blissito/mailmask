@@ -103,8 +103,10 @@ function renderList() {
     let classes = "mesa-conv";
     if (isActive) classes += " active";
     if (isSelected) classes += " selected";
+    if (c.deletedAt) classes += " deleted";
 
     let meta = `<span class="mesa-status-dot ${esc(c.status)}"></span>`;
+    if (c.deletedAt) meta += `<span class="mesa-tag mesa-tag-deleted">eliminado</span>`;
     if (c.priority === "urgent") meta += `<span class="mesa-tag mesa-tag-urgent">urgente</span>`;
     if (c.assignedTo) meta += `<span class="mesa-tag mesa-tag-assigned">${esc(c.assignedTo.split("@")[0])}</span>`;
 
@@ -147,15 +149,45 @@ async function openConversation(conv) {
   document.getElementById("detail-to").textContent = conv.to;
   document.getElementById("detail-count").textContent = conv.messageCount;
 
-  // Show/hide actions based on plan
+  const isDeleted = !!conv.deletedAt;
+
+  // Show/hide actions based on plan and deleted state
   const composer = document.getElementById("composer");
   const banner = document.getElementById("upgrade-banner");
-  if (canDoActions) {
+  const btnReply = document.getElementById("btn-reply");
+  const btnAssign = document.getElementById("btn-assign");
+  const btnCloseConv = document.getElementById("btn-close-conv");
+  const btnUrgent = document.getElementById("btn-urgent");
+  const btnDelete = document.getElementById("btn-delete-conv");
+  const btnRestore = document.getElementById("btn-restore-conv");
+
+  if (isDeleted) {
+    composer.classList.add("mesa-hidden");
+    banner.classList.add("mesa-hidden");
+    btnReply.classList.add("mesa-hidden");
+    btnAssign.classList.add("mesa-hidden");
+    btnCloseConv.classList.add("mesa-hidden");
+    btnUrgent.classList.add("mesa-hidden");
+    btnDelete.classList.add("mesa-hidden");
+    btnRestore.classList.remove("mesa-hidden");
+  } else if (canDoActions) {
     composer.classList.remove("mesa-hidden");
     banner.classList.add("mesa-hidden");
+    btnReply.classList.remove("mesa-hidden");
+    btnAssign.classList.remove("mesa-hidden");
+    btnCloseConv.classList.remove("mesa-hidden");
+    btnUrgent.classList.remove("mesa-hidden");
+    btnDelete.classList.remove("mesa-hidden");
+    btnRestore.classList.add("mesa-hidden");
   } else {
     composer.classList.add("mesa-hidden");
     banner.classList.remove("mesa-hidden");
+    btnReply.classList.remove("mesa-hidden");
+    btnAssign.classList.remove("mesa-hidden");
+    btnCloseConv.classList.remove("mesa-hidden");
+    btnUrgent.classList.remove("mesa-hidden");
+    btnDelete.classList.add("mesa-hidden");
+    btnRestore.classList.add("mesa-hidden");
   }
 
   // Load messages
@@ -271,6 +303,43 @@ async function closeConversation() {
   }
 }
 
+async function deleteConversation() {
+  if (!activeConv || !canDoActions) return;
+  if (!confirm("¿Eliminar esta conversación? Se moverá a la papelera por 15 días.")) return;
+  const res = await fetch(`/api/bandeja/conversations/${activeConv.id}?domainId=${selectedDomainId}`, {
+    method: "DELETE",
+  });
+  if (res.ok) {
+    toast("Conversación eliminada");
+    activeConv = null;
+    document.getElementById("detail-empty").classList.remove("mesa-hidden");
+    document.getElementById("detail-loaded").classList.add("mesa-hidden");
+    await loadConversations();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    toast(err.error || "Error al eliminar");
+  }
+}
+
+async function restoreConversationAction() {
+  if (!activeConv || !canDoActions) return;
+  const res = await fetch(`/api/bandeja/conversations/${activeConv.id}/restore`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ domainId: selectedDomainId }),
+  });
+  if (res.ok) {
+    toast("Conversación restaurada");
+    activeConv = null;
+    document.getElementById("detail-empty").classList.remove("mesa-hidden");
+    document.getElementById("detail-loaded").classList.add("mesa-hidden");
+    await loadConversations();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    toast(err.error || "Error al restaurar");
+  }
+}
+
 async function toggleUrgent() {
   if (!activeConv || !canDoActions) return;
   const newPriority = activeConv.priority === "urgent" ? "normal" : "urgent";
@@ -322,6 +391,8 @@ function setupListeners() {
   document.getElementById("btn-assign").addEventListener("click", assignConversation);
   document.getElementById("btn-close-conv").addEventListener("click", closeConversation);
   document.getElementById("btn-urgent").addEventListener("click", toggleUrgent);
+  document.getElementById("btn-delete-conv").addEventListener("click", deleteConversation);
+  document.getElementById("btn-restore-conv").addEventListener("click", restoreConversationAction);
   document.getElementById("btn-send").addEventListener("click", sendReply);
 
   // Composer mode toggle
@@ -474,6 +545,10 @@ function setupKeyboard() {
     if (e.key === "e" && canDoActions) {
       e.preventDefault();
       closeConversation();
+    }
+    if (e.key === "#" && canDoActions) {
+      e.preventDefault();
+      deleteConversation();
     }
     if (e.key === "/") {
       e.preventDefault();

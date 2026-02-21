@@ -66,6 +66,8 @@ import {
   updateBulkJob,
   listPendingBulkJobs,
   PLAN_MESA_LIMITS,
+  softDeleteConversation,
+  restoreConversation,
   listAllUsers,
   deleteUser,
 } from "./db.ts";
@@ -2176,6 +2178,7 @@ const app = new Elysia()
 
     const conv = await getConversation(domainId, params.id);
     if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+    if (conv.deletedAt) return new Response(JSON.stringify({ error: "Conversación eliminada" }), { status: 400 });
 
     const fromAddress = `${conv.to.split("@")[0]}@${domain.domain}`;
     const lastRef = conv.threadReferences[conv.threadReferences.length - 1];
@@ -2236,6 +2239,10 @@ const app = new Elysia()
       return new Response(JSON.stringify({ error: "Solo el dueño puede asignar conversaciones" }), { status: 403 });
     }
 
+    const convToAssign = await getConversation(domainId, params.id);
+    if (!convToAssign) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+    if (convToAssign.deletedAt) return new Response(JSON.stringify({ error: "Conversación eliminada" }), { status: 400 });
+
     const updated = await updateConversation(domainId, params.id, { assignedTo: assignedTo ?? undefined });
     if (!updated) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
 
@@ -2269,6 +2276,7 @@ const app = new Elysia()
 
     const conv = await getConversation(domainId, params.id);
     if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+    if (conv.deletedAt) return new Response(JSON.stringify({ error: "Conversación eliminada" }), { status: 400 });
 
     const note = await addNote({
       conversationId: conv.id,
@@ -2307,6 +2315,10 @@ const app = new Elysia()
       return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
     }
 
+    const convToPatch = await getConversation(domainId, params.id);
+    if (!convToPatch) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+    if (convToPatch.deletedAt) return new Response(JSON.stringify({ error: "Conversación eliminada" }), { status: 400 });
+
     const updates: Record<string, unknown> = {};
     if (newStatus && ["open", "snoozed", "closed"].includes(newStatus)) updates.status = newStatus;
     if (tags && Array.isArray(tags)) updates.tags = tags;
@@ -2316,6 +2328,69 @@ const app = new Elysia()
     if (!updated) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
 
     return new Response(JSON.stringify(updated), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .delete("/api/bandeja/conversations/:id", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const url = new URL(request.url);
+    const domainId = url.searchParams.get("domainId");
+    if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
+
+    const domain = await getDomain(domainId);
+    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const user = (await getUser(auth.email))!;
+    const plan = user.subscription?.plan ?? "basico";
+    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
+    if (!mesaLimits.mesaActions) {
+      return new Response(JSON.stringify({ error: "Tu plan no permite eliminar conversaciones" }), { status: 403 });
+    }
+
+    const isOwner = domain.ownerEmail === auth.email;
+    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
+    if (!isOwner && !agent) {
+      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
+    }
+
+    const deleted = await softDeleteConversation(domainId, params.id);
+    if (!deleted) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .post("/api/bandeja/conversations/:id/restore", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const { domainId } = await request.json();
+    if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
+
+    const domain = await getDomain(domainId);
+    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const user = (await getUser(auth.email))!;
+    const plan = user.subscription?.plan ?? "basico";
+    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
+    if (!mesaLimits.mesaActions) {
+      return new Response(JSON.stringify({ error: "Tu plan no permite restaurar conversaciones" }), { status: 403 });
+    }
+
+    const isOwner = domain.ownerEmail === auth.email;
+    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
+    if (!isOwner && !agent) {
+      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
+    }
+
+    const restored = await restoreConversation(domainId, params.id);
+    if (!restored) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
     });
   })
