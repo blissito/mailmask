@@ -774,16 +774,6 @@ export async function deleteAgentInvite(token: string): Promise<void> {
   await kv.delete(["agent-invite", token]);
 }
 
-// --- Domain Mesa setting ---
-
-export async function setDomainMesaEnabled(domainId: string, enabled: boolean, forwardAlso: boolean = true): Promise<void> {
-  await kv.set(["domain-mesa", domainId], { enabled, forwardAlso });
-}
-
-export async function getDomainMesaSettings(domainId: string): Promise<{ enabled: boolean; forwardAlso: boolean }> {
-  const entry = await kv.get<{ enabled: boolean; forwardAlso: boolean }>(["domain-mesa", domainId]);
-  return entry.value ?? { enabled: false, forwardAlso: true };
-}
 
 // --- Plan limits extension for Mesa/agents ---
 

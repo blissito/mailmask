@@ -62,8 +62,6 @@ import {
   getBulkJob,
   updateBulkJob,
   listPendingBulkJobs,
-  getDomainMesaSettings,
-  setDomainMesaEnabled,
   PLAN_MESA_LIMITS,
   listAllUsers,
   deleteUser,
@@ -2048,40 +2046,6 @@ const app = new Elysia()
     if (!updated) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
 
     return new Response(JSON.stringify(updated), {
-      headers: { "content-type": "application/json" },
-    });
-  })
-
-  // --- Mesa settings ---
-
-  .post("/api/domains/:id/mesa", async ({ request, params }) => {
-    const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
-
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== auth.email) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
-    }
-
-    const { enabled, forwardAlso } = await request.json();
-    await setDomainMesaEnabled(domain.id, enabled ?? false, forwardAlso ?? true);
-
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { "content-type": "application/json" },
-    });
-  })
-
-  .get("/api/domains/:id/mesa", async ({ request, params }) => {
-    const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
-
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== auth.email) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
-    }
-
-    const settings = await getDomainMesaSettings(domain.id);
-    return new Response(JSON.stringify(settings), {
       headers: { "content-type": "application/json" },
     });
   })

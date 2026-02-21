@@ -1,4 +1,4 @@
-import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, getDomainMesaSettings, findConversationByThread, createConversation, updateConversation, addMessage, type Rule, type ForwardQueueItem } from "./db.ts";
+import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, type Rule, type ForwardQueueItem } from "./db.ts";
 import { forwardEmail, fetchEmailFromS3, sendAlert } from "./ses.ts";
 import { checkRateLimit } from "./rate-limit.ts";
 import { log } from "./logger.ts";
@@ -246,26 +246,12 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
       continue;
     }
 
-    // Mesa integration: save to conversation if enabled
-    const mesaSettings = await getDomainMesaSettings(domain.id);
-    if (mesaSettings.enabled && rawContent) {
+    // Mesa: save to conversation
+    if (rawContent) {
       try {
         await saveToMesa(rawContent, from, recipient, subject, domain.id);
       } catch (err) {
         log("error", "forwarding", "Failed to save to Mesa", { error: String(err), domainId: domain.id });
-      }
-      // If Mesa-only mode (no forwarding), skip the rest
-      if (!mesaSettings.forwardAlso) {
-        await addLog({
-          domainId: domain.id,
-          timestamp: new Date().toISOString(),
-          from, to: recipient, subject,
-          status: "forwarded",
-          forwardedTo: "mesa",
-          sizeBytes: rawContent.length,
-        }, logDays);
-        forwarded++;
-        continue;
       }
     }
 
