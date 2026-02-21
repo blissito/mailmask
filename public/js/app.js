@@ -694,10 +694,10 @@ const _smtpCopied = new Set();
 
 function copySmtp(btn, text, key) {
   navigator.clipboard.writeText(text).then(() => {
-    const original = btn.innerHTML;
+    const orig = btn.innerHTML;
     btn.innerHTML = `<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
     btn.classList.add("border-green-700");
-    setTimeout(() => { btn.innerHTML = original; btn.classList.remove("border-green-700"); }, 1500);
+    setTimeout(() => { btn.innerHTML = orig; btn.classList.remove("border-green-700"); }, 1500);
     if (key) {
       _smtpCopied.add(key);
       if (_smtpCopied.has("username") && _smtpCopied.has("password") && _smtpCopied.has("server")) {
@@ -770,7 +770,7 @@ function renderSmtpCredentials(creds) {
     <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg px-5 py-4">
       <div class="flex items-center justify-between mb-2">
         <span class="font-semibold text-sm">${esc(c.label)}</span>
-        <button onclick="revokeSmtpCredential('${esc(c.id)}')" class="text-xs text-red-400 hover:text-red-300 transition-colors flex items-center gap-1" title="Revocar credencial">
+        <button data-revoke="${esc(c.id)}" class="text-xs text-red-400 hover:text-red-300 transition-colors flex items-center gap-1" title="Revocar credencial">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           Revocar
         </button>
@@ -778,7 +778,7 @@ function renderSmtpCredentials(creds) {
       <div class="flex items-center gap-2 text-xs text-zinc-400">
         <span>Usuario SMTP:</span>
         <code class="bg-zinc-800 border border-zinc-700 rounded px-2 py-0.5 font-mono text-zinc-300 select-all">${esc(c.accessKeyId)}</code>
-        <button onclick="copySmtp(this, '${esc(c.accessKeyId)}')" class="text-zinc-500 hover:text-zinc-300 transition-colors" title="Copiar usuario">${cpIcon}</button>
+        <button data-copy="${esc(c.accessKeyId)}" class="text-zinc-500 hover:text-zinc-300 transition-colors" title="Copiar usuario">${cpIcon}</button>
       </div>
       <div class="flex items-center gap-2 mt-2 text-xs text-zinc-500">
         <span>${relativeTime(c.createdAt)}</span>
@@ -830,17 +830,17 @@ async function createSmtpCredential(label) {
         </div>
         <div class="flex items-center gap-2">
           <code class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 font-mono select-all">${esc(data.server)}</code>
-          <button onclick="copySmtp(this, '${esc(data.server)}', 'server')" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg p-2.5 text-zinc-400 hover:text-zinc-200 transition-colors" title="Copiar">${copyIcon}</button>
+          <button data-copy="${esc(data.server)}" data-copy-key="server" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg p-2.5 text-zinc-400 hover:text-zinc-200 transition-colors" title="Copiar">${copyIcon}</button>
         </div>
         <div class="flex gap-3 mt-2">
           <div class="flex items-center gap-2">
             <code class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300 font-mono">587</code>
-            <button onclick="copySmtp(this, '587')" class="text-zinc-500 hover:text-zinc-300 transition-colors" title="Copiar puerto"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+            <button data-copy="587" class="text-zinc-500 hover:text-zinc-300 transition-colors" title="Copiar puerto"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
             <span class="text-xs text-zinc-500">Puerto</span>
           </div>
           <div class="flex items-center gap-2">
             <code class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300 font-mono">STARTTLS</code>
-            <button onclick="copySmtp(this, 'STARTTLS')" class="text-zinc-500 hover:text-zinc-300 transition-colors" title="Copiar seguridad"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+            <button data-copy="STARTTLS" class="text-zinc-500 hover:text-zinc-300 transition-colors" title="Copiar seguridad"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
             <span class="text-xs text-zinc-500">Seguridad</span>
           </div>
         </div>
@@ -852,7 +852,7 @@ async function createSmtpCredential(label) {
         </div>
         <div class="flex items-center gap-2">
           <code class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 font-mono select-all truncate">${esc(data.username)}</code>
-          <button onclick="copySmtp(this, '${esc(data.username)}', 'username')" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg p-2.5 text-zinc-400 hover:text-zinc-200 transition-colors" title="Copiar">${copyIcon}</button>
+          <button data-copy="${esc(data.username)}" data-copy-key="username" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg p-2.5 text-zinc-400 hover:text-zinc-200 transition-colors" title="Copiar">${copyIcon}</button>
         </div>
       </div>
 
@@ -863,7 +863,7 @@ async function createSmtpCredential(label) {
         <p class="text-xs text-yellow-400/70 mb-1.5">Copia esta contrase\u00f1a ahora — no podr\u00e1s verla de nuevo.</p>
         <div class="flex items-center gap-2">
           <code class="flex-1 bg-zinc-800 border border-yellow-800/50 rounded-lg px-3 py-2.5 text-sm text-zinc-100 font-mono select-all break-all">${esc(data.password)}</code>
-          <button onclick="copySmtp(this, '${esc(data.password)}', 'password')" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-yellow-800/50 rounded-lg p-2.5 text-yellow-400 hover:text-yellow-300 transition-colors" title="Copiar">${copyIcon}</button>
+          <button data-copy="${esc(data.password)}" data-copy-key="password" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-yellow-800/50 rounded-lg p-2.5 text-yellow-400 hover:text-yellow-300 transition-colors" title="Copiar">${copyIcon}</button>
         </div>
       </div>
     </div>
@@ -964,6 +964,20 @@ function setupEventListeners() {
     errEl.classList.add("hidden");
     await createSmtpCredential(form.label.value.trim());
     form.reset();
+  });
+
+  // SMTP delegated click handlers (CSP-safe, no inline onclick)
+  document.addEventListener("click", (e) => {
+    const copyBtn = e.target.closest("[data-copy]");
+    if (copyBtn) {
+      copySmtp(copyBtn, copyBtn.dataset.copy, copyBtn.dataset.copyKey);
+      return;
+    }
+    const revokeBtn = e.target.closest("[data-revoke]");
+    if (revokeBtn) {
+      revokeSmtpCredential(revokeBtn.dataset.revoke);
+      return;
+    }
   });
 
   // Form: Add domain
