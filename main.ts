@@ -728,7 +728,7 @@ const app = new Elysia({ adapter: node() })
         status: 400,
       });
 
-    const emailLimited = checkRateLimit(`forgot:${email}`, 1, 300_000);
+    const emailLimited = checkRateLimit(`forgot:${email}`, 1, 60_000);
     if (!emailLimited.allowed) {
       const waitMs = emailLimited.resetAt - Date.now();
       const waitMin = Math.max(1, Math.ceil(waitMs / 60_000));
