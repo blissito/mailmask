@@ -106,6 +106,7 @@ function renderList() {
     if (c.deletedAt) classes += " deleted";
 
     let meta = `<span class="mesa-status-dot ${esc(c.status)}"></span>`;
+    if (c.to) meta += `<span class="mesa-tag mesa-tag-alias">${esc(c.to.split("@")[0])}</span>`;
     if (c.deletedAt) meta += `<span class="mesa-tag mesa-tag-deleted">eliminado</span>`;
     if (c.priority === "urgent") meta += `<span class="mesa-tag mesa-tag-urgent">urgente</span>`;
     if (c.assignedTo) meta += `<span class="mesa-tag mesa-tag-assigned">${esc(c.assignedTo.split("@")[0])}</span>`;

@@ -217,6 +217,10 @@ body {
   font-family: ui-monospace, 'SF Mono', monospace;
   font-weight: 500;
 }
+.mesa-tag-alias {
+  background: rgba(99, 102, 241, 0.10);
+  color: #6366f1;
+}
 .mesa-tag-assigned {
   background: rgba(99, 102, 241, 0.15);
   color: #818cf8;
