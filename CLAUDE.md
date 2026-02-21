@@ -62,6 +62,7 @@ deno task test    # Run tests
 - [ ] Backup/export de datos de usuario (aliases, reglas)
 - [ ] Notificaciones por email cuando un alias recibe su primer email
 - [ ] Soporte para multiple destinatarios en un alias
+- [ ] **Definir estrategia de historial/almacenamiento**: retención por plan (15-30 días basico/freelancer, ilimitado developer), flush automático, add-on de almacenamiento, UI de uso. Diferenciador clave vs competencia — discutir antes de implementar.
 - [ ] Evaluar pattern de almacenamiento de mensajes en Mesa: ¿leer body de S3 on demand vs duplicar en KV? Investigar otros patterns (cache intermedio, pre-procesado a formato ligero, CDN/signed URLs). Concluir cuál es el mejor approach antes de implementar.
 
 ### Backlog
