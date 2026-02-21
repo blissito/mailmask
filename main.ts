@@ -92,7 +92,7 @@ import {
   deleteConfigurationSet,
   deleteDomainIdentity,
 } from "./ses.ts";
-import { processInbound, extractPlainBody, extractHtmlBody, rebuildConversationsFromS3 } from "./forwarding.ts";
+import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, extractAttachmentByIndex, rebuildConversationsFromS3 } from "./forwarding.ts";
 import { fetchEmailFromS3, repairReceiptRules, ensureSnsSubscription } from "./ses.ts";
 import { log } from "./logger.ts";
 import "./cron.ts";
@@ -1893,10 +1893,11 @@ const app = new Elysia()
       if (msg.s3Bucket && msg.s3Key && !msg.body) {
         try {
           const raw = await fetchEmailFromS3(msg.s3Bucket, msg.s3Key);
-          return { ...msg, body: extractPlainBody(raw), html: extractHtmlBody(raw) };
+          const attachments = extractAttachments(raw);
+          return { ...msg, body: extractPlainBody(raw), html: extractHtmlBody(raw), attachments };
         } catch (err) {
           console.error("Failed to fetch message body from S3:", err);
-          return { ...msg, body: "(Error al cargar el mensaje)", html: "" };
+          return { ...msg, body: "(Error al cargar el mensaje)", html: "", attachments: [] };
         }
       }
       return msg;
@@ -1905,6 +1906,59 @@ const app = new Elysia()
     return new Response(JSON.stringify({ ...conv, messages, notes }), {
       headers: { "content-type": "application/json" },
     });
+  })
+
+  .get("/api/mesa/conversations/:id/attachments/:msgIdx/:attIdx", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const url = new URL(request.url);
+    const domainId = url.searchParams.get("domainId");
+    if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
+
+    const domain = await getDomain(domainId);
+    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const isOwner = domain.ownerEmail === auth.email;
+    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
+    if (!isOwner && !agent) {
+      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
+    }
+
+    const conv = await getConversation(domainId, params.id);
+    if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    const messages = await listMessages(conv.id);
+    const msgIdx = parseInt(params.msgIdx);
+    const attIdx = parseInt(params.attIdx);
+    if (isNaN(msgIdx) || isNaN(attIdx) || msgIdx < 0 || msgIdx >= messages.length) {
+      return new Response(JSON.stringify({ error: "Índice inválido" }), { status: 400 });
+    }
+
+    const msg = messages[msgIdx];
+    if (!msg.s3Bucket || !msg.s3Key) {
+      return new Response(JSON.stringify({ error: "Mensaje sin contenido S3" }), { status: 404 });
+    }
+
+    try {
+      const raw = await fetchEmailFromS3(msg.s3Bucket, msg.s3Key);
+      const attachment = extractAttachmentByIndex(raw, attIdx);
+      if (!attachment) {
+        return new Response(JSON.stringify({ error: "Attachment no encontrado" }), { status: 404 });
+      }
+
+      const disposition = attachment.contentType.startsWith("image/") ? "inline" : "attachment";
+      return new Response(attachment.data as unknown as BodyInit, {
+        headers: {
+          "content-type": attachment.contentType,
+          "content-disposition": `${disposition}; filename="${attachment.filename}"`,
+          "cache-control": "private, max-age=3600",
+        },
+      });
+    } catch (err) {
+      console.error("Failed to fetch attachment from S3:", err);
+      return new Response(JSON.stringify({ error: "Error al cargar attachment" }), { status: 500 });
+    }
   })
 
   .post("/api/mesa/conversations/:id/reply", async ({ request, params }) => {

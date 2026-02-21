@@ -172,7 +172,7 @@ function renderMessages(messages, notes) {
 
   // Interleave messages and notes by time
   const items = [
-    ...messages.map(m => ({ ...m, _type: "message" })),
+    ...messages.map((m, i) => ({ ...m, _type: "message", _msgIdx: i })),
     ...notes.map(n => ({ ...n, _type: "note", createdAt: n.createdAt })),
   ].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
@@ -188,6 +188,7 @@ function renderMessages(messages, notes) {
     }
 
     const dir = item.direction;
+    const attachmentsHtml = renderAttachments(item.attachments, item._msgIdx);
     return `<div class="mesa-msg ${dir}">
       <div class="mesa-msg-header">
         <span class="mesa-msg-from">${esc(item.from)}</span>
@@ -195,6 +196,7 @@ function renderMessages(messages, notes) {
         <span class="mesa-msg-time">${formatTime(item.createdAt)}</span>
       </div>
       <div class="mesa-msg-body">${esc(item.body || item.html || "")}</div>
+      ${attachmentsHtml}
     </div>`;
   }).join("");
 
@@ -372,7 +374,7 @@ function setupListeners() {
   // Welcome toast
   const params = new URLSearchParams(window.location.search);
   if (params.get("welcome") === "1") {
-    toast("Bienvenido a Mesa");
+    toast("Bienvenido a Bandeja");
     window.history.replaceState({}, "", "/mesa");
   }
 }
@@ -494,6 +496,26 @@ function scrollToSelected() {
   if (items[selectedIdx]) {
     items[selectedIdx].scrollIntoView({ block: "nearest" });
   }
+}
+
+// --- Attachments ---
+function renderAttachments(attachments, msgIdx) {
+  if (!attachments || attachments.length === 0) return "";
+  const chips = attachments.map(att => {
+    const url = `/api/mesa/conversations/${activeConv.id}/attachments/${msgIdx}/${att.index}?domainId=${selectedDomainId}`;
+    const isImage = att.contentType.startsWith("image/");
+    const icon = isImage
+      ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`
+      : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`;
+    const sizeKb = Math.round(att.size / 1024) || 1;
+    const preview = isImage ? `<img class="mesa-att-preview" src="${esc(url)}" alt="${esc(att.filename)}" loading="lazy">` : "";
+    return `<a class="mesa-att-chip" href="${esc(url)}" target="_blank" title="${esc(att.filename)}">
+      ${icon}
+      <span class="mesa-att-name">${esc(att.filename)}</span>
+      <span class="mesa-att-size">${sizeKb}KB</span>
+    </a>${preview}`;
+  }).join("");
+  return `<div class="mesa-attachments">${chips}</div>`;
 }
 
 // --- Helpers ---

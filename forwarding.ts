@@ -58,49 +58,183 @@ function extractReferences(raw: string): string[] {
   return [...new Set(refs)];
 }
 
-export function extractPlainBody(raw: string): string {
-  // Simple extraction: find text/plain content in MIME
-  const headerBodySplit = raw.indexOf("\r\n\r\n");
-  if (headerBodySplit === -1) return raw;
-  const body = raw.slice(headerBodySplit + 4);
+// --- Recursive MIME parser ---
 
-  // If multipart, try to find text/plain part
+interface MimePart {
+  headers: string;
+  contentType: string;
+  body: string;
+  filename?: string;
+  encoding?: string;
+}
+
+function parseMimeParts(body: string, boundary: string): MimePart[] {
+  const parts: MimePart[] = [];
+  const segments = body.split(`--${boundary}`);
+
+  for (const segment of segments) {
+    const trimmed = segment.trim();
+    if (!trimmed || trimmed === "--") continue;
+
+    const splitIdx = segment.indexOf("\r\n\r\n");
+    if (splitIdx === -1) continue;
+
+    const headers = segment.slice(0, splitIdx);
+    let partBody = segment.slice(splitIdx + 4);
+    // Remove trailing boundary marker
+    if (partBody.endsWith("\r\n")) partBody = partBody.slice(0, -2);
+
+    const ctMatch = headers.match(/Content-Type:\s*([^\r\n]+(?:\r\n\s+[^\r\n]+)*)/i);
+    const contentType = ctMatch ? ctMatch[1].replace(/\r\n\s+/g, " ").trim() : "";
+
+    // If this part is itself multipart, recurse
+    if (contentType.toLowerCase().includes("multipart")) {
+      const innerBoundary = contentType.match(/boundary="?([^";\s]+)"?/i);
+      if (innerBoundary) {
+        const innerParts = parseMimeParts(partBody, innerBoundary[1]);
+        parts.push(...innerParts);
+        continue;
+      }
+    }
+
+    const encMatch = headers.match(/Content-Transfer-Encoding:\s*(\S+)/i);
+    const encoding = encMatch ? encMatch[1].trim().toLowerCase() : undefined;
+
+    // Extract filename from Content-Disposition or Content-Type
+    let filename: string | undefined;
+    const dispMatch = headers.match(/Content-Disposition:\s*([^\r\n]+(?:\r\n\s+[^\r\n]+)*)/i);
+    if (dispMatch) {
+      const disp = dispMatch[1].replace(/\r\n\s+/g, " ");
+      const fnMatch = disp.match(/filename="?([^";\r\n]+)"?/i);
+      if (fnMatch) filename = fnMatch[1].trim();
+    }
+    if (!filename) {
+      const nameMatch = contentType.match(/name="?([^";\r\n]+)"?/i);
+      if (nameMatch) filename = nameMatch[1].trim();
+    }
+
+    parts.push({ headers, contentType, body: partBody, filename, encoding });
+  }
+  return parts;
+}
+
+function flattenMimeParts(raw: string): MimePart[] {
+  const headerBodySplit = raw.indexOf("\r\n\r\n");
+  if (headerBodySplit === -1) return [];
+  const body = raw.slice(headerBodySplit + 4);
   const contentType = extractHeader(raw, "Content-Type");
+
   if (contentType.includes("multipart")) {
     const boundaryMatch = contentType.match(/boundary="?([^";\s]+)"?/);
     if (boundaryMatch) {
-      const boundary = boundaryMatch[1];
-      const parts = body.split(`--${boundary}`);
-      for (const part of parts) {
-        if (part.toLowerCase().includes("content-type: text/plain")) {
-          const partBody = part.indexOf("\r\n\r\n");
-          if (partBody !== -1) return part.slice(partBody + 4).replace(/--$/, "").trim();
-        }
-      }
+      return parseMimeParts(body, boundaryMatch[1]);
     }
   }
-  return body.trim();
+
+  // Not multipart — single part
+  const encMatch = raw.slice(0, headerBodySplit).match(/Content-Transfer-Encoding:\s*(\S+)/i);
+  return [{ headers: raw.slice(0, headerBodySplit), contentType, body, encoding: encMatch?.[1]?.trim().toLowerCase() }];
+}
+
+function decodePartBody(part: MimePart): string {
+  if (part.encoding === "quoted-printable") {
+    const decoded = part.body.replace(/=\r?\n/g, "");
+    // Convert hex-encoded bytes to a Uint8Array, then decode as UTF-8
+    const bytes: number[] = [];
+    for (let i = 0; i < decoded.length; i++) {
+      if (decoded[i] === "=" && /^[0-9A-Fa-f]{2}$/.test(decoded.slice(i + 1, i + 3))) {
+        bytes.push(parseInt(decoded.slice(i + 1, i + 3), 16));
+        i += 2;
+      } else {
+        bytes.push(decoded.charCodeAt(i));
+      }
+    }
+    return new TextDecoder("utf-8").decode(new Uint8Array(bytes));
+  }
+  if (part.encoding === "base64") {
+    try { return atob(part.body.replace(/\s/g, "")); } catch { return part.body; }
+  }
+  return part.body;
+}
+
+export function extractPlainBody(raw: string): string {
+  const parts = flattenMimeParts(raw);
+  for (const part of parts) {
+    if (part.contentType.toLowerCase().includes("text/plain")) {
+      return decodePartBody(part).trim();
+    }
+  }
+  // Fallback: return raw body after headers
+  const idx = raw.indexOf("\r\n\r\n");
+  return idx === -1 ? raw : raw.slice(idx + 4).trim();
 }
 
 export function extractHtmlBody(raw: string): string {
-  const headerBodySplit = raw.indexOf("\r\n\r\n");
-  if (headerBodySplit === -1) return "";
-  const body = raw.slice(headerBodySplit + 4);
-  const contentType = extractHeader(raw, "Content-Type");
-  if (contentType.includes("multipart")) {
-    const boundaryMatch = contentType.match(/boundary="?([^";\s]+)"?/);
-    if (boundaryMatch) {
-      const boundary = boundaryMatch[1];
-      const parts = body.split(`--${boundary}`);
-      for (const part of parts) {
-        if (part.toLowerCase().includes("content-type: text/html")) {
-          const partBody = part.indexOf("\r\n\r\n");
-          if (partBody !== -1) return part.slice(partBody + 4).replace(/--$/, "").trim();
-        }
-      }
+  const parts = flattenMimeParts(raw);
+  for (const part of parts) {
+    if (part.contentType.toLowerCase().includes("text/html")) {
+      return decodePartBody(part).trim();
     }
   }
   return "";
+}
+
+export interface AttachmentMeta {
+  index: number;
+  filename: string;
+  contentType: string;
+  size: number;
+}
+
+export function extractAttachments(raw: string): AttachmentMeta[] {
+  const parts = flattenMimeParts(raw);
+  const attachments: AttachmentMeta[] = [];
+  let idx = 0;
+
+  for (const part of parts) {
+    const ct = part.contentType.toLowerCase();
+    // Skip text body parts
+    if (ct.includes("text/plain") || ct.includes("text/html")) continue;
+    // Skip empty parts
+    if (!part.body.trim()) continue;
+
+    const baseType = ct.split(";")[0].trim();
+    attachments.push({
+      index: idx++,
+      filename: part.filename ?? `attachment-${idx}`,
+      contentType: baseType,
+      size: part.body.length,
+    });
+  }
+  return attachments;
+}
+
+export function extractAttachmentByIndex(raw: string, index: number): { data: Uint8Array; contentType: string; filename: string } | null {
+  const parts = flattenMimeParts(raw);
+  let idx = 0;
+
+  for (const part of parts) {
+    const ct = part.contentType.toLowerCase();
+    if (ct.includes("text/plain") || ct.includes("text/html")) continue;
+    if (!part.body.trim()) continue;
+
+    if (idx === index) {
+      const baseType = ct.split(";")[0].trim();
+      const filename = part.filename ?? `attachment-${idx + 1}`;
+      // Decode base64 content to binary
+      let data: Uint8Array;
+      if (part.encoding === "base64") {
+        const binary = atob(part.body.replace(/\s/g, ""));
+        data = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) data[i] = binary.charCodeAt(i);
+      } else {
+        data = new TextEncoder().encode(part.body);
+      }
+      return { data, contentType: baseType, filename };
+    }
+    idx++;
+  }
+  return null;
 }
 
 // --- Mesa integration ---

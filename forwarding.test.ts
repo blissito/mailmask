@@ -5,7 +5,7 @@ import { _setKv } from "./db.ts";
 const testKv = await Deno.openKv(":memory:");
 _setKv(testKv);
 
-import { evaluateRules, processInbound } from "./forwarding.ts";
+import { evaluateRules, processInbound, extractPlainBody, extractHtmlBody, extractAttachments } from "./forwarding.ts";
 import {
   enqueueForward, dequeueForward, listForwardQueue, moveToDeadLetter,
   getQueueDepth, getDeadLetterCount, _getKv,
@@ -346,3 +346,83 @@ Deno.test({ name: "processInbound - source rewrite in raw email", ...fwdTestOpts
   // Cleanup
   if (queued) await dequeueForward(queued.id);
 }});
+
+// --- MIME parsing tests ---
+
+const NESTED_MULTIPART = [
+  "From: sender@example.com",
+  "To: alias@domain.com",
+  "Subject: Test with attachment",
+  'Content-Type: multipart/mixed; boundary="outer"',
+  "",
+  "--outer",
+  'Content-Type: multipart/alternative; boundary="inner"',
+  "",
+  "--inner",
+  "Content-Type: text/plain; charset=utf-8",
+  "",
+  "Hello plain text",
+  "--inner--",
+  "--outer",
+  'Content-Type: multipart/alternative; boundary="inner2"',
+  "",
+  "--inner2",
+  "Content-Type: text/html; charset=utf-8",
+  "",
+  "<p>Hello HTML</p>",
+  "--inner2--",
+  "--outer",
+  "Content-Type: image/png; name=\"photo.png\"",
+  "Content-Disposition: attachment; filename=\"photo.png\"",
+  "Content-Transfer-Encoding: base64",
+  "",
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ",
+  "--outer",
+  "Content-Type: application/pdf; name=\"doc.pdf\"",
+  "Content-Disposition: attachment; filename=\"doc.pdf\"",
+  "Content-Transfer-Encoding: base64",
+  "",
+  "JVBERi0xLjQK",
+  "--outer--",
+].join("\r\n");
+
+Deno.test("extractPlainBody handles nested multipart/mixed + multipart/alternative", () => {
+  const body = extractPlainBody(NESTED_MULTIPART);
+  assertEquals(body, "Hello plain text");
+});
+
+Deno.test("extractHtmlBody handles nested multipart/mixed + multipart/alternative", () => {
+  const html = extractHtmlBody(NESTED_MULTIPART);
+  assertEquals(html, "<p>Hello HTML</p>");
+});
+
+Deno.test("extractAttachments returns attachment metadata from nested multipart", () => {
+  const attachments = extractAttachments(NESTED_MULTIPART);
+  assertEquals(attachments.length, 2);
+  assertEquals(attachments[0].filename, "photo.png");
+  assertEquals(attachments[0].contentType, "image/png");
+  assertEquals(attachments[1].filename, "doc.pdf");
+  assertEquals(attachments[1].contentType, "application/pdf");
+});
+
+Deno.test("extractPlainBody handles simple non-multipart email", () => {
+  const simple = ["From: a@b.com", "Content-Type: text/plain", "", "Simple body"].join("\r\n");
+  assertEquals(extractPlainBody(simple), "Simple body");
+});
+
+const QUOTED_PRINTABLE = [
+  "From: sender@example.com",
+  'Content-Type: multipart/alternative; boundary="qp"',
+  "",
+  "--qp",
+  "Content-Type: text/plain; charset=utf-8",
+  "Content-Transfer-Encoding: quoted-printable",
+  "",
+  "Hello =C3=A1cento y l=C3=ADnea",
+  "--qp--",
+].join("\r\n");
+
+Deno.test("extractPlainBody decodes quoted-printable", () => {
+  const body = extractPlainBody(QUOTED_PRINTABLE);
+  assertEquals(body, "Hello ácento y línea");
+});

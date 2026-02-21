@@ -359,6 +359,52 @@ body {
   border-color: rgba(220, 38, 38, 0.15);
 }
 
+/* Attachments */
+.mesa-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.mesa-att-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--mesa-surface-2);
+  border: 1px solid var(--mesa-border);
+  color: var(--mesa-text-2);
+  font-size: 12px;
+  text-decoration: none;
+  transition: all 0.12s;
+  cursor: pointer;
+}
+.mesa-att-chip:hover {
+  border-color: var(--mesa-border-active);
+  color: var(--mesa-text);
+  background: var(--mesa-surface);
+}
+.mesa-att-chip svg { flex-shrink: 0; }
+.mesa-att-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mesa-att-size {
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 10px;
+  color: var(--mesa-text-3);
+}
+.mesa-att-preview {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 6px;
+  margin-top: 6px;
+  border: 1px solid var(--mesa-border);
+}
+
 /* Notes */
 .mesa-note {
   margin-bottom: 12px;
