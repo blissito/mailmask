@@ -390,56 +390,82 @@
     </section>
 
     <!-- Deliverability -->
-    <section class="max-w-4xl mx-auto px-4 py-16">
-      <h2 class="text-2xl font-bold text-center mb-4">
-        Tus emails llegan al inbox, no a spam
-      </h2>
-      <p class="text-center text-zinc-400 mb-12 max-w-2xl mx-auto">
-        MailMask configura automáticamente los estándares de autenticación que
-        Gmail, Outlook y otros proveedores exigen para entregar emails al inbox.
-      </p>
-      <div class="grid md:grid-cols-3 gap-8">
-        <div class="text-center">
-          <div
-            class="w-14 h-14 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
-          >
-            <span class="text-2xl">✍️</span>
+    <section class="relative max-w-5xl mx-auto px-4 py-24 overflow-hidden">
+      <!-- Subtle glow background -->
+      <div class="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
+        <div class="w-[600px] h-[600px] bg-mask-600/5 rounded-full blur-3xl"></div>
+      </div>
+
+      <div class="relative">
+        <p class="text-mask-500 font-semibold text-sm tracking-widest uppercase text-center mb-4">Entregabilidad</p>
+        <h2 class="text-3xl sm:text-4xl font-extrabold text-center tracking-tight mb-4">
+          Tus emails llegan al inbox,<br class="hidden sm:block" />
+          <span class="text-mask-500">no a spam</span>
+        </h2>
+        <p class="text-center text-zinc-400 text-lg max-w-2xl mx-auto mb-16">
+          MailMask configura automáticamente los estándares que Gmail, Outlook y otros
+          proveedores exigen para entregar emails al inbox.
+        </p>
+
+        <div class="grid md:grid-cols-3 gap-6">
+          <!-- DKIM -->
+          <div class="group bg-zinc-900/80 border border-zinc-800 rounded-2xl p-8 hover:border-zinc-700 transition-colors">
+            <div class="w-12 h-12 bg-mask-600/15 rounded-xl flex items-center justify-center mb-6">
+              <svg class="w-6 h-6 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"/>
+              </svg>
+            </div>
+            <h3 class="font-bold text-xl text-zinc-100 mb-1">DKIM</h3>
+            <p class="text-mask-400 text-sm font-medium mb-3">Firma digital automática</p>
+            <p class="text-zinc-400 text-sm leading-relaxed">
+              Cada email sale firmado criptográficamente. Gmail muestra
+              <span class="text-zinc-300 font-medium">"firmado por: tudominio.com"</span>
+              — prueba de que el mensaje es auténtico.
+            </p>
           </div>
-          <h3 class="font-semibold text-lg mb-2">DKIM</h3>
-          <p class="text-zinc-400 text-sm">
-            Firma digital automática en cada email. Gmail muestra
-            "firmado por: tudominio.com" — prueba de que el mensaje es auténtico.
-          </p>
+
+          <!-- SPF -->
+          <div class="group bg-zinc-900/80 border border-zinc-800 rounded-2xl p-8 hover:border-zinc-700 transition-colors">
+            <div class="w-12 h-12 bg-mask-600/15 rounded-xl flex items-center justify-center mb-6">
+              <svg class="w-6 h-6 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
+              </svg>
+            </div>
+            <h3 class="font-bold text-xl text-zinc-100 mb-1">SPF</h3>
+            <p class="text-mask-400 text-sm font-medium mb-3">Autorización de envío</p>
+            <p class="text-zinc-400 text-sm leading-relaxed">
+              Los servidores de correo verifican que el email viene de un
+              servidor autorizado por ti. Sin SPF, tus emails pueden ser
+              rechazados o marcados como sospechosos.
+            </p>
+          </div>
+
+          <!-- Amazon SES -->
+          <div class="group bg-zinc-900/80 border border-zinc-800 rounded-2xl p-8 hover:border-zinc-700 transition-colors">
+            <div class="w-12 h-12 bg-mask-600/15 rounded-xl flex items-center justify-center mb-6">
+              <svg class="w-6 h-6 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z"/>
+              </svg>
+            </div>
+            <h3 class="font-bold text-xl text-zinc-100 mb-1">Amazon SES</h3>
+            <p class="text-mask-400 text-sm font-medium mb-3">Infraestructura de clase mundial</p>
+            <p class="text-zinc-400 text-sm leading-relaxed">
+              La misma infraestructura que usan Netflix, Reddit y miles de
+              empresas. IPs con reputación alta y monitoreo constante de
+              entregabilidad.
+            </p>
+          </div>
         </div>
-        <div class="text-center">
-          <div
-            class="w-14 h-14 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
-          >
-            <span class="text-2xl">🛡️</span>
-          </div>
-          <h3 class="font-semibold text-lg mb-2">SPF</h3>
-          <p class="text-zinc-400 text-sm">
-            Autorización de envío en tu DNS. Los servidores de correo verifican
-            que el email viene de un servidor autorizado por ti.
+
+        <!-- Bottom note -->
+        <div class="mt-14 flex items-center justify-center gap-3">
+          <div class="h-px flex-1 max-w-[80px] bg-zinc-800"></div>
+          <p class="text-zinc-500 text-sm text-center">
+            Todo se configura <span class="text-zinc-300 font-medium">automáticamente</span> al agregar tu dominio — sin certificados, sin servidores, sin complicaciones.
           </p>
-        </div>
-        <div class="text-center">
-          <div
-            class="w-14 h-14 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
-          >
-            <span class="text-2xl">☁️</span>
-          </div>
-          <h3 class="font-semibold text-lg mb-2">Amazon SES</h3>
-          <p class="text-zinc-400 text-sm">
-            Misma infraestructura que usan Netflix, Reddit y miles de empresas.
-            IPs con reputación alta y monitoreo constante.
-          </p>
+          <div class="h-px flex-1 max-w-[80px] bg-zinc-800"></div>
         </div>
       </div>
-      <p class="text-center text-zinc-500 text-sm mt-10 max-w-lg mx-auto">
-        Todo esto se configura automáticamente cuando agregas tu dominio. Sin
-        certificados, sin servidores, sin complicaciones.
-      </p>
     </section>
 
     <!-- Pricing -->
