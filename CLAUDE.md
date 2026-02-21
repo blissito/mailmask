@@ -67,3 +67,6 @@ deno task test    # Run tests
 ### Backlog
 - [ ] **SMTP relay**: Ofrecer credenciales SMTP para que usuarios envíen desde cualquier cliente (Gmail, Thunderbird). Dominio ya es identidad SES verificada, solo falta generar credenciales y endpoint de autenticación SMTP. Disponible desde plan Freelancer.
 - [ ] Probar checkout autenticado con email diferente al collector de MP
+- [ ] **SDK**: Cliente JS/TS para consumir la API de MailMask (crear aliases, listar dominios, etc.). Publicar en npm. Disponible desde plan Developer.
+- [ ] **Webhooks**: Permitir registrar URLs para recibir eventos (email recibido, alias creado, etc.). UI para gestionar webhooks por dominio, endpoint de registro, sistema de delivery con reintentos. Disponible desde plan Developer.
+- [ ] **Members y permisos por dominio**: UI completa para invitar miembros a un dominio, asignar roles (owner, editor, viewer), gestionar permisos. Incluye: modelo de datos (tabla members/invitations), endpoints CRUD, UI en dashboard para listar/invitar/remover miembros, control de acceso en todos los endpoints de dominio según rol.
