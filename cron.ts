@@ -1,7 +1,7 @@
 import { sendFromDomain } from "./ses.ts";
 import { log } from "./logger.ts";
 
-const kv = await Deno.openKv(Deno.env.get("KV_URL"));
+const kv = await Deno.openKv(Deno.env.get("KV_URL") || undefined);
 
 // Daily at 14:00 UTC — warn users whose subscription expires within 3 days
 Deno.cron("expiry-warnings", "0 14 * * *", async () => {
