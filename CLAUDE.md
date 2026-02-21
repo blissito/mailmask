@@ -66,4 +66,5 @@ deno task test    # Run tests
 - [ ] Evaluar pattern de almacenamiento de mensajes en Mesa: ¿leer body de S3 on demand vs duplicar en KV? Investigar otros patterns (cache intermedio, pre-procesado a formato ligero, CDN/signed URLs). Concluir cuál es el mejor approach antes de implementar.
 
 ### Backlog
+- [ ] **SMTP relay**: Ofrecer credenciales SMTP para que usuarios envíen desde cualquier cliente (Gmail, Thunderbird). Dominio ya es identidad SES verificada, solo falta generar credenciales y endpoint de autenticación SMTP. Disponible desde plan Freelancer.
 - [ ] Probar checkout autenticado con email diferente al collector de MP
