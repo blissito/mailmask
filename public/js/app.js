@@ -151,7 +151,7 @@ function renderUsage() {
 
   const items = [`Dominios ${u.domains.current}/${u.domains.limit}`];
   for (const a of u.aliasesPerDomain) {
-    items.push(`Aliases — ${esc(a.domain)} ${a.current}/${a.limit}`);
+    items.push(`Alias — ${esc(a.domain)} ${a.current}/${a.limit}`);
   }
 
   container.innerHTML = `
@@ -292,7 +292,7 @@ function goBack() {
 
 async function deleteDomain() {
   if (!selectedDomain) return;
-  if (!confirm(`¿Eliminar dominio ${selectedDomain.domain}? Se borrarán todos los aliases y reglas.`)) return;
+  if (!confirm(`¿Eliminar dominio ${selectedDomain.domain}? Se borrarán todos los alias y reglas.`)) return;
   const res = await fetch(`/api/domains/${selectedDomain.id}`, { method: "DELETE" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));

@@ -185,7 +185,7 @@ async function openUserDetail(email) {
     ? user.domains.map(d => `
         <div class="flex items-center justify-between bg-zinc-800 rounded px-3 py-1.5">
           <span>${esc(d.domain)} ${d.verified ? '<span class="text-green-500">✓</span>' : '<span class="text-zinc-600">✗</span>'}</span>
-          <span class="text-zinc-500">${d.aliasCount} aliases</span>
+          <span class="text-zinc-500">${d.aliasCount} alias</span>
         </div>`).join("")
     : '<p class="text-zinc-600">Sin dominios</p>';
 
