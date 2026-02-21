@@ -5,14 +5,14 @@ export default {
     extend: {
       colors: {
         mask: {
-          50: "#ecfeff",
-          100: "#cffafe",
-          400: "#22d3ee",
-          500: "#06b6d4",
-          600: "#0891b2",
-          700: "#0e7490",
-          800: "#155e75",
-          900: "#164e63",
+          50: "rgb(var(--mask-50) / <alpha-value>)",
+          100: "rgb(var(--mask-100) / <alpha-value>)",
+          400: "rgb(var(--mask-400) / <alpha-value>)",
+          500: "rgb(var(--mask-500) / <alpha-value>)",
+          600: "rgb(var(--mask-600) / <alpha-value>)",
+          700: "rgb(var(--mask-700) / <alpha-value>)",
+          800: "rgb(var(--mask-800) / <alpha-value>)",
+          900: "rgb(var(--mask-900) / <alpha-value>)",
         },
         gold: { 400: "#facc15", 500: "#eab308" },
       },

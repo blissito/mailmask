@@ -128,8 +128,8 @@
           aria-label="MailMask"
         >
           <title>MailMask</title>
-          <ellipse cx="40" cy="42" rx="28" ry="24" fill="#0891b2" />
-          <ellipse cx="40" cy="38" rx="28" ry="22" fill="#06b6d4" />
+          <ellipse cx="40" cy="42" rx="28" ry="24" fill="rgb(var(--mask-600))" />
+          <ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mask-500))" />
           <!-- Eye holes -->
           <ellipse cx="28" cy="36" rx="8" ry="6" fill="#18181b" />
           <ellipse cx="52" cy="36" rx="8" ry="6" fill="#18181b" />
@@ -167,7 +167,7 @@
           <!-- Mouth area -->
           <path
             d="M30 48 Q40 54 50 48"
-            stroke="#155e75"
+            stroke="rgb(var(--mask-800))"
             stroke-width="2"
             fill="none"
             stroke-linecap="round"
@@ -229,33 +229,40 @@
           <div
             class="w-12 h-12 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
           >
-            <span class="text-2xl">1</span>
+            <svg class="w-6 h-6 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/>
+            </svg>
           </div>
           <h3 class="font-semibold text-lg mb-2">Agrega tu dominio</h3>
           <p class="text-zinc-400 text-sm">
-            Ingresa tu dominio y te damos los registros DNS a configurar.
+            Ingresa tu dominio y configura los registros DNS. DKIM y SPF se activan automáticamente.
           </p>
         </div>
         <div class="feature-card text-center animate-fade-up opacity-0 anim-delay-500">
           <div
             class="w-12 h-12 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
           >
-            <span class="text-2xl">2</span>
+            <svg class="w-6 h-6 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
           </div>
-          <h3 class="font-semibold text-lg mb-2">Configura DNS</h3>
+          <h3 class="font-semibold text-lg mb-2">Crea máscaras y reglas</h3>
           <p class="text-zinc-400 text-sm">
-            Agrega el registro MX y los CNAME de DKIM en tu proveedor de DNS.
+            Define alias como ventas@, soporte@ y reglas inteligentes: reenviar, descartar o enviar a webhook.
           </p>
         </div>
         <div class="feature-card text-center animate-fade-up opacity-0 anim-delay-600">
           <div
             class="w-12 h-12 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
           >
-            <span class="text-2xl">3</span>
+            <svg class="w-6 h-6 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 011.037-.443 48.282 48.282 0 005.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
+            </svg>
           </div>
-          <h3 class="font-semibold text-lg mb-2">Crea máscaras (alias)</h3>
+          <h3 class="font-semibold text-lg mb-2">Recibe, envía y gestiona</h3>
           <p class="text-zinc-400 text-sm">
-            ventas@, soporte@, info@ — todos llegan a tu Gmail o donde quieras.
+            Bandeja integrada, envío desde tu dominio y logs de cada email. Todo en un solo lugar.
           </p>
         </div>
       </div>
@@ -322,69 +329,116 @@
             5 — 100 por dominio
           </div>
         </div>
+        <div
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-1100"
+        >
+          <div class="text-zinc-400">Envío desde tu dominio</div>
+          <div class="text-center text-zinc-500">Solo con licencia</div>
+          <div class="text-center text-mask-400 font-semibold">Incluido</div>
+        </div>
+        <div
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-1100"
+        >
+          <div class="text-zinc-400">DKIM + SPF</div>
+          <div class="text-center text-zinc-500">Manual</div>
+          <div class="text-center text-mask-400 font-semibold">Automático</div>
+        </div>
+        <div
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-1100"
+        >
+          <div class="text-zinc-400">Bandeja / helpdesk</div>
+          <div class="text-center text-zinc-500">Complemento extra</div>
+          <div class="text-center text-mask-400 font-semibold">Integrado</div>
+        </div>
       </div>
     </section>
 
-    <!-- Features -->
+    <!-- Product demo -->
     <section class="max-w-4xl mx-auto px-4 py-16">
-      <h2 class="text-2xl font-bold text-center mb-12">
-        Todo incluido desde $49 MXN/mes
+      <h2 class="text-2xl font-bold text-center mb-4">
+        Tu panel de control
       </h2>
-      <div class="grid sm:grid-cols-2 gap-6">
-        <div
-          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-up opacity-0 anim-delay-400"
-        >
-          <h3 class="font-semibold text-lg mb-2">📬 Forwarding instantáneo</h3>
-          <p class="text-zinc-400 text-sm">
-            Emails llegan a tu inbox en menos de 5 segundos. SES de Amazon como
-            columna vertebral.
-          </p>
+      <p class="text-center text-zinc-400 mb-12 max-w-xl mx-auto">
+        Dominios, máscaras, reglas y logs — todo en un solo lugar.
+      </p>
+
+      <!-- Dashboard mockup -->
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl shadow-black/40 animate-fade-up opacity-0 anim-delay-400">
+        <!-- Mock nav bar -->
+        <div class="flex items-center gap-3 px-5 py-3 border-b border-zinc-800 bg-zinc-950/60">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))"/>
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b"/>
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b"/>
+          </svg>
+          <span class="font-bold text-sm text-zinc-200">MailMask</span>
+          <span class="ml-auto text-xs text-zinc-500 font-mono">tu@email.com</span>
         </div>
-        <div
-          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-up opacity-0 anim-delay-500"
-        >
-          <h3 class="font-semibold text-lg mb-2">📤 Envía desde tu dominio</h3>
-          <p class="text-zinc-400 text-sm">
-            SMTP incluido. Envía como ventas@tuempresa.com directamente.
-          </p>
-        </div>
-        <div
-          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-up opacity-0 anim-delay-600"
-        >
-          <h3 class="font-semibold text-lg mb-2">
-            🎭 Hasta 2000 máscaras (alias)
-          </h3>
-          <p class="text-zinc-400 text-sm">
-            ventas@, soporte@, info@, hola@... o catch-all (*) para recibir
-            todo.
-          </p>
-        </div>
-        <div
-          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-up opacity-0 anim-delay-700"
-        >
-          <h3 class="font-semibold text-lg mb-2">⚡ Reglas inteligentes</h3>
-          <p class="text-zinc-400 text-sm">
-            Filtra por remitente, asunto o destinatario. Reenvía, descarta o
-            envía a webhook.
-          </p>
-        </div>
-        <div
-          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-up opacity-0 anim-delay-800"
-        >
-          <h3 class="font-semibold text-lg mb-2">📊 Logs de email</h3>
-          <p class="text-zinc-400 text-sm">
-            Ve cada email que entra: quién envió, a dónde se reenvió, si falló.
-          </p>
-        </div>
-        <div
-          class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-up opacity-0 anim-delay-900"
-        >
-          <h3 class="font-semibold text-lg mb-2">🔒 DKIM + SPF automático</h3>
-          <p class="text-zinc-400 text-sm">
-            Se configura solo al agregar tu dominio. Tus emails salen firmados
-            con la misma infraestructura de Amazon — el destinatario ve
-            "firmado por tudominio.com" en Gmail.
-          </p>
+
+        <div class="p-5 sm:p-8 space-y-6">
+          <!-- Domain header -->
+          <div class="flex items-center gap-3 flex-wrap">
+            <div class="flex items-center gap-2">
+              <svg class="w-5 h-5 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582"/>
+              </svg>
+              <span class="font-semibold">tuempresa.com</span>
+            </div>
+            <span class="text-xs font-mono px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-400 border border-emerald-800/50">DNS verificado</span>
+            <span class="text-xs font-mono px-2 py-0.5 rounded bg-mask-600/15 text-mask-400 border border-mask-700/30">DKIM activo</span>
+          </div>
+
+          <!-- Aliases grid -->
+          <div>
+            <p class="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-3">Máscaras activas</p>
+            <div class="grid sm:grid-cols-3 gap-2">
+              <div class="flex items-center gap-2 bg-zinc-800/60 rounded-lg px-3 py-2 border border-zinc-700/50">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                <span class="text-sm font-mono truncate">ventas@</span>
+                <svg class="w-3.5 h-3.5 text-zinc-500 ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                <span class="text-xs text-zinc-500 truncate">gmail</span>
+              </div>
+              <div class="flex items-center gap-2 bg-zinc-800/60 rounded-lg px-3 py-2 border border-zinc-700/50">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                <span class="text-sm font-mono truncate">soporte@</span>
+                <svg class="w-3.5 h-3.5 text-zinc-500 ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                <span class="text-xs text-zinc-500 truncate">gmail</span>
+              </div>
+              <div class="flex items-center gap-2 bg-zinc-800/60 rounded-lg px-3 py-2 border border-zinc-700/50">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                <span class="text-sm font-mono truncate">hola@</span>
+                <svg class="w-3.5 h-3.5 text-zinc-500 ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                <span class="text-xs text-zinc-500 truncate">outlook</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent logs -->
+          <div>
+            <p class="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-3">Actividad reciente</p>
+            <div class="space-y-1.5">
+              <div class="flex items-center gap-3 text-sm px-3 py-2 rounded-lg bg-zinc-800/40">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                <span class="text-zinc-300 truncate">cliente@ejemplo.com</span>
+                <svg class="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                <span class="font-mono text-mask-400 truncate">ventas@tuempresa.com</span>
+                <span class="ml-auto text-xs text-zinc-600 font-mono flex-shrink-0">hace 2m</span>
+              </div>
+              <div class="flex items-center gap-3 text-sm px-3 py-2 rounded-lg bg-zinc-800/40">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                <span class="text-zinc-300 truncate">newsletter@servicio.io</span>
+                <svg class="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                <span class="font-mono text-mask-400 truncate">hola@tuempresa.com</span>
+                <span class="ml-auto text-xs text-zinc-600 font-mono flex-shrink-0">hace 15m</span>
+              </div>
+              <div class="flex items-center gap-3 text-sm px-3 py-2 rounded-lg bg-zinc-800/40">
+                <span class="w-1.5 h-1.5 rounded-full bg-zinc-600 flex-shrink-0"></span>
+                <span class="text-zinc-500 truncate">spam@botnet.xyz</span>
+                <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-zinc-700/60 text-zinc-400">descartado por regla</span>
+                <span class="ml-auto text-xs text-zinc-600 font-mono flex-shrink-0">hace 1h</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -703,7 +757,7 @@
       >
         <div class="flex items-center gap-2 text-zinc-400 text-sm">
           <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
-            <ellipse cx="40" cy="40" rx="20" ry="18" fill="#06b6d4" />
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
             <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
             <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
           </svg>
