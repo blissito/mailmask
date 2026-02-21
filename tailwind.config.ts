@@ -25,10 +25,20 @@ export default {
           from: { opacity: "0", transform: "translateX(-8px)" },
           to: { opacity: "1", transform: "translateX(0)" },
         },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+        "hero-glow": {
+          "0%, 100%": { opacity: "0.3", transform: "scale(1)" },
+          "50%": { opacity: "0.5", transform: "scale(1.05)" },
+        },
       },
       animation: {
         "fade-up": "fadeUp 0.5s ease-out forwards",
         "fade-left": "fadeLeft 0.4s ease-out forwards",
+        "float": "float 3s ease-in-out infinite",
+        "hero-glow": "hero-glow 4s ease-in-out infinite",
       },
     },
   },
