@@ -1,5 +1,5 @@
 import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, type Rule, type ForwardQueueItem } from "./db.ts";
-import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchEmailHeadersFromS3 } from "./ses.ts";
+import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchEmailHeadersFromS3, sendFromDomain } from "./ses.ts";
 import { checkRateLimit } from "./rate-limit.ts";
 import { log } from "./logger.ts";
 
@@ -523,6 +523,18 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
         forwarded++;
       }
       bumpAliasStats(domain.id, matched.alias, from); // fire-and-forget
+
+      // Notify owner on first email to this alias
+      if (!matched.forwardCount && owner) {
+        const aliasAddr = `${matched.alias}@${domainName}`;
+        sendFromDomain(
+          `noreply@${domainName}`,
+          owner.email,
+          `Primer email recibido en ${aliasAddr}`,
+          `¡Tu alias ${aliasAddr} acaba de recibir su primer email!\n\nDe: ${from}\nAsunto: ${subject}\n\nPuedes ver la actividad de tus alias en tu panel de control.`,
+          { html: `<p>¡Tu alias <strong>${aliasAddr}</strong> acaba de recibir su primer email!</p><p><strong>De:</strong> ${from}<br><strong>Asunto:</strong> ${subject}</p><p>Puedes ver la actividad de tus alias en tu <a href="https://mailmask.easybits.cloud/app">panel de control</a>.</p>` },
+        ).catch(() => {}); // fire-and-forget
+      }
     } else {
       await addLog({
         domainId: domain.id,

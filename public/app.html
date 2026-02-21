@@ -74,6 +74,7 @@
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="rules">Reglas</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="logs">Logs</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="dns">DNS</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="members">Miembros</button>
       </div>
 
       <!-- Tab: Aliases -->
@@ -124,6 +125,22 @@
             Verificar DNS
           </button>
           <span id="verify-result" class="text-sm"></span>
+        </div>
+      </div>
+
+      <!-- Tab: Members -->
+      <div id="tab-members" class="tab-content hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold">Miembros</h3>
+          <button id="btn-invite-member" class="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors">+ Invitar miembro</button>
+        </div>
+        <div id="members-list" class="space-y-2"></div>
+        <div id="members-empty" class="hidden text-center py-8 text-zinc-500">
+          No hay miembros. Invita a tu equipo para gestionar este dominio.
+        </div>
+        <div id="members-upgrade" class="hidden text-center py-8">
+          <p class="text-zinc-500 mb-3">Tu plan no incluye miembros de equipo.</p>
+          <a href="/#pricing" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Actualiza tu plan</a>
         </div>
       </div>
     </div>
@@ -222,6 +239,38 @@
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-add-rule">Cancelar</button>
           <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear regla</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Invite member -->
+  <div id="modal-invite-member" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+      <h3 class="text-lg font-bold mb-4">Invitar miembro</h3>
+      <form id="form-invite-member">
+        <div class="mb-4">
+          <label class="block text-sm text-zinc-400 mb-1">Nombre</label>
+          <input type="text" name="name" required placeholder="Juan Pérez"
+            class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm text-zinc-400 mb-1">Email</label>
+          <input type="email" name="email" required placeholder="juan@ejemplo.com"
+            class="lowercase w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm text-zinc-400 mb-1">Rol</label>
+          <select name="role" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-zinc-100 focus:border-red-500 focus:outline-none">
+            <option value="agent">Miembro</option>
+            <option value="admin">Admin</option>
+          </select>
+          <p class="text-xs text-zinc-500 mt-1">Los admins pueden invitar y eliminar miembros.</p>
+        </div>
+        <div id="invite-member-error" class="text-red-400 text-sm mt-2 hidden"></div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-invite-member">Cancelar</button>
+          <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Enviar invitación</button>
         </div>
       </form>
     </div>

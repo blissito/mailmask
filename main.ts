@@ -324,6 +324,42 @@ function isPrivateUrl(url: string): boolean {
   }
 }
 
+// --- RBAC: domain-level permissions ---
+
+type Permission = "read" | "write" | "manage_members" | "admin";
+
+const ROLE_PERMISSIONS: Record<string, Permission[]> = {
+  owner: ["read", "write", "manage_members", "admin"],
+  admin: ["read", "write", "manage_members"],
+  agent: ["read"],
+};
+
+interface AccessResult {
+  domain: NonNullable<Awaited<ReturnType<typeof getDomain>>>;
+  role: string;
+}
+
+async function checkDomainAccess(
+  userEmail: string,
+  domainId: string,
+  permission: Permission,
+): Promise<AccessResult | null> {
+  const domain = await getDomain(domainId);
+  if (!domain) return null;
+
+  if (domain.ownerEmail === userEmail) {
+    return { domain, role: "owner" };
+  }
+
+  const agent = await getAgentByEmail(domainId, userEmail);
+  if (!agent) return null;
+
+  const perms = ROLE_PERMISSIONS[agent.role] ?? [];
+  if (!perms.includes(permission)) return null;
+
+  return { domain, role: agent.role };
+}
+
 // --- App ---
 
 const app = new Elysia()
@@ -606,7 +642,7 @@ const app = new Elysia()
   })
 
   .post("/api/auth/resend-verification", async ({ request }) => {
-    const auth = await authenticate(request);
+    const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: { "content-type": "application/json" } });
 
     const user = await getUser(auth.email);
@@ -876,12 +912,13 @@ const app = new Elysia()
         status: 401,
       });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== user.email) {
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
         status: 404,
       });
     }
+    const domain = access.domain;
 
     return new Response(JSON.stringify(domain), {
       headers: { "content-type": "application/json" },
@@ -895,12 +932,13 @@ const app = new Elysia()
         status: 401,
       });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== user.email) {
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
         status: 404,
       });
     }
+    const domain = access.domain;
 
     // If already verified in DB, don't re-check SES (avoids accidentally unverifying)
     if (domain.verified) {
@@ -934,12 +972,13 @@ const app = new Elysia()
         status: 401,
       });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== user.email) {
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
         status: 404,
       });
     }
+    const domain = access.domain;
 
     // Clean up all SES resources (best effort)
     try { await deleteReceiptRule(domain.domain); } catch { /* best effort */ }
@@ -961,12 +1000,13 @@ const app = new Elysia()
         status: 401,
       });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== user.email) {
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
         status: 404,
       });
     }
+    const domain = access.domain;
 
     const aliases = await listAliases(domain.id);
     return new Response(JSON.stringify(aliases), {
@@ -982,12 +1022,13 @@ const app = new Elysia()
       });
     const fullUser = (await getUser(auth.email))!;
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== auth.email) {
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
         status: 404,
       });
     }
+    const domain = access.domain;
 
     const verifyBlock = await checkEmailVerified(auth.email);
     if (verifyBlock) return verifyBlock;
@@ -1052,12 +1093,13 @@ const app = new Elysia()
         status: 401,
       });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== user.email) {
+    const access = await checkDomainAccess(user.email, params.id, "write");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
         status: 404,
       });
     }
+    const domain = access.domain;
 
     const body = await request.json();
 
@@ -1100,12 +1142,13 @@ const app = new Elysia()
         status: 401,
       });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== user.email) {
+    const access = await checkDomainAccess(user.email, params.id, "write");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
         status: 404,
       });
     }
+    const domain = access.domain;
 
     const deleted = await deleteAlias(domain.id, params.alias);
     if (!deleted)
@@ -1127,12 +1170,13 @@ const app = new Elysia()
         status: 401,
       });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== user.email) {
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
         status: 404,
       });
     }
+    const domain = access.domain;
 
     const rules = await listRules(domain.id);
     return new Response(JSON.stringify(rules), {
@@ -1148,12 +1192,13 @@ const app = new Elysia()
       });
     const fullUser = (await getUser(auth.email))!;
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== auth.email) {
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
         status: 404,
       });
     }
+    const domain = access.domain;
 
     const ruleLimits = getUserPlanLimits(fullUser);
     const existingRules = await listRules(domain.id);
@@ -1258,12 +1303,13 @@ const app = new Elysia()
         status: 401,
       });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== user.email) {
+    const access = await checkDomainAccess(user.email, params.id, "write");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
         status: 404,
       });
     }
+    const domain = access.domain;
 
     const body = await request.json();
     const { field, match, value, action, target, priority, enabled } = body;
@@ -1330,12 +1376,13 @@ const app = new Elysia()
         status: 401,
       });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== user.email) {
+    const access = await checkDomainAccess(user.email, params.id, "write");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
         status: 404,
       });
     }
+    const domain = access.domain;
 
     const deleted = await deleteRule(domain.id, params.ruleId);
     if (!deleted)
@@ -1357,12 +1404,13 @@ const app = new Elysia()
         status: 401,
       });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== user.email) {
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
         status: 404,
       });
     }
+    const domain = access.domain;
 
     const url = new URL(request.url);
     const limit = Math.min(
@@ -1857,10 +1905,11 @@ const app = new Elysia()
       return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails" }), { status: 403 });
     }
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== auth.email) {
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     }
+    const domain = access.domain;
     if (!domain.verified) {
       return new Response(JSON.stringify({ error: "Dominio no verificado" }), { status: 400 });
     }
@@ -1908,10 +1957,11 @@ const app = new Elysia()
       return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails" }), { status: 403 });
     }
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== auth.email) {
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     }
+    const domain = access.domain;
     if (!domain.verified) {
       return new Response(JSON.stringify({ error: "Dominio no verificado" }), { status: 400 });
     }
@@ -1944,10 +1994,11 @@ const app = new Elysia()
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== auth.email) {
+    const access = await checkDomainAccess(auth.email, params.id, "read");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     }
+    const domain = access.domain;
 
     const job = await getBulkJob(domain.id, params.jobId);
     if (!job) return new Response(JSON.stringify({ error: "Job no encontrado" }), { status: 404 });
@@ -2275,10 +2326,11 @@ const app = new Elysia()
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== auth.email) {
+    const access = await checkDomainAccess(auth.email, params.id, "manage_members");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     }
+    const domain = access.domain;
 
     const user = (await getUser(auth.email))!;
     const plan = user.subscription?.plan ?? "basico";
@@ -2348,10 +2400,11 @@ const app = new Elysia()
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== auth.email) {
+    const access = await checkDomainAccess(auth.email, params.id, "manage_members");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     }
+    const domain = access.domain;
 
     const agents = await listAgents(domain.id);
     return new Response(JSON.stringify(agents), {
@@ -2363,10 +2416,11 @@ const app = new Elysia()
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
-    const domain = await getDomain(params.id);
-    if (!domain || domain.ownerEmail !== auth.email) {
+    const access = await checkDomainAccess(auth.email, params.id, "manage_members");
+    if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     }
+    const domain = access.domain;
 
     const deleted = await deleteAgent(domain.id, params.agentId);
     if (!deleted) return new Response(JSON.stringify({ error: "Agente no encontrado" }), { status: 404 });

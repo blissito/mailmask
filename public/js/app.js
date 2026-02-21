@@ -416,6 +416,98 @@ async function removeRule(ruleId) {
   await loadRules();
 }
 
+// --- Members ---
+
+async function loadMembers() {
+  if (!selectedDomain) return;
+  const list = document.getElementById("members-list");
+  const empty = document.getElementById("members-empty");
+  const upgrade = document.getElementById("members-upgrade");
+  const inviteBtn = document.getElementById("btn-invite-member");
+
+  // Check plan limits
+  const sub = currentUser?.subscription;
+  const plan = sub?.plan ?? "basico";
+  const agentLimits = { basico: 0, freelancer: 3, developer: 10 };
+  const limit = agentLimits[plan] ?? 0;
+
+  if (limit === 0) {
+    list.innerHTML = "";
+    empty.classList.add("hidden");
+    upgrade.classList.remove("hidden");
+    if (inviteBtn) inviteBtn.classList.add("hidden");
+    return;
+  }
+
+  upgrade.classList.add("hidden");
+  if (inviteBtn) inviteBtn.classList.remove("hidden");
+
+  const res = await fetch(`/api/domains/${selectedDomain.id}/agents`);
+  if (!res.ok) return;
+  const members = await res.json();
+  renderMembers(members, limit);
+}
+
+function renderMembers(members, limit) {
+  const list = document.getElementById("members-list");
+  const empty = document.getElementById("members-empty");
+
+  if (members.length === 0) {
+    list.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
+
+  empty.classList.add("hidden");
+  const roleLabels = { admin: "Admin", agent: "Miembro" };
+  list.innerHTML = `
+    <p class="text-xs text-zinc-500 mb-2">${members.length}/${limit} miembros</p>
+    ${members.map(m => `
+      <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg px-5 py-4 flex items-center justify-between">
+        <div>
+          <span class="text-sm text-zinc-100">${esc(m.name)}</span>
+          <span class="text-sm text-zinc-500 ml-2">${esc(m.email)}</span>
+          <span class="text-xs ml-2 px-2 py-0.5 rounded ${m.role === 'admin' ? 'bg-mask-600/15 text-mask-400' : 'bg-zinc-700 text-zinc-400'}">${roleLabels[m.role] ?? m.role}</span>
+        </div>
+        <button data-action="remove-member" data-agent-id="${esc(m.id)}" data-agent-name="${esc(m.name)}" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
+      </div>
+    `).join("")}`;
+}
+
+async function inviteMember(name, email, role) {
+  const errEl = document.getElementById("invite-member-error");
+  errEl.classList.add("hidden");
+
+  const res = await fetch(`/api/domains/${selectedDomain.id}/agents/invite`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name, email, role }),
+  });
+
+  if (res.ok) {
+    hideModal("modal-invite-member");
+    document.getElementById("form-invite-member").reset();
+    showToast("Invitación enviada");
+    await loadMembers();
+  } else {
+    const data = await res.json();
+    errEl.textContent = data.error || "Error al invitar miembro";
+    errEl.classList.remove("hidden");
+  }
+}
+
+async function removeMember(agentId, name) {
+  if (!confirm(`¿Eliminar a ${name} de este dominio?`)) return;
+  const res = await fetch(`/api/domains/${selectedDomain.id}/agents/${agentId}`, { method: "DELETE" });
+  if (res.ok) {
+    showToast("Miembro eliminado");
+    await loadMembers();
+  } else {
+    const data = await res.json().catch(() => ({}));
+    showToast(data.error || "Error al eliminar", true);
+  }
+}
+
 // --- Logs ---
 
 async function loadLogs() {
@@ -592,6 +684,7 @@ function switchTab(tab) {
   else if (tab === "rules") loadRules();
   else if (tab === "logs") loadLogs();
   else if (tab === "dns") renderDnsRecords();
+  else if (tab === "members") loadMembers();
 }
 
 // --- Modals ---
@@ -765,6 +858,22 @@ function setupEventListeners() {
   document.getElementById("rules-list").addEventListener("click", (e) => {
     const remove = e.target.closest("[data-action='remove-rule']");
     if (remove) removeRule(remove.dataset.ruleId);
+  });
+
+  // Invite member button
+  document.getElementById("btn-invite-member")?.addEventListener("click", () => showModal("modal-invite-member"));
+
+  // Form: Invite member
+  document.getElementById("form-invite-member")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    await inviteMember(form.name.value.trim(), form.email.value.trim().toLowerCase(), form.role.value);
+  });
+
+  // Event delegation: members list
+  document.getElementById("members-list")?.addEventListener("click", (e) => {
+    const remove = e.target.closest("[data-action='remove-member']");
+    if (remove) removeMember(remove.dataset.agentId, remove.dataset.agentName);
   });
 
   // Event delegation: DNS copy buttons with feedback

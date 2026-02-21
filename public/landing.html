@@ -47,6 +47,55 @@
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "MailMask",
+        "url": "https://mailmask.easybits.cloud",
+        "logo": "https://mailmask.easybits.cloud/favicon.svg",
+        "description": "Email profesional en tu dominio. Reenvío, envío autenticado y bandeja integrada desde $49 MXN/mes.",
+        "sameAs": []
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": "MailMask",
+        "description": "Email profesional en tu dominio con reenvío, envío autenticado DKIM+SPF y bandeja integrada.",
+        "brand": { "@type": "Organization", "name": "MailMask" },
+        "offers": [
+          {
+            "@type": "Offer",
+            "name": "Básico",
+            "price": "49",
+            "priceCurrency": "MXN",
+            "priceValidUntil": "2026-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": "https://mailmask.easybits.cloud/#pricing"
+          },
+          {
+            "@type": "Offer",
+            "name": "Freelancer",
+            "price": "449",
+            "priceCurrency": "MXN",
+            "priceValidUntil": "2026-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": "https://mailmask.easybits.cloud/#pricing"
+          },
+          {
+            "@type": "Offer",
+            "name": "Developer",
+            "price": "999",
+            "priceCurrency": "MXN",
+            "priceValidUntil": "2026-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": "https://mailmask.easybits.cloud/#pricing"
+          }
+        ]
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
         "@type": "FAQPage",
         "mainEntity": [
           {
@@ -86,7 +135,7 @@
             "name": "¿Es seguro? ¿Leen mis emails?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "No leemos ni almacenamos el contenido de tus emails. Se procesan en tiempo real y se reenvían inmediatamente. Usamos Amazon SES, la misma infraestructura que usan miles de empresas. Pero, si quisieras que un agente de IA te entregara análisis de tu correo, podríamos arreglarlo."
+              "text": "No leemos tus emails. Se procesan automáticamente para reenviarlos a tu destino. Si usas la Bandeja, el contenido se almacena de forma segura con retención limitada según tu plan. Usamos Amazon SES, la misma infraestructura que usan miles de empresas."
             }
           },
           {
@@ -212,6 +261,9 @@
       <p class="mt-4 text-sm text-zinc-500">
         Primer mes gratis. Paga con MercadoPago.
       </p>
+      <p class="mt-2 text-xs text-zinc-600">
+        Powered by <a href="https://easybits.cloud" class="hover:text-zinc-400 transition-colors">easybits.cloud</a> & <a href="https://fixter.org" class="hover:text-zinc-400 transition-colors">fixter.org</a>
+      </p>
 
       <!-- Success banner after MP payment -->
       <div
@@ -254,7 +306,7 @@
           </div>
           <h3 class="font-semibold text-lg mb-2">Crea máscaras y reglas</h3>
           <p class="text-zinc-400 text-sm">
-            Define alias como ventas@, soporte@ y reglas inteligentes: reenviar, descartar o enviar a webhook.
+            Define alias como ventas@, soporte@ con múltiples destinatarios y reglas inteligentes: reenviar, descartar o enviar a webhook.
           </p>
         </div>
         <div class="feature-card text-center animate-fade-up opacity-0 anim-delay-600">
@@ -364,7 +416,7 @@
         Tu panel de control
       </h2>
       <p class="text-center text-zinc-400 mb-12 max-w-xl mx-auto">
-        Dominios, máscaras, reglas y logs — todo en un solo lugar.
+        Dominios, máscaras, reglas, logs y bandeja de soporte — todo en un solo lugar.
       </p>
 
       <!-- Dashboard mockup -->
@@ -444,6 +496,98 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bandeja -->
+    <section class="max-w-4xl mx-auto px-4 py-16">
+      <p class="text-mask-500 font-semibold text-sm tracking-widest uppercase text-center mb-4">Bandeja integrada</p>
+      <h2 class="text-2xl font-bold text-center mb-4">
+        Tu helpdesk, sin otro SaaS
+      </h2>
+      <p class="text-center text-zinc-400 mb-12 max-w-xl mx-auto">
+        Responde desde tu dominio, lleva historial de cada conversación, agrega notas internas y asigna tickets a tu equipo.
+      </p>
+
+      <!-- Bandeja mockup -->
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl shadow-black/40">
+        <div class="flex items-center gap-3 px-5 py-3 border-b border-zinc-800 bg-zinc-950/60">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))"/>
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b"/>
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b"/>
+          </svg>
+          <span class="font-bold text-sm text-zinc-200">Bandeja</span>
+          <span class="ml-2 text-xs px-2 py-0.5 rounded bg-mask-600/15 text-mask-400 border border-mask-700/30">tuempresa.com</span>
+        </div>
+        <div class="grid md:grid-cols-[280px_1fr] divide-x divide-zinc-800">
+          <!-- Conversation list -->
+          <div class="p-3 space-y-1">
+            <div class="bg-mask-600/10 border border-mask-700/30 rounded-lg px-3 py-2.5">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-sm font-semibold text-zinc-100 truncate">Ana García</span>
+                <span class="text-[10px] text-zinc-500">hace 5m</span>
+              </div>
+              <p class="text-xs text-zinc-400 truncate">Cotización para proyecto web</p>
+            </div>
+            <div class="rounded-lg px-3 py-2.5 hover:bg-zinc-800/50">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-sm font-medium text-zinc-300 truncate">Luis Ramírez</span>
+                <span class="text-[10px] text-zinc-500">hace 2h</span>
+              </div>
+              <p class="text-xs text-zinc-500 truncate">Re: Factura pendiente</p>
+            </div>
+            <div class="rounded-lg px-3 py-2.5 hover:bg-zinc-800/50">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-sm font-medium text-zinc-300 truncate">Shopify Notifications</span>
+                <span class="text-[10px] text-zinc-500">ayer</span>
+              </div>
+              <p class="text-xs text-zinc-500 truncate">Nuevo pedido #1042</p>
+            </div>
+          </div>
+          <!-- Conversation detail -->
+          <div class="p-5 space-y-4 hidden md:block">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="font-semibold text-zinc-100">Cotización para proyecto web</h3>
+                <p class="text-xs text-zinc-500">Ana García &lt;ana@cliente.com&gt; → ventas@tuempresa.com</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-400 border border-emerald-800/50">Abierto</span>
+              </div>
+            </div>
+            <div class="bg-zinc-800/40 rounded-lg px-4 py-3 text-sm text-zinc-300">
+              <p>Hola, me interesa una cotización para rediseñar nuestra página web. ¿Podrían enviarme información de sus paquetes?</p>
+            </div>
+            <div class="bg-mask-600/10 border border-mask-700/20 rounded-lg px-4 py-3 text-sm text-zinc-300">
+              <p class="text-xs text-mask-400 mb-1">Tu respuesta desde ventas@tuempresa.com:</p>
+              <p>¡Hola Ana! Con gusto, te envío nuestro catálogo actualizado...</p>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-zinc-600">
+              <span class="bg-yellow-900/20 text-yellow-500 px-2 py-0.5 rounded border border-yellow-800/30">Nota interna: seguimiento viernes</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bandeja features -->
+      <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+        <div class="text-center px-3 py-4">
+          <p class="text-sm font-semibold text-zinc-200 mb-1">Responde desde tu dominio</p>
+          <p class="text-xs text-zinc-500">Tus clientes ven ventas@tuempresa.com, no tu Gmail personal.</p>
+        </div>
+        <div class="text-center px-3 py-4">
+          <p class="text-sm font-semibold text-zinc-200 mb-1">Historial completo</p>
+          <p class="text-xs text-zinc-500">Cada conversación con su hilo completo, sin perder contexto.</p>
+        </div>
+        <div class="text-center px-3 py-4">
+          <p class="text-sm font-semibold text-zinc-200 mb-1">Notas internas</p>
+          <p class="text-xs text-zinc-500">Agrega contexto que solo tu equipo puede ver.</p>
+        </div>
+        <div class="text-center px-3 py-4">
+          <p class="text-sm font-semibold text-zinc-200 mb-1">Asigna a tu equipo</p>
+          <p class="text-xs text-zinc-500">Invita miembros y asigna conversaciones por dominio.</p>
         </div>
       </div>
     </section>
@@ -729,10 +873,10 @@
             >
           </summary>
           <p class="px-6 pb-4 text-zinc-400 text-sm">
-            No leemos ni almacenamos el contenido de tus emails. Se procesan en
-            tiempo real y se reenvían inmediatamente. Usamos Amazon SES, la
+            No leemos tus emails. Se procesan automáticamente para reenviarlos
+            a tu destino. Si usas la Bandeja, el contenido se almacena de forma
+            segura con retención limitada según tu plan. Usamos Amazon SES, la
             misma infraestructura que usan miles de empresas.
-            Pero, si quisieras que un agente de IA te entregara análisis de tu correo, podríamos arreglarlo.
           </p>
         </details>
         <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
@@ -780,6 +924,9 @@
           >
         </div>
       </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">
+        Powered by <a href="https://easybits.cloud" class="hover:text-zinc-400 transition-colors">easybits.cloud</a> & <a href="https://fixter.org" class="hover:text-zinc-400 transition-colors">fixter.org</a>
+      </p>
     </footer>
     <script src="/js/landing.js"></script>
   </body>
