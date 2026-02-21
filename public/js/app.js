@@ -688,6 +688,17 @@ async function verifyDns() {
   }
 }
 
+// --- SMTP helpers ---
+
+function copySmtp(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const original = btn.innerHTML;
+    btn.innerHTML = `<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+    btn.classList.add("border-green-700");
+    setTimeout(() => { btn.innerHTML = original; btn.classList.remove("border-green-700"); }, 1500);
+  });
+}
+
 // --- SMTP Credentials ---
 
 async function loadSmtpCredentials() {
@@ -756,26 +767,62 @@ async function createSmtpCredential(label) {
 
   hideModal("modal-smtp-label");
 
-  // Show credentials modal
+  // Show credentials modal with step-by-step copy fields
   const info = document.getElementById("smtp-creds-info");
+  const domain = selectedDomain.domain;
+  const copyIcon = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`;
+  const checkIcon = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+
   info.innerHTML = `
-    <div class="bg-zinc-800 rounded-lg p-4 space-y-2 font-mono text-xs">
-      <div class="flex justify-between"><span class="text-zinc-400">Servidor:</span><span class="text-zinc-100">${esc(data.server)}</span></div>
-      <div class="flex justify-between"><span class="text-zinc-400">Puerto:</span><span class="text-zinc-100">${data.port}</span></div>
-      <div class="flex justify-between"><span class="text-zinc-400">Encriptación:</span><span class="text-zinc-100">${esc(data.encryption)}</span></div>
-      <div class="flex justify-between"><span class="text-zinc-400">Usuario:</span><span class="text-zinc-100 select-all">${esc(data.username)}</span></div>
-      <div class="flex justify-between"><span class="text-zinc-400">Contraseña:</span><span class="text-zinc-100 select-all break-all">${esc(data.password)}</span></div>
-    </div>
-    <div class="mt-3 text-xs text-zinc-400">
-      <p class="font-semibold text-zinc-300 mb-1">Instrucciones:</p>
-      <ol class="list-decimal list-inside space-y-1">
-        <li>Abre la configuración de cuenta SMTP en tu cliente de correo</li>
-        <li>Servidor de salida (SMTP): <strong>${esc(data.server)}</strong></li>
-        <li>Puerto: <strong>${data.port}</strong> con STARTTLS</li>
-        <li>Usuario: el AccessKeyId mostrado arriba</li>
-        <li>Contraseña: la contraseña mostrada arriba</li>
-        <li>Dirección "De": cualquier dirección <strong>@${esc(selectedDomain.domain)}</strong></li>
-      </ol>
+    <p class="text-sm text-zinc-400 mb-4">Abre <strong class="text-zinc-200">Apple Mail</strong>, <strong class="text-zinc-200">Outlook</strong> o <strong class="text-zinc-200">Thunderbird</strong> y agrega una cuenta nueva con estos datos:</p>
+
+    <div class="space-y-3">
+      <div class="smtp-field">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Paso 1 — Correo electr\u00f3nico</span>
+        </div>
+        <p class="text-xs text-zinc-500 mb-1.5">Usa cualquier direcci\u00f3n con tu dominio, ej: hola@${esc(domain)}</p>
+        <div class="flex items-center gap-2">
+          <code class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 font-mono select-all">tu-nombre@${esc(domain)}</code>
+        </div>
+      </div>
+
+      <div class="smtp-field">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Paso 2 — Usuario (nombre)</span>
+        </div>
+        <p class="text-xs text-zinc-500 mb-1.5">En Apple Mail es el campo "Nombre". En otros clientes, "Usuario SMTP".</p>
+        <div class="flex items-center gap-2">
+          <code class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 font-mono select-all truncate">${esc(data.username)}</code>
+          <button onclick="copySmtp(this, '${esc(data.username)}')" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg p-2.5 text-zinc-400 hover:text-zinc-200 transition-colors" title="Copiar">${copyIcon}</button>
+        </div>
+      </div>
+
+      <div class="smtp-field">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-semibold text-yellow-400 uppercase tracking-wide">Paso 3 — Contrase\u00f1a</span>
+        </div>
+        <p class="text-xs text-yellow-400/70 mb-1.5">Solo se muestra esta vez. C\u00f3piala ahora.</p>
+        <div class="flex items-center gap-2">
+          <code class="flex-1 bg-zinc-800 border border-yellow-800/50 rounded-lg px-3 py-2.5 text-sm text-zinc-100 font-mono select-all break-all">${esc(data.password)}</code>
+          <button onclick="copySmtp(this, '${esc(data.password)}')" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-yellow-800/50 rounded-lg p-2.5 text-yellow-400 hover:text-yellow-300 transition-colors" title="Copiar">${copyIcon}</button>
+        </div>
+      </div>
+
+      <div class="smtp-field">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Paso 4 — Servidor de salida (SMTP)</span>
+        </div>
+        <p class="text-xs text-zinc-500 mb-1.5">Tu cliente lo pedir\u00e1 despu\u00e9s de iniciar sesi\u00f3n, o en configuraci\u00f3n avanzada.</p>
+        <div class="flex items-center gap-2">
+          <code class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 font-mono select-all">${esc(data.server)}</code>
+          <button onclick="copySmtp(this, '${esc(data.server)}')" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg p-2.5 text-zinc-400 hover:text-zinc-200 transition-colors" title="Copiar">${copyIcon}</button>
+        </div>
+        <div class="flex gap-4 mt-2 text-xs text-zinc-500">
+          <span>Puerto: <strong class="text-zinc-300">587</strong></span>
+          <span>Seguridad: <strong class="text-zinc-300">STARTTLS</strong></span>
+        </div>
+      </div>
     </div>
   `;
   showModal("modal-smtp-creds");
