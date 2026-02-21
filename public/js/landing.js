@@ -39,6 +39,9 @@ function toggleBilling() {
   badge.textContent = isYearly ? "2 meses gratis" : "Primer mes gratis";
 
   document.querySelectorAll(".pricing-card[data-plan]").forEach((card) => {
+    // Skip coupon card — applyCouponToCard handles it
+    if (loadedCoupon && card.dataset.plan === loadedCoupon.plan) return;
+
     const price = card.querySelector(".plan-price");
     const period = card.querySelector(".plan-period");
     const savings = card.querySelector(".plan-savings");
