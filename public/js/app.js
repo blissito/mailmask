@@ -297,7 +297,7 @@ function renderAliases(aliases) {
 
   empty.classList.add("hidden");
   list.innerHTML = aliases.map(a => `
-    <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg p-3 flex items-center justify-between">
+    <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg px-5 py-4 flex items-center justify-between">
       <div>
         <span class="font-mono text-sm ${a.enabled ? 'text-zinc-100' : 'text-zinc-500 line-through'}">
           ${a.alias === '*' ? '*' : esc(a.alias)}@${esc(selectedDomain.domain)}
@@ -356,7 +356,7 @@ function renderRules(rules) {
   const actionLabels = { forward: "→ Reenviar", webhook: "⚡ Webhook", discard: "🗑 Descartar" };
 
   list.innerHTML = rules.map(r => `
-    <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg p-3 flex items-center justify-between">
+    <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg px-5 py-4 flex items-center justify-between">
       <div class="text-sm">
         <span class="text-zinc-400">Si</span>
         <span class="text-zinc-200 font-semibold">${fieldLabels[r.field]}</span>
