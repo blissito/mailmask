@@ -167,7 +167,7 @@
   <!-- Modal: SMTP Label -->
   <div id="modal-smtp-label" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
     <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
-      <h3 class="text-lg font-bold mb-4">Generar credenciales SMTP</h3>
+      <h3 id="smtp-label-title" class="text-lg font-bold mb-4">Generar credenciales SMTP</h3>
       <form id="form-smtp-label">
         <label class="block text-sm text-zinc-400 mb-1">Etiqueta (ej: "Outlook trabajo")</label>
         <input type="text" name="label" required placeholder="Mi cliente de correo" maxlength="100"
@@ -193,7 +193,7 @@
       </div>
       <div id="smtp-creds-info"></div>
       <div class="flex justify-end mt-6">
-        <button type="button" class="btn-cancel-modal bg-zinc-800 hover:bg-zinc-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors" data-modal="modal-smtp-creds">Listo, ya copié todo</button>
+        <button type="button" id="btn-smtp-close" class="btn-cancel-modal bg-zinc-800 hover:bg-zinc-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors opacity-50 cursor-not-allowed" disabled data-modal="modal-smtp-creds">Listo, ya copié todo</button>
       </div>
     </div>
   </div>

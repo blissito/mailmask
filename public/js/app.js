@@ -690,13 +690,40 @@ async function verifyDns() {
 
 // --- SMTP helpers ---
 
-function copySmtp(btn, text) {
+const _smtpCopied = new Set();
+
+function copySmtp(btn, text, key) {
   navigator.clipboard.writeText(text).then(() => {
     const original = btn.innerHTML;
     btn.innerHTML = `<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
     btn.classList.add("border-green-700");
     setTimeout(() => { btn.innerHTML = original; btn.classList.remove("border-green-700"); }, 1500);
+    if (key) {
+      _smtpCopied.add(key);
+      if (_smtpCopied.has("username") && _smtpCopied.has("password") && _smtpCopied.has("server")) {
+        const closeBtn = document.getElementById("btn-smtp-close");
+        if (closeBtn) {
+          closeBtn.disabled = false;
+          closeBtn.classList.remove("opacity-50", "cursor-not-allowed");
+        }
+      }
+    }
   });
+}
+
+function relativeTime(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "hace un momento";
+  if (mins < 60) return `hace ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `hace ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return "hace 1 día";
+  if (days < 30) return `hace ${days} días`;
+  const months = Math.floor(days / 30);
+  if (months === 1) return "hace 1 mes";
+  return `hace ${months} meses`;
 }
 
 // --- SMTP Credentials ---
@@ -738,14 +765,27 @@ function renderSmtpCredentials(creds) {
     return;
   }
   empty.classList.add("hidden");
+  const cpIcon = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`;
   list.innerHTML = creds.map(c => `
-    <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg px-5 py-4 flex items-center justify-between">
-      <div>
+    <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg px-5 py-4">
+      <div class="flex items-center justify-between mb-2">
         <span class="font-semibold text-sm">${esc(c.label)}</span>
-        <span class="text-xs text-zinc-500 ml-2">AccessKeyId: ${esc(c.accessKeyId)}</span>
-        <div class="text-xs text-zinc-500 mt-1">Creada ${new Date(c.createdAt).toLocaleDateString()}</div>
+        <button onclick="revokeSmtpCredential('${esc(c.id)}')" class="text-xs text-red-400 hover:text-red-300 transition-colors flex items-center gap-1" title="Revocar credencial">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          Revocar
+        </button>
       </div>
-      <button onclick="revokeSmtpCredential('${esc(c.id)}')" class="text-xs text-red-400 hover:text-red-300 transition-colors">Revocar</button>
+      <div class="flex items-center gap-2 text-xs text-zinc-400">
+        <span>Usuario SMTP:</span>
+        <code class="bg-zinc-800 border border-zinc-700 rounded px-2 py-0.5 font-mono text-zinc-300 select-all">${esc(c.accessKeyId)}</code>
+        <button onclick="copySmtp(this, '${esc(c.accessKeyId)}')" class="text-zinc-500 hover:text-zinc-300 transition-colors" title="Copiar usuario">${cpIcon}</button>
+      </div>
+      <div class="flex items-center gap-2 mt-2 text-xs text-zinc-500">
+        <span>${relativeTime(c.createdAt)}</span>
+        <span class="inline-flex items-center gap-1 bg-green-900/30 text-green-400 border border-green-800/40 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+          <span class="w-1.5 h-1.5 bg-green-400 rounded-full"></span>Activa
+        </span>
+      </div>
     </div>
   `).join("");
 }
@@ -767,11 +807,18 @@ async function createSmtpCredential(label) {
 
   hideModal("modal-smtp-label");
 
+  // Reset copy tracking and disable close button
+  _smtpCopied.clear();
+  const closeBtn = document.getElementById("btn-smtp-close");
+  if (closeBtn) {
+    closeBtn.disabled = true;
+    closeBtn.classList.add("opacity-50", "cursor-not-allowed");
+  }
+
   // Show credentials modal with step-by-step copy fields
   const info = document.getElementById("smtp-creds-info");
   const domain = selectedDomain.domain;
   const copyIcon = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`;
-  const checkIcon = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
 
   info.innerHTML = `
     <p class="text-sm text-zinc-400 mb-4">Abre <strong class="text-zinc-200">Apple Mail</strong>, <strong class="text-zinc-200">Outlook</strong> o <strong class="text-zinc-200">Thunderbird</strong> y agrega una cuenta nueva con estos datos:</p>
@@ -789,12 +836,12 @@ async function createSmtpCredential(label) {
 
       <div class="smtp-field">
         <div class="flex items-center justify-between mb-1">
-          <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Paso 2 — Usuario (nombre)</span>
+          <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Paso 2 — Nombre de usuario SMTP</span>
         </div>
-        <p class="text-xs text-zinc-500 mb-1.5">En Apple Mail es el campo "Nombre". En otros clientes, "Usuario SMTP".</p>
+        <p class="text-xs text-zinc-500 mb-1.5">P\u00e9galo en el campo "Usuario" o "Username" de tu cliente de correo.</p>
         <div class="flex items-center gap-2">
           <code class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 font-mono select-all truncate">${esc(data.username)}</code>
-          <button onclick="copySmtp(this, '${esc(data.username)}')" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg p-2.5 text-zinc-400 hover:text-zinc-200 transition-colors" title="Copiar">${copyIcon}</button>
+          <button onclick="copySmtp(this, '${esc(data.username)}', 'username')" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg p-2.5 text-zinc-400 hover:text-zinc-200 transition-colors" title="Copiar">${copyIcon}</button>
         </div>
       </div>
 
@@ -802,10 +849,10 @@ async function createSmtpCredential(label) {
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs font-semibold text-yellow-400 uppercase tracking-wide">Paso 3 — Contrase\u00f1a</span>
         </div>
-        <p class="text-xs text-yellow-400/70 mb-1.5">Solo se muestra esta vez. C\u00f3piala ahora.</p>
+        <p class="text-xs text-yellow-400/70 mb-1.5">Copia esta contrase\u00f1a ahora — no podr\u00e1s verla de nuevo.</p>
         <div class="flex items-center gap-2">
           <code class="flex-1 bg-zinc-800 border border-yellow-800/50 rounded-lg px-3 py-2.5 text-sm text-zinc-100 font-mono select-all break-all">${esc(data.password)}</code>
-          <button onclick="copySmtp(this, '${esc(data.password)}')" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-yellow-800/50 rounded-lg p-2.5 text-yellow-400 hover:text-yellow-300 transition-colors" title="Copiar">${copyIcon}</button>
+          <button onclick="copySmtp(this, '${esc(data.password)}', 'password')" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-yellow-800/50 rounded-lg p-2.5 text-yellow-400 hover:text-yellow-300 transition-colors" title="Copiar">${copyIcon}</button>
         </div>
       </div>
 
@@ -816,11 +863,19 @@ async function createSmtpCredential(label) {
         <p class="text-xs text-zinc-500 mb-1.5">Tu cliente lo pedir\u00e1 despu\u00e9s de iniciar sesi\u00f3n, o en configuraci\u00f3n avanzada.</p>
         <div class="flex items-center gap-2">
           <code class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 font-mono select-all">${esc(data.server)}</code>
-          <button onclick="copySmtp(this, '${esc(data.server)}')" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg p-2.5 text-zinc-400 hover:text-zinc-200 transition-colors" title="Copiar">${copyIcon}</button>
+          <button onclick="copySmtp(this, '${esc(data.server)}', 'server')" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg p-2.5 text-zinc-400 hover:text-zinc-200 transition-colors" title="Copiar">${copyIcon}</button>
         </div>
-        <div class="flex gap-4 mt-2 text-xs text-zinc-500">
-          <span>Puerto: <strong class="text-zinc-300">587</strong></span>
-          <span>Seguridad: <strong class="text-zinc-300">STARTTLS</strong></span>
+        <div class="flex gap-3 mt-2">
+          <div class="flex items-center gap-2">
+            <code class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300 font-mono">587</code>
+            <button onclick="copySmtp(this, '587')" class="text-zinc-500 hover:text-zinc-300 transition-colors" title="Copiar puerto"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+            <span class="text-xs text-zinc-500">Puerto</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <code class="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300 font-mono">STARTTLS</code>
+            <button onclick="copySmtp(this, 'STARTTLS')" class="text-zinc-500 hover:text-zinc-300 transition-colors" title="Copiar seguridad"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+            <span class="text-xs text-zinc-500">Seguridad</span>
+          </div>
         </div>
       </div>
     </div>
@@ -909,7 +964,11 @@ function setupEventListeners() {
   document.getElementById("btn-verify-dns").addEventListener("click", verifyDns);
 
   // SMTP
-  document.getElementById("btn-add-smtp").addEventListener("click", () => showModal("modal-smtp-label"));
+  document.getElementById("btn-add-smtp").addEventListener("click", () => {
+    const title = document.getElementById("smtp-label-title");
+    if (title && selectedDomain) title.textContent = `Generar credenciales SMTP — ${selectedDomain.domain}`;
+    showModal("modal-smtp-label");
+  });
   document.getElementById("form-smtp-label").addEventListener("submit", async (e) => {
     e.preventDefault();
     const form = e.target;
