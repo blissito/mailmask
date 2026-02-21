@@ -44,14 +44,13 @@ deno task test    # Run tests
 ## TODO
 
 ### Crítico — bloquea lanzamiento público
-- [ ] **Link de activar cuenta no sirve**: devuelve "Token inválido o expirado". Investigar verificación de email.
-- [ ] **Hardcodear KV database URL**: usar `DENO_KV_URL` env var en `Deno.openKv()` para evitar que Deploy cambie de instancia. Si vuelve a pasar pérdida de datos, migrar fuera de Deno KV (considerar Turso/SQLite, Postgres, o Redis).
-- [ ] **Monitoreo/alerting**: health check externo + alertas (email/Slack) en errores de forwarding. Si SES/S3/MP webhook falla, nadie se entera hoy.
-- [ ] **Retry en forwarding**: si `forwardEmail` falla (SES throttle, error transitorio) el email se pierde. Implementar cola de reintentos o dead-letter queue en Deno KV.
-- [ ] **Revisar `cron.ts`**: está importado en `main.ts` pero no trackeado en git. Verificar qué hace y si es correcto.
+- [x] ~~**Link de activar cuenta no sirve**~~: corregido JSON encoding de tokens, agregado endpoint resend-verification y banner en dashboard.
+- [x] ~~**Hardcodear KV database URL**~~: migrado a Postgres.
+- [ ] **Monitoreo/alerting**: health check externo + alertas (email/Slack) en errores de forwarding. (deprioritized — no se hará este año)
+- [x] ~~**Retry en forwarding**~~: resuelto.
+- [x] ~~**Revisar `cron.ts`**~~: resuelto.
 
 ### Alto — primeras semanas
-- [ ] **Revisitar storage de Mesa**: KV rebuild desde S3 es un parche. Evaluar Postgres/Turso para datos que importan.
 - [ ] Pagina de pricing publica en landing
 - [ ] Agregar endpoint PUT para editar reglas
 - [ ] Dashboard: mostrar uso actual vs limites del plan

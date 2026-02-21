@@ -451,7 +451,7 @@ const app = new Elysia()
         alertFrom,
         email,
         "Verifica tu email — MailMask",
-        `Hola,\n\nVerifica tu email haciendo clic en este enlace:\n${verifyUrl}\n\nTienes 15 días para verificar tu cuenta.\n\n— MailMask`,
+        `Hola,\n\nVerifica tu email haciendo clic en este enlace:\n${verifyUrl}\n\nTienes 7 días para verificar tu cuenta.\n\n— MailMask`,
       );
     } catch (err) {
       log("error", "auth", "Failed to send verification email", { error: String(err) });
@@ -581,6 +581,33 @@ const app = new Elysia()
       status: 302,
       headers: { location: "/app?verified=true" },
     });
+  })
+
+  .post("/api/auth/resend-verification", async ({ request }) => {
+    const auth = await authenticate(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: { "content-type": "application/json" } });
+
+    const user = await getUser(auth.email);
+    if (!user) return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
+    if (user.emailVerified) return new Response(JSON.stringify({ ok: true, message: "Email ya verificado" }), { headers: { "content-type": "application/json" } });
+
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 2, 300_000); // 2 per 5 min
+    if (limited) return limited;
+
+    const verifyToken = crypto.randomUUID();
+    await setVerifyToken(auth.email, verifyToken);
+    const verifyUrl = `${getMainDomainUrl()}/api/auth/verify-email?token=${verifyToken}`;
+    const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+    try {
+      await sendFromDomain(alertFrom, auth.email, "Verifica tu email — MailMask",
+        `Hola,\n\nVerifica tu email haciendo clic en este enlace:\n${verifyUrl}\n\nTienes 7 días para verificar tu cuenta.\n\n— MailMask`);
+    } catch (err) {
+      log("error", "auth", "Failed to send verification email", { error: String(err) });
+      return new Response(JSON.stringify({ error: "Error enviando email de verificación" }), { status: 500, headers: { "content-type": "application/json" } });
+    }
+
+    return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
   })
 
   .post("/api/auth/forgot-password", async ({ request }) => {

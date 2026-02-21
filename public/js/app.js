@@ -29,6 +29,7 @@ async function checkAuth() {
   }
   currentUser = await res.json();
   document.getElementById("user-email").textContent = currentUser.email;
+  renderVerifyBanner();
   renderBillingBanner();
   renderUsage();
 
@@ -42,6 +43,37 @@ async function checkAuth() {
     showToast("Email verificado exitosamente");
     window.history.replaceState({}, "", "/app");
   }
+}
+
+function renderVerifyBanner() {
+  const container = document.getElementById("verify-banner");
+  if (!container || currentUser.emailVerified) return;
+  container.innerHTML = `
+    <div class="bg-yellow-900/20 border border-yellow-800/50 rounded-lg px-4 py-3 flex items-center justify-between">
+      <span class="text-sm text-yellow-400">Verifica tu email para acceder a todas las funciones.</span>
+      <button id="btn-resend-verify" class="text-xs text-yellow-400 hover:text-yellow-300 underline transition-colors">Reenviar email</button>
+    </div>`;
+  document.getElementById("btn-resend-verify").addEventListener("click", async () => {
+    const btn = document.getElementById("btn-resend-verify");
+    btn.textContent = "Enviando...";
+    btn.disabled = true;
+    try {
+      const res = await fetch("/api/auth/resend-verification", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        showToast("Email de verificación enviado");
+        btn.textContent = "Enviado ✓";
+      } else {
+        showToast(data.error || "Error enviando email", true);
+        btn.textContent = "Reenviar email";
+        btn.disabled = false;
+      }
+    } catch {
+      showToast("Error de conexión", true);
+      btn.textContent = "Reenviar email";
+      btn.disabled = false;
+    }
+  });
 }
 
 function renderBillingBanner() {

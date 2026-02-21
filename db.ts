@@ -185,7 +185,7 @@ export async function setVerifyToken(email: string, token: string): Promise<void
   await sql`UPDATE users SET email_verified = FALSE WHERE email = ${email}`;
   await sql`
     INSERT INTO tokens (token, kind, value, expires_at)
-    VALUES (${token}, 'verify', ${JSON.stringify({ email })}, NOW() + INTERVAL '7 days')
+    VALUES (${token}, 'verify', ${sql.json({ email })}, NOW() + INTERVAL '7 days')
     ON CONFLICT (token) DO UPDATE SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at`;
 }
 
