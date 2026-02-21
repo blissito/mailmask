@@ -3,14 +3,31 @@
 @tailwind utilities;
 
 :root {
-  --mask-50: 236 244 254;
-  --mask-100: 219 234 254;
-  --mask-400: 96 165 250;
-  --mask-500: 59 130 246;
-  --mask-600: 37 99 235;
-  --mask-700: 29 78 216;
-  --mask-800: 30 64 175;
-  --mask-900: 30 58 138;
+  --mask-50: 236 253 245;
+  --mask-100: 209 250 229;
+  --mask-400: 52 211 153;
+  --mask-500: 16 185 129;
+  --mask-600: 5 150 105;
+  --mask-700: 4 120 87;
+  --mask-800: 6 95 70;
+  --mask-900: 4 78 56;
+}
+
+/* Glow effects */
+.glow-hero {
+  filter: drop-shadow(0 0 40px rgb(var(--mask-500) / 0.3)) drop-shadow(0 0 80px rgb(var(--mask-500) / 0.15));
+}
+.glow-btn {
+  box-shadow: 0 0 20px rgb(var(--mask-500) / 0.4), 0 0 60px rgb(var(--mask-500) / 0.15);
+}
+.glow-btn:hover {
+  box-shadow: 0 0 25px rgb(var(--mask-500) / 0.5), 0 0 80px rgb(var(--mask-500) / 0.25);
+}
+.glow-card:hover {
+  box-shadow: 0 0 30px rgb(var(--mask-500) / 0.15), 0 0 60px rgb(var(--mask-500) / 0.08);
+}
+.glow-text {
+  text-shadow: 0 0 30px rgb(var(--mask-500) / 0.5), 0 0 60px rgb(var(--mask-500) / 0.25);
 }
 
 /* Staggered animation delays for landing page */
