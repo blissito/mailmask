@@ -4,10 +4,12 @@
     "npm:@aws-sdk/client-s3@3": "3.993.0",
     "npm:@aws-sdk/client-ses@3": "3.985.0",
     "npm:@aws-sdk/client-sesv2@3": "3.993.0",
+    "npm:@aws-sdk/client-sns@3": "3.985.0",
     "npm:@types/node@22": "22.19.11",
     "npm:elysia@^1.2.0": "1.4.22_@sinclair+typebox@0.34.48_exact-mirror@0.2.6__@sinclair+typebox@0.34.48_file-type@21.3.0_openapi-types@12.1.3",
     "npm:mercadopago@2": "2.12.0",
     "npm:postal-mime@2": "2.7.3",
+    "npm:postgres@3": "3.4.8",
     "npm:tailwindcss@^3.4.19": "3.4.19_postcss@8.5.6_jiti@1.21.7"
   },
   "npm": {
@@ -195,6 +197,50 @@
         "@aws-sdk/signature-v4-multi-region",
         "@aws-sdk/types",
         "@aws-sdk/util-endpoints@3.993.0",
+        "@aws-sdk/util-user-agent-browser",
+        "@aws-sdk/util-user-agent-node",
+        "@smithy/config-resolver",
+        "@smithy/core",
+        "@smithy/fetch-http-handler",
+        "@smithy/hash-node",
+        "@smithy/invalid-dependency",
+        "@smithy/middleware-content-length",
+        "@smithy/middleware-endpoint",
+        "@smithy/middleware-retry",
+        "@smithy/middleware-serde",
+        "@smithy/middleware-stack",
+        "@smithy/node-config-provider",
+        "@smithy/node-http-handler",
+        "@smithy/protocol-http",
+        "@smithy/smithy-client",
+        "@smithy/types",
+        "@smithy/url-parser",
+        "@smithy/util-base64",
+        "@smithy/util-body-length-browser",
+        "@smithy/util-body-length-node",
+        "@smithy/util-defaults-mode-browser",
+        "@smithy/util-defaults-mode-node",
+        "@smithy/util-endpoints",
+        "@smithy/util-middleware",
+        "@smithy/util-retry",
+        "@smithy/util-utf8@4.2.0",
+        "tslib"
+      ]
+    },
+    "@aws-sdk/client-sns@3.985.0": {
+      "integrity": "sha512-FpLrwXM1zp1ERkZsb3JUAGNTAJhAaud3HQ8hkc7o35Qt41MLUvzyV8XglowyKzp1sLeEMCWOzUCeeDberqq9kw==",
+      "dependencies": [
+        "@aws-crypto/sha256-browser",
+        "@aws-crypto/sha256-js",
+        "@aws-sdk/core",
+        "@aws-sdk/credential-provider-node",
+        "@aws-sdk/middleware-host-header",
+        "@aws-sdk/middleware-logger",
+        "@aws-sdk/middleware-recursion-detection",
+        "@aws-sdk/middleware-user-agent",
+        "@aws-sdk/region-config-resolver",
+        "@aws-sdk/types",
+        "@aws-sdk/util-endpoints@3.985.0",
         "@aws-sdk/util-user-agent-browser",
         "@aws-sdk/util-user-agent-node",
         "@smithy/config-resolver",
@@ -1493,6 +1539,9 @@
         "source-map-js"
       ]
     },
+    "postgres@3.4.8": {
+      "integrity": "sha512-d+JFcLM17njZaOLkv6SCev7uoLaBtfK86vMUXhW1Z4glPWh4jozno9APvW/XKFJ3CCxVoC7OL38BqRydtu5nGg=="
+    },
     "queue-microtask@1.2.3": {
       "integrity": "sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A=="
     },
@@ -1692,7 +1741,8 @@
       "npm:@types/node@22",
       "npm:elysia@^1.2.0",
       "npm:mercadopago@2",
-      "npm:postal-mime@2"
+      "npm:postal-mime@2",
+      "npm:postgres@3"
     ],
     "packageJson": {
       "dependencies": [

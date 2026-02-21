@@ -1,15 +1,12 @@
 import { assertEquals, assertExists } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { _setKv } from "./db.ts";
 
-// Use in-memory KV for test isolation (must be set before importing main.ts)
-const testKv = await Deno.openKv(":memory:");
-_setKv(testKv);
+// Tests require DATABASE_URL pointing to a test Postgres database
 
 import { app } from "./main.ts";
 import {
   createUser, getUser, createDomain, createAlias, createRule,
   listUserDomains, listAliases, listRules, updateUserSubscription,
-  createPendingCheckout, _getKv,
+  createPendingCheckout, _getSql,
 } from "./db.ts";
 import { hashPassword, signJwt } from "./auth.ts";
 
@@ -266,21 +263,21 @@ Deno.test({ name: "Alias update — invalid email 400, whitelist ignores unknown
   const cookie = `token=${jwt}`;
 
   // Invalid destination email
-  const badRes = await jsonPut(`/api/domains/${domain.id}/aliases/info`, {
+  const badRes = await jsonPut(`/api/domains/${domain.id}/alias/info`, {
     destinations: ["not-an-email"],
   }, cookie);
   assertEquals(badRes.status, 400);
   await badRes.body?.cancel();
 
   // Empty destinations
-  const emptyRes = await jsonPut(`/api/domains/${domain.id}/aliases/info`, {
+  const emptyRes = await jsonPut(`/api/domains/${domain.id}/alias/info`, {
     destinations: [],
   }, cookie);
   assertEquals(emptyRes.status, 400);
   await emptyRes.body?.cancel();
 
   // Unknown fields ignored, valid update succeeds
-  const okRes = await jsonPut(`/api/domains/${domain.id}/aliases/info`, {
+  const okRes = await jsonPut(`/api/domains/${domain.id}/alias/info`, {
     enabled: false, hackField: "ignored",
   }, cookie);
   assertEquals(okRes.status, 200);
@@ -322,7 +319,7 @@ Deno.test({ name: "Backup create → parse → restore → verify data integrity
 
   // Step 1: Simulate runBackup() — iterate KV and build backup JSON
   // (replicates main.ts:184-211 without S3)
-  const kv = _getKv();
+  const kv = _getSql();
   const backupData: Record<string, unknown>[] = [];
 
   for await (const entry of kv.list<any>({ prefix: ["users"] })) {

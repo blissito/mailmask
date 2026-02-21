@@ -1,50 +1,44 @@
-// --- Persistent rate limiter using Deno KV (atomic) ---
+// --- Persistent rate limiter using PostgreSQL ---
 
-let kv: Deno.Kv | null = null;
-async function getKv(): Promise<Deno.Kv> {
-  if (!kv) kv = await Deno.openKv();
-  return kv;
-}
+import { sql } from "./pg.ts";
 
 export async function checkRateLimit(
   ip: string,
   limit: number,
   windowMs: number,
 ): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
-  const db = await getKv();
   const now = Date.now();
-  const key = ["rate", `${ip}:${limit}:${windowMs}`];
-  const entry = await db.get<{ count: number; windowStart: number }>(key);
+  const key = `${ip}:${limit}:${windowMs}`;
+  const expiresAt = new Date(now + windowMs);
 
-  if (!entry.value || entry.value.windowStart + windowMs <= now) {
-    // New window — use atomic check to prevent race
-    const result = await db.atomic()
-      .check(entry)
-      .set(key, { count: 1, windowStart: now }, { expireIn: windowMs })
-      .commit();
-    if (!result.ok) {
-      // Concurrent write — fail-safe: deny
-      return { allowed: false, remaining: 0, resetAt: now + windowMs };
-    }
-    return { allowed: true, remaining: limit - 1, resetAt: now + windowMs };
-  }
+  // Upsert: if window expired, reset; otherwise increment
+  const rows = await sql`
+    INSERT INTO rate_limits (key, count, window_start, expires_at)
+    VALUES (${key}, 1, ${now}, ${expiresAt})
+    ON CONFLICT (key) DO UPDATE SET
+      count = CASE
+        WHEN rate_limits.window_start + ${windowMs} <= ${now}
+        THEN 1
+        ELSE rate_limits.count + 1
+      END,
+      window_start = CASE
+        WHEN rate_limits.window_start + ${windowMs} <= ${now}
+        THEN ${now}
+        ELSE rate_limits.window_start
+      END,
+      expires_at = CASE
+        WHEN rate_limits.window_start + ${windowMs} <= ${now}
+        THEN ${expiresAt}
+        ELSE rate_limits.expires_at
+      END
+    RETURNING count, window_start`;
 
-  const newCount = entry.value.count + 1;
-  const resetAt = entry.value.windowStart + windowMs;
+  const { count, window_start } = rows[0];
+  const resetAt = Number(window_start) + windowMs;
 
-  if (newCount > limit) {
+  if (count > limit) {
     return { allowed: false, remaining: 0, resetAt };
   }
 
-  const result = await db.atomic()
-    .check(entry)
-    .set(key, { count: newCount, windowStart: entry.value.windowStart }, { expireIn: resetAt - now })
-    .commit();
-
-  if (!result.ok) {
-    // Concurrent write — fail-safe: deny
-    return { allowed: false, remaining: 0, resetAt };
-  }
-
-  return { allowed: true, remaining: limit - newCount, resetAt };
+  return { allowed: true, remaining: limit - count, resetAt };
 }

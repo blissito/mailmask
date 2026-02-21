@@ -1,11 +1,8 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { _setKv } from "./db.ts";
 
-// Use in-memory KV for test isolation
-const testKv = await Deno.openKv(":memory:");
-_setKv(testKv);
+// Tests require DATABASE_URL pointing to a test Postgres database
 
-import { isWebhookProcessed, markWebhookProcessed, isMessageProcessed, markMessageProcessed, _getKv } from "./db.ts";
+import { isWebhookProcessed, markWebhookProcessed, isMessageProcessed, markMessageProcessed, _getSql } from "./db.ts";
 
 // --- HMAC signature computation (extracted from main.ts for testing) ---
 
@@ -57,7 +54,7 @@ Deno.test("webhook dedup - processed after marking", async () => {
   assertEquals(result, true);
 
   // Cleanup
-  const kv = _getKv();
+  const kv = _getSql();
   await kv.delete(["webhook-processed", id]);
 });
 
@@ -76,6 +73,6 @@ Deno.test("SNS dedup - processed after marking", async () => {
   assertEquals(result, true);
 
   // Cleanup
-  const kv = _getKv();
+  const kv = _getSql();
   await kv.delete(["sns-processed", id]);
 });

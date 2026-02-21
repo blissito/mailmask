@@ -1,14 +1,12 @@
 import { assertEquals, assertExists } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { _setKv } from "./db.ts";
 
-// Use in-memory KV for test isolation
-const testKv = await Deno.openKv(":memory:");
-_setKv(testKv);
+// Tests require DATABASE_URL pointing to a test Postgres database
+// Run: deno task test
 
 import { evaluateRules, processInbound, extractPlainBody, extractHtmlBody, extractAttachments } from "./forwarding.ts";
 import {
   enqueueForward, dequeueForward, listForwardQueue, moveToDeadLetter,
-  getQueueDepth, getDeadLetterCount, _getKv,
+  getQueueDepth, getDeadLetterCount, _getSql,
   createUser, createDomain, createAlias, listAliases, getAlias,
   isMessageProcessed, markMessageProcessed,
   listLogs, updateUserSubscription,
@@ -138,12 +136,12 @@ Deno.test("moveToDeadLetter removes from queue", async () => {
   assertEquals(queue.find((q) => q.id === item.id), undefined);
 
   // Verify it's in dead-letter
-  const kv = _getKv();
-  const dl = await kv.get(["dead-letter", item.id]);
-  assertExists(dl.value);
+  const db = _getSql();
+  const dl = await db`SELECT 1 FROM forward_queue WHERE id = ${item.id} AND dead = TRUE`;
+  assertExists(dl.length > 0);
 
   // Cleanup
-  await kv.delete(["dead-letter", item.id]);
+  await db`DELETE FROM forward_queue WHERE id = ${item.id}`;
 });
 
 // --- processInbound tests ---
@@ -213,7 +211,7 @@ async function setupForwardingTestData() {
   const domain = await createDomain(fwdEmail, fwdDomain, ["dkim1"], "verify1");
   fwdDomainId = domain.id;
   // Mark domain as verified
-  const kv = _getKv();
+  const kv = _getSql();
   const existing = await kv.get(["domains", domain.id]);
   if (existing.value) {
     await kv.set(["domains", domain.id], { ...(existing.value as any), verified: true });
@@ -299,7 +297,7 @@ Deno.test({ name: "processInbound - catch-all matches when specific alias doesn'
 
 Deno.test({ name: "processInbound - disabled alias is not forwarded", ...fwdTestOpts, fn: async () => {
   // Disable the info alias
-  const kv = _getKv();
+  const kv = _getSql();
   const aliasEntry = await kv.get(["aliases", fwdDomainId, "info"]);
   const aliasData = aliasEntry.value as any;
   await kv.set(["aliases", fwdDomainId, "info"], { ...aliasData, enabled: false });

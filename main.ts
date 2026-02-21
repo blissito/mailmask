@@ -899,7 +899,7 @@ const app = new Elysia()
 
   // --- Aliases ---
 
-  .get("/api/domains/:id/aliases", async ({ request, params }) => {
+  .get("/api/domains/:id/alias", async ({ request, params }) => {
     const user = await getAuthUser(request);
     if (!user)
       return new Response(JSON.stringify({ error: "No autenticado" }), {
@@ -919,7 +919,7 @@ const app = new Elysia()
     });
   })
 
-  .post("/api/domains/:id/aliases", async ({ request, params }) => {
+  .post("/api/domains/:id/alias", async ({ request, params }) => {
     const auth = await getAuthUser(request);
     if (!auth)
       return new Response(JSON.stringify({ error: "No autenticado" }), {
@@ -990,7 +990,7 @@ const app = new Elysia()
     });
   })
 
-  .put("/api/domains/:id/aliases/:alias", async ({ request, params }) => {
+  .put("/api/domains/:id/alias/:alias", async ({ request, params }) => {
     const user = await getAuthUser(request);
     if (!user)
       return new Response(JSON.stringify({ error: "No autenticado" }), {
@@ -1038,7 +1038,7 @@ const app = new Elysia()
     });
   })
 
-  .delete("/api/domains/:id/aliases/:alias", async ({ request, params }) => {
+  .delete("/api/domains/:id/alias/:alias", async ({ request, params }) => {
     const user = await getAuthUser(request);
     if (!user)
       return new Response(JSON.stringify({ error: "No autenticado" }), {

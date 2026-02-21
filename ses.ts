@@ -1,6 +1,5 @@
 import { log } from "./logger.ts";
-
-const alertKv = await Deno.openKv();
+import { sql } from "./pg.ts";
 
 // Lazy-loaded AWS SDK clients to reduce cold start on Deno Deploy
 let _sesOutbound: any;
@@ -501,9 +500,9 @@ export async function sendAlert(alertType: string, message: string): Promise<boo
   if (!alertEmail) return false;
 
   // Throttle: max 1 alert of same type per hour
-  const throttleKey = ["alert-throttle", alertType];
-  const existing = await alertKv.get(throttleKey);
-  if (existing.value) return false;
+  const throttleToken = `alert-throttle:${alertType}`;
+  const existing = await sql`SELECT 1 FROM tokens WHERE token = ${throttleToken} AND expires_at > NOW()`;
+  if (existing.length > 0) return false;
 
   const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
   const recipients = alertEmail.split(",").map((e) => e.trim()).filter(Boolean);
@@ -531,7 +530,10 @@ export async function sendAlert(alertType: string, message: string): Promise<boo
       Source: alertFrom,
       Destinations: recipients,
     }));
-    await alertKv.set(throttleKey, true, { expireIn: 60 * 60 * 1000 }); // 1h
+    await sql`
+      INSERT INTO tokens (token, kind, value, expires_at)
+      VALUES (${throttleToken}, 'alert-throttle', '{}', NOW() + INTERVAL '1 hour')
+      ON CONFLICT (token) DO UPDATE SET expires_at = EXCLUDED.expires_at`;
     return true;
   } catch (err) {
     log("error", "ses", "Failed to send alert", { alertType, error: String(err) });

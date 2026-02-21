@@ -279,7 +279,7 @@ async function deleteDomain() {
 
 async function loadAliases() {
   if (!selectedDomain) return;
-  const res = await fetch(`/api/domains/${selectedDomain.id}/aliases`);
+  const res = await fetch(`/api/domains/${selectedDomain.id}/alias`);
   if (!res.ok) return;
   const aliases = await res.json();
   renderAliases(aliases);
@@ -315,7 +315,7 @@ function renderAliases(aliases) {
 }
 
 async function toggleAlias(alias, enabled) {
-  await fetch(`/api/domains/${selectedDomain.id}/aliases/${alias}`, {
+  await fetch(`/api/domains/${selectedDomain.id}/alias/${alias}`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ enabled }),
@@ -325,7 +325,7 @@ async function toggleAlias(alias, enabled) {
 
 async function removeAlias(alias) {
   if (!confirm(`¿Eliminar alias ${alias}@${selectedDomain.domain}?`)) return;
-  await fetch(`/api/domains/${selectedDomain.id}/aliases/${alias}`, { method: "DELETE" });
+  await fetch(`/api/domains/${selectedDomain.id}/alias/${alias}`, { method: "DELETE" });
   await loadAliases();
   await refreshUsage();
 }
@@ -649,7 +649,7 @@ function setupEventListeners() {
       return;
     }
 
-    const res = await fetch(`/api/domains/${selectedDomain.id}/aliases`, {
+    const res = await fetch(`/api/domains/${selectedDomain.id}/alias`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ alias: form.alias.value.trim().toLowerCase(), destinations }),
