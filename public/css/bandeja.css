@@ -236,6 +236,16 @@ body {
 .mesa-conv.deleted {
   opacity: 0.55;
 }
+.mesa-action-urgent.active {
+  color: rgb(var(--mask-400));
+  border-color: rgb(var(--mask-500));
+  background: var(--mesa-accent-dim);
+}
+.mesa-action-urgent:hover {
+  color: rgb(var(--mask-400));
+  border-color: rgb(var(--mask-500));
+  background: var(--mesa-accent-dim);
+}
 .mesa-action-danger {
   color: #f87171;
 }

@@ -176,6 +176,8 @@ async function openConversation(conv) {
   const btnDelete = document.getElementById("btn-delete-conv");
   const btnRestore = document.getElementById("btn-restore-conv");
 
+  btnUrgent.classList.toggle("active", conv.priority === "urgent");
+
   if (isDeleted) {
     composer.classList.add("mesa-hidden");
     banner.classList.add("mesa-hidden");
@@ -366,6 +368,7 @@ async function toggleUrgent() {
   if (res.ok) {
     toast(newPriority === "urgent" ? "Marcada como urgente" : "Prioridad normal");
     activeConv.priority = newPriority;
+    document.getElementById("btn-urgent").classList.toggle("active", newPriority === "urgent");
     await loadConversations();
   } else {
     const err = await res.json().catch(() => ({ error: "Error al actualizar" }));
