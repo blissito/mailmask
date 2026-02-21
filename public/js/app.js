@@ -174,7 +174,7 @@ async function startCheckout() {
   const btn = document.getElementById("btn-checkout");
   if (btn) { btn.textContent = "Redirigiendo..."; btn.disabled = true; }
   try {
-    const coupon = localStorage.getItem("mailmask_coupon") || undefined;
+    const coupon = new URLSearchParams(location.search).get("coupon") || undefined;
     const res = await fetch("/api/billing/checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
