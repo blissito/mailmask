@@ -1,6 +1,24 @@
-import { sql as _sql } from "./pg.ts";
+import { db, sqlite } from "./pg.js";
+import { eq, and, gt, lte, lt, sql as rawSql, inArray, isNull, isNotNull, desc, asc, count } from "drizzle-orm";
+import {
+  users,
+  domains,
+  alias,
+  rules,
+  emailLogs,
+  tokens,
+  forwardQueue,
+  conversations,
+  messages,
+  notes,
+  agents,
+  suppressions,
+  sendCounts,
+  bulkJobs,
+  coupons,
+} from "./schema.js";
 
-let sql = _sql;
+export { db };
 
 // --- Types ---
 
@@ -81,320 +99,434 @@ export const PLANS = {
 
 // --- Row → interface mappers ---
 
-function rowToUser(r: any): User {
+function rowToUser(r: typeof users.$inferSelect): User {
   const user: User = {
     email: r.email,
-    passwordHash: r.password_hash,
-    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
-    emailVerified: r.email_verified ?? false,
-    passwordChangedAt: r.password_changed_at ? (r.password_changed_at instanceof Date ? r.password_changed_at.toISOString() : r.password_changed_at) : undefined,
+    passwordHash: r.passwordHash,
+    createdAt: r.createdAt,
+    emailVerified: r.emailVerified ?? false,
+    passwordChangedAt: r.passwordChangedAt ?? undefined,
   };
-  if (r.sub_plan) {
+  if (r.subPlan) {
     user.subscription = {
-      plan: r.sub_plan,
-      status: r.sub_status ?? "none",
-      mpSubscriptionId: r.sub_mp_id ?? undefined,
-      currentPeriodEnd: r.sub_period_end ? (r.sub_period_end instanceof Date ? r.sub_period_end.toISOString() : r.sub_period_end) : undefined,
+      plan: r.subPlan as any,
+      status: (r.subStatus ?? "none") as any,
+      mpSubscriptionId: r.subMpId ?? undefined,
+      currentPeriodEnd: r.subPeriodEnd ?? undefined,
     };
   }
   return user;
 }
 
-function rowToDomain(r: any): Domain {
+function rowToDomain(r: typeof domains.$inferSelect): Domain {
   return {
     id: r.id,
-    ownerEmail: r.owner_email,
+    ownerEmail: r.ownerEmail,
     domain: r.domain,
     verified: r.verified,
-    mxConfigured: r.mx_configured,
-    dkimTokens: r.dkim_tokens ?? [],
-    verificationToken: r.verification_token,
-    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
+    mxConfigured: r.mxConfigured,
+    dkimTokens: r.dkimTokens ?? [],
+    verificationToken: r.verificationToken,
+    createdAt: r.createdAt,
   };
 }
 
-function rowToAlias(r: any): Alias {
+function rowToAlias(r: typeof alias.$inferSelect): Alias {
   return {
     alias: r.alias,
-    domainId: r.domain_id,
+    domainId: r.domainId,
     destinations: r.destinations ?? [],
     enabled: r.enabled,
-    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
-    forwardCount: r.forward_count || undefined,
-    lastFrom: r.last_from ?? undefined,
-    lastAt: r.last_at ? (r.last_at instanceof Date ? r.last_at.toISOString() : r.last_at) : undefined,
+    createdAt: r.createdAt,
+    forwardCount: r.forwardCount || undefined,
+    lastFrom: r.lastFrom ?? undefined,
+    lastAt: r.lastAt ?? undefined,
   };
 }
 
-function rowToRule(r: any): Rule {
+function rowToRule(r: typeof rules.$inferSelect): Rule {
   return {
     id: r.id,
-    domainId: r.domain_id,
-    field: r.field,
-    match: r.match,
+    domainId: r.domainId,
+    field: r.field as any,
+    match: r.match as any,
     value: r.value,
-    action: r.action,
+    action: r.action as any,
     target: r.target,
     priority: r.priority,
     enabled: r.enabled,
-    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
+    createdAt: r.createdAt,
   };
 }
 
-function rowToLog(r: any): EmailLog {
+function rowToLog(r: typeof emailLogs.$inferSelect): EmailLog {
   return {
     id: r.id,
-    domainId: r.domain_id,
-    timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : r.timestamp,
+    domainId: r.domainId,
+    timestamp: r.timestamp,
     from: r.from,
     to: r.to,
     subject: r.subject,
-    status: r.status,
-    forwardedTo: r.forwarded_to,
-    sizeBytes: r.size_bytes,
+    status: r.status as any,
+    forwardedTo: r.forwardedTo,
+    sizeBytes: r.sizeBytes,
     error: r.error ?? undefined,
+  };
+}
+
+function rowToConversation(r: typeof conversations.$inferSelect): Conversation {
+  return {
+    id: r.id,
+    domainId: r.domainId,
+    from: r.from,
+    to: r.to,
+    subject: r.subject,
+    status: r.status as any,
+    assignedTo: r.assignedTo ?? undefined,
+    priority: r.priority as any,
+    lastMessageAt: r.lastMessageAt,
+    messageCount: r.messageCount,
+    tags: r.tags ?? [],
+    threadReferences: r.threadRefs ?? [],
+    deletedAt: r.deletedAt ?? undefined,
+  };
+}
+
+function rowToMessage(r: typeof messages.$inferSelect): Message {
+  return {
+    id: r.id,
+    conversationId: r.conversationId,
+    from: r.from,
+    body: r.body ?? undefined,
+    html: r.html ?? undefined,
+    s3Bucket: r.s3Bucket ?? undefined,
+    s3Key: r.s3Key ?? undefined,
+    direction: r.direction as any,
+    createdAt: r.createdAt,
+    messageId: r.messageId ?? undefined,
+  };
+}
+
+function rowToNote(r: typeof notes.$inferSelect): Note {
+  return {
+    id: r.id,
+    conversationId: r.conversationId,
+    author: r.author,
+    body: r.body,
+    createdAt: r.createdAt,
+  };
+}
+
+function rowToAgent(r: typeof agents.$inferSelect): Agent {
+  return {
+    id: r.id,
+    domainId: r.domainId,
+    email: r.email,
+    name: r.name,
+    role: r.role as any,
+    createdAt: r.createdAt,
+  };
+}
+
+function rowToBulkJob(r: typeof bulkJobs.$inferSelect): BulkJob {
+  return {
+    id: r.id,
+    domainId: r.domainId,
+    recipients: r.recipients ?? [],
+    subject: r.subject,
+    html: r.html,
+    from: r.from,
+    status: r.status as any,
+    totalRecipients: r.totalRecipients,
+    sent: r.sent,
+    failed: r.failed,
+    skippedSuppressed: r.skippedSuppressed,
+    createdAt: r.createdAt,
+    completedAt: r.completedAt ?? undefined,
+    lastError: r.lastError ?? undefined,
+  };
+}
+
+function rowToCoupon(r: typeof coupons.$inferSelect): Coupon {
+  return {
+    code: r.code,
+    plan: r.plan,
+    fixedPrice: r.fixedPrice,
+    description: r.description,
+    singleUse: r.singleUse,
+    used: r.used,
+    expiresAt: r.expiresAt ?? undefined,
+    createdAt: r.createdAt,
+  };
+}
+
+function rowToForwardQueue(r: typeof forwardQueue.$inferSelect): ForwardQueueItem {
+  return {
+    id: r.id,
+    rawContent: r.rawContent,
+    from: r.from,
+    to: r.to,
+    domainId: r.domainId,
+    domainName: r.domainName,
+    originalTo: r.originalTo,
+    subject: r.subject,
+    logDays: r.logDays,
+    attemptCount: r.attemptCount,
+    nextRetryAt: r.nextRetryAt,
+    createdAt: r.createdAt,
+    lastError: r.lastError ?? undefined,
+    s3Bucket: r.s3Bucket ?? undefined,
+    s3Key: r.s3Key ?? undefined,
   };
 }
 
 // --- Users ---
 
-export async function getUser(email: string): Promise<User | null> {
-  const rows = await sql`SELECT * FROM users WHERE email = ${email}`;
+export function getUser(email: string): User | null {
+  const rows = db.select().from(users).where(eq(users.email, email)).all();
   return rows.length ? rowToUser(rows[0]) : null;
 }
 
-export async function createUser(email: string, passwordHash: string): Promise<User> {
-  const rows = await sql`
-    INSERT INTO users (email, password_hash) VALUES (${email}, ${passwordHash})
-    RETURNING *`;
+export function createUser(email: string, passwordHash: string): User {
+  const rows = db.insert(users).values({ email, passwordHash }).returning().all();
   return rowToUser(rows[0]);
 }
 
-export async function getUserByVerifyToken(token: string): Promise<User | null> {
-  const rows = await sql`
-    SELECT value FROM tokens WHERE token = ${token} AND kind = 'verify' AND expires_at > NOW()`;
+export function getUserByVerifyToken(token: string): User | null {
+  const now = new Date().toISOString();
+  const rows = db.select().from(tokens)
+    .where(and(eq(tokens.token, token), eq(tokens.kind, "verify"), gt(tokens.expiresAt, now)))
+    .all();
   if (!rows.length) return null;
   const email = (rows[0].value as any)?.email;
   if (!email) return null;
   return getUser(email);
 }
 
-export async function setVerifyToken(email: string, token: string): Promise<void> {
-  const user = await getUser(email);
+export function setVerifyToken(email: string, token: string): void {
+  const user = getUser(email);
   if (!user) return;
-  await sql`UPDATE users SET email_verified = FALSE WHERE email = ${email}`;
-  await sql`
-    INSERT INTO tokens (token, kind, value, expires_at)
-    VALUES (${token}, 'verify', ${sql.json({ email })}, NOW() + INTERVAL '7 days')
-    ON CONFLICT (token) DO UPDATE SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at`;
+  db.update(users).set({ emailVerified: false }).where(eq(users.email, email)).run();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 3600_000).toISOString();
+  db.insert(tokens).values({ token, kind: "verify", value: { email }, expiresAt })
+    .onConflictDoUpdate({ target: tokens.token, set: { value: { email }, expiresAt } })
+    .run();
 }
 
-export async function verifyUserEmail(email: string): Promise<void> {
-  await sql`UPDATE users SET email_verified = TRUE WHERE email = ${email}`;
-  // Clean up verify tokens for this user
-  await sql`DELETE FROM tokens WHERE kind = 'verify' AND value->>'email' = ${email}`;
+export function verifyUserEmail(email: string): void {
+  db.update(users).set({ emailVerified: true }).where(eq(users.email, email)).run();
+  // Clean up verify tokens for this user — use raw SQL for JSON field access
+  sqlite.prepare(`DELETE FROM tokens WHERE kind = 'verify' AND json_extract(value, '$.email') = ?`).run(email);
 }
 
 // --- Domains ---
 
-export async function createDomain(ownerEmail: string, domain: string, dkimTokens: string[], verificationToken: string): Promise<Domain> {
-  const rows = await sql`
-    INSERT INTO domains (owner_email, domain, dkim_tokens, verification_token)
-    VALUES (${ownerEmail}, ${domain}, ${dkimTokens}, ${verificationToken})
-    RETURNING *`;
+export function createDomain(ownerEmail: string, domain: string, dkimTokens: string[], verificationToken: string): Domain {
+  const rows = db.insert(domains).values({ ownerEmail, domain, dkimTokens, verificationToken }).returning().all();
   return rowToDomain(rows[0]);
 }
 
-export async function getDomain(id: string): Promise<Domain | null> {
-  const rows = await sql`SELECT * FROM domains WHERE id = ${id}`;
+export function getDomain(id: string): Domain | null {
+  const rows = db.select().from(domains).where(eq(domains.id, id)).all();
   return rows.length ? rowToDomain(rows[0]) : null;
 }
 
-export async function getDomainByName(domain: string): Promise<Domain | null> {
-  const rows = await sql`SELECT * FROM domains WHERE domain = ${domain}`;
+export function getDomainByName(domain: string): Domain | null {
+  const rows = db.select().from(domains).where(eq(domains.domain, domain)).all();
   return rows.length ? rowToDomain(rows[0]) : null;
 }
 
-export async function listUserDomains(email: string): Promise<Domain[]> {
-  const rows = await sql`SELECT * FROM domains WHERE owner_email = ${email} ORDER BY created_at`;
+export function listUserDomains(email: string): Domain[] {
+  const rows = db.select().from(domains).where(eq(domains.ownerEmail, email)).orderBy(asc(domains.createdAt)).all();
   return rows.map(rowToDomain);
 }
 
-export async function updateDomain(id: string, updates: Partial<Pick<Domain, "verified" | "mxConfigured">>): Promise<Domain | null> {
-  const sets: string[] = [];
-  if (updates.verified !== undefined) sets.push("verified");
-  if (updates.mxConfigured !== undefined) sets.push("mx_configured");
-  if (!sets.length) return getDomain(id);
-
-  const rows = await sql`
-    UPDATE domains SET
-      verified = COALESCE(${updates.verified ?? null}, verified),
-      mx_configured = COALESCE(${updates.mxConfigured ?? null}, mx_configured)
-    WHERE id = ${id} RETURNING *`;
+export function updateDomain(id: string, updates: Partial<Pick<Domain, "verified" | "mxConfigured">>): Domain | null {
+  if (updates.verified === undefined && updates.mxConfigured === undefined) return getDomain(id);
+  const set: Record<string, any> = {};
+  if (updates.verified !== undefined) set.verified = updates.verified;
+  if (updates.mxConfigured !== undefined) set.mxConfigured = updates.mxConfigured;
+  const rows = db.update(domains).set(set).where(eq(domains.id, id)).returning().all();
   return rows.length ? rowToDomain(rows[0]) : null;
 }
 
-export async function deleteDomain(id: string): Promise<boolean> {
-  // CASCADE handles alias, rules, conversations, messages, notes, agents, suppressions, email_logs
-  const res = await sql`DELETE FROM domains WHERE id = ${id}`;
-  return res.count > 0;
+export function deleteDomain(id: string): boolean {
+  const result = db.delete(domains).where(eq(domains.id, id)).run();
+  return result.changes > 0;
 }
 
-export async function countUserDomains(email: string): Promise<number> {
-  const rows = await sql`SELECT COUNT(*)::int AS c FROM domains WHERE owner_email = ${email}`;
+export function countUserDomains(email: string): number {
+  const rows = db.select({ c: count() }).from(domains).where(eq(domains.ownerEmail, email)).all();
   return rows[0].c;
 }
 
 // --- Aliases ---
 
-export async function createAlias(domainId: string, alias: string, destinations: string[]): Promise<Alias> {
-  const rows = await sql`
-    INSERT INTO alias (domain_id, alias, destinations)
-    VALUES (${domainId}, ${alias}, ${destinations})
-    RETURNING *`;
+export function createAlias(domainId: string, aliasName: string, destinations: string[]): Alias {
+  const rows = db.insert(alias).values({ domainId, alias: aliasName, destinations }).returning().all();
   return rowToAlias(rows[0]);
 }
 
-export async function getAlias(domainId: string, alias: string): Promise<Alias | null> {
-  const rows = await sql`SELECT * FROM alias WHERE domain_id = ${domainId} AND alias = ${alias}`;
+export function getAlias(domainId: string, aliasName: string): Alias | null {
+  const rows = db.select().from(alias).where(and(eq(alias.domainId, domainId), eq(alias.alias, aliasName))).all();
   return rows.length ? rowToAlias(rows[0]) : null;
 }
 
-export async function listAliases(domainId: string): Promise<Alias[]> {
-  const rows = await sql`SELECT * FROM alias WHERE domain_id = ${domainId} ORDER BY created_at`;
+export function listAliases(domainId: string): Alias[] {
+  const rows = db.select().from(alias).where(eq(alias.domainId, domainId)).orderBy(asc(alias.createdAt)).all();
   return rows.map(rowToAlias);
 }
 
-export async function updateAlias(domainId: string, alias: string, updates: Partial<Pick<Alias, "destinations" | "enabled">>): Promise<Alias | null> {
-  const rows = await sql`
-    UPDATE alias SET
-      destinations = COALESCE(${updates.destinations ?? null}, destinations),
-      enabled = COALESCE(${updates.enabled ?? null}, enabled)
-    WHERE domain_id = ${domainId} AND alias = ${alias}
-    RETURNING *`;
+export function updateAlias(domainId: string, aliasName: string, updates: Partial<Pick<Alias, "destinations" | "enabled">>): Alias | null {
+  const set: Record<string, any> = {};
+  if (updates.destinations !== undefined) set.destinations = updates.destinations;
+  if (updates.enabled !== undefined) set.enabled = updates.enabled;
+  if (!Object.keys(set).length) return getAlias(domainId, aliasName);
+  const rows = db.update(alias).set(set)
+    .where(and(eq(alias.domainId, domainId), eq(alias.alias, aliasName)))
+    .returning().all();
   return rows.length ? rowToAlias(rows[0]) : null;
 }
 
-export async function bumpAliasStats(domainId: string, alias: string, from: string): Promise<void> {
-  await sql`
-    UPDATE alias SET
-      forward_count = forward_count + 1,
-      last_from = ${from},
-      last_at = NOW()
-    WHERE domain_id = ${domainId} AND alias = ${alias}`;
+export function bumpAliasStats(domainId: string, aliasName: string, from: string): void {
+  db.update(alias).set({
+    forwardCount: rawSql`${alias.forwardCount} + 1`,
+    lastFrom: from,
+    lastAt: new Date().toISOString(),
+  }).where(and(eq(alias.domainId, domainId), eq(alias.alias, aliasName))).run();
 }
 
-export async function deleteAlias(domainId: string, alias: string): Promise<boolean> {
-  const res = await sql`DELETE FROM alias WHERE domain_id = ${domainId} AND alias = ${alias}`;
-  return res.count > 0;
+export function deleteAlias(domainId: string, aliasName: string): boolean {
+  const result = db.delete(alias).where(and(eq(alias.domainId, domainId), eq(alias.alias, aliasName))).run();
+  return result.changes > 0;
 }
 
-export async function countAliases(domainId: string): Promise<number> {
-  const rows = await sql`SELECT COUNT(*)::int AS c FROM alias WHERE domain_id = ${domainId}`;
+export function countAliases(domainId: string): number {
+  const rows = db.select({ c: count() }).from(alias).where(eq(alias.domainId, domainId)).all();
   return rows[0].c;
 }
 
 // --- Rules ---
 
-export async function createRule(domainId: string, rule: Omit<Rule, "id" | "domainId" | "createdAt">): Promise<Rule> {
-  const rows = await sql`
-    INSERT INTO rules (domain_id, field, match, value, action, target, priority, enabled)
-    VALUES (${domainId}, ${rule.field}, ${rule.match}, ${rule.value}, ${rule.action}, ${rule.target}, ${rule.priority}, ${rule.enabled})
-    RETURNING *`;
+export function createRule(domainId: string, rule: Omit<Rule, "id" | "domainId" | "createdAt">): Rule {
+  const rows = db.insert(rules).values({
+    domainId,
+    field: rule.field,
+    match: rule.match,
+    value: rule.value,
+    action: rule.action,
+    target: rule.target,
+    priority: rule.priority,
+    enabled: rule.enabled,
+  }).returning().all();
   return rowToRule(rows[0]);
 }
 
-export async function listRules(domainId: string): Promise<Rule[]> {
-  const rows = await sql`SELECT * FROM rules WHERE domain_id = ${domainId} ORDER BY priority`;
+export function listRules(domainId: string): Rule[] {
+  const rows = db.select().from(rules).where(eq(rules.domainId, domainId)).orderBy(asc(rules.priority)).all();
   return rows.map(rowToRule);
 }
 
-export async function updateRule(domainId: string, ruleId: string, updates: Partial<Pick<Rule, "field" | "match" | "value" | "action" | "target" | "priority" | "enabled">>): Promise<Rule | null> {
-  const rows = await sql`
-    UPDATE rules SET
-      field = COALESCE(${updates.field ?? null}, field),
-      match = COALESCE(${updates.match ?? null}, match),
-      value = COALESCE(${updates.value ?? null}, value),
-      action = COALESCE(${updates.action ?? null}, action),
-      target = COALESCE(${updates.target ?? null}, target),
-      priority = COALESCE(${updates.priority ?? null}, priority),
-      enabled = COALESCE(${updates.enabled ?? null}, enabled)
-    WHERE domain_id = ${domainId} AND id = ${ruleId}
-    RETURNING *`;
+export function updateRule(domainId: string, ruleId: string, updates: Partial<Pick<Rule, "field" | "match" | "value" | "action" | "target" | "priority" | "enabled">>): Rule | null {
+  const set: Record<string, any> = {};
+  if (updates.field !== undefined) set.field = updates.field;
+  if (updates.match !== undefined) set.match = updates.match;
+  if (updates.value !== undefined) set.value = updates.value;
+  if (updates.action !== undefined) set.action = updates.action;
+  if (updates.target !== undefined) set.target = updates.target;
+  if (updates.priority !== undefined) set.priority = updates.priority;
+  if (updates.enabled !== undefined) set.enabled = updates.enabled;
+  if (!Object.keys(set).length) {
+    const rows = db.select().from(rules).where(and(eq(rules.domainId, domainId), eq(rules.id, ruleId))).all();
+    return rows.length ? rowToRule(rows[0]) : null;
+  }
+  const rows = db.update(rules).set(set)
+    .where(and(eq(rules.domainId, domainId), eq(rules.id, ruleId)))
+    .returning().all();
   return rows.length ? rowToRule(rows[0]) : null;
 }
 
-export async function countRules(domainId: string): Promise<number> {
-  const rows = await sql`SELECT COUNT(*)::int AS c FROM rules WHERE domain_id = ${domainId}`;
+export function countRules(domainId: string): number {
+  const rows = db.select({ c: count() }).from(rules).where(eq(rules.domainId, domainId)).all();
   return rows[0].c;
 }
 
-export async function deleteRule(domainId: string, ruleId: string): Promise<boolean> {
-  const res = await sql`DELETE FROM rules WHERE domain_id = ${domainId} AND id = ${ruleId}`;
-  return res.count > 0;
+export function deleteRule(domainId: string, ruleId: string): boolean {
+  const result = db.delete(rules).where(and(eq(rules.domainId, domainId), eq(rules.id, ruleId))).run();
+  return result.changes > 0;
 }
 
 // --- Logs ---
 
-export async function addLog(log: Omit<EmailLog, "id">, logDays = 30): Promise<EmailLog> {
-  const rows = await sql`
-    INSERT INTO email_logs (domain_id, timestamp, "from", "to", subject, status, forwarded_to, size_bytes, error, expires_at)
-    VALUES (${log.domainId}, ${log.timestamp}, ${log.from}, ${log.to}, ${log.subject}, ${log.status}, ${log.forwardedTo}, ${log.sizeBytes}, ${log.error ?? null}, NOW() + ${logDays + ' days'}::interval)
-    RETURNING *`;
+export function addLog(log: Omit<EmailLog, "id">, logDays = 30): EmailLog {
+  const expiresAt = new Date(Date.now() + logDays * 24 * 3600_000).toISOString();
+  const rows = db.insert(emailLogs).values({
+    domainId: log.domainId,
+    timestamp: log.timestamp,
+    from: log.from,
+    to: log.to,
+    subject: log.subject,
+    status: log.status,
+    forwardedTo: log.forwardedTo,
+    sizeBytes: log.sizeBytes,
+    error: log.error ?? null,
+    expiresAt,
+  }).returning().all();
   return rowToLog(rows[0]);
 }
 
-export async function listLogs(domainId: string, limit = 50): Promise<EmailLog[]> {
-  const rows = await sql`
-    SELECT * FROM email_logs
-    WHERE domain_id = ${domainId} AND expires_at > NOW()
-    ORDER BY timestamp DESC LIMIT ${limit}`;
+export function listLogs(domainId: string, limit = 50): EmailLog[] {
+  const now = new Date().toISOString();
+  const rows = db.select().from(emailLogs)
+    .where(and(eq(emailLogs.domainId, domainId), gt(emailLogs.expiresAt, now)))
+    .orderBy(desc(emailLogs.timestamp))
+    .limit(limit)
+    .all();
   return rows.map(rowToLog);
 }
 
-export async function getMonthlyForwardCounts(domainIds: string[]): Promise<Map<string, number>> {
+export function getMonthlyForwardCounts(domainIds: string[]): Map<string, number> {
   if (domainIds.length === 0) return new Map();
-  const rows = await sql`
-    SELECT domain_id, COUNT(*)::int AS count
-    FROM email_logs
-    WHERE domain_id = ANY(${domainIds})
-      AND timestamp >= date_trunc('month', NOW())
-    GROUP BY domain_id`;
+  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+  const rows = db.select({ domainId: emailLogs.domainId, c: count() })
+    .from(emailLogs)
+    .where(and(inArray(emailLogs.domainId, domainIds), gt(emailLogs.timestamp, firstOfMonth)))
+    .groupBy(emailLogs.domainId)
+    .all();
   const map = new Map<string, number>();
-  for (const r of rows) map.set(r.domain_id, r.count);
+  for (const r of rows) map.set(r.domainId, r.c);
   return map;
 }
 
 // --- Subscription helpers ---
 
-export async function getUserBySubscriptionId(mpSubId: string): Promise<User | null> {
-  const rows = await sql`SELECT * FROM users WHERE sub_mp_id = ${mpSubId}`;
+export function getUserBySubscriptionId(mpSubId: string): User | null {
+  const rows = db.select().from(users).where(eq(users.subMpId, mpSubId)).all();
   return rows.length ? rowToUser(rows[0]) : null;
 }
 
-export async function extendSubscriptionPeriod(email: string, days: number): Promise<void> {
-  const user = await getUser(email);
+export function extendSubscriptionPeriod(email: string, days: number): void {
+  const user = getUser(email);
   if (!user?.subscription) return;
   const existing = user.subscription.currentPeriodEnd
     ? new Date(user.subscription.currentPeriodEnd)
     : new Date();
   const base = existing > new Date() ? existing : new Date();
   base.setDate(base.getDate() + days);
-  await updateUserSubscription(email, {
+  updateUserSubscription(email, {
     ...user.subscription,
     status: "active",
     currentPeriodEnd: base.toISOString(),
   });
 }
 
-export async function updateUserSubscription(email: string, sub: Subscription): Promise<User | null> {
-  const rows = await sql`
-    UPDATE users SET
-      sub_plan = ${sub.plan},
-      sub_status = ${sub.status},
-      sub_mp_id = ${sub.mpSubscriptionId ?? null},
-      sub_period_end = ${sub.currentPeriodEnd ?? null}
-    WHERE email = ${email} RETURNING *`;
+export function updateUserSubscription(email: string, sub: Subscription): User | null {
+  const rows = db.update(users).set({
+    subPlan: sub.plan,
+    subStatus: sub.status,
+    subMpId: sub.mpSubscriptionId ?? null,
+    subPeriodEnd: sub.currentPeriodEnd ?? null,
+  }).where(eq(users.email, email)).returning().all();
   return rows.length ? rowToUser(rows[0]) : null;
 }
 
@@ -412,87 +544,96 @@ export function getUserPlanLimits(user: User): { domains: number; aliases: numbe
 
 // --- Pending checkout (guest flow) ---
 
-export async function createPendingCheckout(token: string, plan: string): Promise<void> {
-  await sql`
-    INSERT INTO tokens (token, kind, value, expires_at)
-    VALUES (${token}, 'pending-checkout', ${JSON.stringify({ plan })}, NOW() + INTERVAL '24 hours')
-    ON CONFLICT (token) DO UPDATE SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at`;
+export function createPendingCheckout(token: string, plan: string): void {
+  const expiresAt = new Date(Date.now() + 24 * 3600_000).toISOString();
+  db.insert(tokens).values({ token, kind: "pending-checkout", value: { plan }, expiresAt })
+    .onConflictDoUpdate({ target: tokens.token, set: { value: { plan }, expiresAt } })
+    .run();
 }
 
-export async function getPendingCheckout(token: string): Promise<string | null> {
-  const rows = await sql`
-    SELECT value FROM tokens WHERE token = ${token} AND kind = 'pending-checkout' AND expires_at > NOW()`;
+export function getPendingCheckout(token: string): string | null {
+  const now = new Date().toISOString();
+  const rows = db.select().from(tokens)
+    .where(and(eq(tokens.token, token), eq(tokens.kind, "pending-checkout"), gt(tokens.expiresAt, now)))
+    .all();
   if (!rows.length) return null;
   return (rows[0].value as any)?.plan ?? null;
 }
 
-export async function deletePendingCheckout(token: string): Promise<void> {
-  await sql`DELETE FROM tokens WHERE token = ${token} AND kind = 'pending-checkout'`;
+export function deletePendingCheckout(token: string): void {
+  db.delete(tokens).where(and(eq(tokens.token, token), eq(tokens.kind, "pending-checkout"))).run();
 }
 
 // --- Password token (set-password flow) ---
 
-export async function setPasswordToken(email: string, token: string): Promise<void> {
-  await sql`
-    INSERT INTO tokens (token, kind, value, expires_at)
-    VALUES (${token}, 'password', ${JSON.stringify({ email })}, NOW() + INTERVAL '7 days')
-    ON CONFLICT (token) DO UPDATE SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at`;
+export function setPasswordToken(email: string, token: string): void {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 3600_000).toISOString();
+  db.insert(tokens).values({ token, kind: "password", value: { email }, expiresAt })
+    .onConflictDoUpdate({ target: tokens.token, set: { value: { email }, expiresAt } })
+    .run();
 }
 
-export async function getEmailByPasswordToken(token: string): Promise<string | null> {
-  const rows = await sql`
-    SELECT value FROM tokens WHERE token = ${token} AND kind = 'password' AND expires_at > NOW()`;
+export function getEmailByPasswordToken(token: string): string | null {
+  const now = new Date().toISOString();
+  const rows = db.select().from(tokens)
+    .where(and(eq(tokens.token, token), eq(tokens.kind, "password"), gt(tokens.expiresAt, now)))
+    .all();
   if (!rows.length) return null;
   return (rows[0].value as any)?.email ?? null;
 }
 
-export async function deletePasswordToken(token: string): Promise<void> {
-  await sql`DELETE FROM tokens WHERE token = ${token} AND kind = 'password'`;
+export function deletePasswordToken(token: string): void {
+  db.delete(tokens).where(and(eq(tokens.token, token), eq(tokens.kind, "password"))).run();
 }
 
 // --- Update user password ---
 
-export async function updateUserPassword(email: string, passwordHash: string): Promise<void> {
-  await sql`UPDATE users SET password_hash = ${passwordHash}, password_changed_at = NOW() WHERE email = ${email}`;
+export function updateUserPassword(email: string, passwordHash: string): void {
+  db.update(users).set({ passwordHash, passwordChangedAt: new Date().toISOString() }).where(eq(users.email, email)).run();
 }
 
 // --- Webhook idempotency ---
 
-export async function isWebhookProcessed(id: string): Promise<boolean> {
-  const rows = await sql`
-    SELECT 1 FROM tokens WHERE token = ${id} AND kind = 'webhook' AND expires_at > NOW()`;
+export function isWebhookProcessed(id: string): boolean {
+  const now = new Date().toISOString();
+  const rows = db.select().from(tokens)
+    .where(and(eq(tokens.token, id), eq(tokens.kind, "webhook"), gt(tokens.expiresAt, now)))
+    .all();
   return rows.length > 0;
 }
 
-export async function markWebhookProcessed(id: string): Promise<void> {
-  await sql`
-    INSERT INTO tokens (token, kind, value, expires_at)
-    VALUES (${id}, 'webhook', '{}', NOW() + INTERVAL '7 days')
-    ON CONFLICT (token) DO NOTHING`;
+export function markWebhookProcessed(id: string): void {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 3600_000).toISOString();
+  db.insert(tokens).values({ token: id, kind: "webhook", value: {}, expiresAt })
+    .onConflictDoNothing()
+    .run();
 }
 
 // --- Atomic user creation (guest checkout) ---
 
-export async function createUserIfNotExists(email: string, passwordHash: string): Promise<boolean> {
-  const rows = await sql`
-    INSERT INTO users (email, password_hash) VALUES (${email}, ${passwordHash})
-    ON CONFLICT (email) DO NOTHING RETURNING email`;
+export function createUserIfNotExists(email: string, passwordHash: string): boolean {
+  const rows = db.insert(users).values({ email, passwordHash })
+    .onConflictDoNothing()
+    .returning()
+    .all();
   return rows.length > 0;
 }
 
 // --- SNS message dedup ---
 
-export async function isMessageProcessed(messageId: string): Promise<boolean> {
-  const rows = await sql`
-    SELECT 1 FROM tokens WHERE token = ${messageId} AND kind = 'sns' AND expires_at > NOW()`;
+export function isMessageProcessed(messageId: string): boolean {
+  const now = new Date().toISOString();
+  const rows = db.select().from(tokens)
+    .where(and(eq(tokens.token, messageId), eq(tokens.kind, "sns"), gt(tokens.expiresAt, now)))
+    .all();
   return rows.length > 0;
 }
 
-export async function markMessageProcessed(messageId: string): Promise<void> {
-  await sql`
-    INSERT INTO tokens (token, kind, value, expires_at)
-    VALUES (${messageId}, 'sns', '{}', NOW() + INTERVAL '24 hours')
-    ON CONFLICT (token) DO NOTHING`;
+export function markMessageProcessed(messageId: string): void {
+  const expiresAt = new Date(Date.now() + 24 * 3600_000).toISOString();
+  db.insert(tokens).values({ token: messageId, kind: "sns", value: {}, expiresAt })
+    .onConflictDoNothing()
+    .run();
 }
 
 // --- Forward queue (retry on SES failure) ---
@@ -521,71 +662,72 @@ const QUEUE_TTL = 48 * 60 * 60 * 1000;
 
 export { RETRY_DELAYS, MAX_ATTEMPTS };
 
-function rowToForwardQueue(r: any): ForwardQueueItem {
-  return {
-    id: r.id,
-    rawContent: r.raw_content,
-    from: r.from,
-    to: r.to,
-    domainId: r.domain_id,
-    domainName: r.domain_name,
-    originalTo: r.original_to,
-    subject: r.subject,
-    logDays: r.log_days,
-    attemptCount: r.attempt_count,
-    nextRetryAt: r.next_retry_at instanceof Date ? r.next_retry_at.toISOString() : r.next_retry_at,
-    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
-    lastError: r.last_error ?? undefined,
-    s3Bucket: r.s3_bucket ?? undefined,
-    s3Key: r.s3_key ?? undefined,
-  };
-}
-
-export async function enqueueForward(item: Omit<ForwardQueueItem, "id" | "createdAt" | "attemptCount" | "nextRetryAt">, error?: string): Promise<ForwardQueueItem> {
-  const nextRetry = new Date(Date.now() + RETRY_DELAYS[0]);
-  const expiresAt = new Date(Date.now() + QUEUE_TTL);
-  const rows = await sql`
-    INSERT INTO forward_queue (raw_content, "from", "to", domain_id, domain_name, original_to, subject, log_days, attempt_count, next_retry_at, last_error, s3_bucket, s3_key, expires_at)
-    VALUES (${item.rawContent}, ${item.from}, ${item.to}, ${item.domainId}, ${item.domainName}, ${item.originalTo}, ${item.subject}, ${item.logDays}, 0, ${nextRetry}, ${error ?? null}, ${item.s3Bucket ?? null}, ${item.s3Key ?? null}, ${expiresAt})
-    RETURNING *`;
+export function enqueueForward(item: Omit<ForwardQueueItem, "id" | "createdAt" | "attemptCount" | "nextRetryAt">, error?: string): ForwardQueueItem {
+  const nextRetryAt = new Date(Date.now() + RETRY_DELAYS[0]).toISOString();
+  const expiresAt = new Date(Date.now() + QUEUE_TTL).toISOString();
+  const rows = db.insert(forwardQueue).values({
+    rawContent: item.rawContent,
+    from: item.from,
+    to: item.to,
+    domainId: item.domainId,
+    domainName: item.domainName,
+    originalTo: item.originalTo,
+    subject: item.subject,
+    logDays: item.logDays,
+    attemptCount: 0,
+    nextRetryAt,
+    lastError: error ?? null,
+    s3Bucket: item.s3Bucket ?? null,
+    s3Key: item.s3Key ?? null,
+    expiresAt,
+  }).returning().all();
   return rowToForwardQueue(rows[0]);
 }
 
-export async function getForwardQueueItem(id: string): Promise<ForwardQueueItem | null> {
-  const rows = await sql`SELECT * FROM forward_queue WHERE id = ${id} AND NOT dead`;
+export function getForwardQueueItem(id: string): ForwardQueueItem | null {
+  const rows = db.select().from(forwardQueue)
+    .where(and(eq(forwardQueue.id, id), eq(forwardQueue.dead, false)))
+    .all();
   return rows.length ? rowToForwardQueue(rows[0]) : null;
 }
 
-export async function updateForwardQueueItem(item: ForwardQueueItem): Promise<void> {
-  const expiresAt = new Date(Date.now() + QUEUE_TTL);
-  await sql`
-    UPDATE forward_queue SET
-      attempt_count = ${item.attemptCount},
-      next_retry_at = ${item.nextRetryAt},
-      last_error = ${item.lastError ?? null}
-    WHERE id = ${item.id} AND NOT dead`;
+export function updateForwardQueueItem(item: ForwardQueueItem): void {
+  db.update(forwardQueue).set({
+    attemptCount: item.attemptCount,
+    nextRetryAt: item.nextRetryAt,
+    lastError: item.lastError ?? null,
+  }).where(and(eq(forwardQueue.id, item.id), eq(forwardQueue.dead, false))).run();
 }
 
-export async function dequeueForward(id: string): Promise<void> {
-  await sql`DELETE FROM forward_queue WHERE id = ${id}`;
+export function dequeueForward(id: string): void {
+  db.delete(forwardQueue).where(eq(forwardQueue.id, id)).run();
 }
 
-export async function listForwardQueue(): Promise<ForwardQueueItem[]> {
-  const rows = await sql`SELECT * FROM forward_queue WHERE NOT dead AND expires_at > NOW()`;
+export function listForwardQueue(): ForwardQueueItem[] {
+  const now = new Date().toISOString();
+  const rows = db.select().from(forwardQueue)
+    .where(and(eq(forwardQueue.dead, false), gt(forwardQueue.expiresAt, now)))
+    .all();
   return rows.map(rowToForwardQueue);
 }
 
-export async function moveToDeadLetter(item: ForwardQueueItem): Promise<void> {
-  await sql`UPDATE forward_queue SET dead = TRUE, expires_at = NOW() + INTERVAL '30 days' WHERE id = ${item.id}`;
+export function moveToDeadLetter(item: ForwardQueueItem): void {
+  const expiresAt = new Date(Date.now() + 30 * 24 * 3600_000).toISOString();
+  db.update(forwardQueue).set({ dead: true, expiresAt }).where(eq(forwardQueue.id, item.id)).run();
 }
 
-export async function getQueueDepth(): Promise<number> {
-  const rows = await sql`SELECT COUNT(*)::int AS c FROM forward_queue WHERE NOT dead AND expires_at > NOW()`;
+export function getQueueDepth(): number {
+  const now = new Date().toISOString();
+  const rows = db.select({ c: count() }).from(forwardQueue)
+    .where(and(eq(forwardQueue.dead, false), gt(forwardQueue.expiresAt, now)))
+    .all();
   return rows[0].c;
 }
 
-export async function getDeadLetterCount(): Promise<number> {
-  const rows = await sql`SELECT COUNT(*)::int AS c FROM forward_queue WHERE dead`;
+export function getDeadLetterCount(): number {
+  const rows = db.select({ c: count() }).from(forwardQueue)
+    .where(eq(forwardQueue.dead, true))
+    .all();
   return rows[0].c;
 }
 
@@ -654,328 +796,308 @@ export interface BulkJob {
   lastError?: string;
 }
 
-function rowToConversation(r: any): Conversation {
-  return {
-    id: r.id,
-    domainId: r.domain_id,
-    from: r.from,
-    to: r.to,
-    subject: r.subject,
-    status: r.status,
-    assignedTo: r.assigned_to ?? undefined,
-    priority: r.priority,
-    lastMessageAt: r.last_message_at instanceof Date ? r.last_message_at.toISOString() : r.last_message_at,
-    messageCount: r.message_count,
-    tags: r.tags ?? [],
-    threadReferences: r.thread_refs ?? [],
-    deletedAt: r.deleted_at ? (r.deleted_at instanceof Date ? r.deleted_at.toISOString() : r.deleted_at) : undefined,
-  };
-}
-
-function rowToMessage(r: any): Message {
-  return {
-    id: r.id,
-    conversationId: r.conversation_id,
-    from: r.from,
-    body: r.body ?? undefined,
-    html: r.html ?? undefined,
-    s3Bucket: r.s3_bucket ?? undefined,
-    s3Key: r.s3_key ?? undefined,
-    direction: r.direction,
-    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
-    messageId: r.message_id ?? undefined,
-  };
-}
-
-function rowToNote(r: any): Note {
-  return {
-    id: r.id,
-    conversationId: r.conversation_id,
-    author: r.author,
-    body: r.body,
-    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
-  };
-}
-
-function rowToAgent(r: any): Agent {
-  return {
-    id: r.id,
-    domainId: r.domain_id,
-    email: r.email,
-    name: r.name,
-    role: r.role,
-    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
-  };
-}
-
-function rowToBulkJob(r: any): BulkJob {
-  return {
-    id: r.id,
-    domainId: r.domain_id,
-    recipients: r.recipients ?? [],
-    subject: r.subject,
-    html: r.html,
-    from: r.from,
-    status: r.status,
-    totalRecipients: r.total_recipients,
-    sent: r.sent,
-    failed: r.failed,
-    skippedSuppressed: r.skipped_suppressed,
-    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
-    completedAt: r.completed_at ? (r.completed_at instanceof Date ? r.completed_at.toISOString() : r.completed_at) : undefined,
-    lastError: r.last_error ?? undefined,
-  };
-}
-
 // --- Mesa CRUD ---
 
-export async function createConversation(conv: Omit<Conversation, "id">): Promise<Conversation> {
-  const rows = await sql`
-    INSERT INTO conversations (domain_id, "from", "to", subject, status, assigned_to, priority, last_message_at, message_count, tags, thread_refs)
-    VALUES (${conv.domainId}, ${conv.from}, ${conv.to}, ${conv.subject}, ${conv.status}, ${conv.assignedTo ?? null}, ${conv.priority}, ${conv.lastMessageAt}, ${conv.messageCount}, ${conv.tags}, ${conv.threadReferences})
-    RETURNING *`;
+export function createConversation(conv: Omit<Conversation, "id">): Conversation {
+  const rows = db.insert(conversations).values({
+    domainId: conv.domainId,
+    from: conv.from,
+    to: conv.to,
+    subject: conv.subject,
+    status: conv.status,
+    assignedTo: conv.assignedTo ?? null,
+    priority: conv.priority,
+    lastMessageAt: conv.lastMessageAt,
+    messageCount: conv.messageCount,
+    tags: conv.tags,
+    threadRefs: conv.threadReferences,
+  }).returning().all();
   return rowToConversation(rows[0]);
 }
 
-export async function getConversation(domainId: string, id: string): Promise<Conversation | null> {
-  const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND id = ${id}`;
+export function getConversation(domainId: string, id: string): Conversation | null {
+  const rows = db.select().from(conversations)
+    .where(and(eq(conversations.domainId, domainId), eq(conversations.id, id)))
+    .all();
   return rows.length ? rowToConversation(rows[0]) : null;
 }
 
-export async function listConversations(domainId: string, opts?: { status?: string; assignedTo?: string }): Promise<Conversation[]> {
+export function listConversations(domainId: string, opts?: { status?: string; assignedTo?: string }): Conversation[] {
   // status=deleted → show soft-deleted conversations
   if (opts?.status === "deleted") {
-    if (opts?.assignedTo) {
-      const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND deleted_at IS NOT NULL AND assigned_to = ${opts.assignedTo} ORDER BY last_message_at DESC`;
-      return rows.map(rowToConversation);
-    }
-    const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND deleted_at IS NOT NULL ORDER BY last_message_at DESC`;
+    const conditions = [eq(conversations.domainId, domainId), isNotNull(conversations.deletedAt)];
+    if (opts?.assignedTo) conditions.push(eq(conversations.assignedTo, opts.assignedTo));
+    const rows = db.select().from(conversations)
+      .where(and(...conditions))
+      .orderBy(desc(conversations.lastMessageAt))
+      .all();
     return rows.map(rowToConversation);
   }
   // Default: exclude deleted
-  if (opts?.status && opts?.assignedTo) {
-    const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND deleted_at IS NULL AND status = ${opts.status} AND assigned_to = ${opts.assignedTo} ORDER BY last_message_at DESC`;
-    return rows.map(rowToConversation);
-  }
-  if (opts?.status) {
-    const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND deleted_at IS NULL AND status = ${opts.status} ORDER BY last_message_at DESC`;
-    return rows.map(rowToConversation);
-  }
-  if (opts?.assignedTo) {
-    const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND deleted_at IS NULL AND assigned_to = ${opts.assignedTo} ORDER BY last_message_at DESC`;
-    return rows.map(rowToConversation);
-  }
-  const rows = await sql`SELECT * FROM conversations WHERE domain_id = ${domainId} AND deleted_at IS NULL ORDER BY last_message_at DESC`;
+  const conditions = [eq(conversations.domainId, domainId), isNull(conversations.deletedAt)];
+  if (opts?.status) conditions.push(eq(conversations.status, opts.status));
+  if (opts?.assignedTo) conditions.push(eq(conversations.assignedTo, opts.assignedTo));
+  const rows = db.select().from(conversations)
+    .where(and(...conditions))
+    .orderBy(desc(conversations.lastMessageAt))
+    .all();
   return rows.map(rowToConversation);
 }
 
-export async function updateConversation(domainId: string, id: string, updates: Partial<Pick<Conversation, "status" | "assignedTo" | "priority" | "tags" | "lastMessageAt" | "messageCount" | "threadReferences">>): Promise<Conversation | null> {
-  const conv = await getConversation(domainId, id);
+export function updateConversation(domainId: string, id: string, updates: Partial<Pick<Conversation, "status" | "assignedTo" | "priority" | "tags" | "lastMessageAt" | "messageCount" | "threadReferences">>): Conversation | null {
+  const conv = getConversation(domainId, id);
   if (!conv) return null;
   const merged = { ...conv, ...updates };
-  const rows = await sql`
-    UPDATE conversations SET
-      status = ${merged.status},
-      assigned_to = ${merged.assignedTo ?? null},
-      priority = ${merged.priority},
-      tags = ${merged.tags},
-      thread_refs = ${merged.threadReferences},
-      last_message_at = ${merged.lastMessageAt},
-      message_count = ${merged.messageCount}
-    WHERE domain_id = ${domainId} AND id = ${id}
-    RETURNING *`;
+  const rows = db.update(conversations).set({
+    status: merged.status,
+    assignedTo: merged.assignedTo ?? null,
+    priority: merged.priority,
+    tags: merged.tags,
+    threadRefs: merged.threadReferences,
+    lastMessageAt: merged.lastMessageAt,
+    messageCount: merged.messageCount,
+  }).where(and(eq(conversations.domainId, domainId), eq(conversations.id, id))).returning().all();
   return rows.length ? rowToConversation(rows[0]) : null;
 }
 
-export async function findConversationByThread(domainId: string, _from: string, references: string[]): Promise<Conversation | null> {
+export function findConversationByThread(domainId: string, _from: string, references: string[]): Conversation | null {
   if (!references.length) return null;
-  const rows = await sql`
+  const placeholders = references.map(() => "?").join(",");
+  const row = sqlite.prepare(`
     SELECT * FROM conversations
-    WHERE domain_id = ${domainId} AND thread_refs && ${references}::text[]
-    LIMIT 1`;
-  return rows.length ? rowToConversation(rows[0]) : null;
+    WHERE domain_id = ? AND EXISTS (
+      SELECT 1 FROM json_each(thread_refs) WHERE value IN (${placeholders})
+    )
+    LIMIT 1
+  `).get(domainId, ...references) as any;
+  return row ? rowToConversation(row) : null;
 }
 
-export async function softDeleteConversation(domainId: string, id: string): Promise<boolean> {
-  const res = await sql`UPDATE conversations SET deleted_at = NOW() WHERE domain_id = ${domainId} AND id = ${id} AND deleted_at IS NULL`;
-  return res.count > 0;
+export function softDeleteConversation(domainId: string, id: string): boolean {
+  const result = db.update(conversations).set({ deletedAt: new Date().toISOString() })
+    .where(and(eq(conversations.domainId, domainId), eq(conversations.id, id), isNull(conversations.deletedAt)))
+    .run();
+  return result.changes > 0;
 }
 
-export async function restoreConversation(domainId: string, id: string): Promise<boolean> {
-  const res = await sql`UPDATE conversations SET deleted_at = NULL WHERE domain_id = ${domainId} AND id = ${id} AND deleted_at IS NOT NULL`;
-  return res.count > 0;
+export function restoreConversation(domainId: string, id: string): boolean {
+  const result = db.update(conversations).set({ deletedAt: null })
+    .where(and(eq(conversations.domainId, domainId), eq(conversations.id, id), isNotNull(conversations.deletedAt)))
+    .run();
+  return result.changes > 0;
 }
 
-export async function purgeDeletedConversations(days: number): Promise<{ s3Bucket: string; s3Key: string }[]> {
+export function purgeDeletedConversations(days: number): { s3Bucket: string; s3Key: string }[] {
+  const cutoff = new Date(Date.now() - days * 24 * 3600_000).toISOString();
   // Collect S3 keys from messages belonging to conversations that will be purged
-  const s3Rows = await sql`
+  const s3Rows = sqlite.prepare(`
     SELECT m.s3_bucket, m.s3_key FROM messages m
     JOIN conversations c ON m.conversation_id = c.id
-    WHERE c.deleted_at IS NOT NULL AND c.deleted_at < NOW() - ${days + ' days'}::interval
-      AND m.s3_bucket IS NOT NULL AND m.s3_key IS NOT NULL`;
+    WHERE c.deleted_at IS NOT NULL AND c.deleted_at < ?
+      AND m.s3_bucket IS NOT NULL AND m.s3_key IS NOT NULL
+  `).all(cutoff) as any[];
   const s3Keys = s3Rows.map((r: any) => ({ s3Bucket: r.s3_bucket, s3Key: r.s3_key }));
 
   // Delete conversations (CASCADE handles messages + notes)
-  await sql`DELETE FROM conversations WHERE deleted_at IS NOT NULL AND deleted_at < NOW() - ${days + ' days'}::interval`;
+  db.delete(conversations)
+    .where(and(isNotNull(conversations.deletedAt), lt(conversations.deletedAt, cutoff)))
+    .run();
 
   return s3Keys;
 }
 
 // --- Messages ---
 
-export async function addMessage(msg: Omit<Message, "id">): Promise<Message> {
-  const rows = await sql`
-    INSERT INTO messages (conversation_id, "from", body, html, s3_bucket, s3_key, direction, message_id)
-    VALUES (${msg.conversationId}, ${msg.from}, ${msg.body ?? null}, ${msg.html ?? null}, ${msg.s3Bucket ?? null}, ${msg.s3Key ?? null}, ${msg.direction}, ${msg.messageId ?? null})
-    RETURNING *`;
+export function addMessage(msg: Omit<Message, "id">): Message {
+  const rows = db.insert(messages).values({
+    conversationId: msg.conversationId,
+    from: msg.from,
+    body: msg.body ?? null,
+    html: msg.html ?? null,
+    s3Bucket: msg.s3Bucket ?? null,
+    s3Key: msg.s3Key ?? null,
+    direction: msg.direction,
+    messageId: msg.messageId ?? null,
+  }).returning().all();
   return rowToMessage(rows[0]);
 }
 
-export async function listMessages(conversationId: string): Promise<Message[]> {
-  const rows = await sql`SELECT * FROM messages WHERE conversation_id = ${conversationId} ORDER BY created_at`;
+export function listMessages(conversationId: string): Message[] {
+  const rows = db.select().from(messages)
+    .where(eq(messages.conversationId, conversationId))
+    .orderBy(asc(messages.createdAt))
+    .all();
   return rows.map(rowToMessage);
 }
 
 // --- Notes ---
 
-export async function addNote(note: Omit<Note, "id">): Promise<Note> {
-  const rows = await sql`
-    INSERT INTO notes (conversation_id, author, body)
-    VALUES (${note.conversationId}, ${note.author}, ${note.body})
-    RETURNING *`;
+export function addNote(note: Omit<Note, "id">): Note {
+  const rows = db.insert(notes).values({
+    conversationId: note.conversationId,
+    author: note.author,
+    body: note.body,
+  }).returning().all();
   return rowToNote(rows[0]);
 }
 
-export async function listNotes(conversationId: string): Promise<Note[]> {
-  const rows = await sql`SELECT * FROM notes WHERE conversation_id = ${conversationId} ORDER BY created_at`;
+export function listNotes(conversationId: string): Note[] {
+  const rows = db.select().from(notes)
+    .where(eq(notes.conversationId, conversationId))
+    .orderBy(asc(notes.createdAt))
+    .all();
   return rows.map(rowToNote);
 }
 
 // --- Agents ---
 
-export async function createAgent(agent: Omit<Agent, "id" | "createdAt">): Promise<Agent> {
-  const rows = await sql`
-    INSERT INTO agents (domain_id, email, name, role)
-    VALUES (${agent.domainId}, ${agent.email}, ${agent.name}, ${agent.role})
-    RETURNING *`;
+export function createAgent(agent: Omit<Agent, "id" | "createdAt">): Agent {
+  const rows = db.insert(agents).values({
+    domainId: agent.domainId,
+    email: agent.email,
+    name: agent.name,
+    role: agent.role,
+  }).returning().all();
   return rowToAgent(rows[0]);
 }
 
-export async function getAgent(domainId: string, agentId: string): Promise<Agent | null> {
-  const rows = await sql`SELECT * FROM agents WHERE domain_id = ${domainId} AND id = ${agentId}`;
+export function getAgent(domainId: string, agentId: string): Agent | null {
+  const rows = db.select().from(agents)
+    .where(and(eq(agents.domainId, domainId), eq(agents.id, agentId)))
+    .all();
   return rows.length ? rowToAgent(rows[0]) : null;
 }
 
-export async function getAgentByEmail(domainId: string, email: string): Promise<Agent | null> {
-  const rows = await sql`SELECT * FROM agents WHERE domain_id = ${domainId} AND email = ${email}`;
+export function getAgentByEmail(domainId: string, email: string): Agent | null {
+  const rows = db.select().from(agents)
+    .where(and(eq(agents.domainId, domainId), eq(agents.email, email)))
+    .all();
   return rows.length ? rowToAgent(rows[0]) : null;
 }
 
-export async function listAgents(domainId: string): Promise<Agent[]> {
-  const rows = await sql`SELECT * FROM agents WHERE domain_id = ${domainId}`;
+export function listAgents(domainId: string): Agent[] {
+  const rows = db.select().from(agents).where(eq(agents.domainId, domainId)).all();
   return rows.map(rowToAgent);
 }
 
-export async function deleteAgent(domainId: string, agentId: string): Promise<boolean> {
-  const res = await sql`DELETE FROM agents WHERE domain_id = ${domainId} AND id = ${agentId}`;
-  return res.count > 0;
+export function deleteAgent(domainId: string, agentId: string): boolean {
+  const result = db.delete(agents)
+    .where(and(eq(agents.domainId, domainId), eq(agents.id, agentId)))
+    .run();
+  return result.changes > 0;
 }
 
-export async function countAgents(domainId: string): Promise<number> {
-  const rows = await sql`SELECT COUNT(*)::int AS c FROM agents WHERE domain_id = ${domainId}`;
+export function countAgents(domainId: string): number {
+  const rows = db.select({ c: count() }).from(agents).where(eq(agents.domainId, domainId)).all();
   return rows[0].c;
 }
 
 // --- Suppression list ---
 
-export async function addSuppression(domainId: string, email: string, reason: string): Promise<void> {
-  await sql`
-    INSERT INTO suppressions (domain_id, email, reason)
-    VALUES (${domainId}, ${email}, ${reason})
-    ON CONFLICT (domain_id, email) DO UPDATE SET reason = EXCLUDED.reason`;
+export function addSuppression(domainId: string, email: string, reason: string): void {
+  db.insert(suppressions).values({ domainId, email, reason })
+    .onConflictDoUpdate({ target: [suppressions.domainId, suppressions.email], set: { reason } })
+    .run();
 }
 
-export async function isSuppressed(domainId: string, email: string): Promise<boolean> {
-  const rows = await sql`SELECT 1 FROM suppressions WHERE domain_id = ${domainId} AND email = ${email}`;
+export function isSuppressed(domainId: string, email: string): boolean {
+  const rows = db.select().from(suppressions)
+    .where(and(eq(suppressions.domainId, domainId), eq(suppressions.email, email)))
+    .all();
   return rows.length > 0;
 }
 
-export async function removeSuppression(domainId: string, email: string): Promise<void> {
-  await sql`DELETE FROM suppressions WHERE domain_id = ${domainId} AND email = ${email}`;
+export function removeSuppression(domainId: string, email: string): void {
+  db.delete(suppressions)
+    .where(and(eq(suppressions.domainId, domainId), eq(suppressions.email, email)))
+    .run();
 }
 
 // --- Send counter (monthly) ---
 
-export async function incrementSendCount(domainId: string): Promise<number> {
+export function incrementSendCount(domainId: string): number {
   const month = new Date().toISOString().slice(0, 7);
-  const expiresAt = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000);
-  const rows = await sql`
-    INSERT INTO send_counts (domain_id, month, count, expires_at)
-    VALUES (${domainId}, ${month}, 1, ${expiresAt})
-    ON CONFLICT (domain_id, month) DO UPDATE SET count = send_counts.count + 1
-    RETURNING count`;
+  const expiresAt = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString();
+  const rows = db.insert(sendCounts).values({ domainId, month, count: 1, expiresAt })
+    .onConflictDoUpdate({
+      target: [sendCounts.domainId, sendCounts.month],
+      set: { count: rawSql`${sendCounts.count} + 1` },
+    })
+    .returning()
+    .all();
   return rows[0].count;
 }
 
-export async function getSendCount(domainId: string): Promise<number> {
+export function getSendCount(domainId: string): number {
   const month = new Date().toISOString().slice(0, 7);
-  const rows = await sql`SELECT count FROM send_counts WHERE domain_id = ${domainId} AND month = ${month}`;
+  const rows = db.select().from(sendCounts)
+    .where(and(eq(sendCounts.domainId, domainId), eq(sendCounts.month, month)))
+    .all();
   return rows.length ? rows[0].count : 0;
 }
 
 // --- Bulk jobs ---
 
-export async function createBulkJob(job: Omit<BulkJob, "id" | "createdAt" | "sent" | "failed" | "skippedSuppressed" | "status">): Promise<BulkJob> {
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const rows = await sql`
-    INSERT INTO bulk_jobs (domain_id, recipients, subject, html, "from", total_recipients, expires_at)
-    VALUES (${job.domainId}, ${job.recipients}, ${job.subject}, ${job.html}, ${job.from}, ${job.totalRecipients}, ${expiresAt})
-    RETURNING *`;
+export function createBulkJob(job: Omit<BulkJob, "id" | "createdAt" | "sent" | "failed" | "skippedSuppressed" | "status">): BulkJob {
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const rows = db.insert(bulkJobs).values({
+    domainId: job.domainId,
+    recipients: job.recipients,
+    subject: job.subject,
+    html: job.html,
+    from: job.from,
+    totalRecipients: job.totalRecipients,
+    expiresAt,
+  }).returning().all();
   return rowToBulkJob(rows[0]);
 }
 
-export async function getBulkJob(domainId: string, jobId: string): Promise<BulkJob | null> {
-  const rows = await sql`SELECT * FROM bulk_jobs WHERE domain_id = ${domainId} AND id = ${jobId}`;
+export function getBulkJob(domainId: string, jobId: string): BulkJob | null {
+  const rows = db.select().from(bulkJobs)
+    .where(and(eq(bulkJobs.domainId, domainId), eq(bulkJobs.id, jobId)))
+    .all();
   return rows.length ? rowToBulkJob(rows[0]) : null;
 }
 
-export async function updateBulkJob(job: BulkJob): Promise<void> {
-  await sql`
-    UPDATE bulk_jobs SET
-      status = ${job.status},
-      sent = ${job.sent},
-      failed = ${job.failed},
-      skipped_suppressed = ${job.skippedSuppressed},
-      completed_at = ${job.completedAt ?? null},
-      last_error = ${job.lastError ?? null}
-    WHERE id = ${job.id}`;
+export function updateBulkJob(job: BulkJob): void {
+  db.update(bulkJobs).set({
+    status: job.status,
+    sent: job.sent,
+    failed: job.failed,
+    skippedSuppressed: job.skippedSuppressed,
+    completedAt: job.completedAt ?? null,
+    lastError: job.lastError ?? null,
+  }).where(eq(bulkJobs.id, job.id)).run();
 }
 
-export async function listPendingBulkJobs(): Promise<BulkJob[]> {
-  const rows = await sql`
-    SELECT * FROM bulk_jobs WHERE status IN ('queued', 'processing') ORDER BY created_at`;
+export function listPendingBulkJobs(): BulkJob[] {
+  const rows = db.select().from(bulkJobs)
+    .where(inArray(bulkJobs.status, ["queued", "processing"]))
+    .orderBy(asc(bulkJobs.createdAt))
+    .all();
   return rows.map(rowToBulkJob);
 }
 
 // --- Agent invite tokens ---
 
-export async function createAgentInvite(domainId: string, email: string, name: string, role: "admin" | "agent"): Promise<string> {
+export function createAgentInvite(domainId: string, email: string, name: string, role: "admin" | "agent"): string {
   const token = crypto.randomUUID();
-  await sql`
-    INSERT INTO tokens (token, kind, value, expires_at)
-    VALUES (${token}, 'agent-invite', ${JSON.stringify({ domainId, email, name, role })}, NOW() + INTERVAL '7 days')`;
+  const expiresAt = new Date(Date.now() + 7 * 24 * 3600_000).toISOString();
+  db.insert(tokens).values({ token, kind: "agent-invite", value: { domainId, email, name, role }, expiresAt }).run();
   return token;
 }
 
-export async function getAgentInvite(token: string): Promise<{ domainId: string; email: string; name: string; role: "admin" | "agent" } | null> {
-  const rows = await sql`
-    SELECT value FROM tokens WHERE token = ${token} AND kind = 'agent-invite' AND expires_at > NOW()`;
+export function getAgentInvite(token: string): { domainId: string; email: string; name: string; role: "admin" | "agent" } | null {
+  const now = new Date().toISOString();
+  const rows = db.select().from(tokens)
+    .where(and(eq(tokens.token, token), eq(tokens.kind, "agent-invite"), gt(tokens.expiresAt, now)))
+    .all();
   if (!rows.length) return null;
   return rows[0].value as any;
 }
 
-export async function deleteAgentInvite(token: string): Promise<void> {
-  await sql`DELETE FROM tokens WHERE token = ${token} AND kind = 'agent-invite'`;
+export function deleteAgentInvite(token: string): void {
+  db.delete(tokens).where(and(eq(tokens.token, token), eq(tokens.kind, "agent-invite"))).run();
 }
 
 // --- Plan limits extension for Mesa/agents ---
@@ -990,8 +1112,8 @@ export const PLAN_MESA_LIMITS = {
 
 // --- Admin: list all users ---
 
-export async function listAllUsers(): Promise<Omit<User, "passwordHash">[]> {
-  const rows = await sql`SELECT * FROM users ORDER BY created_at DESC`;
+export function listAllUsers(): Omit<User, "passwordHash">[] {
+  const rows = db.select().from(users).orderBy(desc(users.createdAt)).all();
   return rows.map(r => {
     const u = rowToUser(r);
     const { passwordHash: _, ...safe } = u;
@@ -999,12 +1121,12 @@ export async function listAllUsers(): Promise<Omit<User, "passwordHash">[]> {
   });
 }
 
-export async function deleteUser(email: string): Promise<boolean> {
+export function deleteUser(email: string): boolean {
   // CASCADE from domains handles most cleanup
-  const res = await sql`DELETE FROM users WHERE email = ${email}`;
-  if (res.count === 0) return false;
+  const result = db.delete(users).where(eq(users.email, email)).run();
+  if (result.changes === 0) return false;
   // Clean up tokens related to this user
-  await sql`DELETE FROM tokens WHERE kind IN ('verify', 'password') AND value->>'email' = ${email}`;
+  sqlite.prepare(`DELETE FROM tokens WHERE kind IN ('verify', 'password') AND json_extract(value, '$.email') = ?`).run(email);
   return true;
 }
 
@@ -1021,21 +1143,8 @@ export interface Coupon {
   createdAt: string;
 }
 
-function rowToCoupon(r: any): Coupon {
-  return {
-    code: r.code,
-    plan: r.plan,
-    fixedPrice: r.fixed_price,
-    description: r.description,
-    singleUse: r.single_use,
-    used: r.used,
-    expiresAt: r.expires_at ? (r.expires_at instanceof Date ? r.expires_at.toISOString() : r.expires_at) : undefined,
-    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
-  };
-}
-
-export async function getCoupon(code: string): Promise<Coupon | null> {
-  const rows = await sql`SELECT * FROM coupons WHERE code = ${code}`;
+export function getCoupon(code: string): Coupon | null {
+  const rows = db.select().from(coupons).where(eq(coupons.code, code)).all();
   if (!rows.length) return null;
   const coupon = rowToCoupon(rows[0]);
   if (coupon.singleUse && coupon.used) return null;
@@ -1043,34 +1152,28 @@ export async function getCoupon(code: string): Promise<Coupon | null> {
   return coupon;
 }
 
-export async function createCoupon(coupon: Omit<Coupon, "used" | "createdAt">): Promise<Coupon> {
-  const rows = await sql`
-    INSERT INTO coupons (code, plan, fixed_price, description, single_use, expires_at)
-    VALUES (${coupon.code}, ${coupon.plan}, ${coupon.fixedPrice}, ${coupon.description}, ${coupon.singleUse}, ${coupon.expiresAt ?? null})
-    RETURNING *`;
+export function createCoupon(coupon: Omit<Coupon, "used" | "createdAt">): Coupon {
+  const rows = db.insert(coupons).values({
+    code: coupon.code,
+    plan: coupon.plan,
+    fixedPrice: coupon.fixedPrice,
+    description: coupon.description,
+    singleUse: coupon.singleUse,
+    expiresAt: coupon.expiresAt ?? null,
+  }).returning().all();
   return rowToCoupon(rows[0]);
 }
 
-export async function listCoupons(): Promise<Coupon[]> {
-  const rows = await sql`SELECT * FROM coupons ORDER BY created_at DESC`;
+export function listCoupons(): Coupon[] {
+  const rows = db.select().from(coupons).orderBy(desc(coupons.createdAt)).all();
   return rows.map(rowToCoupon);
 }
 
-export async function deleteCoupon(code: string): Promise<boolean> {
-  const res = await sql`DELETE FROM coupons WHERE code = ${code}`;
-  return res.count > 0;
+export function deleteCoupon(code: string): boolean {
+  const result = db.delete(coupons).where(eq(coupons.code, code)).run();
+  return result.changes > 0;
 }
 
-export async function markCouponUsed(code: string): Promise<void> {
-  await sql`UPDATE coupons SET used = TRUE WHERE code = ${code}`;
-}
-
-// --- Test helpers ---
-
-export function _getSql() {
-  return sql;
-}
-
-export function _setSql(newSql: typeof sql) {
-  sql = newSql;
+export function markCouponUsed(code: string): void {
+  db.update(coupons).set({ used: true }).where(eq(coupons.code, code)).run();
 }

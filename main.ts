@@ -1,4 +1,11 @@
 import { Elysia } from "elysia";
+import { node } from "@elysiajs/node";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import cron from "node-cron";
+import { db } from "./pg.js";
+import { users as usersTable } from "./schema.js";
+import { eq } from "drizzle-orm";
 import {
   getUser,
   createUser,
@@ -75,7 +82,7 @@ import {
   listCoupons,
   deleteCoupon,
   markCouponUsed,
-} from "./db.ts";
+} from "./db.js";
 import {
   hashPassword,
   verifyPassword,
@@ -83,8 +90,8 @@ import {
   makeAuthCookie,
   clearAuthCookie,
   getAuthUser,
-} from "./auth.ts";
-import { checkRateLimit } from "./rate-limit.ts";
+} from "./auth.js";
+import { checkRateLimit } from "./rate-limit.js";
 import {
   verifyDomain,
   checkDomainStatus,
@@ -101,11 +108,11 @@ import {
   deleteBackupFromS3,
   deleteConfigurationSet,
   deleteDomainIdentity,
-} from "./ses.ts";
-import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, extractAttachmentByIndex, rebuildConversationsFromS3 } from "./forwarding.ts";
-import { fetchEmailFromS3, repairReceiptRules, ensureSnsSubscription } from "./ses.ts";
-import { log } from "./logger.ts";
-import "./cron.ts";
+} from "./ses.js";
+import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, extractAttachmentByIndex, rebuildConversationsFromS3 } from "./forwarding.js";
+import { fetchEmailFromS3, repairReceiptRules, ensureSnsSubscription } from "./ses.js";
+import { log } from "./logger.js";
+import "./cron.js";
 
 // --- Coupons (dynamic, from DB) ---
 type PlanKeyTop = "basico" | "freelancer" | "developer" | "pro" | "agencia";
@@ -122,7 +129,7 @@ function ensureEnv() {
     "AWS_SECRET_ACCESS_KEY",
   ];
   for (const key of REQUIRED_ENV) {
-    if (!Deno.env.get(key)) throw new Error(`Missing required env var: ${key}`);
+    if (!process.env[key]) throw new Error(`Missing required env var: ${key}`);
   }
   envChecked = true;
 }
@@ -130,16 +137,16 @@ function ensureEnv() {
 // --- Helpers ---
 
 function getMainDomainUrl(): string {
-  const raw = Deno.env.get("MAIN_DOMAIN") ?? "localhost:8000";
+  const raw = process.env.MAIN_DOMAIN ?? "localhost:8000";
   const bare = raw.replace(/^https?:\/\//, "").replace(/\/+$/, "");
   return `https://${bare}`;
 }
 
-const PUBLIC_DIR = new URL("./public", import.meta.url).pathname;
+const PUBLIC_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), "public");
 
 async function serveStatic(path: string): Promise<Response> {
   try {
-    const file = await Deno.readFile(`${PUBLIC_DIR}${path}`);
+    const file = fs.readFileSync(`${PUBLIC_DIR}${path}`);
     const ext = path.split(".").pop() ?? "";
     const types: Record<string, string> = {
       html: "text/html; charset=utf-8",
@@ -173,7 +180,7 @@ async function rateLimitGuard(
   limit: number,
   windowMs: number,
 ): Promise<Response | null> {
-  const result = await checkRateLimit(ip, limit, windowMs);
+  const result = checkRateLimit(ip, limit, windowMs);
   if (!result.allowed) {
     const retryAfter = Math.ceil((result.resetAt - Date.now()) / 1000);
     return new Response(JSON.stringify({ error: "Demasiadas solicitudes" }), {
@@ -190,7 +197,7 @@ async function rateLimitGuard(
 // --- Admin check ---
 
 function isAdmin(email: string): boolean {
-  const admins = (Deno.env.get("ADMIN_EMAILS") ?? "").split(",").map(e => e.trim().toLowerCase());
+  const admins = (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim().toLowerCase());
   return admins.includes(email.toLowerCase());
 }
 
@@ -271,7 +278,7 @@ function buildSnsStringToSign(body: Record<string, string>): string {
 async function verifySnsSignature(
   body: Record<string, string>,
 ): Promise<boolean> {
-  const expectedTopicArn = Deno.env.get("SNS_TOPIC_ARN");
+  const expectedTopicArn = process.env.SNS_TOPIC_ARN;
   if (expectedTopicArn && body.TopicArn !== expectedTopicArn) return false;
 
   const certUrl = body.SigningCertURL;
@@ -373,12 +380,21 @@ async function checkDomainAccess(
 
 // --- App ---
 
-const app = new Elysia()
+const app = new Elysia({ adapter: node() })
+
+  // --- Naked domain redirect ---
+  .onRequest(({ request }) => {
+    const url = new URL(request.url);
+    if (url.hostname === "mailmask.studio") {
+      url.hostname = "www.mailmask.studio";
+      return Response.redirect(url.toString(), 301);
+    }
+  })
 
   // --- CORS ---
   .onRequest(({ request }) => {
     ensureEnv();
-    const isDeploy = !!Deno.env.get("DENO_DEPLOYMENT_ID");
+    const isDeploy = !!process.env.FLY_APP_NAME;
     const corsOrigin = isDeploy
       ? getMainDomainUrl()
       : request.headers.get("origin") || "http://localhost:8000";
@@ -395,7 +411,7 @@ const app = new Elysia()
     }
   })
   .onAfterHandle(({ request, response }) => {
-    const isDeploy = !!Deno.env.get("DENO_DEPLOYMENT_ID");
+    const isDeploy = !!process.env.FLY_APP_NAME;
     const corsOrigin = isDeploy
       ? getMainDomainUrl()
       : request.headers.get("origin") || "http://localhost:8000";
@@ -507,7 +523,7 @@ const app = new Elysia()
     await setVerifyToken(email, verifyToken);
     const verifyUrl = `${getMainDomainUrl()}/api/auth/verify-email?token=${verifyToken}`;
     const alertFrom =
-      Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+      process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
     try {
       await sendFromDomain(
         alertFrom,
@@ -544,7 +560,7 @@ const app = new Elysia()
       );
 
     // Per-email rate limit: 5 attempts per 15 minutes (prevents credential stuffing across IPs)
-    const emailRl = await checkRateLimit(`login:${email}`, 5, 15 * 60_000);
+    const emailRl = checkRateLimit(`login:${email}`, 5, 15 * 60_000);
     if (!emailRl.allowed) {
       const waitMin = Math.max(1, Math.ceil((emailRl.resetAt - Date.now()) / 60_000));
       return new Response(
@@ -678,7 +694,7 @@ const app = new Elysia()
     const verifyToken = crypto.randomUUID();
     await setVerifyToken(auth.email, verifyToken);
     const verifyUrl = `${getMainDomainUrl()}/api/auth/verify-email?token=${verifyToken}`;
-    const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+    const alertFrom = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
     try {
       await sendFromDomain(alertFrom, auth.email, "Verifica tu email — MailMask",
         `Hola,\n\nVerifica tu email haciendo clic en este enlace:\n${verifyUrl}\n\nTienes 7 días para verificar tu cuenta.\n\n— MailMask`);
@@ -702,7 +718,7 @@ const app = new Elysia()
         status: 400,
       });
 
-    const emailLimited = await checkRateLimit(`forgot:${email}`, 1, 300_000);
+    const emailLimited = checkRateLimit(`forgot:${email}`, 1, 300_000);
     if (!emailLimited.allowed) {
       const waitMs = emailLimited.resetAt - Date.now();
       const waitMin = Math.max(1, Math.ceil(waitMs / 60_000));
@@ -720,13 +736,13 @@ const app = new Elysia()
       await setPasswordToken(email, token);
       const resetUrl = `${getMainDomainUrl()}/set-password?token=${token}`;
       const alertFrom =
-        Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+        process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
       try {
         await sendFromDomain(
           alertFrom,
           email,
           "Restablecer contraseña — MailMask",
-          `Hola,\n\nRecibimos una solicitud para restablecer tu contraseña.\n\nHaz clic en este enlace para crear una nueva contraseña:\n${resetUrl}\n\nEste enlace es válido por 7 días.\n\nSi no solicitaste esto, puedes ignorar este email.\n\n— https://MailMask.deno.dev`,
+          `Hola,\n\nRecibimos una solicitud para restablecer tu contraseña.\n\nHaz clic en este enlace para crear una nueva contraseña:\n${resetUrl}\n\nEste enlace es válido por 7 días.\n\nSi no solicitaste esto, puedes ignorar este email.\n\n— https://mailmask.studio`,
         );
       } catch (err) {
         log("error", "auth", "Failed to send password reset email", { error: String(err) });
@@ -853,7 +869,7 @@ const app = new Elysia()
     }
 
     // Check if domain already registered
-    const existing = await (await import("./db.ts")).getDomainByName(domain);
+    const existing = await (await import("./db.js")).getDomainByName(domain);
     if (existing) {
       return new Response(
         JSON.stringify({ error: "Este dominio ya está registrado" }),
@@ -1496,7 +1512,7 @@ const app = new Elysia()
     }
 
     const { PreApproval } = await import("mercadopago");
-    const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
+    const mpAccessToken = process.env.MP_ACCESS_TOKEN;
     if (!mpAccessToken) {
       return new Response(
         JSON.stringify({ error: "MercadoPago no configurado" }),
@@ -1528,7 +1544,7 @@ const app = new Elysia()
             },
           }),
         },
-        payer_email: "guest@mailmask.app",
+        payer_email: "guest@mailmask.studio",
         back_url: backUrl,
         external_reference: token,
       };
@@ -1578,7 +1594,7 @@ const app = new Elysia()
     }
 
     const { PreApproval } = await import("mercadopago");
-    const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
+    const mpAccessToken = process.env.MP_ACCESS_TOKEN;
     if (!mpAccessToken) {
       return new Response(
         JSON.stringify({ error: "MercadoPago no configurado" }),
@@ -1610,7 +1626,7 @@ const app = new Elysia()
             },
           }),
         },
-        payer_email: "guest@mailmask.app",
+        payer_email: "guest@mailmask.studio",
         back_url: backUrl,
         external_reference: user.email,
       };
@@ -1634,7 +1650,7 @@ const app = new Elysia()
 
   .post("/api/webhooks/mercadopago", async ({ request }) => {
     // Validate HMAC signature
-    const secret = Deno.env.get("MP_WEBHOOK_SECRET");
+    const secret = process.env.MP_WEBHOOK_SECRET;
     if (!secret) {
       log("error", "webhook", "MP_WEBHOOK_SECRET not configured");
       return new Response("Server misconfigured", { status: 500 });
@@ -1687,7 +1703,7 @@ const app = new Elysia()
           return new Response("OK", { status: 200 });
         }
 
-        const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
+        const mpAccessToken = process.env.MP_ACCESS_TOKEN;
         if (!mpAccessToken) {
           log("error", "webhook", "MP_ACCESS_TOKEN not configured");
           return new Response("Server misconfigured", { status: 500 });
@@ -1785,7 +1801,7 @@ const app = new Elysia()
               });
               log("info", "webhook", "Subscription activated", { email, plan });
 
-              const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+              const alertFrom = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
 
               if (isGuestCheckout) {
                 // Guest checkout: send welcome email with password-setup link
@@ -1872,7 +1888,7 @@ const app = new Elysia()
       );
     }
 
-    const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
+    const mpAccessToken = process.env.MP_ACCESS_TOKEN;
     if (!mpAccessToken) {
       return new Response(
         JSON.stringify({ error: "MercadoPago no configurado" }),
@@ -2507,7 +2523,7 @@ const app = new Elysia()
     const token = await createAgentInvite(domain.id, email, name, role);
     const inviteUrl = `${getMainDomainUrl()}/api/agents/accept?token=${token}`;
 
-    const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+    const alertFrom = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
     try {
       await sendFromDomain(alertFrom, email, `Invitación a Mesa — ${domain.domain}`,
         `Hola ${name},\n\n${auth.email} te invita como ${role} en Mesa para el dominio ${domain.domain}.\n\nAcepta la invitación aquí:\n${inviteUrl}\n\nEste enlace es válido por 7 días.\n\n— MailMask`);
@@ -2531,7 +2547,7 @@ const app = new Elysia()
 
     const existingUser = await getUser(invite.email);
     if (!existingUser) {
-      const { hashPassword: hp } = await import("./auth.ts");
+      const { hashPassword: hp } = await import("./auth.js");
       await createUserIfNotExists(invite.email, await hp(crypto.randomUUID()));
     }
 
@@ -2610,7 +2626,7 @@ const app = new Elysia()
           const configSet = message.mail?.tags?.["ses:configuration-set"]?.[0] ?? "";
           const domainName = configSet.replace("mailmask-", "").replace(/-/g, ".");
           if (domainName) {
-            const { getDomainByName } = await import("./db.ts");
+            const { getDomainByName } = await import("./db.js");
             const domainRecord = await getDomainByName(domainName);
             if (domainRecord) {
               await addSuppression(domainRecord.id, email, `bounce:${bounce.bounceType}`);
@@ -2626,7 +2642,7 @@ const app = new Elysia()
           const configSet = message.mail?.tags?.["ses:configuration-set"]?.[0] ?? "";
           const domainName = configSet.replace("mailmask-", "").replace(/-/g, ".");
           if (domainName) {
-            const { getDomainByName } = await import("./db.ts");
+            const { getDomainByName } = await import("./db.js");
             const domainRecord = await getDomainByName(domainName);
             if (domainRecord) {
               await addSuppression(domainRecord.id, email, "complaint");
@@ -2814,8 +2830,7 @@ const app = new Elysia()
 
     // Update emailVerified
     if (body.emailVerified !== undefined) {
-      const { sql } = await import("./pg.ts");
-      await sql`UPDATE users SET email_verified = ${!!body.emailVerified} WHERE email = ${email}`;
+      db.update(usersTable).set({ emailVerified: !!body.emailVerified }).where(eq(usersTable.email, email)).run();
     }
 
     log("info", "admin", "User updated by admin", { admin: auth.email, target: email, changes: body });
@@ -2902,7 +2917,7 @@ const app = new Elysia()
 
 // --- Bulk send cron (every minute, processes 14 emails/sec) ---
 
-Deno.cron("bulk-send", "* * * * *", async () => {
+cron.schedule("* * * * *", async () => {
   const jobs = await listPendingBulkJobs();
   if (jobs.length === 0) return;
 
@@ -2957,7 +2972,7 @@ Deno.cron("bulk-send", "* * * * *", async () => {
 
 // --- Monitoring cron (every 5 minutes) ---
 
-Deno.cron("queue-monitor", "*/5 * * * *", async () => {
+cron.schedule("*/5 * * * *", async () => {
   const queueDepth = await getQueueDepth();
   const deadLetterCount = await getDeadLetterCount();
 
@@ -2970,7 +2985,7 @@ Deno.cron("queue-monitor", "*/5 * * * *", async () => {
 
 // --- Daily backup cron (4:00 UTC) ---
 
-Deno.cron("daily-backup", "0 4 * * *", async () => {
+cron.schedule("0 4 * * *", async () => {
   try {
     const result = await runBackup();
     log("info", "backup", "Daily backup completed", { users: result.users, key: result.key });
@@ -2980,8 +2995,10 @@ Deno.cron("daily-backup", "0 4 * * *", async () => {
   }
 });
 
-const port = parseInt(Deno.env.get("PORT") ?? "8000");
-Deno.serve({ port }, (req) => app.fetch(req));
+const port = parseInt(process.env.PORT ?? "8000");
+app.listen({ port, hostname: "0.0.0.0" }, () => {
+  console.log(`MailMask running on port ${port}`);
+});
 
 // Repair receipt rules missing SNS TopicArn (one-time fix for rules created before SNS_TOPIC_ARN was set)
 // Receipt rule repair already imported at top
@@ -2990,7 +3007,7 @@ Deno.serve({ port }, (req) => app.fetch(req));
     const repaired = await repairReceiptRules();
     if (repaired > 0) log("info", "startup", `Repaired ${repaired} receipt rule(s) with missing TopicArn`);
 
-    const appUrl = Deno.env.get("APP_URL") ?? "https://mailmask.deno.dev";
+    const appUrl = process.env.APP_URL ?? "https://mailmask.studio";
     const subStatus = await ensureSnsSubscription(appUrl);
     log("info", "startup", `SNS subscription: ${subStatus}`);
   } catch (err) {

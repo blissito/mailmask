@@ -1,44 +1,59 @@
-// --- Persistent rate limiter using PostgreSQL ---
+// --- Persistent rate limiter using SQLite with Drizzle ORM ---
 
-import { sql } from "./pg.ts";
+import { sqlite } from "./pg.js";
+import { rateLimits } from "./schema.js";
 
-export async function checkRateLimit(
+export function checkRateLimit(
   ip: string,
   limit: number,
   windowMs: number,
-): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+): { allowed: boolean; remaining: number; resetAt: number } {
   const now = Date.now();
   const key = `${ip}:${limit}:${windowMs}`;
-  const expiresAt = new Date(now + windowMs);
+  const expiresAt = new Date(now + windowMs).toISOString();
 
-  // Upsert: if window expired, reset; otherwise increment
-  const rows = await sql`
+  // Use raw SQL for the upsert with CASE logic (SQLite compatible)
+  const stmt = sqlite.prepare(`
     INSERT INTO rate_limits (key, count, window_start, expires_at)
-    VALUES (${key}, 1, ${now}, ${expiresAt})
+    VALUES (?, 1, ?, ?)
     ON CONFLICT (key) DO UPDATE SET
       count = CASE
-        WHEN rate_limits.window_start + ${windowMs} <= ${now}
+        WHEN rate_limits.window_start + ? <= ?
         THEN 1
         ELSE rate_limits.count + 1
       END,
       window_start = CASE
-        WHEN rate_limits.window_start + ${windowMs} <= ${now}
-        THEN ${now}
+        WHEN rate_limits.window_start + ? <= ?
+        THEN ?
         ELSE rate_limits.window_start
       END,
       expires_at = CASE
-        WHEN rate_limits.window_start + ${windowMs} <= ${now}
-        THEN ${expiresAt}
+        WHEN rate_limits.window_start + ? <= ?
+        THEN ?
         ELSE rate_limits.expires_at
       END
-    RETURNING count, window_start`;
+    RETURNING count, window_start
+  `);
 
-  const { count, window_start } = rows[0];
-  const resetAt = Number(window_start) + windowMs;
+  const row = stmt.get(
+    key,
+    now,
+    expiresAt,
+    windowMs,
+    now,
+    windowMs,
+    now,
+    now,
+    windowMs,
+    now,
+    expiresAt,
+  ) as { count: number; window_start: number };
 
-  if (count > limit) {
+  const resetAt = Number(row.window_start) + windowMs;
+
+  if (row.count > limit) {
     return { allowed: false, remaining: 0, resetAt };
   }
 
-  return { allowed: true, remaining: limit - count, resetAt };
+  return { allowed: true, remaining: limit - row.count, resetAt };
 }

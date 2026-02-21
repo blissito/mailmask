@@ -1,7 +1,7 @@
-import { getUser, type User } from "./db.ts";
+import { getUser, type User } from "./db.js";
 
 const encoder = new TextEncoder();
-const JWT_SECRET = Deno.env.get("JWT_SECRET") ?? (() => { throw new Error("JWT_SECRET required"); })();
+const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error("JWT_SECRET required"); })();
 const JWT_EXPIRY = 3600; // 1 hour
 
 // --- Password hashing (PBKDF2 via Web Crypto) ---
@@ -88,7 +88,7 @@ export async function verifyJwt(token: string): Promise<Record<string, unknown> 
 
 // --- Cookie helpers ---
 
-const IS_PROD = Deno.env.get("DENO_DEPLOYMENT_ID") !== undefined;
+const IS_PROD = process.env.FLY_APP_NAME !== undefined;
 const SECURE_FLAG = IS_PROD ? " Secure;" : "";
 
 export function makeAuthCookie(token: string): string {

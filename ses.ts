@@ -1,5 +1,7 @@
-import { log } from "./logger.ts";
-import { sql } from "./pg.ts";
+import { log } from "./logger.js";
+import { db } from "./pg.js";
+import { tokens } from "./schema.js";
+import { eq, and, gt } from "drizzle-orm";
 
 // Lazy-loaded AWS SDK clients to reduce cold start on Deno Deploy
 let _sesOutbound: any;
@@ -9,7 +11,7 @@ let _s3: any;
 async function getSesOutbound() {
   if (!_sesOutbound) {
     const { SESClient } = await import("@aws-sdk/client-ses");
-    _sesOutbound = new SESClient({ region: Deno.env.get("AWS_REGION") ?? "us-east-2" });
+    _sesOutbound = new SESClient({ region: process.env.AWS_REGION ?? "us-east-2" });
   }
   return _sesOutbound;
 }
@@ -17,7 +19,7 @@ async function getSesOutbound() {
 async function getSesInbound() {
   if (!_sesInbound) {
     const { SESClient } = await import("@aws-sdk/client-ses");
-    _sesInbound = new SESClient({ region: Deno.env.get("AWS_SES_INBOUND_REGION") ?? "us-east-1" });
+    _sesInbound = new SESClient({ region: process.env.AWS_SES_INBOUND_REGION ?? "us-east-1" });
   }
   return _sesInbound;
 }
@@ -25,14 +27,14 @@ async function getSesInbound() {
 async function getS3() {
   if (!_s3) {
     const { S3Client } = await import("@aws-sdk/client-s3");
-    _s3 = new S3Client({ region: Deno.env.get("AWS_SES_INBOUND_REGION") ?? "us-east-1" });
+    _s3 = new S3Client({ region: process.env.AWS_SES_INBOUND_REGION ?? "us-east-1" });
   }
   return _s3;
 }
 
-const SNS_TOPIC_ARN = Deno.env.get("SNS_TOPIC_ARN") ?? "";
-const RECEIPT_RULE_SET = Deno.env.get("SES_RULE_SET") ?? "formmy-email-forwarding";
-const S3_BUCKET = Deno.env.get("S3_BUCKET") ?? "mailmask-inbound";
+const SNS_TOPIC_ARN = process.env.SNS_TOPIC_ARN ?? "";
+const RECEIPT_RULE_SET = process.env.SES_RULE_SET ?? "formmy-email-forwarding";
+const S3_BUCKET = process.env.S3_BUCKET ?? "mailmask-inbound";
 
 // --- Health check ---
 
@@ -94,7 +96,7 @@ async function createConfigurationSet(domain: string): Promise<void> {
     if (!String(err).includes("AlreadyExists")) throw err;
   }
 
-  const snsTopicArn = Deno.env.get("SNS_OUTBOUND_TOPIC_ARN");
+  const snsTopicArn = process.env.SNS_OUTBOUND_TOPIC_ARN;
   if (snsTopicArn) {
     try {
       await ses.send(new CreateConfigurationSetEventDestinationCommand({
@@ -295,7 +297,7 @@ export async function forwardEmail(originalRaw: string, from: string, to: string
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
 
-  const forwardingAddress = Deno.env.get("FORWARDING_FROM") ?? "mailmask@easybits.cloud";
+  const forwardingAddress = process.env.FORWARDING_FROM ?? "mailmask@mailmask.studio";
 
   // Rewrite From header and add Reply-To so replies go to original sender
   let rewrittenRaw = originalRaw.replace(
@@ -330,7 +332,7 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
 
-  const messageId = `<${crypto.randomUUID()}@${from.split("@")[1] ?? "mailmask.app"}>`;
+  const messageId = `<${crypto.randomUUID()}@${from.split("@")[1] ?? "mailmask.studio"}>`;
   const boundary = `----=_Part_${Date.now()}`;
   const headers = [
     `From: ${from}`,
@@ -387,7 +389,7 @@ export async function deleteEmailFromS3(bucket: string, key: string): Promise<vo
 
 // --- S3 backup helpers ---
 
-const BACKUP_BUCKET = Deno.env.get("S3_BACKUP_BUCKET") ?? "mailmask-inbound";
+const BACKUP_BUCKET = process.env.S3_BACKUP_BUCKET ?? "mailmask-inbound";
 const BACKUP_PREFIX = "backups/";
 const BACKUP_RETENTION = 7;
 
@@ -464,7 +466,7 @@ let _sns: any;
 async function getSns() {
   if (!_sns) {
     const { SNSClient } = await import("@aws-sdk/client-sns");
-    _sns = new SNSClient({ region: Deno.env.get("AWS_SES_INBOUND_REGION") ?? "us-east-1" });
+    _sns = new SNSClient({ region: process.env.AWS_SES_INBOUND_REGION ?? "us-east-1" });
   }
   return _sns;
 }
@@ -516,15 +518,17 @@ export async function ensureSnsSubscription(appUrl: string): Promise<string> {
 // --- Admin alerts with throttle ---
 
 export async function sendAlert(alertType: string, message: string): Promise<boolean> {
-  const alertEmail = Deno.env.get("ALERT_EMAIL") ?? "brenda@fixter.org,contacto@fixter.org";
+  const alertEmail = process.env.ALERT_EMAIL ?? "brenda@fixter.org,contacto@fixter.org";
   if (!alertEmail) return false;
 
   // Throttle: max 1 alert of same type per hour
   const throttleToken = `alert-throttle:${alertType}`;
-  const existing = await sql`SELECT 1 FROM tokens WHERE token = ${throttleToken} AND expires_at > NOW()`;
+  const existing = await db.select().from(tokens).where(
+    and(eq(tokens.token, throttleToken), gt(tokens.expiresAt, new Date().toISOString()))
+  );
   if (existing.length > 0) return false;
 
-  const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
+  const alertFrom = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
   const recipients = alertEmail.split(",").map((e) => e.trim()).filter(Boolean);
   try {
     const ses = await getSesOutbound();
@@ -550,10 +554,13 @@ export async function sendAlert(alertType: string, message: string): Promise<boo
       Source: alertFrom,
       Destinations: recipients,
     }));
-    await sql`
-      INSERT INTO tokens (token, kind, value, expires_at)
-      VALUES (${throttleToken}, 'alert-throttle', '{}', NOW() + INTERVAL '1 hour')
-      ON CONFLICT (token) DO UPDATE SET expires_at = EXCLUDED.expires_at`;
+    const expiresAt = new Date(Date.now() + 3600_000).toISOString();
+    await db.insert(tokens).values({
+      token: throttleToken,
+      kind: "alert-throttle",
+      value: {},
+      expiresAt,
+    }).onConflictDoUpdate({ target: tokens.token, set: { expiresAt } });
     return true;
   } catch (err) {
     log("error", "ses", "Failed to send alert", { alertType, error: String(err) });

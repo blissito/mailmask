@@ -1,39 +1,63 @@
-import { sendFromDomain, deleteEmailFromS3 } from "./ses.ts";
-import { log } from "./logger.ts";
-import { sql } from "./pg.ts";
-import { purgeDeletedConversations } from "./db.ts";
+import cron from "node-cron";
+import { sendFromDomain, deleteEmailFromS3 } from "./ses.js";
+import { log } from "./logger.js";
+import { db } from "./pg.js";
+import { tokens, emailLogs, forwardQueue, rateLimits, sendCounts, bulkJobs, users } from "./schema.js";
+import { lte, and, inArray, isNotNull, gt, sql as rawSql } from "drizzle-orm";
+import { purgeDeletedConversations } from "./db.js";
 
 // Daily at 14:00 UTC — warn users whose subscription expires within 3 days
-Deno.cron("expiry-warnings", "0 14 * * *", async () => {
-  const alertFrom = Deno.env.get("ALERT_FROM_EMAIL") ?? "noreply@mailmask.app";
-  const baseUrl = Deno.env.get("MAIN_DOMAIN")
-    ? `https://${Deno.env.get("MAIN_DOMAIN")!.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`
-    : "https://mailmask.deno.dev";
+cron.schedule("0 14 * * *", async () => {
+  const alertFrom = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
+  const baseUrl = process.env.MAIN_DOMAIN
+    ? `https://${process.env.MAIN_DOMAIN.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`
+    : "https://mailmask.studio";
 
-  // Find users expiring within 3 days who haven't been warned
-  const users = await sql`
-    SELECT email, sub_period_end FROM users
-    WHERE sub_status IN ('active', 'cancelled')
-      AND sub_period_end IS NOT NULL
-      AND sub_period_end > NOW()
-      AND sub_period_end <= NOW() + INTERVAL '3 days'
-      AND email NOT IN (
-        SELECT value->>'email' FROM tokens WHERE kind = 'expiry-warned' AND expires_at > NOW()
-      )`;
+  // Find users expiring within 3 days who haven't been warned yet.
+  // Step 1: get emails of already-warned users (stored as JSON value)
+  const now = new Date().toISOString();
+  const threeDaysLater = new Date(Date.now() + 3 * 24 * 3600_000).toISOString();
+
+  const warnedRows = await db.select({ value: tokens.value })
+    .from(tokens)
+    .where(and(rawSql`${tokens.kind} = 'expiry-warned'`, gt(tokens.expiresAt, now)));
+  const warnedEmails = new Set(
+    warnedRows
+      .map((r) => (r.value as { email?: string } | null)?.email)
+      .filter((e): e is string => typeof e === "string"),
+  );
+
+  // Step 2: get users expiring within 3 days with active/cancelled status
+  const expiringUsers = await db.select({ email: users.email, subPeriodEnd: users.subPeriodEnd })
+    .from(users)
+    .where(
+      and(
+        inArray(users.subStatus, ["active", "cancelled"]),
+        isNotNull(users.subPeriodEnd),
+        gt(users.subPeriodEnd, now),
+        lte(users.subPeriodEnd, threeDaysLater),
+      ),
+    );
+
+  const toWarn = expiringUsers.filter((u) => !warnedEmails.has(u.email));
 
   let warned = 0;
-  for (const user of users) {
+  for (const user of toWarn) {
     try {
-      const endDate = new Date(user.sub_period_end).toLocaleDateString("es-MX");
+      const endDate = new Date(user.subPeriodEnd!).toLocaleDateString("es-MX");
       await sendFromDomain(
         alertFrom,
         user.email,
         "Tu plan de MailMask está por vencer",
         `Hola,\n\nTu suscripción de MailMask vence el ${endDate}.\n\nSi tu pago está al día, tu plan se renovará automáticamente. Si no, reactiva tu suscripción para no perder acceso:\n${baseUrl}/app\n\n— MailMask`,
       );
-      await sql`
-        INSERT INTO tokens (token, kind, value, expires_at)
-        VALUES (${crypto.randomUUID()}, 'expiry-warned', ${JSON.stringify({ email: user.email })}, NOW() + INTERVAL '4 days')`;
+      const expiresAt = new Date(Date.now() + 4 * 24 * 3600_000).toISOString();
+      await db.insert(tokens).values({
+        token: crypto.randomUUID(),
+        kind: "expiry-warned",
+        value: { email: user.email },
+        expiresAt,
+      });
       warned++;
     } catch (err) {
       log("error", "cron", "Failed to send expiry warning", { email: user.email, error: String(err) });
@@ -44,17 +68,18 @@ Deno.cron("expiry-warnings", "0 14 * * *", async () => {
 });
 
 // Every 15 minutes — clean up expired rows
-Deno.cron("cleanup-expired", "*/15 * * * *", async () => {
+cron.schedule("*/15 * * * *", async () => {
   try {
+    const now = new Date().toISOString();
     const results = await Promise.all([
-      sql`DELETE FROM tokens WHERE expires_at <= NOW()`,
-      sql`DELETE FROM email_logs WHERE expires_at <= NOW()`,
-      sql`DELETE FROM forward_queue WHERE expires_at <= NOW()`,
-      sql`DELETE FROM rate_limits WHERE expires_at <= NOW()`,
-      sql`DELETE FROM send_counts WHERE expires_at <= NOW()`,
-      sql`DELETE FROM bulk_jobs WHERE expires_at <= NOW()`,
+      db.delete(tokens).where(lte(tokens.expiresAt, now)),
+      db.delete(emailLogs).where(lte(emailLogs.expiresAt, now)),
+      db.delete(forwardQueue).where(lte(forwardQueue.expiresAt, now)),
+      db.delete(rateLimits).where(lte(rateLimits.expiresAt, now)),
+      db.delete(sendCounts).where(lte(sendCounts.expiresAt, now)),
+      db.delete(bulkJobs).where(lte(bulkJobs.expiresAt, now)),
     ]);
-    const total = results.reduce((sum, r) => sum + r.count, 0);
+    const total = results.reduce((sum, r) => sum + (r.changes ?? 0), 0);
     if (total > 0) log("info", "cron", "Cleaned expired rows", { count: total });
   } catch (err) {
     log("error", "cron", "Cleanup failed", { error: String(err) });
@@ -62,7 +87,7 @@ Deno.cron("cleanup-expired", "*/15 * * * *", async () => {
 });
 
 // Daily at 3:00 UTC — purge conversations deleted >15 days ago + their S3 objects
-Deno.cron("purge-deleted-conversations", "0 3 * * *", async () => {
+cron.schedule("0 3 * * *", async () => {
   try {
     const s3Keys = await purgeDeletedConversations(15);
     for (const { s3Bucket, s3Key } of s3Keys) {

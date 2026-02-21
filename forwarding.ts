@@ -1,7 +1,8 @@
-import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, type Rule, type ForwardQueueItem } from "./db.ts";
-import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchEmailHeadersFromS3, sendFromDomain } from "./ses.ts";
-import { checkRateLimit } from "./rate-limit.ts";
-import { log } from "./logger.ts";
+import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, type Rule, type ForwardQueueItem } from "./db.js";
+import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchEmailHeadersFromS3, sendFromDomain } from "./ses.js";
+import { checkRateLimit } from "./rate-limit.js";
+import { log } from "./logger.js";
+import cron from "node-cron";
 
 // --- SNS notification types ---
 
@@ -296,7 +297,7 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
 // --- Rebuild conversations from S3 ---
 
 export async function rebuildConversationsFromS3(domainId: string, domainName: string): Promise<number> {
-  const s3Bucket = Deno.env.get("S3_BUCKET") ?? "mailmask-inbound";
+  const s3Bucket = process.env.S3_BUCKET ?? "mailmask-inbound";
   const keys = await listInboundEmailKeys(domainName);
   if (keys.length === 0) return 0;
 
@@ -442,7 +443,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     }
 
     // Rate limit: per-domain forwarding
-    const rlResult = await checkRateLimit(`fwd:${domain.id}`, forwardPerHour, 3600_000);
+    const rlResult = checkRateLimit(`fwd:${domain.id}`, forwardPerHour, 3600_000);
     if (!rlResult.allowed) {
       log("warn", "forwarding", "Forwarding rate limit exceeded", { domainId: domain.id, domainName, forwardPerHour });
       await sendAlert("fwd-rate-limit", `Forwarding rate limit exceeded for domain ${domainName} (${forwardPerHour}/hr). Email from ${from} discarded.`);
@@ -532,7 +533,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
           owner.email,
           `Primer email recibido en ${aliasAddr}`,
           `¡Tu alias ${aliasAddr} acaba de recibir su primer email!\n\nDe: ${from}\nAsunto: ${subject}\n\nPuedes ver la actividad de tus alias en tu panel de control.`,
-          { html: `<p>¡Tu alias <strong>${aliasAddr}</strong> acaba de recibir su primer email!</p><p><strong>De:</strong> ${from}<br><strong>Asunto:</strong> ${subject}</p><p>Puedes ver la actividad de tus alias en tu <a href="https://mailmask.easybits.cloud/app">panel de control</a>.</p>` },
+          { html: `<p>¡Tu alias <strong>${aliasAddr}</strong> acaba de recibir su primer email!</p><p><strong>De:</strong> ${from}<br><strong>Asunto:</strong> ${subject}</p><p>Puedes ver la actividad de tus alias en tu <a href="https://mailmask.studio/app">panel de control</a>.</p>` },
         ).catch(() => {}); // fire-and-forget
       }
     } else {
@@ -649,7 +650,7 @@ async function doForward(rawContent: string, from: string, to: string, domainId:
 
 // --- Retry cron (every 5 minutes) ---
 
-Deno.cron("forward-retry", "*/5 * * * *", async () => {
+cron.schedule("*/5 * * * *", async () => {
   const now = Date.now();
   const items = await listForwardQueue();
   let processed = 0;

@@ -3,4 +3,4 @@ Allow: /
 Disallow: /api/
 Disallow: /app
 Disallow: /set-password
-Sitemap: https://fancybit.dev/sitemap.xml
+Sitemap: https://mailmask.studio/sitemap.xml

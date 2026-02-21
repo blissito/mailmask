@@ -1,5 +1,35 @@
 {
+  "name": "mailmask",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx --watch main.ts",
+    "start": "tsx main.ts",
+    "test": "JWT_SECRET=test-secret-key MP_ACCESS_TOKEN=test MP_WEBHOOK_SECRET=test AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test tsx --test",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "build:css": "npx tailwindcss -c tailwind.config.ts -i public/css/input.css -o public/css/styles.css --minify"
+  },
+  "dependencies": {
+    "elysia": "^1.2",
+    "@elysiajs/node": "^1.2",
+    "drizzle-orm": "^0.38",
+    "better-sqlite3": "^11",
+    "node-cron": "^3",
+    "@aws-sdk/client-ses": "^3",
+    "@aws-sdk/client-sesv2": "^3",
+    "@aws-sdk/client-sns": "^3",
+    "@aws-sdk/client-s3": "^3",
+    "postal-mime": "^2",
+    "mercadopago": "^2"
+  },
   "devDependencies": {
-    "tailwindcss": "^3.4.19"
+    "tsx": "^4",
+    "typescript": "^5",
+    "drizzle-kit": "^0.30",
+    "@types/better-sqlite3": "^7",
+    "@types/node": "^22",
+    "@types/node-cron": "^3"
   }
 }
