@@ -226,8 +226,8 @@ body {
   color: #818cf8;
 }
 .mesa-tag-urgent {
-  background: var(--mesa-accent-dim);
-  color: rgb(var(--mask-400));
+  background: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
 }
 .mesa-tag-deleted {
   background: rgba(239, 68, 68, 0.15);
@@ -237,14 +237,14 @@ body {
   opacity: 0.55;
 }
 .mesa-action-urgent.active {
-  color: rgb(var(--mask-400));
-  border-color: rgb(var(--mask-500));
-  background: var(--mesa-accent-dim);
+  color: #fb923c;
+  border-color: #f97316;
+  background: rgba(249, 115, 22, 0.15);
 }
 .mesa-action-urgent:hover {
-  color: rgb(var(--mask-400));
-  border-color: rgb(var(--mask-500));
-  background: var(--mesa-accent-dim);
+  color: #fb923c;
+  border-color: #f97316;
+  background: rgba(249, 115, 22, 0.15);
 }
 .mesa-action-danger {
   color: #f87171;
@@ -392,8 +392,8 @@ body {
   word-break: break-word;
 }
 .mesa-msg.outbound .mesa-msg-body {
-  background: rgba(220, 38, 38, 0.06);
-  border-color: rgba(220, 38, 38, 0.15);
+  background: rgb(var(--mask-600) / 0.06);
+  border-color: rgb(var(--mask-600) / 0.15);
 }
 
 /* Attachments */

@@ -60,6 +60,7 @@ deno task test    # Run tests
 - [ ] Tests: cubrir forwarding y webhook billing. (no urgente por ahora)
 - [ ] Logs centralizados: se migrará a solución propia cuando esté lista.
 - [ ] Backup/export de datos de usuario (aliases, reglas)
+- [ ] **Email de "certificado" al verificar dominio**: Cuando un dominio pasa a verificado (DNS confirmado), enviar email estilo AWS Health Event — diseño tipo certificado/notificación con: nombre del dominio, región/fecha, estado DKIM/MX, badge de "verificado", CTA al dashboard. Inspirado en las notificaciones de AWS SES DKIM_PENDING_TO_VERIFIED. Pendiente: detectar el momento exacto de verificación (¿cron de chequeo DNS? ¿webhook SES?).
 - [ ] Notificaciones por email cuando un alias recibe su primer email
 - [ ] Soporte para multiple destinatarios en un alias
 - [ ] **Definir estrategia de historial/almacenamiento**: retención por plan (15-30 días basico/freelancer, ilimitado developer), flush automático, add-on de almacenamiento, UI de uso. Diferenciador clave vs competencia — discutir antes de implementar.

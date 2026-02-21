@@ -277,21 +277,46 @@ function renderDomains() {
   }
 
   empty.classList.add("hidden");
-  list.innerHTML = domains.map(d => `
-    <div class="bg-zinc-900 border border-zinc-800 rounded-xl px-6 py-5 flex items-center justify-between cursor-pointer hover:border-zinc-600 transition-colors"
+  list.innerHTML = domains.map(d => {
+    const accentClass = d.verified ? 'border-l-green-500' : 'border-l-yellow-500';
+    const dotClass = d.verified ? 'bg-green-400' : 'bg-yellow-400';
+    const badgeBg = d.verified ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400';
+    const badgeText = d.verified ? 'Verificado' : 'Pendiente DNS';
+    const created = d.createdAt ? new Date(d.createdAt).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    return `
+    <div class="bg-zinc-900 border border-zinc-800 ${accentClass} border-l-4 rounded-xl px-6 py-5 cursor-pointer hover:border-zinc-600 hover:-translate-y-0.5 transition-all"
          data-action="select-domain" data-domain-id="${esc(d.id)}">
-      <div>
-        <span class="font-semibold text-lg">${esc(d.domain)}</span>
-        <span class="ml-3 text-xs px-2 py-0.5 rounded-full ${d.verified ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}">
-          ${d.verified ? 'Verificado' : 'Pendiente DNS'}
-        </span>
-        <div class="text-xs text-zinc-500 mt-1">${d.monthlyForwards ?? 0} reenvío${(d.monthlyForwards ?? 0) === 1 ? '' : 's'} este mes · límite ${d.forwardPerHour ?? 0}/hora</div>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <svg class="w-5 h-5 text-zinc-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
+          </svg>
+          <span class="font-bold text-lg">${esc(d.domain)}</span>
+          <span class="text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${badgeBg}">
+            <span class="w-1.5 h-1.5 rounded-full ${dotClass}"></span>
+            ${badgeText}
+          </span>
+        </div>
+        <svg class="w-5 h-5 text-zinc-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
       </div>
-      <svg class="w-5 h-5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-      </svg>
-    </div>
-  `).join("");
+      <div class="flex items-center gap-4 text-xs text-zinc-500 mt-2 ml-8">
+        <span class="inline-flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          ${d.monthlyForwards ?? 0} reenvío${(d.monthlyForwards ?? 0) === 1 ? '' : 's'} este mes
+        </span>
+        <span class="inline-flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          ${d.forwardPerHour ?? 0}/hora
+        </span>
+        ${created ? `<span class="inline-flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          ${created}
+        </span>` : ''}
+      </div>
+    </div>`;
+  }).join("");
 }
 
 async function selectDomain(id) {
