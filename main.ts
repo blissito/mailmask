@@ -18,6 +18,7 @@ import {
   listRules,
   deleteRule,
   listLogs,
+  getMonthlyForwardCounts,
   PLANS,
   updateUserSubscription,
   getUserBySubscriptionId,
@@ -706,7 +707,15 @@ const app = new Elysia()
       });
 
     const domains = await listUserDomains(user.email);
-    return new Response(JSON.stringify(domains), {
+    const fullUser = (await getUser(user.email))!;
+    const limits = getUserPlanLimits(fullUser);
+    const counts = await getMonthlyForwardCounts(domains.map(d => d.id));
+    const enriched = domains.map(d => ({
+      ...d,
+      monthlyForwards: counts.get(d.id) ?? 0,
+      forwardPerHour: limits.forwardPerHour,
+    }));
+    return new Response(JSON.stringify(enriched), {
       headers: { "content-type": "application/json" },
     });
   })

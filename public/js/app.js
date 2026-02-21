@@ -252,6 +252,7 @@ function renderDomains() {
         <span class="ml-3 text-xs px-2 py-0.5 rounded-full ${d.verified ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}">
           ${d.verified ? 'Verificado' : 'Pendiente DNS'}
         </span>
+        <div class="text-xs text-zinc-500 mt-1">${d.monthlyForwards ?? 0} reenvío${(d.monthlyForwards ?? 0) === 1 ? '' : 's'} este mes · límite ${d.forwardPerHour ?? 0}/hora</div>
       </div>
       <svg class="w-5 h-5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>

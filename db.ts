@@ -332,6 +332,19 @@ export async function listLogs(domainId: string, limit = 50): Promise<EmailLog[]
   return rows.map(rowToLog);
 }
 
+export async function getMonthlyForwardCounts(domainIds: string[]): Promise<Map<string, number>> {
+  if (domainIds.length === 0) return new Map();
+  const rows = await sql`
+    SELECT domain_id, COUNT(*)::int AS count
+    FROM email_logs
+    WHERE domain_id = ANY(${domainIds})
+      AND timestamp >= date_trunc('month', NOW())
+    GROUP BY domain_id`;
+  const map = new Map<string, number>();
+  for (const r of rows) map.set(r.domain_id, r.count);
+  return map;
+}
+
 // --- Subscription helpers ---
 
 export async function getUserBySubscriptionId(mpSubId: string): Promise<User | null> {
