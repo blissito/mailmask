@@ -111,23 +111,17 @@
 
       <!-- Tab: DNS -->
       <div id="tab-dns" class="tab-content hidden">
-        <div class="flex items-center justify-between mb-6">
-          <div>
-            <h3 class="font-semibold">Configuración DNS</h3>
-            <p class="text-sm text-zinc-400 mt-1">Agrega estos registros en tu proveedor de DNS para activar tu dominio.</p>
-          </div>
-          <div class="flex items-center gap-3">
-            <span id="verify-result" class="text-sm"></span>
-            <button id="btn-verify-dns" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm flex items-center gap-2">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              Verificar
-            </button>
-          </div>
+        <p class="text-sm text-zinc-400 mb-4">Agrega estos registros en tu proveedor de DNS.</p>
+
+        <div class="border border-zinc-800 rounded-xl overflow-hidden overflow-x-auto">
+          <div id="dns-records"></div>
         </div>
 
-        <!-- DNS table -->
-        <div class="border border-zinc-800 rounded-xl overflow-hidden">
-          <div id="dns-records"></div>
+        <div class="mt-4 flex items-center gap-3">
+          <button id="btn-verify-dns" class="bg-zinc-800 hover:bg-zinc-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm">
+            Verificar DNS
+          </button>
+          <span id="verify-result" class="text-sm"></span>
         </div>
       </div>
     </div>
