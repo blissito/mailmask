@@ -748,14 +748,15 @@ const app = new Elysia({ adapter: node() })
       const alertFrom =
         process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
       try {
-        await sendFromDomain(
+        const messageId = await sendFromDomain(
           alertFrom,
           email,
           "Restablecer contraseña — MailMask",
           `Hola,\n\nRecibimos una solicitud para restablecer tu contraseña.\n\nHaz clic en este enlace para crear una nueva contraseña:\n${resetUrl}\n\nEste enlace es válido por 7 días.\n\nSi no solicitaste esto, puedes ignorar este email.\n\n— https://mailmask.studio`,
         );
+        log("info", "auth", "Password reset email sent", { email, messageId });
       } catch (err) {
-        log("error", "auth", "Failed to send password reset email", { error: String(err) });
+        log("error", "auth", "Failed to send password reset email", { email, error: String(err) });
       }
     }
 
