@@ -360,7 +360,7 @@ const app = new Elysia()
       );
       response.headers.set(
         "content-security-policy",
-        "default-src 'self'; style-src 'self'; img-src 'self' data:; script-src 'self'",
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'",
       );
     }
     return response;
