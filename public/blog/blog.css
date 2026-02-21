@@ -22,13 +22,28 @@
 
 .post-card {
   display: block;
-  padding: 1.5rem;
   border: 1px solid rgba(63, 63, 70, 0.5);
   border-radius: 0.75rem;
   background: rgba(39, 39, 42, 0.4);
+  overflow: hidden;
   transition: border-color 0.2s, box-shadow 0.2s;
   text-decoration: none;
   color: inherit;
+}
+
+.post-card-img {
+  width: 100%;
+  height: 12rem;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.post-card:hover .post-card-img {
+  transform: scale(1.05);
+}
+
+.post-card-body {
+  padding: 1.5rem;
 }
 
 .post-card:hover {
