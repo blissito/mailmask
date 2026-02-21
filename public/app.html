@@ -151,14 +151,14 @@
           <h3 class="font-semibold">Credenciales SMTP</h3>
           <button id="btn-add-smtp" class="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors">+ Generar credenciales</button>
         </div>
-        <p class="text-sm text-zinc-400 mb-4">Configura tu cliente de correo (Outlook, Thunderbird, Apple Mail) para enviar emails desde tu dominio.</p>
+        <p class="text-sm text-zinc-400 mb-4">Env\u00eda emails desde tu dominio usando estas credenciales en tu aplicaci\u00f3n o SaaS.</p>
         <div id="smtp-list" class="space-y-2"></div>
         <div id="smtp-empty" class="hidden text-center py-8 text-zinc-500">
           No hay credenciales SMTP. Genera una para enviar desde tu dominio.
         </div>
         <div id="smtp-upgrade" class="hidden text-center py-8">
           <p class="text-zinc-500 mb-3">SMTP relay no disponible en tu plan.</p>
-          <a href="/#pricing" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Actualiza a Freelancer o Developer</a>
+          <a href="/#pricing" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Actualiza a Developer</a>
         </div>
       </div>
     </div>
@@ -185,11 +185,11 @@
   <div id="modal-smtp-creds" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
     <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto">
       <div class="flex items-start justify-between mb-1">
-        <h3 class="text-lg font-bold">Configura tu cliente de correo</h3>
+        <h3 class="text-lg font-bold">Credenciales SMTP</h3>
       </div>
       <div class="flex items-center gap-2 mb-5 px-3 py-2 bg-yellow-900/30 border border-yellow-800/50 rounded-lg">
         <svg class="text-yellow-400 shrink-0" style="width:16px;height:16px;min-width:16px" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
-        <span class="text-sm text-yellow-300">La contraseña solo se muestra una vez. Guarda estos datos antes de cerrar.</span>
+        <span class="text-sm text-yellow-300">La contrase\u00f1a solo se muestra una vez. Copia los datos antes de cerrar.</span>
       </div>
       <div id="smtp-creds-info"></div>
       <div class="flex justify-end mt-6">

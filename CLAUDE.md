@@ -70,7 +70,8 @@ deno task test    # Run tests
 
 ### Backlog
 - [ ] **SES Tenants + aislamiento de reputación**: Implementar SES Tenants (feature de agosto 2025) para aislar reputación por dominio de cliente. 1 tenant por dominio, política Standard para Básico/Freelancer, Strict para Developer. Managed Dedicated IPs para tiers de pago (auto-scaling, sin warmup manual). EventBridge para recibir eventos de cambio de estado/reputación y pausar forwarding automáticamente. Evaluar VDM (Virtual Deliverability Manager) para dashboard de entregabilidad por config set. También agregar `monthlyForwards` a PLANS para limitar emails procesados por mes y proteger margen (hoy solo existe `forwardPerHour`).
-- [ ] **SMTP relay**: Ofrecer credenciales SMTP para que usuarios envíen desde cualquier cliente (Gmail, Thunderbird). Dominio ya es identidad SES verificada, solo falta generar credenciales y endpoint de autenticación SMTP. Disponible desde plan Freelancer.
+- [x] ~~**SMTP relay**~~: Implementado. Credenciales SMTP para enviar desde código/SaaS (no clientes de correo). Solo plan Developer. IAM user por credencial con policy scoped al dominio.
+- [ ] **IMAP/POP (Dovecot)**: Integrar Dovecot open source (basado en ForwardEmail) para ofrecer servidor de entrada completo. Permitiría configurar clientes de correo (Apple Mail, Outlook, Thunderbird) con recepción + envío. Proyecto separado a futuro, no incluir en marketing actual.
 - [ ] Probar checkout autenticado con email diferente al collector de MP
 - [ ] **SDK**: Cliente JS/TS para consumir la API de MailMask (crear aliases, listar dominios, etc.). Publicar en npm. Disponible desde plan Developer.
 - [ ] **Webhooks**: Permitir registrar URLs para recibir eventos (email recibido, alias creado, etc.). UI para gestionar webhooks por dominio, endpoint de registro, sistema de delivery con reintentos. Disponible desde plan Developer.

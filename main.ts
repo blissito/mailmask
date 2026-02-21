@@ -2668,7 +2668,7 @@ const app = new Elysia({ adapter: node() })
     const access = await checkDomainAccess(user.email, params.id, "admin");
     if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
 
-    const revoked = revokeSmtpCredential(params.id, (params as any).credId);
+    const revoked = revokeSmtpCredential(params.id, params.credId);
     if (!revoked) return new Response(JSON.stringify({ error: "Credencial no encontrada" }), { status: 404 });
 
     // Clean up IAM user, policy and access key
