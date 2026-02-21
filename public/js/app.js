@@ -453,39 +453,26 @@ function renderDnsRecords() {
     })),
   ];
 
-  const copyBtn = (val) => `<button data-action="copy" data-copy-value="${esc(val)}" class="opacity-0 group-hover/row:opacity-100 text-zinc-500 hover:text-white transition-all shrink-0 p-1.5 rounded-md hover:bg-zinc-700" title="Copiar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>`;
+  const copyBtn = (val) => `<button data-action="copy" data-copy-value="${esc(val)}" class="text-zinc-600 hover:text-white transition-colors shrink-0 p-1 rounded hover:bg-zinc-700" title="Copiar"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>`;
 
   records.innerHTML = `
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="text-left text-xs text-zinc-500 uppercase tracking-wider">
-          <th class="px-4 py-3 font-medium w-20">Tipo</th>
-          <th class="px-4 py-3 font-medium">Nombre</th>
-          <th class="px-4 py-3 font-medium">Valor</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-zinc-800/60">
-        ${dnsItems.map(r => `
-          <tr class="group/row hover:bg-zinc-800/40 transition-colors">
-            <td class="px-4 py-3">
-              <span class="font-mono font-semibold text-xs text-zinc-300">${r.type}</span>
-            </td>
-            <td class="px-4 py-3">
-              <div class="flex items-center gap-1.5 min-w-0">
-                <code class="text-xs text-zinc-300 truncate font-mono">${esc(r.name)}</code>
-                ${copyBtn(r.name)}
-              </div>
-            </td>
-            <td class="px-4 py-3">
-              <div class="flex items-center gap-1.5 min-w-0">
-                <code class="text-xs text-zinc-400 truncate font-mono">${esc(r.value)}</code>
-                ${copyBtn(r.value)}
-              </div>
-            </td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>`;
+    <div class="divide-y divide-zinc-800/60">
+      ${dnsItems.map(r => `
+        <div class="group/row px-4 py-3 hover:bg-zinc-800/40 transition-colors">
+          <div class="font-mono font-semibold text-xs text-zinc-300 mb-2">${r.type}</div>
+          <div class="flex items-center gap-1.5 mb-1.5">
+            <span class="text-[11px] text-zinc-500 w-14 shrink-0">Nombre</span>
+            <code class="text-xs text-zinc-300 font-mono truncate min-w-0 flex-1">${esc(r.name)}</code>
+            ${copyBtn(r.name)}
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-[11px] text-zinc-500 w-14 shrink-0">Valor</span>
+            <code class="text-xs text-zinc-400 font-mono truncate min-w-0 flex-1">${esc(r.value)}</code>
+            ${copyBtn(r.value)}
+          </div>
+        </div>
+      `).join("")}
+    </div>`;
 }
 
 async function verifyDns() {
