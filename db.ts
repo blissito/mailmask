@@ -1,4 +1,5 @@
-let kv = await Deno.openKv();
+const DENO_KV_URL = Deno.env.get("DENO_KV_URL");
+let kv = await Deno.openKv(DENO_KV_URL);
 
 // --- Types ---
 
@@ -528,8 +529,10 @@ export interface Message {
   id: string;
   conversationId: string;
   from: string;
-  body: string;
-  html: string;
+  body?: string;       // Only used for outbound messages (replies)
+  html?: string;       // Only used for outbound messages (replies)
+  s3Bucket?: string;   // S3 bucket for inbound raw email
+  s3Key?: string;      // S3 object key for inbound raw email
   direction: "inbound" | "outbound";
   createdAt: string;
   messageId?: string; // SMTP Message-ID header

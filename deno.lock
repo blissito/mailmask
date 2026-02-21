@@ -1688,6 +1688,7 @@
       "npm:@aws-sdk/client-s3@3",
       "npm:@aws-sdk/client-ses@3",
       "npm:@aws-sdk/client-sesv2@3",
+      "npm:@aws-sdk/client-sns@3",
       "npm:@types/node@22",
       "npm:elysia@^1.2.0",
       "npm:mercadopago@2",

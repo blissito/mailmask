@@ -44,6 +44,7 @@ deno task test    # Run tests
 ## TODO
 
 ### Crítico — bloquea lanzamiento público
+- [ ] **Hardcodear KV database URL**: usar `DENO_KV_URL` env var en `Deno.openKv()` para evitar que Deploy cambie de instancia. Si vuelve a pasar pérdida de datos, migrar fuera de Deno KV (considerar Turso/SQLite, Postgres, o Redis).
 - [ ] **Monitoreo/alerting**: health check externo + alertas (email/Slack) en errores de forwarding. Si SES/S3/MP webhook falla, nadie se entera hoy.
 - [ ] **Retry en forwarding**: si `forwardEmail` falla (SES throttle, error transitorio) el email se pierde. Implementar cola de reintentos o dead-letter queue en Deno KV.
 - [ ] **Revisar `cron.ts`**: está importado en `main.ts` pero no trackeado en git. Verificar qué hace y si es correcto.

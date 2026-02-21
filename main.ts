@@ -92,7 +92,8 @@ import {
   deleteConfigurationSet,
   deleteDomainIdentity,
 } from "./ses.ts";
-import { processInbound } from "./forwarding.ts";
+import { processInbound, extractPlainBody, extractHtmlBody } from "./forwarding.ts";
+import { fetchEmailFromS3, repairReceiptRules, ensureSnsSubscription } from "./ses.ts";
 import { log } from "./logger.ts";
 import "./cron.ts";
 
@@ -1869,10 +1870,24 @@ const app = new Elysia()
     const conv = await getConversation(domainId, params.id);
     if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
 
-    const [messages, notes] = await Promise.all([
+    const [rawMessages, notes] = await Promise.all([
       listMessages(conv.id),
       listNotes(conv.id),
     ]);
+
+    // Fetch body from S3 on demand for inbound messages
+    const messages = await Promise.all(rawMessages.map(async (msg) => {
+      if (msg.s3Bucket && msg.s3Key && !msg.body) {
+        try {
+          const raw = await fetchEmailFromS3(msg.s3Bucket, msg.s3Key);
+          return { ...msg, body: extractPlainBody(raw), html: extractHtmlBody(raw) };
+        } catch (err) {
+          console.error("Failed to fetch message body from S3:", err);
+          return { ...msg, body: "(Error al cargar el mensaje)", html: "" };
+        }
+      }
+      return msg;
+    }));
 
     return new Response(JSON.stringify({ ...conv, messages, notes }), {
       headers: { "content-type": "application/json" },
@@ -2493,7 +2508,7 @@ const port = parseInt(Deno.env.get("PORT") ?? "8000");
 Deno.serve({ port }, (req) => app.fetch(req));
 
 // Repair receipt rules missing SNS TopicArn (one-time fix for rules created before SNS_TOPIC_ARN was set)
-import { repairReceiptRules, ensureSnsSubscription } from "./ses.ts";
+// Receipt rule repair already imported at top
 (async () => {
   try {
     const repaired = await repairReceiptRules();

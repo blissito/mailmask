@@ -58,7 +58,7 @@ function extractReferences(raw: string): string[] {
   return [...new Set(refs)];
 }
 
-function extractPlainBody(raw: string): string {
+export function extractPlainBody(raw: string): string {
   // Simple extraction: find text/plain content in MIME
   const headerBodySplit = raw.indexOf("\r\n\r\n");
   if (headerBodySplit === -1) return raw;
@@ -82,7 +82,7 @@ function extractPlainBody(raw: string): string {
   return body.trim();
 }
 
-function extractHtmlBody(raw: string): string {
+export function extractHtmlBody(raw: string): string {
   const headerBodySplit = raw.indexOf("\r\n\r\n");
   if (headerBodySplit === -1) return "";
   const body = raw.slice(headerBodySplit + 4);
@@ -105,11 +105,9 @@ function extractHtmlBody(raw: string): string {
 
 // --- Mesa integration ---
 
-async function saveToMesa(rawContent: string, from: string, recipient: string, subject: string, domainId: string): Promise<void> {
+async function saveToMesa(rawContent: string, from: string, recipient: string, subject: string, domainId: string, s3Bucket?: string, s3Key?: string): Promise<void> {
   const references = rawContent ? extractReferences(rawContent) : [];
   const messageIdHeader = rawContent ? extractHeader(rawContent, "Message-ID") : "";
-  const plainBody = rawContent ? extractPlainBody(rawContent) : "";
-  const htmlBody = rawContent ? extractHtmlBody(rawContent) : "";
 
   // Try to find existing conversation by threading
   let conv = await findConversationByThread(domainId, from, references);
@@ -119,8 +117,8 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
     await addMessage({
       conversationId: conv.id,
       from,
-      body: plainBody,
-      html: htmlBody,
+      s3Bucket,
+      s3Key,
       direction: "inbound",
       createdAt: new Date().toISOString(),
       messageId: messageIdHeader,
@@ -152,8 +150,8 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
     await addMessage({
       conversationId: conv.id,
       from,
-      body: plainBody,
-      html: htmlBody,
+      s3Bucket,
+      s3Key,
       direction: "inbound",
       createdAt: new Date().toISOString(),
       messageId: messageIdHeader,
@@ -249,7 +247,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     // Mesa: save to conversation
     if (rawContent) {
       try {
-        await saveToMesa(rawContent, from, recipient, subject, domain.id);
+        await saveToMesa(rawContent, from, recipient, subject, domain.id, s3Bucket, s3Key);
       } catch (err) {
         log("error", "forwarding", "Failed to save to Mesa", { error: String(err), domainId: domain.id });
       }

@@ -1,6 +1,6 @@
 import { log } from "./logger.ts";
 
-const alertKv = await Deno.openKv();
+const alertKv = await Deno.openKv(Deno.env.get("DENO_KV_URL"));
 
 // Lazy-loaded AWS SDK clients to reduce cold start on Deno Deploy
 let _sesOutbound: any;
