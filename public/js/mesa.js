@@ -58,7 +58,7 @@ async function loadDomains() {
 async function loadConversations() {
   if (!selectedDomainId) return;
   const status = document.getElementById("status-filter").value;
-  let url = `/api/mesa/conversations?domainId=${selectedDomainId}`;
+  let url = `/api/bandeja/conversations?domainId=${selectedDomainId}`;
   if (status) url += `&status=${status}`;
 
   const res = await fetch(url);
@@ -159,7 +159,7 @@ async function openConversation(conv) {
   }
 
   // Load messages
-  const res = await fetch(`/api/mesa/conversations/${conv.id}?domainId=${selectedDomainId}`);
+  const res = await fetch(`/api/bandeja/conversations/${conv.id}?domainId=${selectedDomainId}`);
   if (!res.ok) return;
   const data = await res.json();
 
@@ -215,7 +215,7 @@ async function sendReply() {
   btn.disabled = true;
 
   if (composerMode === "note") {
-    const res = await fetch(`/api/mesa/conversations/${activeConv.id}/note`, {
+    const res = await fetch(`/api/bandeja/conversations/${activeConv.id}/note`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ domainId: selectedDomainId, body: text }),
@@ -230,7 +230,7 @@ async function sendReply() {
       toast(err.error || "Error al agregar nota");
     }
   } else {
-    const res = await fetch(`/api/mesa/conversations/${activeConv.id}/reply`, {
+    const res = await fetch(`/api/bandeja/conversations/${activeConv.id}/reply`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ domainId: selectedDomainId, body: text }),
@@ -256,7 +256,7 @@ async function assignConversation() {
 async function closeConversation() {
   if (!activeConv || !canDoActions) return;
   const newStatus = activeConv.status === "closed" ? "open" : "closed";
-  const res = await fetch(`/api/mesa/conversations/${activeConv.id}`, {
+  const res = await fetch(`/api/bandeja/conversations/${activeConv.id}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ domainId: selectedDomainId, status: newStatus }),
@@ -274,7 +274,7 @@ async function closeConversation() {
 async function toggleUrgent() {
   if (!activeConv || !canDoActions) return;
   const newPriority = activeConv.priority === "urgent" ? "normal" : "urgent";
-  const res = await fetch(`/api/mesa/conversations/${activeConv.id}`, {
+  const res = await fetch(`/api/bandeja/conversations/${activeConv.id}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ domainId: selectedDomainId, priority: newPriority }),
@@ -349,7 +349,7 @@ function setupListeners() {
   document.getElementById("assign-confirm").addEventListener("click", async () => {
     const email = document.getElementById("assign-email").value.trim();
     if (!email || !activeConv) return;
-    const res = await fetch(`/api/mesa/conversations/${activeConv.id}/assign`, {
+    const res = await fetch(`/api/bandeja/conversations/${activeConv.id}/assign`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ domainId: selectedDomainId, assignedTo: email }),
@@ -375,7 +375,7 @@ function setupListeners() {
   const params = new URLSearchParams(window.location.search);
   if (params.get("welcome") === "1") {
     toast("Bienvenido a Bandeja");
-    window.history.replaceState({}, "", "/mesa");
+    window.history.replaceState({}, "", "/bandeja");
   }
 }
 
@@ -502,7 +502,7 @@ function scrollToSelected() {
 function renderAttachments(attachments, msgIdx) {
   if (!attachments || attachments.length === 0) return "";
   const chips = attachments.map(att => {
-    const url = `/api/mesa/conversations/${activeConv.id}/attachments/${msgIdx}/${att.index}?domainId=${selectedDomainId}`;
+    const url = `/api/bandeja/conversations/${activeConv.id}/attachments/${msgIdx}/${att.index}?domainId=${selectedDomainId}`;
     const isImage = att.contentType.startsWith("image/");
     const icon = isImage
       ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`

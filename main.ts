@@ -398,7 +398,7 @@ const app = new Elysia()
   .get("/js/*", ({ params }) => serveStatic(`/js/${params["*"]}`))
   .get("/favicon.svg", () => serveStatic("/favicon.svg"))
   .get("/landing", () => serveStatic("/landing.html"))
-  .get("/mesa", () => serveStatic("/mesa.html"))
+  .get("/bandeja", () => serveStatic("/mesa.html"))
   .get("/admin", async ({ request }) => {
     const user = await getAuthUser(request);
     if (!user || !isAdmin(user.email)) return new Response("Not found", { status: 404 });
@@ -1822,7 +1822,7 @@ const app = new Elysia()
 
   // --- Mesa: conversations ---
 
-  .get("/api/mesa/conversations", async ({ request }) => {
+  .get("/api/bandeja/conversations", async ({ request }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
@@ -1863,7 +1863,7 @@ const app = new Elysia()
     });
   })
 
-  .get("/api/mesa/conversations/:id", async ({ request, params }) => {
+  .get("/api/bandeja/conversations/:id", async ({ request, params }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
@@ -1908,7 +1908,7 @@ const app = new Elysia()
     });
   })
 
-  .get("/api/mesa/conversations/:id/attachments/:msgIdx/:attIdx", async ({ request, params }) => {
+  .get("/api/bandeja/conversations/:id/attachments/:msgIdx/:attIdx", async ({ request, params }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
@@ -1961,7 +1961,7 @@ const app = new Elysia()
     }
   })
 
-  .post("/api/mesa/conversations/:id/reply", async ({ request, params }) => {
+  .post("/api/bandeja/conversations/:id/reply", async ({ request, params }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
@@ -2026,7 +2026,7 @@ const app = new Elysia()
     }
   })
 
-  .post("/api/mesa/conversations/:id/assign", async ({ request, params }) => {
+  .post("/api/bandeja/conversations/:id/assign", async ({ request, params }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
@@ -2056,7 +2056,7 @@ const app = new Elysia()
     });
   })
 
-  .post("/api/mesa/conversations/:id/note", async ({ request, params }) => {
+  .post("/api/bandeja/conversations/:id/note", async ({ request, params }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
@@ -2095,7 +2095,7 @@ const app = new Elysia()
     });
   })
 
-  .patch("/api/mesa/conversations/:id", async ({ request, params }) => {
+  .patch("/api/bandeja/conversations/:id", async ({ request, params }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
@@ -2203,7 +2203,7 @@ const app = new Elysia()
 
     return new Response(null, {
       status: 302,
-      headers: { location: "/mesa?welcome=1" },
+      headers: { location: "/bandeja?welcome=1" },
     });
   })
 
