@@ -4,7 +4,7 @@ Email profesional con tu dominio. Alias, forwarding y SMTP relay — sin Google 
 
 ## Stack
 
-Deno + Elysia · Postgres · AWS SES/S3 · MercadoPago
+Deno + Elysia · SQLite · AWS SES/S3 · MercadoPago
 
 ## Setup
 
