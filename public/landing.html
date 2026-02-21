@@ -160,7 +160,15 @@
             "name": "¿En qué se diferencia de Google Workspace?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Google Workspace cobra por usuario (~$7 USD/mes cada uno). Si necesitas 5 direcciones de correo para tu negocio, pagas 5 licencias. Con MailMask creas todas las direcciones que tu plan permita por una sola cuota — y cada una puede reenviar a uno o varios destinos a la vez. No pagas por buzón, pagas por dominio."
+              "text": "Google Workspace cobra por usuario (~$7 USD/mes cada uno). Si necesitas 5 direcciones de correo, pagas 5 licencias. Con MailMask creas todas las que tu plan permita por una sola cuota, cada una reenvía a varios destinos, y con Freelancer/Developer puedes enviar desde tu dominio vía SMTP en Gmail u Outlook. Pagas por dominio, no por usuario."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "¿Puedo enviar desde Gmail o Outlook con mi dominio?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Sí. Los planes Freelancer y Developer incluyen credenciales SMTP que puedes configurar en Gmail, Outlook, Thunderbird o cualquier cliente. Envías como ventas@tudominio.com con DKIM y SPF configurados automáticamente."
             }
           }
         ]
@@ -950,7 +958,28 @@
             licencias. Con MailMask creas todas las direcciones que tu plan
             permita por una sola cuota — y cada una puede reenviar a uno o
             varios destinos a la vez (Gmail, Outlook, el correo de tu equipo,
-            donde quieras). No pagas por buzón, pagas por dominio.
+            donde quieras). Además, con los planes Freelancer y Developer
+            puedes enviar desde tu dominio directamente en Gmail o Outlook
+            vía SMTP — recibes y envías como ventas@tudominio.com sin pagar
+            por buzón. Pagas por dominio, no por usuario.
+          </p>
+        </details>
+        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
+          <summary
+            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
+          >
+            ¿Puedo enviar desde Gmail o Outlook con mi dominio?
+            <span
+              class="text-zinc-500 group-open:rotate-45 transition-transform text-xl"
+              >+</span
+            >
+          </summary>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">
+            Sí. Los planes Freelancer y Developer incluyen credenciales SMTP
+            que puedes configurar en Gmail, Outlook, Thunderbird o cualquier
+            cliente de correo. Envías como ventas@tudominio.com directamente
+            desde tu app favorita, con DKIM y SPF configurados
+            automáticamente para que tus emails no caigan en spam.
           </p>
         </details>
       </div>
