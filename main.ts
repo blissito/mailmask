@@ -2130,8 +2130,9 @@ const app = new Elysia({ adapter: node() })
 
     let convs = await listConversations(domainId, { status, assignedTo });
 
-    // Auto-rebuild from S3 if KV has no conversations
-    if (convs.length === 0 && domain.domain) {
+    // Auto-rebuild from S3 only if domain has zero conversations (including deleted)
+    const hasDeletedConvs = convs.length === 0 && listConversations(domainId, { status: "deleted" }).length > 0;
+    if (convs.length === 0 && !hasDeletedConvs && domain.domain) {
       try {
         const rebuilt = await rebuildConversationsFromS3(domainId, domain.domain);
         if (rebuilt > 0) {

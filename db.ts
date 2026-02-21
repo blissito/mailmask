@@ -865,7 +865,7 @@ export function findConversationByThread(domainId: string, _from: string, refere
   const placeholders = references.map(() => "?").join(",");
   const row = sqlite.prepare(`
     SELECT * FROM conversations
-    WHERE domain_id = ? AND EXISTS (
+    WHERE domain_id = ? AND deleted_at IS NULL AND EXISTS (
       SELECT 1 FROM json_each(thread_refs) WHERE value IN (${placeholders})
     )
     LIMIT 1
