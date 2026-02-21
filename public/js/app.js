@@ -217,7 +217,7 @@ function renderDomains() {
 
   empty.classList.add("hidden");
   list.innerHTML = domains.map(d => `
-    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-zinc-600 transition-colors"
+    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex items-center justify-between cursor-pointer hover:border-zinc-600 transition-colors"
          data-action="select-domain" data-domain-id="${esc(d.id)}">
       <div>
         <span class="font-semibold text-lg">${esc(d.domain)}</span>
