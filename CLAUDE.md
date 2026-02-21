@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 ## Project overview
-MailMask — email alias/forwarding service. Deno + Elysia monolith with Deno KV, AWS SES/S3, MercadoPago billing.
+MailMask — email alias/forwarding service. Elysia monolith with SQLite, AWS SES/S3, MercadoPago billing.
 
 ## Commands
 ```bash
@@ -13,7 +13,7 @@ deno task test    # Run tests
 - Single-file API server (`main.ts`) with all routes
 - No framework router separation — everything is chained `.get()/.post()` on one Elysia instance
 - Frontend is vanilla HTML + JS in `public/`
-- Deno KV for all persistence (users, domains, aliases, rules, logs, rate limits)
+- SQLite for all persistence (users, domains, aliases, rules, logs, rate limits)
 - JWT auth via HttpOnly cookies (`auth.ts`)
 
 ## Key files
@@ -21,10 +21,10 @@ deno task test    # Run tests
 |------|---------|
 | `main.ts` | All API endpoints, static file serving, middleware |
 | `auth.ts` | JWT creation/verification, PBKDF2 password hashing |
-| `db.ts` | Deno KV data layer, plan definitions, all CRUD |
+| `db.ts` | SQLite data layer, plan definitions, all CRUD |
 | `ses.ts` | AWS SES send email, S3 fetch |
 | `forwarding.ts` | Inbound email parsing and forwarding logic |
-| `rate-limit.ts` | Persistent rate limiting with Deno KV |
+| `rate-limit.ts` | Persistent rate limiting with SQLite |
 | `public/js/app.js` | Main frontend logic (dashboard, checkout, domains) |
 
 ## Conventions
@@ -61,10 +61,10 @@ deno task test    # Run tests
 - [ ] Logs centralizados: se migrará a solución propia cuando esté lista.
 - [ ] Backup/export de datos de usuario (aliases, reglas)
 - [ ] **Email de "certificado" al verificar dominio**: Cuando un dominio pasa a verificado (DNS confirmado), enviar email estilo AWS Health Event — diseño tipo certificado/notificación con: nombre del dominio, región/fecha, estado DKIM/MX, badge de "verificado", CTA al dashboard. Inspirado en las notificaciones de AWS SES DKIM_PENDING_TO_VERIFIED. Pendiente: detectar el momento exacto de verificación (¿cron de chequeo DNS? ¿webhook SES?).
-- [ ] Notificaciones por email cuando un alias recibe su primer email
-- [ ] Soporte para multiple destinatarios en un alias
+- [x] ~~Notificaciones por email cuando un alias recibe su primer email~~
+- [x] ~~Soporte para multiple destinatarios en un alias~~
 - [ ] **Definir estrategia de historial/almacenamiento**: retención por plan (15-30 días basico/freelancer, ilimitado developer), flush automático, add-on de almacenamiento, UI de uso. Diferenciador clave vs competencia — discutir antes de implementar.
-- [ ] Evaluar pattern de almacenamiento de mensajes en Mesa: ¿leer body de S3 on demand vs duplicar en KV? Investigar otros patterns (cache intermedio, pre-procesado a formato ligero, CDN/signed URLs). Concluir cuál es el mejor approach antes de implementar.
+- [ ] Evaluar pattern de almacenamiento de mensajes en Bandeja: ¿leer body de S3 on demand vs duplicar en SQLite? Investigar otros patterns (cache intermedio, pre-procesado a formato ligero, CDN/signed URLs). Concluir cuál es el mejor approach antes de implementar.
 
 ### Contenido / Educación
 - [ ] **Guías de automatización con IA + aliases**: Blog posts y/o sección educativa enseñando a usuarios a automatizar workflows usando aliases específicos de MailMask + herramientas de IA. Ejemplos: alias dedicado para recibir notificaciones de n8n/Make/Zapier, alias como trigger de workflows AI, alias para clasificación automática de leads, alias temporal para campañas con análisis automático. Doble propósito: educar usuarios existentes y atraer audiencia técnica vía SEO. Investigar y documentar patrones concretos antes de escribir.
@@ -76,7 +76,7 @@ deno task test    # Run tests
 - [ ] Probar checkout autenticado con email diferente al collector de MP
 - [ ] **SDK**: Cliente JS/TS para consumir la API de MailMask (crear aliases, listar dominios, etc.). Publicar en npm. Disponible desde plan Developer.
 - [ ] **Webhooks**: Permitir registrar URLs para recibir eventos (email recibido, alias creado, etc.). UI para gestionar webhooks por dominio, endpoint de registro, sistema de delivery con reintentos. Disponible desde plan Developer.
-- [ ] **Flush de historial / almacenamiento**: Basico/Freelancer tienen franja de 15-30 días de retención, después se hace flush automático. Developer incluye almacenamiento base para conservar todo su historial, y puede comprar más cuando se acabe (add-on por GB o por bloque). Definir: UI para ver uso de almacenamiento, alerta cuando se acerca al límite, flujo de compra de almacenamiento adicional, export antes de flush. Investigar costos S3/Postgres para pricing. **Nota competitiva:** Ningún competidor directo (SimpleLogin, ImprovMX, ForwardEmail, addy.io) almacena contenido de emails ni ofrece historial — todos son forwarding puro sin retención. Mesa + historial persistente es diferenciador único que posiciona a MailMask más cerca de Helpscout/Intercom pero a fracción del costo y con máscaras incluidas. El almacenamiento como add-on es feature sin competencia en el segmento.
+- [ ] **Flush de historial / almacenamiento**: Basico/Freelancer tienen franja de 15-30 días de retención, después se hace flush automático. Developer incluye almacenamiento base para conservar todo su historial, y puede comprar más cuando se acabe (add-on por GB o por bloque). Definir: UI para ver uso de almacenamiento, alerta cuando se acerca al límite, flujo de compra de almacenamiento adicional, export antes de flush. Investigar costos S3/Postgres para pricing. **Nota competitiva:** Ningún competidor directo (SimpleLogin, ImprovMX, ForwardEmail, addy.io) almacena contenido de emails ni ofrece historial — todos son forwarding puro sin retención. Bandeja + historial persistente es diferenciador único que posiciona a MailMask más cerca de Helpscout/Intercom pero a fracción del costo y con máscaras incluidas. El almacenamiento como add-on es feature sin competencia en el segmento.
 - [ ] **Blog**: Blog con posts como archivos HTML individuales en el repo (`public/blog/`). Cada post puede tener su propio diseño y estilo. Página índice que lista todos los posts, SEO meta tags. Posts iniciales: "cómo tener email profesional sin Google Workspace", "alternativa barata a Google Workspace", "cómo reenviar emails de dominio propio a Gmail", "cómo agregar email personalizado a tu SaaS en 10 minutos" (este último empuja al SDK y plan Developer). ~12 posts SEO en español enfocados en búsquedas sin competencia en LATAM.
 - [ ] **Calculadora interactiva (lead magnet)**: Página pública con sliders/range inputs donde el usuario calcula cuánto ahorra vs Google Workspace según número de usuarios, dominios y buzones. Muestra comparativa de costo mensual/anual y CTA a registro. Funciona como lead magnet para SEO y compartir en redes.
 - [ ] **Campaña "dominio gratis"**: Diseñar y ejecutar campaña de marketing aprovechando el feature de registro de dominio integrado. Definir: oferta (dominio gratis primer año con plan X, etc.), landing page dedicada, copy para email/redes, segmento objetivo, métricas de éxito. Coordinar con implementación de registro de dominios (Route 53).
