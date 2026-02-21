@@ -84,7 +84,7 @@ async function startCheckout(plan, billing, btn) {
     const res = await fetch("/api/billing/guest-checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ plan, billing, coupon }),
+      body: JSON.stringify({ plan, billing: (loadedCoupon && plan === loadedCoupon.plan) ? "monthly" : billing, coupon }),
     });
     const data = await res.json();
     if (data.init_point) {
