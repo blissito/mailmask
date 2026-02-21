@@ -297,7 +297,7 @@ export async function forwardEmail(originalRaw: string, from: string, to: string
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
 
-  const forwardingAddress = process.env.FORWARDING_FROM ?? "mailmask@mailmask.studio";
+  const forwardingAddress = process.env.FORWARDING_FROM ?? "reenvio@mailmask.studio";
 
   // Rewrite From header and add Reply-To so replies go to original sender
   let rewrittenRaw = originalRaw.replace(
