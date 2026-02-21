@@ -97,19 +97,15 @@ function renderBillingBanner() {
   // Hide header add-domain button when no domains (empty state handles it)
   const addDomainBtn = document.getElementById("btn-add-domain");
   if (addDomainBtn) {
-    if (domains.length === 0) {
-      addDomainBtn.classList.add("hidden");
+    addDomainBtn.classList.remove("hidden");
+    if (!isActive && !isCancelledWithAccess) {
+      addDomainBtn.disabled = true;
+      addDomainBtn.classList.add("opacity-50", "cursor-not-allowed");
+      addDomainBtn.title = "Necesitas un plan activo";
     } else {
-      addDomainBtn.classList.remove("hidden");
-      if (!isActive && !isCancelledWithAccess) {
-        addDomainBtn.disabled = true;
-        addDomainBtn.classList.add("opacity-50", "cursor-not-allowed");
-        addDomainBtn.title = "Necesitas un plan activo";
-      } else {
-        addDomainBtn.disabled = false;
-        addDomainBtn.classList.remove("opacity-50", "cursor-not-allowed");
-        addDomainBtn.title = "";
-      }
+      addDomainBtn.disabled = false;
+      addDomainBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      addDomainBtn.title = "";
     }
   }
 }
