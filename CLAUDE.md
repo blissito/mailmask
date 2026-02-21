@@ -60,6 +60,7 @@ deno task test    # Run tests
 - [ ] Backup/export de datos de usuario (aliases, reglas)
 - [ ] Notificaciones por email cuando un alias recibe su primer email
 - [ ] Soporte para multiple destinatarios en un alias
+- [ ] Evaluar pattern de almacenamiento de mensajes en Mesa: ¿leer body de S3 on demand vs duplicar en KV? Investigar otros patterns (cache intermedio, pre-procesado a formato ligero, CDN/signed URLs). Concluir cuál es el mejor approach antes de implementar.
 
 ### Backlog
 - [ ] Probar checkout autenticado con email diferente al collector de MP
