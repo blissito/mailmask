@@ -1,6 +1,6 @@
 # MailMask
 
-Email profesional con tu dominio. Aliases, forwarding y SMTP relay — sin Google Workspace.
+Email profesional con tu dominio. Alias, forwarding y SMTP relay — sin Google Workspace.
 
 ## Stack
 
