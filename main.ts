@@ -141,7 +141,7 @@ function ensureEnv() {
 // --- Helpers ---
 
 function getMainDomainUrl(): string {
-  const raw = process.env.MAIN_DOMAIN ?? "localhost:8000";
+  const raw = process.env.MAIN_DOMAIN ?? "www.mailmask.studio";
   const bare = raw.replace(/^https?:\/\//, "").replace(/\/+$/, "");
   return `https://${bare}`;
 }
@@ -2005,6 +2005,11 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails" }), { status: 403 });
     }
 
+    const plan = user.subscription?.plan ?? "basico";
+    if (plan === "basico") {
+      return new Response(JSON.stringify({ error: "Envío directo no disponible en plan Básico. Usa Mesa para responder." }), { status: 403 });
+    }
+
     const access = await checkDomainAccess(auth.email, params.id, "write");
     if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
@@ -2055,6 +2060,11 @@ const app = new Elysia({ adapter: node() })
 
     if (limits.sends === 0) {
       return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails" }), { status: 403 });
+    }
+
+    const plan = user.subscription?.plan ?? "basico";
+    if (plan === "basico") {
+      return new Response(JSON.stringify({ error: "Envío directo no disponible en plan Básico. Usa Mesa para responder." }), { status: 403 });
     }
 
     const access = await checkDomainAccess(auth.email, params.id, "write");

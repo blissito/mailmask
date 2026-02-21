@@ -31,7 +31,7 @@ async function checkAuth() {
   document.getElementById("user-email").textContent = currentUser.email;
 
   const plan = currentUser.subscription?.plan ?? "basico";
-  canDoActions = plan !== "basico";
+  canDoActions = true;
 }
 
 // --- Domains ---

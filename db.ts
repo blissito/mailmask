@@ -91,7 +91,7 @@ export interface EmailLog {
 // --- Plans ---
 
 export const PLANS = {
-  basico:     { price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 0,  sends: 0,     api: false, webhooks: false, forwardPerHour: 100,  smtpRelay: false },
+  basico:     { price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 0,  sends: 50,    api: false, webhooks: false, forwardPerHour: 100,  smtpRelay: false },
   freelancer: { price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500,  smtpRelay: true },
   developer:  { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
   pro:     { price: 299_00, yearlyPrice: 2990_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500,  smtpRelay: true },
@@ -1104,7 +1104,7 @@ export function deleteAgentInvite(token: string): void {
 // --- Plan limits extension for Mesa/agents ---
 
 export const PLAN_MESA_LIMITS = {
-  basico:     { mesaActions: false, agents: 0 },
+  basico:     { mesaActions: true,  agents: 0 },
   freelancer: { mesaActions: true,  agents: 3 },
   developer:  { mesaActions: true,  agents: 10 },
   pro:        { mesaActions: true,  agents: 3 },
