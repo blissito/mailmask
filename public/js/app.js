@@ -411,19 +411,30 @@ function renderLogs(logs) {
     rule_matched: "⚡",
   };
 
-  list.innerHTML = logs.map(l => {
+  const rows = logs.map(l => {
     const date = new Date(l.timestamp);
     const time = date.toLocaleString("es-MX", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
     return `
-      <div class="grid grid-cols-[80px_1fr_1fr_80px_24px] gap-2 text-xs py-2 border-b border-zinc-800/50 items-center">
-        <span class="text-zinc-500">${time}</span>
-        <span class="text-zinc-300 truncate" title="${esc(l.from)}">${esc(l.from)}</span>
-        <span class="text-zinc-400 truncate" title="${esc(l.subject)}">${esc(l.subject)}</span>
-        <span class="text-zinc-500 truncate">${l.forwardedTo ? esc(l.forwardedTo) : '—'}</span>
-        <span class="${statusColors[l.status]}">${statusIcons[l.status]}</span>
-      </div>
-    `;
+      <tr class="border-b border-zinc-800/50">
+        <td class="py-2 pr-3 text-zinc-500 whitespace-nowrap">${time}</td>
+        <td class="py-2 pr-3 text-zinc-300 truncate max-w-[200px]" title="${esc(l.from)}">${esc(l.from)}</td>
+        <td class="py-2 pr-3 text-zinc-400 truncate max-w-[200px]" title="${esc(l.subject)}">${esc(l.subject)}</td>
+        <td class="py-2 pr-3 text-zinc-500 truncate max-w-[120px]">${l.forwardedTo ? esc(l.forwardedTo) : '—'}</td>
+        <td class="py-2 ${statusColors[l.status]}">${statusIcons[l.status]}</td>
+      </tr>`;
   }).join("");
+
+  list.innerHTML = `
+    <thead>
+      <tr class="border-b border-zinc-700 text-zinc-500">
+        <th class="py-2 pr-3 font-medium text-left">Fecha</th>
+        <th class="py-2 pr-3 font-medium text-left">De</th>
+        <th class="py-2 pr-3 font-medium text-left">Asunto</th>
+        <th class="py-2 pr-3 font-medium text-left">Destino</th>
+        <th class="py-2 font-medium text-left">Estado</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>`;
 }
 
 // --- DNS ---

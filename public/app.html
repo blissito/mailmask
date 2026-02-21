@@ -101,7 +101,9 @@
       <!-- Tab: Logs -->
       <div id="tab-logs" class="tab-content hidden">
         <h3 class="font-semibold mb-4">Últimos emails</h3>
-        <div id="logs-list" class="space-y-1"></div>
+        <div class="overflow-x-auto">
+          <table id="logs-list" class="w-full text-xs text-left"></table>
+        </div>
         <div id="logs-empty" class="hidden text-center py-8 text-zinc-500">
           No hay logs aún. Cuando recibas emails, aparecerán aquí.
         </div>

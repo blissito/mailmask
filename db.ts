@@ -102,7 +102,7 @@ export async function setVerifyToken(email: string, token: string): Promise<void
   const user = await getUser(email);
   if (!user) return;
   await kv.set(["users", email], { ...user, verifyToken: token, emailVerified: false });
-  await kv.set(["verify-tokens", token], email);
+  await kv.set(["verify-tokens", token], email, { expireIn: 7 * 24 * 60 * 60 * 1000 });
 }
 
 export async function verifyUserEmail(email: string): Promise<void> {
