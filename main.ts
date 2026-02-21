@@ -140,6 +140,7 @@ async function serveStatic(path: string): Promise<Response> {
       png: "image/png",
       svg: "image/svg+xml",
       ico: "image/x-icon",
+      json: "application/json; charset=utf-8",
       xml: "application/xml; charset=utf-8",
       txt: "text/plain; charset=utf-8",
     };
@@ -448,6 +449,16 @@ const app = new Elysia()
   .get("/forgot-password", () => serveStatic("/forgot-password.html"))
   .get("/terms", () => serveStatic("/terms.html"))
   .get("/privacy", () => serveStatic("/privacy.html"))
+  .get("/blog", () => serveStatic("/blog/index.html"))
+  .get("/blog/blog.css", () => serveStatic("/blog/blog.css"))
+  .get("/blog/:slug", async ({ params }) => {
+    const slug = params.slug.replace(/[^a-z0-9-]/g, "");
+    try {
+      return await serveStatic(`/blog/${slug}.html`);
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
+  })
   .get("/robots.txt", () => serveStatic("/robots.txt"))
   .get("/sitemap.xml", () => serveStatic("/sitemap.xml"))
 

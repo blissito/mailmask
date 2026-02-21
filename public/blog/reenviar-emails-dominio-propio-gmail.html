@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cómo reenviar emails de tu dominio a Gmail — MailMask</title>
+    <meta name="description" content="Tutorial paso a paso para reenviar emails de tu dominio propio a Gmail sin Google Workspace. Configura registros MX y aliases con MailMask en minutos." />
+    <link rel="canonical" href="https://mailmask.easybits.cloud/blog/reenviar-emails-dominio-propio-gmail" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="Cómo reenviar emails de tu dominio a Gmail" />
+    <meta property="og:description" content="Tutorial: recibe en Gmail los emails de tu dominio propio sin Google Workspace." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://mailmask.easybits.cloud/blog/reenviar-emails-dominio-propio-gmail" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="article:published_time" content="2026-02-21" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Cómo reenviar emails de tu dominio a Gmail" />
+    <meta name="twitter:description" content="Tutorial: recibe en Gmail los emails de tu dominio propio sin Google Workspace." />
+    <script src="/js/analytics.js"></script>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Cómo reenviar emails de tu dominio a Gmail",
+      "description": "Tutorial paso a paso para reenviar emails de tu dominio propio a Gmail sin Google Workspace.",
+      "datePublished": "2026-02-21",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://mailmask.easybits.cloud/favicon.svg" } },
+      "mainEntityOfPage": "https://mailmask.easybits.cloud/blog/reenviar-emails-dominio-propio-gmail"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "Cómo reenviar emails de tu dominio a Gmail con MailMask",
+      "description": "Configura el reenvío de emails de tu dominio propio a tu cuenta de Gmail en menos de 5 minutos.",
+      "step": [
+        { "@type": "HowToStep", "position": 1, "name": "Crear cuenta en MailMask", "text": "Regístrate en mailmask.easybits.cloud/register con tu email." },
+        { "@type": "HowToStep", "position": 2, "name": "Agregar tu dominio", "text": "En el dashboard, haz clic en 'Agregar dominio' e ingresa tu dominio." },
+        { "@type": "HowToStep", "position": 3, "name": "Configurar registros MX", "text": "Copia los registros MX que MailMask te indica y agrégalos en el panel DNS de tu proveedor de dominio." },
+        { "@type": "HowToStep", "position": 4, "name": "Verificar dominio", "text": "Haz clic en 'Verificar' en MailMask. La verificación puede tardar unos minutos." },
+        { "@type": "HowToStep", "position": 5, "name": "Crear alias", "text": "Crea un alias como hola@tudominio.com apuntando a tu cuenta de Gmail." },
+        { "@type": "HowToStep", "position": 6, "name": "Probar", "text": "Envía un email de prueba a tu alias y verifica que llega a tu Gmail." }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://mailmask.easybits.cloud/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://mailmask.easybits.cloud/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Reenviar emails de dominio a Gmail", "item": "https://mailmask.easybits.cloud/blog/reenviar-emails-dominio-propio-gmail" }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
+      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Cómo reenviar emails de tu dominio propio a Gmail</h1>
+        <div class="meta">
+          <span>📅 21 Feb 2026</span>
+          <span>⏱ 4 min de lectura</span>
+        </div>
+      </header>
+
+      <div class="blog-content">
+        <p>Tienes un dominio como <strong>miempresa.com</strong> y quieres que los emails a <code>contacto@miempresa.com</code> lleguen a tu cuenta de Gmail. Sin pagar Google Workspace. Sin montar un servidor de correo. Este tutorial te explica cómo hacerlo paso a paso con MailMask.</p>
+
+        <h2>¿Qué necesitas?</h2>
+        <ul>
+          <li>Un dominio propio (comprado en Namecheap, GoDaddy, Cloudflare, etc.)</li>
+          <li>Acceso al panel DNS de tu proveedor de dominio</li>
+          <li>Una cuenta de Gmail (o cualquier email donde quieras recibir)</li>
+        </ul>
+
+        <h2>Paso 1: Crea tu cuenta en MailMask</h2>
+        <p>Ve a <a href="/register">mailmask.easybits.cloud/register</a> y crea tu cuenta. Solo necesitas un email y contraseña.</p>
+
+        <h2>Paso 2: Agrega tu dominio</h2>
+        <p>Una vez dentro del dashboard, haz clic en <strong>"Agregar dominio"</strong> e ingresa tu dominio (por ejemplo, <code>miempresa.com</code>). MailMask te mostrará los registros DNS que necesitas configurar.</p>
+
+        <h2>Paso 3: Configura los registros MX</h2>
+        <p>MailMask te dará registros MX específicos. Ve al panel DNS de tu proveedor de dominio y:</p>
+        <ol>
+          <li><strong>Elimina</strong> cualquier registro MX existente (si no los estás usando).</li>
+          <li><strong>Agrega</strong> los registros MX que MailMask te indica.</li>
+        </ol>
+
+        <blockquote>
+          <strong>Nota:</strong> Los registros MX le dicen a Internet "los emails de este dominio deben llegar a estos servidores". Al cambiarlos, le dices que lleguen a MailMask en lugar de a otro proveedor.
+        </blockquote>
+
+        <h2>Paso 4: Verifica tu dominio</h2>
+        <p>Regresa al dashboard de MailMask y haz clic en <strong>"Verificar"</strong>. Si los registros DNS ya se propagaron (puede tardar de 1 minuto a unas horas), verás tu dominio como verificado.</p>
+
+        <h2>Paso 5: Crea tu primer alias</h2>
+        <p>Ahora crea un alias. Por ejemplo:</p>
+        <ul>
+          <li><strong>Alias:</strong> <code>contacto@miempresa.com</code></li>
+          <li><strong>Destino:</strong> <code>tuemailpersonal@gmail.com</code></li>
+        </ul>
+
+        <p>Puedes crear cuantos aliases necesites: <code>ventas@</code>, <code>soporte@</code>, <code>info@</code>, etc.</p>
+
+        <h2>Paso 6: Prueba</h2>
+        <p>Pídele a alguien (o usa otro email) que envíe un mensaje a <code>contacto@miempresa.com</code>. En unos segundos debería llegar a tu Gmail.</p>
+
+        <h2>Bonus: responder desde tu dominio</h2>
+        <p>Con los planes Freelancer y Developer, puedes <strong>responder desde la bandeja integrada de MailMask</strong> y el destinatario verá que el email viene de <code>contacto@miempresa.com</code> con firma DKIM+SPF verificada. No necesitas configurar nada extra — MailMask se encarga de los registros de autenticación automáticamente.</p>
+
+        <h2>Resumen</h2>
+        <ol>
+          <li>Crea cuenta en MailMask.</li>
+          <li>Agrega tu dominio.</li>
+          <li>Configura registros MX en tu proveedor DNS.</li>
+          <li>Verifica el dominio.</li>
+          <li>Crea aliases → recibe en Gmail.</li>
+        </ol>
+
+        <p>Todo toma menos de 5 minutos. Sin servidores, sin Workspace, sin complicaciones.</p>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Empieza a recibir emails en tu dominio</h2>
+      <p>Configura reenvío a Gmail en minutos. Desde $49 MXN/mes.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-zinc-800 py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · easybits.cloud
+        </div>
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">
+        Powered by <a href="https://easybits.cloud" class="hover:text-zinc-400 transition-colors">easybits.cloud</a> & <a href="https://fixter.org" class="hover:text-zinc-400 transition-colors">fixter.org</a>
+      </p>
+    </footer>
+  </body>
+</html>
