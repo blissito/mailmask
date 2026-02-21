@@ -160,15 +160,15 @@
             "name": "¿En qué se diferencia de Google Workspace?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Google Workspace cobra por usuario (~$7 USD/mes cada uno). Si necesitas 5 direcciones de correo, pagas 5 licencias. Con MailMask creas todas las que tu plan permita por una sola cuota, cada una reenvía a varios destinos, y con Freelancer/Developer puedes enviar desde tu dominio vía SMTP en Gmail u Outlook. Pagas por dominio, no por usuario."
+              "text": "Google Workspace cobra por usuario (~$7 USD/mes cada uno). Si necesitas 5 direcciones de correo, pagas 5 licencias. Con MailMask creas todas las que tu plan permita por una sola cuota, cada una reenvía a varios destinos. Además, con Freelancer/Developer puedes enviar desde tu dominio usando credenciales SMTP en Outlook, Thunderbird o cualquier cliente de correo. Pagas por dominio, no por usuario."
             }
           },
           {
             "@type": "Question",
-            "name": "¿Puedo enviar desde Gmail o Outlook con mi dominio?",
+            "name": "¿Puedo enviar emails desde mi dominio con un cliente de correo?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Sí. Los planes Freelancer y Developer incluyen credenciales SMTP que puedes configurar en Gmail, Outlook, Thunderbird o cualquier cliente. Envías como ventas@tudominio.com con DKIM y SPF configurados automáticamente."
+              "text": "Sí. Los planes Freelancer y Developer incluyen credenciales SMTP que configuras en Outlook, Thunderbird, Apple Mail o cualquier cliente que soporte SMTP. Envías como ventas@tudominio.com con DKIM y SPF configurados automáticamente."
             }
           }
         ]
@@ -960,16 +960,17 @@
             permita por una sola cuota — y cada una puede reenviar a uno o
             varios destinos a la vez (Gmail, Outlook, el correo de tu equipo,
             donde quieras). Además, con los planes Freelancer y Developer
-            puedes enviar desde tu dominio directamente en Gmail o Outlook
-            vía SMTP — recibes y envías como ventas@tudominio.com sin pagar
-            por buzón. Pagas por dominio, no por usuario.
+            puedes enviar desde tu dominio usando credenciales SMTP en
+            Outlook, Thunderbird o cualquier cliente de correo — recibes y
+            envías como ventas@tudominio.com sin pagar por buzón. Pagas por
+            dominio, no por usuario.
           </p>
         </details>
         <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
           <summary
             class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
           >
-            ¿Puedo enviar desde Gmail o Outlook con mi dominio?
+            ¿Puedo enviar emails desde mi dominio con un cliente de correo?
             <span
               class="text-zinc-500 group-open:rotate-45 transition-transform text-xl"
               >+</span
@@ -977,10 +978,10 @@
           </summary>
           <p class="px-6 pb-4 text-zinc-400 text-sm">
             Sí. Los planes Freelancer y Developer incluyen credenciales SMTP
-            que puedes configurar en Gmail, Outlook, Thunderbird o cualquier
-            cliente de correo. Envías como ventas@tudominio.com directamente
-            desde tu app favorita, con DKIM y SPF configurados
-            automáticamente para que tus emails no caigan en spam.
+            que configuras en Outlook, Thunderbird, Apple Mail o cualquier
+            cliente que soporte SMTP. Envías como ventas@tudominio.com
+            directamente desde tu cliente favorito, con DKIM y SPF
+            configurados automáticamente para que tus emails no caigan en spam.
           </p>
         </details>
       </div>
@@ -992,14 +993,18 @@
       <p class="text-zinc-400 text-sm mb-8">Guías prácticas para sacarle el máximo a tu dominio sin complicarte.</p>
       <div class="grid sm:grid-cols-2 gap-6 text-left mb-8">
         <a href="/blog/email-profesional-sin-google-workspace" class="group block bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-600 transition-colors">
-          <img src="/img/blog-email-profesional.jpg" alt="Email profesional" class="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy">
+          <div class="w-full h-40 flex items-center justify-center group-hover:scale-105 transition-transform duration-300" style="background:linear-gradient(135deg,#6d28d9 0%,#7c3aed 40%,#a78bfa 100%)">
+            <svg width="80" height="80" viewBox="0 0 80 80" fill="none"><rect x="12" y="24" width="56" height="36" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/><path d="M12 30l28 18 28-18" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"/><circle cx="62" cy="20" r="10" fill="#fbbf24"/><path d="M62 15v6m0 3v0" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
           <div class="p-5">
             <div class="text-sm font-semibold text-zinc-200 mb-1">Email profesional sin Google Workspace</div>
             <div class="text-xs text-zinc-500">Configura direcciones con tu dominio en minutos, sin pagar por usuario.</div>
           </div>
         </a>
         <a href="/blog/reenviar-emails-dominio-propio-gmail" class="group block bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-600 transition-colors">
-          <img src="/img/blog-reenviar-gmail.jpg" alt="Reenviar emails a Gmail" class="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy">
+          <div class="w-full h-40 flex items-center justify-center group-hover:scale-105 transition-transform duration-300" style="background:linear-gradient(135deg,#0369a1 0%,#0ea5e9 40%,#7dd3fc 100%)">
+            <svg width="80" height="80" viewBox="0 0 80 80" fill="none"><path d="M16 44c0-13.3 10.7-24 24-24h0c13.3 0 24 10.7 24 24" stroke="#e0f2fe" stroke-width="3" fill="none"/><ellipse cx="40" cy="44" rx="28" ry="14" fill="#e0f2fe" opacity=".6"/><ellipse cx="26" cy="48" rx="14" ry="10" fill="#fff" opacity=".8"/><ellipse cx="54" cy="48" rx="14" ry="10" fill="#fff" opacity=".8"/><ellipse cx="40" cy="46" rx="18" ry="12" fill="#fff"/><rect x="30" y="50" width="20" height="14" rx="3" fill="#0ea5e9"/><path d="M30 53l10 6 10-6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><path d="M36 30l4-8 4 8" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="40" cy="18" r="4" fill="#fbbf24"/></svg>
+          </div>
           <div class="p-5">
             <div class="text-sm font-semibold text-zinc-200 mb-1">Reenviar emails de dominio propio a Gmail</div>
             <div class="text-xs text-zinc-500">Recibe correo de tu dominio directo en tu Gmail personal o de trabajo.</div>
