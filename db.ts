@@ -309,6 +309,26 @@ export async function listRules(domainId: string): Promise<Rule[]> {
   return rows.map(rowToRule);
 }
 
+export async function updateRule(domainId: string, ruleId: string, updates: Partial<Pick<Rule, "field" | "match" | "value" | "action" | "target" | "priority" | "enabled">>): Promise<Rule | null> {
+  const rows = await sql`
+    UPDATE rules SET
+      field = COALESCE(${updates.field ?? null}, field),
+      match = COALESCE(${updates.match ?? null}, match),
+      value = COALESCE(${updates.value ?? null}, value),
+      action = COALESCE(${updates.action ?? null}, action),
+      target = COALESCE(${updates.target ?? null}, target),
+      priority = COALESCE(${updates.priority ?? null}, priority),
+      enabled = COALESCE(${updates.enabled ?? null}, enabled)
+    WHERE domain_id = ${domainId} AND id = ${ruleId}
+    RETURNING *`;
+  return rows.length ? rowToRule(rows[0]) : null;
+}
+
+export async function countRules(domainId: string): Promise<number> {
+  const rows = await sql`SELECT COUNT(*)::int AS c FROM rules WHERE domain_id = ${domainId}`;
+  return rows[0].c;
+}
+
 export async function deleteRule(domainId: string, ruleId: string): Promise<boolean> {
   const res = await sql`DELETE FROM rules WHERE domain_id = ${domainId} AND id = ${ruleId}`;
   return res.count > 0;

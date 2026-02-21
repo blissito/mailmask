@@ -153,6 +153,16 @@ function renderUsage() {
   for (const a of u.aliasesPerDomain) {
     items.push(`Alias — ${esc(a.domain)} ${a.current}/${a.limit}`);
   }
+  if (u.rulesPerDomain) {
+    for (const r of u.rulesPerDomain) {
+      if (r.limit > 0) items.push(`Reglas — ${esc(r.domain)} ${r.current}/${r.limit}`);
+    }
+  }
+  if (u.sendsPerDomain) {
+    for (const s of u.sendsPerDomain) {
+      if (s.limit > 0) items.push(`Envíos — ${esc(s.domain)} ${s.current}/${s.limit}/mes`);
+    }
+  }
 
   container.innerHTML = `
     <div class="flex flex-wrap gap-3 text-xs text-zinc-400 px-1 py-2">

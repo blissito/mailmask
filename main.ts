@@ -16,7 +16,9 @@ import {
   countAliases,
   createRule,
   listRules,
+  updateRule,
   deleteRule,
+  countRules,
   listLogs,
   getMonthlyForwardCounts,
   PLANS,
@@ -397,6 +399,7 @@ const app = new Elysia()
   .get("/js/*", ({ params }) => serveStatic(`/js/${params["*"]}`))
   .get("/favicon.svg", () => serveStatic("/favicon.svg"))
   .get("/landing", () => serveStatic("/landing.html"))
+  .get("/pricing", () => serveStatic("/pricing.html"))
   .get("/bandeja", () => serveStatic("/mesa.html"))
   .get("/admin", async ({ request }) => {
     const user = await getAuthUser(request);
@@ -545,6 +548,22 @@ const app = new Elysia()
         limit: limits.aliases,
       })),
     );
+    const rulesPerDomain = await Promise.all(
+      domains.map(async (d) => ({
+        domain: d.domain,
+        domainId: d.id,
+        current: await countRules(d.id),
+        limit: limits.rules,
+      })),
+    );
+    const sendsPerDomain = await Promise.all(
+      domains.map(async (d) => ({
+        domain: d.domain,
+        domainId: d.id,
+        current: await getSendCount(d.id),
+        limit: limits.sends,
+      })),
+    );
 
     return new Response(
       JSON.stringify({
@@ -559,6 +578,8 @@ const app = new Elysia()
         usage: {
           domains: { current: domains.length, limit: limits.domains },
           aliasesPerDomain,
+          rulesPerDomain,
+          sendsPerDomain,
         },
       }),
       {
@@ -1226,6 +1247,78 @@ const app = new Elysia()
     });
     return new Response(JSON.stringify(rule), {
       status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .put("/api/domains/:id/rules/:ruleId", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), {
+        status: 401,
+      });
+
+    const domain = await getDomain(params.id);
+    if (!domain || domain.ownerEmail !== user.email) {
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), {
+        status: 404,
+      });
+    }
+
+    const body = await request.json();
+    const { field, match, value, action, target, priority, enabled } = body;
+
+    // Validate field/match/action if provided
+    const validFields = ["to", "from", "subject"];
+    const validMatches = ["contains", "equals", "regex"];
+    const validActions = ["forward", "webhook", "discard"];
+
+    if (field !== undefined && !validFields.includes(field))
+      return new Response(JSON.stringify({ error: "Valor inválido para field" }), { status: 400 });
+    if (match !== undefined && !validMatches.includes(match))
+      return new Response(JSON.stringify({ error: "Valor inválido para match" }), { status: 400 });
+    if (action !== undefined && !validActions.includes(action))
+      return new Response(JSON.stringify({ error: "Valor inválido para action" }), { status: 400 });
+
+    // SSRF: validate webhook targets aren't private IPs
+    const effectiveAction = action ?? undefined;
+    const effectiveTarget = target ?? undefined;
+    if (effectiveAction === "webhook" && effectiveTarget && isPrivateUrl(effectiveTarget)) {
+      return new Response(
+        JSON.stringify({ error: "URL de webhook no permitida (dirección privada)" }),
+        { status: 400 },
+      );
+    }
+
+    // ReDoS: limit regex pattern length
+    const effectiveMatch = match ?? undefined;
+    const effectiveValue = value ?? undefined;
+    if (effectiveMatch === "regex" && effectiveValue) {
+      if (effectiveValue.length > 200) {
+        return new Response(
+          JSON.stringify({ error: "Patrón regex demasiado largo (máx 200 caracteres)" }),
+          { status: 400 },
+        );
+      }
+      try {
+        new RegExp(effectiveValue);
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Patrón regex inválido" }),
+          { status: 400 },
+        );
+      }
+    }
+
+    const updated = await updateRule(domain.id, params.ruleId, {
+      field, match, value, action, target, priority, enabled,
+    });
+    if (!updated)
+      return new Response(JSON.stringify({ error: "Regla no encontrada" }), {
+        status: 404,
+      });
+
+    return new Response(JSON.stringify(updated), {
       headers: { "content-type": "application/json" },
     });
   })
