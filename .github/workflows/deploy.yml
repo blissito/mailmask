@@ -31,6 +31,8 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - run: deno install
+      - run: deno task build:css
       - name: Deploy
         run: deno install -gArf jsr:@deno/deployctl && deployctl deploy --project=mailmask --entrypoint=main.ts --include=. --prod
         env:
