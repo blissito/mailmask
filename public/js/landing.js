@@ -68,6 +68,9 @@ function toggleBilling() {
     { opacity: 0, transform: "scale(0.9)" },
     { opacity: 1, transform: "scale(1)" },
   ], { duration: 250, easing: "ease-out", fill: "forwards" });
+
+  // Re-apply coupon price after toggle overwrites it
+  applyCouponToCard();
 }
 
 async function startCheckout(plan, billing, btn) {
@@ -128,28 +131,41 @@ document.querySelectorAll(".checkout-btn").forEach(btn => {
 });
 
 // --- Coupon display ---
+let loadedCoupon = null;
+
+function applyCouponToCard() {
+  if (!loadedCoupon) return;
+  const card = document.querySelector(`.pricing-card[data-plan="${loadedCoupon.plan}"]`);
+  if (!card) return;
+
+  const priceEl = card.querySelector(".plan-price");
+  const displayPrice = Math.round(loadedCoupon.fixedPrice / 100);
+  if (priceEl) {
+    const originalPrice = currentBilling === "yearly" ? card.dataset.yearly : card.dataset.monthly;
+    priceEl.innerHTML = `<span class="line-through text-zinc-500 text-2xl mr-2">$${originalPrice}</span>$${displayPrice.toLocaleString("es-MX")}`;
+  }
+
+  // Lock period label to /mes since coupon is monthly
+  const periodEl = card.querySelector(".plan-period");
+  if (periodEl) periodEl.textContent = "/mes";
+}
+
 (async () => {
   const couponCode = new URLSearchParams(location.search).get("coupon");
   if (!couponCode) return;
   try {
     const res = await fetch(`/api/coupons/${encodeURIComponent(couponCode)}`);
     if (!res.ok) return;
-    const coupon = await res.json();
-    const card = document.querySelector(`.pricing-card[data-plan="${coupon.plan}"]`);
+    loadedCoupon = await res.json();
+    const card = document.querySelector(`.pricing-card[data-plan="${loadedCoupon.plan}"]`);
     if (!card) return;
 
-    // Update price display
-    const priceEl = card.querySelector(".plan-price");
-    const displayPrice = Math.round(coupon.fixedPrice / 100);
-    if (priceEl) {
-      const originalPrice = card.dataset.monthly;
-      priceEl.innerHTML = `<span class="line-through text-zinc-500 text-2xl mr-2">$${originalPrice}</span>$${displayPrice.toLocaleString("es-MX")}`;
-    }
+    applyCouponToCard();
 
     // Add coupon badge
     const badgeEl = document.createElement("div");
     badgeEl.className = "absolute -top-3 right-4 bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full";
-    badgeEl.textContent = coupon.description;
+    badgeEl.textContent = loadedCoupon.description;
     card.style.position = "relative";
     card.appendChild(badgeEl);
 
