@@ -46,19 +46,19 @@ deno task test    # Run tests
 ### Crítico — bloquea lanzamiento público
 - [x] ~~**Link de activar cuenta no sirve**~~: corregido JSON encoding de tokens, agregado endpoint resend-verification y banner en dashboard.
 - [x] ~~**Hardcodear KV database URL**~~: migrado a Postgres.
-- [ ] **Monitoreo/alerting**: health check externo + alertas (email/Slack) en errores de forwarding. (deprioritized — no se hará este año)
+- [x] ~~**Monitoreo/alerting**~~: deprioritized — equipo trabaja diario en el sitio, no se hará este año.
 - [x] ~~**Retry en forwarding**~~: resuelto.
 - [x] ~~**Revisar `cron.ts`**~~: resuelto.
 
 ### Alto — primeras semanas
-- [ ] Pagina de pricing publica en landing
-- [ ] Agregar endpoint PUT para editar reglas
-- [ ] Dashboard: mostrar uso actual vs limites del plan
-- [ ] Email de confirmación de pago para usuarios autenticados (hoy solo guests reciben welcome email)
+- [x] ~~Pagina de pricing publica en landing~~: `/pricing` standalone + sección en landing con smooth scroll.
+- [x] ~~Agregar endpoint PUT para editar reglas~~: `PUT /api/domains/:id/rules/:ruleId` con validación completa.
+- [x] ~~Dashboard: mostrar uso actual vs limites del plan~~: reglas y envíos por dominio en `/api/auth/me` + renderUsage().
+- [x] ~~Email de confirmación de pago para usuarios autenticados~~: ya implementado.
 
 ### Medio — primer mes
-- [ ] Tests: no hay archivos de test. Cubrir al menos forwarding (Source rewrite, dedup) y webhook billing.
-- [ ] Logs centralizados: todo va a `console.error`. Dificulta depurar problemas de un usuario específico en prod.
+- [ ] Tests: cubrir forwarding y webhook billing. (no urgente por ahora)
+- [ ] Logs centralizados: se migrará a solución propia cuando esté lista.
 - [ ] Backup/export de datos de usuario (aliases, reglas)
 - [ ] Notificaciones por email cuando un alias recibe su primer email
 - [ ] Soporte para multiple destinatarios en un alias
