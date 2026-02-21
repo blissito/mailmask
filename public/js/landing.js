@@ -119,10 +119,42 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // Bind billing toggle and checkout buttons
-document.getElementById("billing-toggle").addEventListener("click", toggleBilling);
+document.getElementById("billing-toggle")?.addEventListener("click", toggleBilling);
 document.querySelectorAll(".checkout-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     const plan = btn.closest("[data-plan]").dataset.plan;
     startCheckout(plan, currentBilling, btn);
   });
 });
+
+// --- Coupon display ---
+(async () => {
+  const couponCode = new URLSearchParams(location.search).get("coupon");
+  if (!couponCode) return;
+  try {
+    const res = await fetch(`/api/coupons/${encodeURIComponent(couponCode)}`);
+    if (!res.ok) return;
+    const coupon = await res.json();
+    const card = document.querySelector(`.pricing-card[data-plan="${coupon.plan}"]`);
+    if (!card) return;
+
+    // Update price display
+    const priceEl = card.querySelector(".plan-price");
+    const displayPrice = Math.round(coupon.fixedPrice / 100);
+    if (priceEl) {
+      const originalPrice = card.dataset.monthly;
+      priceEl.innerHTML = `<span class="line-through text-zinc-500 text-2xl mr-2">$${originalPrice}</span>$${displayPrice.toLocaleString("es-MX")}`;
+    }
+
+    // Add coupon badge
+    const badgeEl = document.createElement("div");
+    badgeEl.className = "absolute -top-3 right-4 bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full";
+    badgeEl.textContent = coupon.description;
+    card.style.position = "relative";
+    card.appendChild(badgeEl);
+
+    // Highlight card border
+    card.classList.remove("border-zinc-800");
+    card.classList.add("border-green-600", "border-2");
+  } catch { /* ignore */ }
+})();

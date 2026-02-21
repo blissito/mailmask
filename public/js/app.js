@@ -16,6 +16,7 @@ async function refreshUsage() {
 
 // --- Init ---
 document.addEventListener("DOMContentLoaded", async () => {
+  await loadCoupon();
   await checkAuth();
   await loadDomains();
   setupEventListeners();
@@ -120,7 +121,7 @@ function renderBillingBanner() {
       <div class="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 flex items-center justify-between">
         <span class="text-sm text-zinc-400">Sin plan activo — Activa tu plan para agregar dominios</span>
         <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-          Activar Plan — $49/mes
+          ${getCheckoutLabel()}
         </button>
       </div>`;
     document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
@@ -170,26 +171,47 @@ function renderUsage() {
     </div>`;
 }
 
+let activeCoupon = null;
+
+async function loadCoupon() {
+  const code = new URLSearchParams(location.search).get("coupon");
+  if (!code) return;
+  try {
+    const res = await fetch(`/api/coupons/${encodeURIComponent(code)}`);
+    if (res.ok) activeCoupon = await res.json();
+  } catch { /* ignore */ }
+}
+
+function getCheckoutLabel() {
+  if (activeCoupon) {
+    const name = activeCoupon.plan.charAt(0).toUpperCase() + activeCoupon.plan.slice(1);
+    const price = Math.round(activeCoupon.fixedPrice / 100);
+    return `Activar Plan ${name} — $${price}/mes`;
+  }
+  return "Activar Plan — $49/mes";
+}
+
 async function startCheckout() {
   const btn = document.getElementById("btn-checkout");
   if (btn) { btn.textContent = "Redirigiendo..."; btn.disabled = true; }
   try {
     const coupon = new URLSearchParams(location.search).get("coupon") || undefined;
+    const plan = activeCoupon ? activeCoupon.plan : "basico";
     const res = await fetch("/api/billing/checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ plan: "basico", billing: "monthly", coupon }),
+      body: JSON.stringify({ plan, billing: "monthly", coupon }),
     });
     const data = await res.json();
     if (data.init_point) {
       window.location.href = data.init_point;
     } else {
       showToast(data.error || "Error al iniciar pago", true);
-      if (btn) { btn.textContent = "Activar Plan — $49/mes"; btn.disabled = false; }
+      if (btn) { btn.textContent = getCheckoutLabel(); btn.disabled = false; }
     }
   } catch {
     showToast("Error de conexión", true);
-    if (btn) { btn.textContent = "Activar Plan — $49/mes"; btn.disabled = false; }
+    if (btn) { btn.textContent = getCheckoutLabel(); btn.disabled = false; }
   }
 }
 

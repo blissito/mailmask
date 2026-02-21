@@ -1,4 +1,9 @@
-fetch("/api/auth/me").then(r => { if (r.ok) window.location.href = "/app"; });
+fetch("/api/auth/me").then(r => {
+  if (r.ok) {
+    const coupon = new URLSearchParams(location.search).get("coupon");
+    window.location.href = "/app" + (coupon ? "?coupon=" + encodeURIComponent(coupon) : "");
+  }
+});
 
 document.getElementById("login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -20,7 +25,8 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
     });
 
     if (res.ok) {
-      window.location.href = "/app";
+      const coupon = new URLSearchParams(location.search).get("coupon");
+      window.location.href = "/app" + (coupon ? "?coupon=" + encodeURIComponent(coupon) : "");
     } else {
       const data = await res.json();
       errEl.textContent = data.error || "Error al iniciar sesión";

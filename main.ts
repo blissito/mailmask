@@ -1444,6 +1444,24 @@ const app = new Elysia()
     });
   })
 
+  // --- Coupons (public) ---
+
+  .get("/api/coupons/:code", async ({ params }) => {
+    const code = params.code.toUpperCase().trim();
+    const coupon = COUPONS[code];
+    if (!coupon) {
+      return new Response(JSON.stringify({ error: "Cupón no encontrado" }), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({
+      plan: coupon.plan,
+      fixedPrice: coupon.fixedPrice,
+      description: coupon.description,
+    }), { headers: { "content-type": "application/json" } });
+  })
+
   // --- Billing ---
 
   .post("/api/billing/guest-checkout", async ({ request }) => {
