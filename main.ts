@@ -2311,6 +2311,16 @@ const app = new Elysia()
   .post("/api/webhooks/ses-inbound", async ({ request }) => {
     const body = await request.json();
 
+    // Handle SNS subscription confirmation
+    if (body.Type === "SubscriptionConfirmation" && body.SubscribeURL) {
+      const parsed = new URL(body.SubscribeURL);
+      if (parsed.hostname.endsWith(".amazonaws.com") && parsed.protocol === "https:") {
+        await fetch(body.SubscribeURL);
+        log("info", "ses", "SNS subscription confirmed", { endpoint: request.url });
+      }
+      return new Response("OK", { status: 200 });
+    }
+
     // Validate SNS signature
     if (!body.Type || !body.Signature || !body.SigningCertURL) {
       return new Response(JSON.stringify({ error: "Invalid SNS message" }), {

@@ -479,6 +479,18 @@ export async function ensureSnsSubscription(appUrl: string): Promise<string> {
   );
 
   if (existing) {
+    // If pending confirmation, delete and re-subscribe to trigger a new confirmation
+    if (existing.SubscriptionArn === "PendingConfirmation") {
+      log("info", "ses", "SNS subscription pending, will re-subscribe", { endpoint });
+      // Can't delete PendingConfirmation subs, just re-subscribe to trigger new confirmation
+      await sns.send(new SubscribeCommand({
+        TopicArn: SNS_TOPIC_ARN,
+        Protocol: "https",
+        Endpoint: endpoint,
+      }));
+      log("info", "ses", "Re-subscribed SNS to trigger confirmation", { endpoint });
+      return "re-subscribed";
+    }
     log("info", "ses", "SNS subscription already exists", { endpoint, arn: existing.SubscriptionArn });
     return "exists";
   }
