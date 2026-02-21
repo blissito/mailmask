@@ -1,5 +1,5 @@
-const DENO_KV_URL = Deno.env.get("DENO_KV_URL");
-let kv = await Deno.openKv(DENO_KV_URL);
+const KV_URL = Deno.env.get("KV_URL");
+let kv = await Deno.openKv(KV_URL);
 
 // --- Types ---
 

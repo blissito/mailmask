@@ -2,7 +2,7 @@
 
 let kv: Deno.Kv | null = null;
 async function getKv(): Promise<Deno.Kv> {
-  if (!kv) kv = await Deno.openKv(Deno.env.get("DENO_KV_URL"));
+  if (!kv) kv = await Deno.openKv(Deno.env.get("KV_URL"));
   return kv;
 }
 
