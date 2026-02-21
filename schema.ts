@@ -191,6 +191,16 @@ export const coupons = sqliteTable("coupons", {
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
 });
 
+export const smtpCredentials = sqliteTable("smtp_credentials", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  domainId: text("domain_id").notNull().references(() => domains.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  iamUsername: text("iam_username").notNull().unique(),
+  accessKeyId: text("access_key_id").notNull(),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+  revokedAt: text("revoked_at"),
+});
+
 export const rateLimits = sqliteTable("rate_limits", {
   key: text("key").primaryKey(),
   count: integer("count").notNull().default(0),

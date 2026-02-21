@@ -82,6 +82,9 @@ import {
   listCoupons,
   deleteCoupon,
   markCouponUsed,
+  createSmtpCredential,
+  listSmtpCredentials,
+  revokeSmtpCredential,
 } from "./db.js";
 import {
   hashPassword,
@@ -112,6 +115,7 @@ import {
 import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, extractAttachmentByIndex, rebuildConversationsFromS3 } from "./forwarding.js";
 import { fetchEmailFromS3, repairReceiptRules, ensureSnsSubscription } from "./ses.js";
 import { log } from "./logger.js";
+import { createSmtpIamCredential, revokeSmtpIamCredential } from "./ses.js";
 import "./cron.js";
 
 // --- Coupons (dynamic, from DB) ---
@@ -2600,6 +2604,81 @@ const app = new Elysia({ adapter: node() })
     });
   })
 
+  // --- SMTP Credentials ---
+
+  .post("/api/domains/:id/smtp-credentials", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401 });
+
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const owner = await getUser(access.domain.ownerEmail);
+    if (!owner) return new Response(JSON.stringify({ error: "Cuenta no encontrada" }), { status: 404 });
+    const limits = getUserPlanLimits(owner);
+    if (!limits.smtpRelay) {
+      return new Response(JSON.stringify({ error: "SMTP relay no disponible en tu plan. Actualiza a Freelancer o Developer." }), { status: 403 });
+    }
+
+    const body = await request.json();
+    const label = (body.label ?? "").trim();
+    if (!label || label.length > 100) {
+      return new Response(JSON.stringify({ error: "Label requerido (máx 100 caracteres)" }), { status: 400 });
+    }
+
+    // Create IAM user with restricted SES policy for this domain
+    const iamResult = await createSmtpIamCredential(access.domain.domain);
+
+    const credential = createSmtpCredential(params.id, label, iamResult.iamUsername, iamResult.accessKeyId);
+
+    const smtpServer = `email-smtp.${process.env.AWS_REGION ?? "us-east-2"}.amazonaws.com`;
+
+    return new Response(JSON.stringify({
+      id: credential.id,
+      label: credential.label,
+      server: smtpServer,
+      port: 587,
+      encryption: "STARTTLS",
+      username: iamResult.accessKeyId,
+      password: iamResult.smtpPassword, // Only shown once
+      createdAt: credential.createdAt,
+    }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .get("/api/domains/:id/smtp-credentials", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401 });
+
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const credentials = listSmtpCredentials(params.id);
+    return new Response(JSON.stringify(credentials), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .delete("/api/domains/:id/smtp-credentials/:credId", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401 });
+
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const revoked = revokeSmtpCredential(params.id, (params as any).credId);
+    if (!revoked) return new Response(JSON.stringify({ error: "Credencial no encontrada" }), { status: 404 });
+
+    // Clean up IAM user, policy and access key
+    await revokeSmtpIamCredential(revoked.iamUsername, revoked.accessKeyId);
+
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
   // --- SES bounce/complaint events ---
 
   .post("/api/webhooks/ses-events", async ({ request }) => {
@@ -3000,6 +3079,7 @@ const port = parseInt(process.env.PORT ?? "8000");
 app.listen({ port, hostname: "0.0.0.0" }, () => {
   console.log(`MailMask running on port ${port}`);
 });
+
 
 // Repair receipt rules missing SNS TopicArn (one-time fix for rules created before SNS_TOPIC_ARN was set)
 // Receipt rule repair already imported at top

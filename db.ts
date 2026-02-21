@@ -16,6 +16,7 @@ import {
   sendCounts,
   bulkJobs,
   coupons,
+  smtpCredentials,
 } from "./schema.js";
 
 export { db };
@@ -90,11 +91,11 @@ export interface EmailLog {
 // --- Plans ---
 
 export const PLANS = {
-  basico:     { price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 0,  sends: 0,     api: false, webhooks: false, forwardPerHour: 100 },
-  freelancer: { price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500 },
-  developer:  { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true,  forwardPerHour: 2000 },
-  pro:     { price: 299_00, yearlyPrice: 2990_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500 },
-  agencia: { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true,  forwardPerHour: 2000 },
+  basico:     { price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 0,  sends: 0,     api: false, webhooks: false, forwardPerHour: 100,  smtpRelay: false },
+  freelancer: { price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500,  smtpRelay: true },
+  developer:  { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
+  pro:     { price: 299_00, yearlyPrice: 2990_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500,  smtpRelay: true },
+  agencia: { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
 } as const;
 
 // --- Row → interface mappers ---
@@ -530,16 +531,16 @@ export function updateUserSubscription(email: string, sub: Subscription): User |
   return rows.length ? rowToUser(rows[0]) : null;
 }
 
-export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; api: boolean; webhooks: boolean; forwardPerHour: number } {
+export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; api: boolean; webhooks: boolean; forwardPerHour: number; smtpRelay: boolean } {
   const sub = user.subscription;
   if (sub && (sub.status === "active" || sub.status === "cancelled")) {
     if (sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) < new Date()) {
-      return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, api: false, webhooks: false, forwardPerHour: 0 };
+      return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false };
     }
     const plan = PLANS[sub.plan];
-    return { domains: plan.domains, aliases: plan.aliases, rules: plan.rules, logDays: plan.logDays, sends: plan.sends, api: plan.api, webhooks: plan.webhooks, forwardPerHour: plan.forwardPerHour };
+    return { domains: plan.domains, aliases: plan.aliases, rules: plan.rules, logDays: plan.logDays, sends: plan.sends, api: plan.api, webhooks: plan.webhooks, forwardPerHour: plan.forwardPerHour, smtpRelay: plan.smtpRelay };
   }
-  return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, api: false, webhooks: false, forwardPerHour: 0 };
+  return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false };
 }
 
 // --- Pending checkout (guest flow) ---
@@ -1176,4 +1177,54 @@ export function deleteCoupon(code: string): boolean {
 
 export function markCouponUsed(code: string): void {
   db.update(coupons).set({ used: true }).where(eq(coupons.code, code)).run();
+}
+
+// --- SMTP Credentials ---
+
+export interface SmtpCredential {
+  id: string;
+  domainId: string;
+  label: string;
+  iamUsername: string;
+  accessKeyId: string;
+  createdAt: string;
+  revokedAt?: string;
+}
+
+function rowToSmtpCredential(r: typeof smtpCredentials.$inferSelect): SmtpCredential {
+  return {
+    id: r.id,
+    domainId: r.domainId,
+    label: r.label,
+    iamUsername: r.iamUsername,
+    accessKeyId: r.accessKeyId,
+    createdAt: r.createdAt,
+    revokedAt: r.revokedAt ?? undefined,
+  };
+}
+
+export function createSmtpCredential(domainId: string, label: string, iamUsername: string, accessKeyId: string): SmtpCredential {
+  const rows = db.insert(smtpCredentials).values({ domainId, label, iamUsername, accessKeyId }).returning().all();
+  return rowToSmtpCredential(rows[0]);
+}
+
+export function listSmtpCredentials(domainId: string): SmtpCredential[] {
+  const rows = db.select().from(smtpCredentials)
+    .where(and(eq(smtpCredentials.domainId, domainId), isNull(smtpCredentials.revokedAt)))
+    .orderBy(asc(smtpCredentials.createdAt))
+    .all();
+  return rows.map(rowToSmtpCredential);
+}
+
+export function revokeSmtpCredential(domainId: string, id: string): { iamUsername: string; accessKeyId: string } | null {
+  const rows = db.select().from(smtpCredentials)
+    .where(and(eq(smtpCredentials.domainId, domainId), eq(smtpCredentials.id, id), isNull(smtpCredentials.revokedAt)))
+    .all();
+  if (!rows.length) return null;
+  const cred = rows[0];
+  db.update(smtpCredentials)
+    .set({ revokedAt: new Date().toISOString() })
+    .where(eq(smtpCredentials.id, id))
+    .run();
+  return { iamUsername: cred.iamUsername, accessKeyId: cred.accessKeyId };
 }

@@ -12,24 +12,25 @@
     "build:css": "npx tailwindcss -c tailwind.config.ts -i public/css/input.css -o public/css/styles.css --minify"
   },
   "dependencies": {
-    "elysia": "^1.2",
-    "@elysiajs/node": "^1.2",
-    "drizzle-orm": "^0.38",
-    "better-sqlite3": "^11",
-    "node-cron": "^3",
+    "@aws-sdk/client-iam": "^3",
+    "@aws-sdk/client-s3": "^3",
     "@aws-sdk/client-ses": "^3",
     "@aws-sdk/client-sesv2": "^3",
     "@aws-sdk/client-sns": "^3",
-    "@aws-sdk/client-s3": "^3",
-    "postal-mime": "^2",
-    "mercadopago": "^2"
+    "@elysiajs/node": "^1.2",
+    "better-sqlite3": "^11",
+    "drizzle-orm": "^0.38",
+    "elysia": "^1.2",
+    "mercadopago": "^2",
+    "node-cron": "^3",
+    "postal-mime": "^2"
   },
   "devDependencies": {
-    "tsx": "^4",
-    "typescript": "^5",
-    "drizzle-kit": "^0.30",
     "@types/better-sqlite3": "^7",
     "@types/node": "^22",
-    "@types/node-cron": "^3"
+    "@types/node-cron": "^3",
+    "drizzle-kit": "^0.30",
+    "tsx": "^4",
+    "typescript": "^5"
   }
 }

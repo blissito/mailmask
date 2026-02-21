@@ -460,6 +460,121 @@ export async function deleteBackupFromS3(key: string): Promise<void> {
   }));
 }
 
+// --- SMTP Relay: IAM credential management ---
+
+let _iam: any;
+async function getIam() {
+  if (!_iam) {
+    const { IAMClient } = await import("@aws-sdk/client-iam");
+    _iam = new IAMClient({ region: process.env.AWS_REGION ?? "us-east-2" });
+  }
+  return _iam;
+}
+
+const SES_SMTP_REGION = process.env.AWS_REGION ?? "us-east-2";
+
+export async function deriveSesSmtpPassword(secretAccessKey: string, region: string): Promise<string> {
+  const enc = new TextEncoder();
+  const VERSION = 0x04;
+
+  async function hmacSha256(key: Uint8Array, data: Uint8Array): Promise<Uint8Array> {
+    const cryptoKey = await crypto.subtle.importKey("raw", (key as unknown as ArrayBuffer), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const sig = await crypto.subtle.sign("HMAC", cryptoKey, (data as unknown as ArrayBuffer));
+    return new Uint8Array(sig);
+  }
+
+  // AWS SES SMTP password derivation algorithm
+  const DATE = "11111111";
+  const SERVICE = "ses";
+
+  let signature = await hmacSha256(enc.encode("AWS4" + secretAccessKey), enc.encode(DATE));
+  signature = await hmacSha256(signature, enc.encode(region));
+  signature = await hmacSha256(signature, enc.encode(SERVICE));
+  signature = await hmacSha256(signature, new Uint8Array([VERSION]));
+
+  // Prepend version byte and base64 encode
+  const result = new Uint8Array(1 + signature.length);
+  result[0] = VERSION;
+  result.set(signature, 1);
+
+  // Base64 encode
+  let binary = "";
+  for (const byte of result) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+export async function createSmtpIamCredential(domain: string): Promise<{ iamUsername: string; accessKeyId: string; smtpPassword: string }> {
+  const iam = await getIam();
+  const {
+    CreateUserCommand,
+    PutUserPolicyCommand,
+    CreateAccessKeyCommand,
+  } = await import("@aws-sdk/client-iam");
+
+  const iamUsername = `mailmask-smtp-${domain.replace(/\./g, "-")}-${Date.now()}`;
+
+  // 1. Create IAM user
+  await iam.send(new CreateUserCommand({ UserName: iamUsername }));
+
+  // 2. Attach inline policy restricting to SendRawEmail for this domain only
+  const policy = JSON.stringify({
+    Version: "2012-10-17",
+    Statement: [{
+      Effect: "Allow",
+      Action: ["ses:SendRawEmail", "ses:SendEmail"],
+      Resource: "*",
+      Condition: {
+        StringLike: {
+          "ses:FromAddress": `*@${domain}`,
+        },
+      },
+    }],
+  });
+
+  await iam.send(new PutUserPolicyCommand({
+    UserName: iamUsername,
+    PolicyName: "ses-send",
+    PolicyDocument: policy,
+  }));
+
+  // 3. Create access key
+  const keyRes = await iam.send(new CreateAccessKeyCommand({ UserName: iamUsername }));
+  const accessKeyId = keyRes.AccessKey!.AccessKeyId!;
+  const secretAccessKey = keyRes.AccessKey!.SecretAccessKey!;
+
+  // 4. Derive SMTP password from secret access key
+  const smtpPassword = await deriveSesSmtpPassword(secretAccessKey, SES_SMTP_REGION);
+
+  return { iamUsername, accessKeyId, smtpPassword };
+}
+
+export async function revokeSmtpIamCredential(iamUsername: string, accessKeyId: string): Promise<void> {
+  const iam = await getIam();
+  const {
+    DeleteAccessKeyCommand,
+    DeleteUserPolicyCommand,
+    DeleteUserCommand,
+  } = await import("@aws-sdk/client-iam");
+
+  try {
+    await iam.send(new DeleteAccessKeyCommand({ UserName: iamUsername, AccessKeyId: accessKeyId }));
+  } catch (err) {
+    log("warn", "iam", "Could not delete access key", { iamUsername, error: String(err) });
+  }
+
+  try {
+    await iam.send(new DeleteUserPolicyCommand({ UserName: iamUsername, PolicyName: "ses-send" }));
+  } catch (err) {
+    log("warn", "iam", "Could not delete user policy", { iamUsername, error: String(err) });
+  }
+
+  try {
+    await iam.send(new DeleteUserCommand({ UserName: iamUsername }));
+  } catch (err) {
+    log("warn", "iam", "Could not delete IAM user", { iamUsername, error: String(err) });
+  }
+}
+
 // --- SNS subscription verification ---
 
 let _sns: any;

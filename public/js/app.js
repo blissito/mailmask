@@ -688,6 +688,112 @@ async function verifyDns() {
   }
 }
 
+// --- SMTP Credentials ---
+
+async function loadSmtpCredentials() {
+  if (!selectedDomain) return;
+  const list = document.getElementById("smtp-list");
+  const empty = document.getElementById("smtp-empty");
+  const upgrade = document.getElementById("smtp-upgrade");
+
+  // Check plan
+  const sub = currentUser?.subscription;
+  const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
+  const isExpired = periodEnd && periodEnd < new Date();
+  const plan = sub && (sub.status === "active" || sub.status === "cancelled") && !isExpired ? sub.plan : null;
+  const smtpAllowed = plan && ["freelancer", "developer", "pro", "agencia"].includes(plan);
+
+  if (!smtpAllowed) {
+    list.innerHTML = "";
+    empty.classList.add("hidden");
+    upgrade.classList.remove("hidden");
+    return;
+  }
+  upgrade.classList.add("hidden");
+
+  const res = await fetch(`/api/domains/${selectedDomain.id}/smtp-credentials`);
+  if (!res.ok) return;
+  const creds = await res.json();
+  renderSmtpCredentials(creds);
+}
+
+function renderSmtpCredentials(creds) {
+  const list = document.getElementById("smtp-list");
+  const empty = document.getElementById("smtp-empty");
+
+  if (creds.length === 0) {
+    list.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  list.innerHTML = creds.map(c => `
+    <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg px-5 py-4 flex items-center justify-between">
+      <div>
+        <span class="font-semibold text-sm">${esc(c.label)}</span>
+        <span class="text-xs text-zinc-500 ml-2">AccessKeyId: ${esc(c.accessKeyId)}</span>
+        <div class="text-xs text-zinc-500 mt-1">Creada ${new Date(c.createdAt).toLocaleDateString()}</div>
+      </div>
+      <button onclick="revokeSmtpCredential('${esc(c.id)}')" class="text-xs text-red-400 hover:text-red-300 transition-colors">Revocar</button>
+    </div>
+  `).join("");
+}
+
+async function createSmtpCredential(label) {
+  if (!selectedDomain) return;
+  const res = await fetch(`/api/domains/${selectedDomain.id}/smtp-credentials`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ label }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    const errEl = document.getElementById("smtp-label-error");
+    errEl.textContent = data.error || "Error al generar credenciales";
+    errEl.classList.remove("hidden");
+    return;
+  }
+
+  hideModal("modal-smtp-label");
+
+  // Show credentials modal
+  const info = document.getElementById("smtp-creds-info");
+  info.innerHTML = `
+    <div class="bg-zinc-800 rounded-lg p-4 space-y-2 font-mono text-xs">
+      <div class="flex justify-between"><span class="text-zinc-400">Servidor:</span><span class="text-zinc-100">${esc(data.server)}</span></div>
+      <div class="flex justify-between"><span class="text-zinc-400">Puerto:</span><span class="text-zinc-100">${data.port}</span></div>
+      <div class="flex justify-between"><span class="text-zinc-400">Encriptación:</span><span class="text-zinc-100">${esc(data.encryption)}</span></div>
+      <div class="flex justify-between"><span class="text-zinc-400">Usuario:</span><span class="text-zinc-100 select-all">${esc(data.username)}</span></div>
+      <div class="flex justify-between"><span class="text-zinc-400">Contraseña:</span><span class="text-zinc-100 select-all break-all">${esc(data.password)}</span></div>
+    </div>
+    <div class="mt-3 text-xs text-zinc-400">
+      <p class="font-semibold text-zinc-300 mb-1">Instrucciones:</p>
+      <ol class="list-decimal list-inside space-y-1">
+        <li>Abre la configuración de cuenta SMTP en tu cliente de correo</li>
+        <li>Servidor de salida (SMTP): <strong>${esc(data.server)}</strong></li>
+        <li>Puerto: <strong>${data.port}</strong> con STARTTLS</li>
+        <li>Usuario: el AccessKeyId mostrado arriba</li>
+        <li>Contraseña: la contraseña mostrada arriba</li>
+        <li>Dirección "De": cualquier dirección <strong>@${esc(selectedDomain.domain)}</strong></li>
+      </ol>
+    </div>
+  `;
+  showModal("modal-smtp-creds");
+  await loadSmtpCredentials();
+}
+
+async function revokeSmtpCredential(credId) {
+  if (!selectedDomain) return;
+  if (!confirm("¿Revocar esta credencial SMTP? El cliente de correo dejará de poder enviar.")) return;
+  const res = await fetch(`/api/domains/${selectedDomain.id}/smtp-credentials/${credId}`, { method: "DELETE" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    alert(data.error || "Error al revocar credencial");
+    return;
+  }
+  await loadSmtpCredentials();
+}
+
 // --- Tabs ---
 
 function switchTab(tab) {
@@ -708,6 +814,7 @@ function switchTab(tab) {
   else if (tab === "logs") loadLogs();
   else if (tab === "dns") renderDnsRecords();
   else if (tab === "members") loadMembers();
+  else if (tab === "smtp") loadSmtpCredentials();
 }
 
 // --- Modals ---
@@ -753,6 +860,17 @@ function setupEventListeners() {
 
   // Verify DNS button
   document.getElementById("btn-verify-dns").addEventListener("click", verifyDns);
+
+  // SMTP
+  document.getElementById("btn-add-smtp").addEventListener("click", () => showModal("modal-smtp-label"));
+  document.getElementById("form-smtp-label").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const errEl = document.getElementById("smtp-label-error");
+    errEl.classList.add("hidden");
+    await createSmtpCredential(form.label.value.trim());
+    form.reset();
+  });
 
   // Form: Add domain
   document.getElementById("form-add-domain").addEventListener("submit", async (e) => {

@@ -75,6 +75,7 @@
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="logs">Logs</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="dns">DNS</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="members">Miembros</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="smtp">SMTP</button>
       </div>
 
       <!-- Tab: Aliases -->
@@ -143,8 +144,54 @@
           <a href="/#pricing" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Actualiza tu plan</a>
         </div>
       </div>
+
+      <!-- Tab: SMTP -->
+      <div id="tab-smtp" class="tab-content hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold">Credenciales SMTP</h3>
+          <button id="btn-add-smtp" class="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors">+ Generar credenciales</button>
+        </div>
+        <p class="text-sm text-zinc-400 mb-4">Configura tu cliente de correo (Outlook, Thunderbird, Apple Mail) para enviar emails desde tu dominio.</p>
+        <div id="smtp-list" class="space-y-2"></div>
+        <div id="smtp-empty" class="hidden text-center py-8 text-zinc-500">
+          No hay credenciales SMTP. Genera una para enviar desde tu dominio.
+        </div>
+        <div id="smtp-upgrade" class="hidden text-center py-8">
+          <p class="text-zinc-500 mb-3">SMTP relay no disponible en tu plan.</p>
+          <a href="/#pricing" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Actualiza a Freelancer o Developer</a>
+        </div>
+      </div>
     </div>
   </main>
+
+  <!-- Modal: SMTP Label -->
+  <div id="modal-smtp-label" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+      <h3 class="text-lg font-bold mb-4">Generar credenciales SMTP</h3>
+      <form id="form-smtp-label">
+        <label class="block text-sm text-zinc-400 mb-1">Etiqueta (ej: "Outlook trabajo")</label>
+        <input type="text" name="label" required placeholder="Mi cliente de correo" maxlength="100"
+          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+        <div id="smtp-label-error" class="text-red-400 text-sm mt-2 hidden"></div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-smtp-label">Cancelar</button>
+          <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Generar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: SMTP Credentials (shown once) -->
+  <div id="modal-smtp-creds" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg p-6">
+      <h3 class="text-lg font-bold mb-2">Credenciales SMTP generadas</h3>
+      <p class="text-sm text-yellow-400 mb-4">⚠ La contraseña solo se muestra una vez. Cópiala ahora.</p>
+      <div id="smtp-creds-info" class="space-y-3 text-sm"></div>
+      <div class="flex justify-end mt-6">
+        <button type="button" class="btn-cancel-modal bg-zinc-800 hover:bg-zinc-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors" data-modal="modal-smtp-creds">Cerrar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal: Add domain -->
   <div id="modal-add-domain" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
