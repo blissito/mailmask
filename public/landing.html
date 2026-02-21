@@ -70,7 +70,7 @@
             "name": "¿Puedo enviar emails desde mi dominio?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Sí. Los planes Freelancer y Developer incluyen envío autenticado con DKIM y SPF, para que tus emails no caigan en spam."
+              "text": "Sí. Los planes Freelancer y Developer incluyen envío autenticado. Al agregar tu dominio, MailMask configura DKIM y SPF automáticamente — Gmail y Outlook muestran \"firmado por tudominio.com\" junto al remitente, lo que mejora la entregabilidad y evita que tus emails caigan en spam."
             }
           },
           {
@@ -185,8 +185,8 @@
       <p
         class="hero-sub mt-6 text-lg sm:text-xl text-zinc-400 max-w-xl animate-fade-up opacity-0 anim-delay-200"
       >
-        Recibe y envía email desde tu dominio. Sin servidores, sin Google
-        Workspace, sin complicaciones.
+        Recibe y envía email desde tu dominio. Autenticación DKIM + SPF
+        automática — tus emails llegan al inbox, no a spam.
       </p>
 
       <div class="hero-sub mt-8 flex flex-col sm:flex-row gap-3 animate-fade-up opacity-0 anim-delay-300">
@@ -379,12 +379,67 @@
         <div
           class="feature-card bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-fade-up opacity-0 anim-delay-900"
         >
-          <h3 class="font-semibold text-lg mb-2">🔒 DKIM + SPF</h3>
+          <h3 class="font-semibold text-lg mb-2">🔒 DKIM + SPF automático</h3>
           <p class="text-zinc-400 text-sm">
-            Tus emails no caen en spam. Verificación completa de autenticidad.
+            Se configura solo al agregar tu dominio. Tus emails salen firmados
+            con la misma infraestructura de Amazon — el destinatario ve
+            "firmado por tudominio.com" en Gmail.
           </p>
         </div>
       </div>
+    </section>
+
+    <!-- Deliverability -->
+    <section class="max-w-4xl mx-auto px-4 py-16">
+      <h2 class="text-2xl font-bold text-center mb-4">
+        Tus emails llegan al inbox, no a spam
+      </h2>
+      <p class="text-center text-zinc-400 mb-12 max-w-2xl mx-auto">
+        MailMask configura automáticamente los estándares de autenticación que
+        Gmail, Outlook y otros proveedores exigen para entregar emails al inbox.
+      </p>
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="text-center">
+          <div
+            class="w-14 h-14 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
+          >
+            <span class="text-2xl">✍️</span>
+          </div>
+          <h3 class="font-semibold text-lg mb-2">DKIM</h3>
+          <p class="text-zinc-400 text-sm">
+            Firma digital automática en cada email. Gmail muestra
+            "firmado por: tudominio.com" — prueba de que el mensaje es auténtico.
+          </p>
+        </div>
+        <div class="text-center">
+          <div
+            class="w-14 h-14 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
+          >
+            <span class="text-2xl">🛡️</span>
+          </div>
+          <h3 class="font-semibold text-lg mb-2">SPF</h3>
+          <p class="text-zinc-400 text-sm">
+            Autorización de envío en tu DNS. Los servidores de correo verifican
+            que el email viene de un servidor autorizado por ti.
+          </p>
+        </div>
+        <div class="text-center">
+          <div
+            class="w-14 h-14 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
+          >
+            <span class="text-2xl">☁️</span>
+          </div>
+          <h3 class="font-semibold text-lg mb-2">Amazon SES</h3>
+          <p class="text-zinc-400 text-sm">
+            Misma infraestructura que usan Netflix, Reddit y miles de empresas.
+            IPs con reputación alta y monitoreo constante.
+          </p>
+        </div>
+      </div>
+      <p class="text-center text-zinc-500 text-sm mt-10 max-w-lg mx-auto">
+        Todo esto se configura automáticamente cuando agregas tu dominio. Sin
+        certificados, sin servidores, sin complicaciones.
+      </p>
     </section>
 
     <!-- Pricing -->
@@ -556,8 +611,10 @@
             >
           </summary>
           <p class="px-6 pb-4 text-zinc-400 text-sm">
-            Sí. Los planes Freelancer y Developer incluyen envío autenticado con DKIM y
-            SPF, para que tus emails no caigan en spam.
+            Sí. Los planes Freelancer y Developer incluyen envío autenticado.
+            Al agregar tu dominio, MailMask configura DKIM y SPF automáticamente —
+            Gmail y Outlook muestran "firmado por tudominio.com" junto al remitente,
+            lo que mejora la entregabilidad y evita que tus emails caigan en spam.
           </p>
         </details>
         <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
