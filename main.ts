@@ -102,6 +102,12 @@ import { fetchEmailFromS3, repairReceiptRules, ensureSnsSubscription } from "./s
 import { log } from "./logger.ts";
 import "./cron.ts";
 
+// --- Coupons ---
+type PlanKeyTop = "basico" | "freelancer" | "developer" | "pro" | "agencia";
+const COUPONS: Record<string, { plan: PlanKeyTop; fixedPrice: number; description: string }> = {
+  FREE_50: { plan: "freelancer", fixedPrice: 50_00, description: "Plan Freelancer a $50 MXN/mes" },
+};
+
 // --- Fail-fast env validation (deferred for Deno Deploy compatibility) ---
 let envChecked = false;
 function ensureEnv() {
@@ -1445,9 +1451,9 @@ const app = new Elysia()
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
 
-    const { plan = "basico", billing = "monthly" } = await request
+    const { plan = "basico", billing = "monthly", coupon } = await request
       .json()
-      .catch(() => ({ plan: "basico", billing: "monthly" }));
+      .catch(() => ({ plan: "basico", billing: "monthly", coupon: undefined }));
     const planKey = plan as keyof typeof PLANS;
     if (!PLANS[planKey]) {
       return new Response(JSON.stringify({ error: "Plan inválido" }), {
@@ -1455,6 +1461,10 @@ const app = new Elysia()
       });
     }
     const isYearly = billing === "yearly";
+
+    // Validate coupon
+    const couponCode = typeof coupon === "string" ? coupon.toUpperCase().trim() : undefined;
+    const activeCoupon = couponCode && COUPONS[couponCode]?.plan === planKey ? COUPONS[couponCode] : undefined;
 
     const token = crypto.randomUUID();
     await createPendingCheckout(token, isYearly ? `${planKey}:yearly` : planKey);
@@ -1473,13 +1483,17 @@ const app = new Elysia()
 
     try {
       const billingLabel = isYearly ? "Anual" : "Mensual";
+      const couponSuffix = activeCoupon && couponCode ? ` [${couponCode}]` : "";
+      const amount = activeCoupon
+        ? activeCoupon.fixedPrice / 100
+        : isYearly ? PLANS[planKey].yearlyPrice / 100 : PLANS[planKey].price / 100;
       // deno-lint-ignore no-explicit-any
       const body: any = {
-        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)} (${billingLabel})`,
+        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)} (${billingLabel})${couponSuffix}`,
         auto_recurring: {
           frequency: isYearly ? 12 : 1,
           frequency_type: "months",
-          transaction_amount: isYearly ? PLANS[planKey].yearlyPrice / 100 : PLANS[planKey].price / 100,
+          transaction_amount: amount,
           currency_id: "MXN",
           ...(isYearly ? {} : {
             free_trial: {
@@ -1516,9 +1530,9 @@ const app = new Elysia()
         status: 401,
       });
 
-    const { plan = "basico", billing = "monthly" } = await request
+    const { plan = "basico", billing = "monthly", coupon } = await request
       .json()
-      .catch(() => ({ plan: "basico", billing: "monthly" }));
+      .catch(() => ({ plan: "basico", billing: "monthly", coupon: undefined }));
     const planKey = plan as keyof typeof PLANS;
     if (!PLANS[planKey]) {
       return new Response(JSON.stringify({ error: "Plan inválido" }), {
@@ -1526,6 +1540,10 @@ const app = new Elysia()
       });
     }
     const isYearly = billing === "yearly";
+
+    // Validate coupon
+    const couponCode = typeof coupon === "string" ? coupon.toUpperCase().trim() : undefined;
+    const activeCoupon = couponCode && COUPONS[couponCode]?.plan === planKey ? COUPONS[couponCode] : undefined;
 
     const { PreApproval } = await import("mercadopago");
     const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN");
@@ -1541,13 +1559,17 @@ const app = new Elysia()
 
     try {
       const billingLabel = isYearly ? "Anual" : "Mensual";
+      const couponSuffix = activeCoupon && couponCode ? ` [${couponCode}]` : "";
+      const amount = activeCoupon
+        ? activeCoupon.fixedPrice / 100
+        : isYearly ? PLANS[planKey].yearlyPrice / 100 : PLANS[planKey].price / 100;
       // deno-lint-ignore no-explicit-any
       const body: any = {
-        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)} (${billingLabel})`,
+        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)} (${billingLabel})${couponSuffix}`,
         auto_recurring: {
           frequency: isYearly ? 12 : 1,
           frequency_type: "months",
-          transaction_amount: isYearly ? PLANS[planKey].yearlyPrice / 100 : PLANS[planKey].price / 100,
+          transaction_amount: amount,
           currency_id: "MXN",
           ...(isYearly ? {} : {
             free_trial: {
@@ -1688,6 +1710,18 @@ const app = new Elysia()
                 await deletePendingCheckout(externalRef);
               }
 
+              // Try to determine plan from reason (handles coupons with non-standard amounts)
+              if (!plan) {
+                const reasonMatch = sub.reason?.match(/Plan (\w+)/i);
+                if (reasonMatch) {
+                  const parsed = reasonMatch[1].toLowerCase() as PlanKey;
+                  if (["basico", "freelancer", "developer", "pro", "agencia"].includes(parsed)) {
+                    plan = parsed;
+                  }
+                }
+              }
+
+              // Fallback to amount-based lookup for backwards compat
               if (!plan) {
                 const amount = sub.auto_recurring?.transaction_amount ?? 0;
                 const amountToPlan: Record<number, PlanKey> = {

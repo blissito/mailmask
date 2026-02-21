@@ -70,14 +70,19 @@ function toggleBilling() {
   ], { duration: 250, easing: "ease-out", fill: "forwards" });
 }
 
+// Persist coupon from URL to localStorage
+const _landingCoupon = new URLSearchParams(location.search).get("coupon");
+if (_landingCoupon) localStorage.setItem("mailmask_coupon", _landingCoupon);
+
 async function startCheckout(plan, billing, btn) {
   btn.disabled = true;
   btn.textContent = "Redirigiendo...";
   try {
+    const coupon = localStorage.getItem("mailmask_coupon") || undefined;
     const res = await fetch("/api/billing/guest-checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ plan, billing }),
+      body: JSON.stringify({ plan, billing, coupon }),
     });
     const data = await res.json();
     if (data.init_point) {

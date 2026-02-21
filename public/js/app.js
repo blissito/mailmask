@@ -174,10 +174,11 @@ async function startCheckout() {
   const btn = document.getElementById("btn-checkout");
   if (btn) { btn.textContent = "Redirigiendo..."; btn.disabled = true; }
   try {
+    const coupon = localStorage.getItem("mailmask_coupon") || undefined;
     const res = await fetch("/api/billing/checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ plan: "basico", billing: "monthly" }),
+      body: JSON.stringify({ plan: "basico", billing: "monthly", coupon }),
     });
     const data = await res.json();
     if (data.init_point) {
