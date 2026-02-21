@@ -65,6 +65,7 @@ deno task test    # Run tests
 - [ ] Evaluar pattern de almacenamiento de mensajes en Mesa: ¿leer body de S3 on demand vs duplicar en KV? Investigar otros patterns (cache intermedio, pre-procesado a formato ligero, CDN/signed URLs). Concluir cuál es el mejor approach antes de implementar.
 
 ### Backlog
+- [ ] **SES Tenants + aislamiento de reputación**: Implementar SES Tenants (feature de agosto 2025) para aislar reputación por dominio de cliente. 1 tenant por dominio, política Standard para Básico/Freelancer, Strict para Developer. Managed Dedicated IPs para tiers de pago (auto-scaling, sin warmup manual). EventBridge para recibir eventos de cambio de estado/reputación y pausar forwarding automáticamente. Evaluar VDM (Virtual Deliverability Manager) para dashboard de entregabilidad por config set. También agregar `monthlyForwards` a PLANS para limitar emails procesados por mes y proteger margen (hoy solo existe `forwardPerHour`).
 - [ ] **SMTP relay**: Ofrecer credenciales SMTP para que usuarios envíen desde cualquier cliente (Gmail, Thunderbird). Dominio ya es identidad SES verificada, solo falta generar credenciales y endpoint de autenticación SMTP. Disponible desde plan Freelancer.
 - [ ] Probar checkout autenticado con email diferente al collector de MP
 - [ ] **SDK**: Cliente JS/TS para consumir la API de MailMask (crear aliases, listar dominios, etc.). Publicar en npm. Disponible desde plan Developer.
