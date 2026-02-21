@@ -45,7 +45,7 @@ deno task test    # Run tests
 
 ### Crítico — bloquea lanzamiento público
 - [x] ~~**Link de activar cuenta no sirve**~~: corregido JSON encoding de tokens, agregado endpoint resend-verification y banner en dashboard.
-- [x] ~~**Hardcodear KV database URL**~~: migrado a Postgres.
+- [x] ~~**Hardcodear KV database URL**~~: migrado a SQLite.
 - [x] ~~**Monitoreo/alerting**~~: deprioritized — equipo trabaja diario en el sitio, no se hará este año.
 - [x] ~~**Retry en forwarding**~~: resuelto.
 - [x] ~~**Revisar `cron.ts`**~~: resuelto.
@@ -77,7 +77,7 @@ deno task test    # Run tests
 - [ ] **SDK**: Cliente JS/TS para consumir la API de MailMask (crear aliases, listar dominios, etc.). Publicar en npm. Disponible desde plan Developer.
 - [ ] **Webhooks**: Permitir registrar URLs para recibir eventos (email recibido, alias creado, etc.). UI para gestionar webhooks por dominio, endpoint de registro, sistema de delivery con reintentos. Disponible desde plan Developer.
 - [ ] **Flush de historial / almacenamiento**: Basico/Freelancer tienen franja de 15-30 días de retención, después se hace flush automático. Developer incluye almacenamiento base para conservar todo su historial, y puede comprar más cuando se acabe (add-on por GB o por bloque). Definir: UI para ver uso de almacenamiento, alerta cuando se acerca al límite, flujo de compra de almacenamiento adicional, export antes de flush. Investigar costos S3/Postgres para pricing. **Nota competitiva:** Ningún competidor directo (SimpleLogin, ImprovMX, ForwardEmail, addy.io) almacena contenido de emails ni ofrece historial — todos son forwarding puro sin retención. Bandeja + historial persistente es diferenciador único que posiciona a MailMask más cerca de Helpscout/Intercom pero a fracción del costo y con máscaras incluidas. El almacenamiento como add-on es feature sin competencia en el segmento.
-- [ ] **Blog**: Blog con posts como archivos HTML individuales en el repo (`public/blog/`). Cada post puede tener su propio diseño y estilo. Página índice que lista todos los posts, SEO meta tags. Posts iniciales: "cómo tener email profesional sin Google Workspace", "alternativa barata a Google Workspace", "cómo reenviar emails de dominio propio a Gmail", "cómo agregar email personalizado a tu SaaS en 10 minutos" (este último empuja al SDK y plan Developer). ~12 posts SEO en español enfocados en búsquedas sin competencia en LATAM.
+- [~] **Blog** *(parcial)*: 3 posts publicados + index + blog.css integrado en landing. Posts: email profesional sin Google Workspace, reenviar emails de dominio a Gmail, gestionar emails de dominio en equipo. Faltan ~9 posts SEO adicionales del plan original.
 - [ ] **Calculadora interactiva (lead magnet)**: Página pública con sliders/range inputs donde el usuario calcula cuánto ahorra vs Google Workspace según número de usuarios, dominios y buzones. Muestra comparativa de costo mensual/anual y CTA a registro. Funciona como lead magnet para SEO y compartir en redes.
 - [ ] **Campaña "dominio gratis"**: Diseñar y ejecutar campaña de marketing aprovechando el feature de registro de dominio integrado. Definir: oferta (dominio gratis primer año con plan X, etc.), landing page dedicada, copy para email/redes, segmento objetivo, métricas de éxito. Coordinar con implementación de registro de dominios (Route 53).
 - [ ] **Schema markup (structured data)**: Agregar JSON-LD a landing, blog y páginas clave para SEO. Schemas: Organization, Product, FAQPage, BlogPosting, BreadcrumbList. Mejora visibilidad en Google y rich snippets.
