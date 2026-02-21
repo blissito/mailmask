@@ -18,6 +18,11 @@
           <ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mask-500))"/>
           <ellipse cx="28" cy="36" rx="8" ry="6" fill="#18181b"/>
           <ellipse cx="52" cy="36" rx="8" ry="6" fill="#18181b"/>
+          <ellipse cx="30" cy="34" rx="2" ry="1.5" fill="#fafafa" opacity="0.6"/>
+          <ellipse cx="54" cy="34" rx="2" ry="1.5" fill="#fafafa" opacity="0.6"/>
+          <path d="M40 18 L40 26" stroke="#facc15" stroke-width="2" stroke-linecap="round"/>
+          <path d="M36 19 L40 26 L44 19" stroke="#facc15" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path d="M30 48 Q40 54 50 48" stroke="rgb(var(--mask-800))" stroke-width="2" fill="none" stroke-linecap="round"/>
         </svg>
         <span class="font-bold text-lg">MailMask</span>
       </a>
@@ -239,6 +244,27 @@
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-add-alias">Cancelar</button>
           <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear alias</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Edit alias -->
+  <div id="modal-edit-alias" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+      <h3 class="text-lg font-bold mb-4">Editar alias <span id="edit-alias-name" class="font-mono text-mask-400"></span></h3>
+      <form id="form-edit-alias">
+        <input type="hidden" name="alias" />
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">Destino(s)</label>
+          <input type="email" name="destinations" multiple required placeholder="tu@gmail.com, otro@gmail.com"
+            class="lowercase w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+          <p class="text-xs text-zinc-500 mt-1">Separa múltiples destinos con coma</p>
+        </div>
+        <div id="edit-alias-error" class="text-red-400 text-sm mt-2 hidden"></div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-edit-alias">Cancelar</button>
+          <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Guardar</button>
         </div>
       </form>
     </div>

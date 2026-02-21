@@ -394,6 +394,7 @@ function renderAliases(aliases) {
         ${a.forwardCount ? `<span class="text-xs text-zinc-500 ml-2">${a.forwardCount} reenviado${a.forwardCount === 1 ? '' : 's'}${a.lastFrom ? ` · último de ${esc(a.lastFrom)}` : ''}</span>` : ''}
       </div>
       <div class="flex items-center gap-2">
+        <button data-action="edit-alias" data-alias="${esc(a.alias)}" data-destinations="${esc(a.destinations.join(', '))}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Editar</button>
         <button data-action="toggle-alias" data-alias="${esc(a.alias)}" data-enabled="${!a.enabled}" class="text-xs px-2 py-1 rounded ${a.enabled ? 'bg-green-900/30 text-green-400' : 'bg-zinc-700 text-zinc-400'}">${a.enabled ? 'Activo' : 'Inactivo'}</button>
         <button data-action="remove-alias" data-alias="${esc(a.alias)}" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
       </div>
@@ -1073,6 +1074,43 @@ function setupEventListeners() {
     }
   });
 
+  // Form: Edit alias
+  document.getElementById("form-edit-alias").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const errEl = document.getElementById("edit-alias-error");
+    errEl.classList.add("hidden");
+
+    const destinations = form.destinations.value.split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
+    if (destinations.length === 0) {
+      errEl.textContent = "Agrega al menos un destino";
+      errEl.classList.remove("hidden");
+      return;
+    }
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalid = destinations.filter(d => !emailRe.test(d));
+    if (invalid.length) {
+      errEl.textContent = `Email(s) inválido(s): ${invalid.join(", ")}`;
+      errEl.classList.remove("hidden");
+      return;
+    }
+
+    const res = await fetch(`/api/domains/${selectedDomain.id}/alias/${form.alias.value}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ destinations }),
+    });
+
+    if (res.ok) {
+      hideModal("modal-edit-alias");
+      await loadAliases();
+    } else {
+      const data = await res.json();
+      errEl.textContent = data.error || "Error al editar alias";
+      errEl.classList.remove("hidden");
+    }
+  });
+
   // Form: Add rule
   document.getElementById("form-add-rule").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1126,6 +1164,16 @@ function setupEventListeners() {
     }
     const remove = e.target.closest("[data-action='remove-alias']");
     if (remove) removeAlias(remove.dataset.alias);
+    const edit = e.target.closest("[data-action='edit-alias']");
+    if (edit) {
+      const alias = edit.dataset.alias;
+      document.getElementById("edit-alias-name").textContent = `${alias}@${selectedDomain.domain}`;
+      const form = document.getElementById("form-edit-alias");
+      form.alias.value = alias;
+      form.destinations.value = edit.dataset.destinations;
+      document.getElementById("edit-alias-error").classList.add("hidden");
+      showModal("modal-edit-alias");
+    }
   });
 
   // Event delegation: rules list
