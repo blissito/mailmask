@@ -2,15 +2,12 @@ import { sql } from "./pg.ts";
 
 const schema = await Deno.readTextFile(new URL("./schema.sql", import.meta.url));
 
-// Split by semicolons and execute each statement
-const statements = schema
-  .split(";")
-  .map((s) => s.trim())
-  .filter((s) => s.length > 0 && !s.startsWith("--"));
-
-for (const stmt of statements) {
-  await sql.unsafe(stmt);
+try {
+  await sql.unsafe(schema);
+  console.log("Migration complete");
+} catch (err) {
+  console.error("Migration failed:", err);
+  Deno.exit(1);
 }
 
-console.log(`Migration complete: ${statements.length} statements executed`);
 await sql.end();
