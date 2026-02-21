@@ -184,11 +184,9 @@ function isAdmin(email: string): boolean {
 
 async function runBackup(): Promise<{ key: string; users: number }> {
   const backupData: Record<string, unknown>[] = [];
-  const { _getKv } = await import("./db.ts");
-  const kv = _getKv();
+  const allUsers = await listAllUsers();
 
-  for await (const entry of kv.list<any>({ prefix: ["users"] })) {
-    const user = entry.value;
+  for (const user of allUsers) {
     const domains = await listUserDomains(user.email);
     const domainsData = [];
     for (const d of domains) {
@@ -2470,12 +2468,8 @@ const app = new Elysia()
 
     // Update emailVerified
     if (body.emailVerified !== undefined) {
-      const fresh = await getUser(email);
-      if (fresh) {
-        const { _getKv } = await import("./db.ts");
-        const kv = _getKv();
-        await kv.set(["users", email], { ...fresh, emailVerified: !!body.emailVerified });
-      }
+      const { sql } = await import("./pg.ts");
+      await sql`UPDATE users SET email_verified = ${!!body.emailVerified} WHERE email = ${email}`;
     }
 
     log("info", "admin", "User updated by admin", { admin: auth.email, target: email, changes: body });
