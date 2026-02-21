@@ -238,6 +238,49 @@ export async function deleteConfigurationSet(domain: string): Promise<void> {
   }
 }
 
+// --- List inbound email keys from S3 ---
+
+export async function listInboundEmailKeys(domain: string): Promise<{ key: string; lastModified: string; size: number }[]> {
+  const s3 = await getS3();
+  const { ListObjectsV2Command } = await import("@aws-sdk/client-s3");
+  const prefix = `inbound/${domain}/`;
+  const results: { key: string; lastModified: string; size: number }[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const res = await s3.send(new ListObjectsV2Command({
+      Bucket: S3_BUCKET,
+      Prefix: prefix,
+      ContinuationToken: continuationToken,
+    }));
+    for (const obj of res.Contents ?? []) {
+      if (obj.Key) {
+        results.push({
+          key: obj.Key,
+          lastModified: obj.LastModified?.toISOString() ?? "",
+          size: obj.Size ?? 0,
+        });
+      }
+    }
+    continuationToken = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return results;
+}
+
+// --- Fetch partial email from S3 (headers only) ---
+
+export async function fetchEmailHeadersFromS3(bucketName: string, objectKey: string, bytes = 4096): Promise<string> {
+  const s3 = await getS3();
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  const res = await s3.send(new GetObjectCommand({
+    Bucket: bucketName,
+    Key: objectKey,
+    Range: `bytes=0-${bytes - 1}`,
+  }));
+  return await res.Body!.transformToString("utf-8");
+}
+
 // --- Fetch raw email from S3 ---
 
 export async function fetchEmailFromS3(bucketName: string, objectKey: string): Promise<string> {

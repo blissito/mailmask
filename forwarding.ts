@@ -1,5 +1,5 @@
 import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, type Rule, type ForwardQueueItem } from "./db.ts";
-import { forwardEmail, fetchEmailFromS3, sendAlert } from "./ses.ts";
+import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchEmailHeadersFromS3 } from "./ses.ts";
 import { checkRateLimit } from "./rate-limit.ts";
 import { log } from "./logger.ts";
 
@@ -157,6 +157,87 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
       messageId: messageIdHeader,
     });
   }
+}
+
+// --- Rebuild conversations from S3 ---
+
+export async function rebuildConversationsFromS3(domainId: string, domainName: string): Promise<number> {
+  const s3Bucket = Deno.env.get("S3_BUCKET") ?? "mailmask-inbound";
+  const keys = await listInboundEmailKeys(domainName);
+  if (keys.length === 0) return 0;
+
+  log("info", "mesa", "Rebuilding conversations from S3", { domainId, domainName, emailCount: keys.length });
+
+  let rebuilt = 0;
+  for (const obj of keys) {
+    try {
+      // Fetch first 4KB to parse headers
+      const partial = await fetchEmailHeadersFromS3(s3Bucket, obj.key);
+      const from = extractHeader(partial, "From");
+      const subject = extractHeader(partial, "Subject") || "(sin asunto)";
+      const messageIdHeader = extractHeader(partial, "Message-ID");
+      const date = extractHeader(partial, "Date");
+      const references = extractReferences(partial);
+
+      // Extract recipient from S3 key or To header
+      const toHeader = extractHeader(partial, "To");
+      const recipient = toHeader || `unknown@${domainName}`;
+
+      // Thread into existing or create new conversation
+      let conv = await findConversationByThread(domainId, from, references);
+
+      const createdAt = date ? new Date(date).toISOString() : (obj.lastModified || new Date().toISOString());
+
+      if (conv) {
+        await addMessage({
+          conversationId: conv.id,
+          from,
+          s3Bucket,
+          s3Key: obj.key,
+          direction: "inbound",
+          createdAt,
+          messageId: messageIdHeader,
+        });
+        const newRefs = [...new Set([...conv.threadReferences, ...references])];
+        await updateConversation(domainId, conv.id, {
+          lastMessageAt: createdAt,
+          messageCount: conv.messageCount + 1,
+          threadReferences: newRefs,
+        });
+      } else {
+        const initialRefs = messageIdHeader
+          ? [...new Set([...references, messageIdHeader])]
+          : references;
+        conv = await createConversation({
+          domainId,
+          from,
+          to: recipient,
+          subject,
+          status: "open",
+          priority: "normal",
+          lastMessageAt: createdAt,
+          messageCount: 1,
+          tags: [],
+          threadReferences: initialRefs,
+        });
+        await addMessage({
+          conversationId: conv.id,
+          from,
+          s3Bucket,
+          s3Key: obj.key,
+          direction: "inbound",
+          createdAt,
+          messageId: messageIdHeader,
+        });
+        rebuilt++;
+      }
+    } catch (err) {
+      log("error", "mesa", "Failed to rebuild conversation from S3 object", { key: obj.key, error: String(err) });
+    }
+  }
+
+  log("info", "mesa", "Rebuild complete", { domainId, rebuilt, totalEmails: keys.length });
+  return rebuilt;
 }
 
 // --- Process inbound email ---

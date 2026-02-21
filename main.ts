@@ -92,7 +92,7 @@ import {
   deleteConfigurationSet,
   deleteDomainIdentity,
 } from "./ses.ts";
-import { processInbound, extractPlainBody, extractHtmlBody } from "./forwarding.ts";
+import { processInbound, extractPlainBody, extractHtmlBody, rebuildConversationsFromS3 } from "./forwarding.ts";
 import { fetchEmailFromS3, repairReceiptRules, ensureSnsSubscription } from "./ses.ts";
 import { log } from "./logger.ts";
 import "./cron.ts";
@@ -1844,7 +1844,20 @@ const app = new Elysia()
       return new Response(JSON.stringify({ error: "Sin acceso a este dominio" }), { status: 403 });
     }
 
-    const convs = await listConversations(domainId, { status, assignedTo });
+    let convs = await listConversations(domainId, { status, assignedTo });
+
+    // Auto-rebuild from S3 if KV has no conversations
+    if (convs.length === 0 && domain.domain) {
+      try {
+        const rebuilt = await rebuildConversationsFromS3(domainId, domain.domain);
+        if (rebuilt > 0) {
+          convs = await listConversations(domainId, { status, assignedTo });
+        }
+      } catch (err) {
+        console.error("Mesa rebuild from S3 failed:", err);
+      }
+    }
+
     return new Response(JSON.stringify(convs), {
       headers: { "content-type": "application/json" },
     });
