@@ -439,7 +439,7 @@ const app = new Elysia()
   .get("/favicon.svg", () => serveStatic("/favicon.svg"))
   .get("/landing", () => serveStatic("/landing.html"))
   .get("/pricing", () => serveStatic("/pricing.html"))
-  .get("/bandeja", () => serveStatic("/mesa.html"))
+  .get("/bandeja", () => serveStatic("/bandeja.html"))
   .get("/admin", async ({ request }) => {
     const user = await getAuthUser(request);
     if (!user || !isAdmin(user.email)) return new Response("Not found", { status: 404 });

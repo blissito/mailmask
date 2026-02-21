@@ -68,17 +68,31 @@ async function loadConversations() {
     return;
   }
   conversations = await res.json();
+  populateAliasFilter();
   renderList();
+}
+
+function populateAliasFilter() {
+  const sel = document.getElementById("alias-filter");
+  const prev = sel.value;
+  const aliases = [...new Set(conversations.map(c => c.to).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos los alias</option>' +
+    aliases.map(a => `<option value="${esc(a)}">${esc(a.split("@")[0])}</option>`).join("");
+  if (prev && aliases.includes(prev)) sel.value = prev;
 }
 
 function renderList() {
   const container = document.getElementById("conv-list");
   const empty = document.getElementById("list-empty");
   const search = document.getElementById("search-input").value.toLowerCase();
+  const aliasFilter = document.getElementById("alias-filter").value;
 
   let filtered = conversations;
+  if (aliasFilter) {
+    filtered = filtered.filter(c => c.to === aliasFilter);
+  }
   if (search) {
-    filtered = conversations.filter(c =>
+    filtered = filtered.filter(c =>
       c.from.toLowerCase().includes(search) ||
       c.subject.toLowerCase().includes(search)
     );
@@ -379,6 +393,10 @@ function setupListeners() {
     loadConversations();
   });
 
+  document.getElementById("alias-filter").addEventListener("change", () => {
+    renderList();
+  });
+
   document.getElementById("search-input").addEventListener("input", () => {
     renderList();
   });
@@ -560,11 +578,18 @@ function setupKeyboard() {
 
 function getFilteredConversations() {
   const search = document.getElementById("search-input").value.toLowerCase();
-  if (!search) return conversations;
-  return conversations.filter(c =>
-    c.from.toLowerCase().includes(search) ||
-    c.subject.toLowerCase().includes(search)
-  );
+  const aliasFilter = document.getElementById("alias-filter").value;
+  let filtered = conversations;
+  if (aliasFilter) {
+    filtered = filtered.filter(c => c.to === aliasFilter);
+  }
+  if (search) {
+    filtered = filtered.filter(c =>
+      c.from.toLowerCase().includes(search) ||
+      c.subject.toLowerCase().includes(search)
+    );
+  }
+  return filtered;
 }
 
 function scrollToSelected() {

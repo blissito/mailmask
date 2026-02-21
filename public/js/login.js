@@ -1,3 +1,5 @@
+fetch("/api/auth/me").then(r => { if (r.ok) window.location.href = "/app"; });
+
 document.getElementById("login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = e.target;

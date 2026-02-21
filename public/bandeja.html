@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bandeja — MailMask</title>
   <link rel="stylesheet" href="/css/styles.css">
-  <link rel="stylesheet" href="/css/mesa.css">
+  <link rel="stylesheet" href="/css/bandeja.css">
 </head>
 <body>
 
@@ -41,6 +41,9 @@
       <option value="open">Abiertas</option>
       <option value="closed">Cerradas</option>
       <option value="deleted">Eliminados</option>
+    </select>
+    <select id="alias-filter" class="mesa-select">
+      <option value="">Todos los alias</option>
     </select>
     <span id="conv-count" class="mesa-toolbar-count"></span>
     <div class="mesa-toolbar-spacer"></div>
@@ -146,6 +149,6 @@
   <!-- Toast -->
   <div class="mesa-toast" id="toast"></div>
 
-  <script src="/js/mesa.js"></script>
+  <script src="/js/bandeja.js"></script>
 </body>
 </html>
