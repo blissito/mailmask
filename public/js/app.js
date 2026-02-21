@@ -483,7 +483,7 @@ function renderDnsRecords() {
 
   const field = (label, val) => `
     <div class="mb-2">
-      <div class="text-[11px] text-zinc-500 mb-1">${label}</div>
+      <div class="text-xs text-zinc-500 mb-1">${label}</div>
       <div class="flex items-center gap-2 bg-zinc-900 rounded-lg border border-zinc-800 px-3 py-2">
         <code class="text-xs text-zinc-300 font-mono break-all flex-1 select-all">${esc(val)}</code>
         ${copyBtn(val)}
@@ -502,7 +502,7 @@ function renderDnsRecords() {
               ${r.hints.map(h => `
                 <div class="flex items-start gap-2">
                   ${hintIcon}
-                  <p class="text-[11px] text-zinc-500 leading-relaxed">${h}</p>
+                  <p class="text-xs text-zinc-500 leading-relaxed">${h}</p>
                 </div>
               `).join("")}
             </div>
@@ -510,7 +510,6 @@ function renderDnsRecords() {
         </div>
       `).join("")}
     </div>`;
-}
 }
 
 async function verifyDns() {
