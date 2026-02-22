@@ -120,17 +120,18 @@
 
       <!-- Tab: DNS -->
       <div id="tab-dns" class="tab-content hidden">
-        <p class="text-sm text-zinc-400 mb-4">Agrega estos registros en tu proveedor de DNS.</p>
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-sm text-zinc-400">Agrega estos registros en tu proveedor de DNS.</p>
+          <div class="flex items-center gap-3">
+            <span id="verify-result" class="text-sm"></span>
+            <button id="btn-verify-dns" class="bg-zinc-800 hover:bg-zinc-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm">
+              Verificar DNS
+            </button>
+          </div>
+        </div>
 
         <div class="border border-zinc-800 rounded-xl overflow-hidden">
           <div id="dns-records"></div>
-        </div>
-
-        <div class="mt-4 flex items-center gap-3">
-          <button id="btn-verify-dns" class="bg-zinc-800 hover:bg-zinc-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm">
-            Verificar DNS
-          </button>
-          <span id="verify-result" class="text-sm"></span>
         </div>
       </div>
 
