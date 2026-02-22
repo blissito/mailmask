@@ -5,4 +5,4 @@ RUN npm ci --production
 COPY . .
 RUN mkdir -p data
 EXPOSE 8000
-CMD ["npx", "tsx", "main.ts"]
+CMD ["node_modules/.bin/tsx", "main.ts"]

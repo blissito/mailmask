@@ -23,7 +23,8 @@
     "elysia": "^1.2",
     "mercadopago": "^2",
     "node-cron": "^3",
-    "postal-mime": "^2"
+    "postal-mime": "^2",
+    "tsx": "^4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7",
@@ -31,7 +32,6 @@
     "@types/node-cron": "^3",
     "drizzle-kit": "^0.30",
     "tailwindcss": "^3.4.19",
-    "tsx": "^4",
     "typescript": "^5"
   }
 }
