@@ -809,7 +809,7 @@ export function createConversation(conv: Omit<Conversation, "id">): Conversation
     assignedTo: conv.assignedTo ?? null,
     priority: conv.priority,
     lastMessageAt: conv.lastMessageAt,
-    messageCount: conv.messageCount,
+    messageCount: conv.messageCount ?? 1,
     tags: conv.tags,
     threadRefs: conv.threadReferences,
   }).returning().all();
