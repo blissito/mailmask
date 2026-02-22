@@ -163,7 +163,7 @@ function renderUsage() {
   }
   if (u.sendsPerDomain) {
     for (const s of u.sendsPerDomain) {
-      if (s.limit > 0) items.push(`Envíos — ${esc(s.domain)} ${s.current}/${s.limit}/mes`);
+      if (s.limit > 0) items.push(`Envíos — ${esc(s.domain)} ${s.current}/${s.limit}/día`);
     }
   }
 

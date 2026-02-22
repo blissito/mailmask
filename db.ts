@@ -91,9 +91,9 @@ export interface EmailLog {
 // --- Plans ---
 
 export const PLANS = {
-  basico:     { price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 15, sends: 250,   api: false, webhooks: false, forwardPerHour: 100,  smtpRelay: false },
-  freelancer: { price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 1000,  api: false, webhooks: false, forwardPerHour: 500,  smtpRelay: false },
-  developer:  { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 5000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
+  basico:     { price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 15, sends: 10,    api: false, webhooks: false, forwardPerHour: 100,  smtpRelay: false },
+  freelancer: { price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 50,    api: false, webhooks: false, forwardPerHour: 500,  smtpRelay: false },
+  developer:  { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 200,   api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
   pro:     { price: 299_00, yearlyPrice: 2990_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500,  smtpRelay: true },
   agencia: { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
 } as const;
@@ -1027,8 +1027,8 @@ export function removeSuppression(domainId: string, email: string): void {
 // --- Send counter (monthly) ---
 
 export function incrementSendCount(domainId: string): number {
-  const month = new Date().toISOString().slice(0, 7);
-  const expiresAt = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString();
+  const month = new Date().toISOString().slice(0, 10); // daily key (YYYY-MM-DD)
+  const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
   const rows = db.insert(sendCounts).values({ domainId, month, count: 1, expiresAt })
     .onConflictDoUpdate({
       target: [sendCounts.domainId, sendCounts.month],
@@ -1040,7 +1040,7 @@ export function incrementSendCount(domainId: string): number {
 }
 
 export function getSendCount(domainId: string): number {
-  const month = new Date().toISOString().slice(0, 7);
+  const month = new Date().toISOString().slice(0, 10); // daily key (YYYY-MM-DD)
   const rows = db.select().from(sendCounts)
     .where(and(eq(sendCounts.domainId, domainId), eq(sendCounts.month, month)))
     .all();

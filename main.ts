@@ -2161,7 +2161,7 @@ const app = new Elysia({ adapter: node() })
 
     const currentSends = await getSendCount(domain.id);
     if (currentSends >= limits.sends) {
-      return new Response(JSON.stringify({ error: `Límite mensual de envíos alcanzado (${limits.sends})` }), { status: 429 });
+      return new Response(JSON.stringify({ error: `Límite diario de envíos alcanzado (${limits.sends})` }), { status: 429 });
     }
 
     const fromAddress = `${fromLocal ?? "noreply"}@${domain.domain}`;
