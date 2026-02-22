@@ -689,34 +689,44 @@ function connectSSE(domainId) {
   sseSource = new EventSource(`/api/bandeja/sse?domainId=${encodeURIComponent(domainId)}`);
 
   sseSource.addEventListener("new_conversation", async (e) => {
-    const data = e.data ? JSON.parse(e.data) : {};
-    await loadConversations();
-    if (data.id) newConvIds.add(data.id);
-    else if (conversations.length) newConvIds.add(conversations[0].id);
-    unreadCount++;
-    updateTitle();
-    renderList();
-    const sender = data.from ? data.from.slice(0, 40) : "";
-    toast(sender ? `Nueva conversación de ${sender}` : "Nueva conversación");
-    playNotifSound();
+    try {
+      const data = e.data ? JSON.parse(e.data) : {};
+      const convId = data.conversationId;
+      if (convId) newConvIds.add(convId);
+      unreadCount++;
+      updateTitle();
+      await loadConversations();
+      renderList();
+      const sender = data.from ? data.from.slice(0, 40) : "";
+      toast(sender ? `Nueva conversación de ${sender}` : "Nueva conversación");
+      playNotifSound();
+    } catch (err) {
+      console.error("SSE new_conversation error:", err);
+      loadConversations();
+    }
   });
 
   sseSource.addEventListener("new_message", async (e) => {
-    const data = JSON.parse(e.data);
-    await loadConversations();
-    const convId = data.conversationId;
-    if (activeConv && activeConv.id === convId) {
-      const updated = conversations.find(c => c.id === convId);
-      if (updated) openConversation(updated);
-    } else {
-      newConvIds.add(convId);
-      unreadCount++;
-      updateTitle();
-      renderList();
+    try {
+      const data = JSON.parse(e.data);
+      const convId = data.conversationId;
+      await loadConversations();
+      if (activeConv && activeConv.id === convId) {
+        const updated = conversations.find(c => c.id === convId);
+        if (updated) openConversation(updated);
+      } else {
+        if (convId) newConvIds.add(convId);
+        unreadCount++;
+        updateTitle();
+        renderList();
+      }
+      const subj = data.subject ? data.subject.slice(0, 40) : "conversación";
+      toast(`Nuevo mensaje en: ${subj}`);
+      playNotifSound();
+    } catch (err) {
+      console.error("SSE new_message error:", err);
+      loadConversations();
     }
-    const subj = data.subject ? data.subject.slice(0, 40) : "conversación";
-    toast(`Nuevo mensaje en: ${subj}`);
-    playNotifSound();
   });
 
   sseSource.addEventListener("ping", () => {}); // ignore keepalive
