@@ -80,6 +80,7 @@ deno task test    # Run tests
 - [x] ~~Notificaciones por email cuando un alias recibe su primer email~~
 - [x] ~~Soporte para multiple destinatarios en un alias~~
 - [ ] **Definir estrategia de historial/almacenamiento**: retención por plan (15-30 días basico/freelancer, ilimitado developer), flush automático, add-on de almacenamiento, UI de uso. Diferenciador clave vs competencia — discutir antes de implementar.
+- [ ] **Configurar SES multi-tenancy y estrategia de reputación**: Sesión de investigación para definir arquitectura de tenants SES, configuration sets por dominio, políticas de envío (Standard vs Strict), métricas de reputación a monitorear, y plan de acción para aislar dominios de clientes. Estudiar docs de SES Tenants, VDM, y EventBridge antes de implementar.
 - [ ] Evaluar pattern de almacenamiento de mensajes en Bandeja: ¿leer body de S3 on demand vs duplicar en SQLite? Investigar otros patterns (cache intermedio, pre-procesado a formato ligero, CDN/signed URLs). Concluir cuál es el mejor approach antes de implementar.
 
 ### Contenido / Educación

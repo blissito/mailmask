@@ -4,6 +4,7 @@ import {
   integer,
   primaryKey,
   unique,
+  index,
 } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
@@ -69,7 +70,9 @@ export const conversations = sqliteTable("conversations", {
   tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
   threadRefs: text("thread_refs", { mode: "json" }).$type<string[]>().notNull().default([]),
   deletedAt: text("deleted_at"),
-});
+}, (table) => [
+  index("idx_conversations_domain_status").on(table.domainId, table.status, table.deletedAt),
+]);
 
 export const messages = sqliteTable("messages", {
   id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
@@ -82,7 +85,9 @@ export const messages = sqliteTable("messages", {
   direction: text("direction").notNull(),
   messageId: text("message_id"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
-});
+}, (table) => [
+  index("idx_messages_conversation").on(table.conversationId),
+]);
 
 export const notes = sqliteTable("notes", {
   id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
@@ -117,7 +122,9 @@ export const tokens = sqliteTable("tokens", {
   kind: text("kind").notNull(),
   value: text("value", { mode: "json" }),
   expiresAt: text("expires_at").notNull(),
-});
+}, (table) => [
+  index("idx_tokens_kind_expires").on(table.kind, table.expiresAt),
+]);
 
 export const emailLogs = sqliteTable("email_logs", {
   id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
@@ -131,7 +138,9 @@ export const emailLogs = sqliteTable("email_logs", {
   sizeBytes: integer("size_bytes").notNull().default(0),
   error: text("error"),
   expiresAt: text("expires_at").notNull(),
-});
+}, (table) => [
+  index("idx_email_logs_domain_ts").on(table.domainId, table.timestamp),
+]);
 
 export const forwardQueue = sqliteTable("forward_queue", {
   id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
@@ -151,7 +160,9 @@ export const forwardQueue = sqliteTable("forward_queue", {
   dead: integer("dead", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
   expiresAt: text("expires_at").notNull(),
-});
+}, (table) => [
+  index("idx_forward_queue_retry").on(table.nextRetryAt, table.dead),
+]);
 
 export const sendCounts = sqliteTable("send_counts", {
   domainId: text("domain_id").notNull(),
