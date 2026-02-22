@@ -489,6 +489,7 @@ const app = new Elysia({ adapter: node() })
   .get("/privacy", () => serveStatic("/privacy.html"))
   .get("/blog", () => serveStatic("/blog/index.html"))
   .get("/blog/blog.css", () => serveStatic("/blog/blog.css"))
+  .get("/blog/img/*", ({ params }) => serveStatic(`/blog/img/${params["*"]}`))
   .get("/blog/:slug", async ({ params }) => {
     const slug = params.slug.replace(/[^a-z0-9-]/g, "");
     try {
