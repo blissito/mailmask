@@ -653,6 +653,7 @@ const app = new Elysia({ adapter: node() })
     return new Response(
       JSON.stringify({
         email: user.email,
+        isAdmin: isAdmin(user.email),
         domainsCount: domains.length,
         subscription: {
           ...(user.subscription ?? { plan: "basico", status: "none" }),

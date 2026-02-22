@@ -30,6 +30,7 @@ async function checkAuth() {
   }
   currentUser = await res.json();
   document.getElementById("user-email").textContent = currentUser.email;
+  if (currentUser.isAdmin) document.getElementById("admin-link")?.classList.remove("hidden");
   renderVerifyBanner();
   renderBillingBanner();
   renderUsage();
