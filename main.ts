@@ -423,6 +423,7 @@ const app = new Elysia({ adapter: node() })
     if (response instanceof Response) {
       response.headers.set("access-control-allow-origin", corsOrigin);
       response.headers.set("access-control-allow-credentials", "true");
+      response.headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
       response.headers.set("x-frame-options", "DENY");
       response.headers.set("x-content-type-options", "nosniff");
       response.headers.set(
@@ -505,6 +506,11 @@ const app = new Elysia({ adapter: node() })
     if (!email || !password)
       return new Response(
         JSON.stringify({ error: "Email y contraseña requeridos" }),
+        { status: 400 },
+      );
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+      return new Response(
+        JSON.stringify({ error: "Email inválido" }),
         { status: 400 },
       );
     if (password.length < 8)
