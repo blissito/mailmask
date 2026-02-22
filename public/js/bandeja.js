@@ -14,6 +14,8 @@ let selectedIdx = -1;
 let activeConv = null;
 let canDoActions = false; // false for basico plan
 let composerMode = "reply"; // "reply" | "note"
+let newConvIds = new Set();
+let unreadCount = 0;
 
 // --- Init ---
 document.addEventListener("DOMContentLoaded", async () => {
@@ -120,6 +122,7 @@ function renderList() {
     if (isActive) classes += " active";
     if (isSelected) classes += " selected";
     if (c.deletedAt) classes += " deleted";
+    if (newConvIds.has(c.id)) classes += " is-new";
 
     let meta = `<span class="mesa-status-dot ${esc(c.status)}"></span>`;
     if (c.to) meta += `<span class="mesa-tag mesa-tag-alias">${esc(c.to.split("@")[0])}</span>`;
@@ -157,6 +160,11 @@ function renderList() {
 // --- Open conversation detail ---
 async function openConversation(conv) {
   activeConv = conv;
+  if (newConvIds.has(conv.id)) {
+    newConvIds.delete(conv.id);
+    unreadCount = Math.max(0, unreadCount - 1);
+    updateTitle();
+  }
   document.getElementById("detail-empty").classList.add("mesa-hidden");
   const loaded = document.getElementById("detail-loaded");
   loaded.classList.remove("mesa-hidden");
@@ -389,6 +397,9 @@ function setupListeners() {
     selectedDomainId = e.target.value;
     activeConv = null;
     selectedIdx = -1;
+    newConvIds.clear();
+    unreadCount = 0;
+    updateTitle();
     document.getElementById("detail-empty").classList.remove("mesa-hidden");
     document.getElementById("detail-loaded").classList.add("mesa-hidden");
     loadConversations();
@@ -646,6 +657,27 @@ function toast(msg) {
   setTimeout(() => el.classList.remove("show"), 2500);
 }
 
+function updateTitle() {
+  document.title = unreadCount > 0 ? `(${unreadCount}) Bandeja` : "Bandeja";
+}
+
+function playNotifSound() {
+  if (document.hasFocus()) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 800;
+    gain.gain.value = 0.15;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+    osc.stop(ctx.currentTime + 0.1);
+  } catch (e) { /* ignore audio errors */ }
+}
+
 // --- SSE for real-time updates ---
 
 let sseSource = null;
@@ -656,18 +688,38 @@ function connectSSE(domainId) {
 
   sseSource = new EventSource(`/api/bandeja/sse?domainId=${encodeURIComponent(domainId)}`);
 
-  sseSource.addEventListener("new_conversation", () => {
-    loadConversations();
+  sseSource.addEventListener("new_conversation", async (e) => {
+    const data = e.data ? JSON.parse(e.data) : {};
+    await loadConversations();
+    if (data.id) newConvIds.add(data.id);
+    else if (conversations.length) newConvIds.add(conversations[0].id);
+    unreadCount++;
+    updateTitle();
+    renderList();
+    const sender = data.from ? data.from.slice(0, 40) : "";
+    toast(sender ? `Nueva conversación de ${sender}` : "Nueva conversación");
+    playNotifSound();
   });
 
   sseSource.addEventListener("new_message", async (e) => {
     const data = JSON.parse(e.data);
     await loadConversations();
-    if (activeConv && activeConv.id === data.conversationId) {
-      const updated = conversations.find(c => c.id === data.conversationId);
+    const convId = data.conversationId;
+    if (activeConv && activeConv.id === convId) {
+      const updated = conversations.find(c => c.id === convId);
       if (updated) openConversation(updated);
+    } else {
+      newConvIds.add(convId);
+      unreadCount++;
+      updateTitle();
+      renderList();
     }
+    const subj = data.subject ? data.subject.slice(0, 40) : "conversación";
+    toast(`Nuevo mensaje en: ${subj}`);
+    playNotifSound();
   });
+
+  sseSource.addEventListener("ping", () => {}); // ignore keepalive
 
   sseSource.onerror = () => {
     sseSource.close();
