@@ -679,7 +679,7 @@ function renderHealthPanel() {
   const checkLabels = { verified: "Verificación", mx: "MX (recepción)", spf: "SPF", dkim: "DKIM", aliases: "Aliases", plan: "Plan" };
 
   panel.innerHTML = `
-    <div class="mb-6 border ${summaryBg[health.status]} rounded-xl p-4">
+    <div class="mb-6 border ${summaryBg[health.status]} rounded-xl p-5">
       <p class="text-sm font-medium ${summaryText[health.status]} mb-3">${esc(health.summary)}</p>
       <div class="space-y-2">
         ${checkOrder.map(key => {
