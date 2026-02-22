@@ -53,6 +53,7 @@ async function loadDomains() {
 
   selectedDomainId = domains[0].id;
   await loadConversations();
+  connectSSE(selectedDomainId);
 }
 
 // --- Conversations ---
@@ -391,6 +392,7 @@ function setupListeners() {
     document.getElementById("detail-empty").classList.remove("mesa-hidden");
     document.getElementById("detail-loaded").classList.add("mesa-hidden");
     loadConversations();
+    connectSSE(selectedDomainId);
   });
 
   document.getElementById("status-filter").addEventListener("change", () => {
@@ -642,4 +644,35 @@ function toast(msg) {
   el.textContent = msg;
   el.classList.add("show");
   setTimeout(() => el.classList.remove("show"), 2500);
+}
+
+// --- SSE for real-time updates ---
+
+let sseSource = null;
+
+function connectSSE(domainId) {
+  if (sseSource) { sseSource.close(); sseSource = null; }
+  if (!domainId) return;
+
+  sseSource = new EventSource(`/api/bandeja/sse?domainId=${encodeURIComponent(domainId)}`);
+
+  sseSource.addEventListener("new_conversation", () => {
+    loadConversations();
+  });
+
+  sseSource.addEventListener("new_message", async (e) => {
+    const data = JSON.parse(e.data);
+    await loadConversations();
+    if (activeConv && activeConv.id === data.conversationId) {
+      const updated = conversations.find(c => c.id === data.conversationId);
+      if (updated) openConversation(updated);
+    }
+  });
+
+  sseSource.onerror = () => {
+    sseSource.close();
+    sseSource = null;
+    // Reconnect after 5s
+    setTimeout(() => { if (selectedDomainId) connectSSE(selectedDomainId); }, 5000);
+  };
 }

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx --watch main.ts",
     "start": "tsx main.ts",
-    "test": "JWT_SECRET=test-secret-key MP_ACCESS_TOKEN=test MP_WEBHOOK_SECRET=test AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test tsx --test",
+    "test": "DATABASE_PATH=./data/test.db JWT_SECRET=test-secret-key MP_ACCESS_TOKEN=test MP_WEBHOOK_SECRET=test AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_ENDPOINT_URL=http://localhost:1 tsx --test --test-timeout=60000 --test-force-exit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "build:css": "npx tailwindcss -c tailwind.config.ts -i public/css/input.css -o public/css/styles.css --minify"

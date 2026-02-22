@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as dns from "node:dns/promises";
 import cron from "node-cron";
+import { addSseClient } from "./sse-hub.js";
 import { db } from "./pg.js";
 import { users as usersTable } from "./schema.js";
 import { eq } from "drizzle-orm";
@@ -2272,6 +2273,49 @@ const app = new Elysia({ adapter: node() })
 
     return new Response(JSON.stringify(job), {
       headers: { "content-type": "application/json" },
+    });
+  })
+
+  // --- Mesa: SSE ---
+
+  .get("/api/bandeja/sse", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response("Unauthorized", { status: 401 });
+
+    const url = new URL(request.url);
+    const domainId = url.searchParams.get("domainId");
+    if (!domainId) return new Response(JSON.stringify({ error: "domainId required" }), { status: 400 });
+
+    const access = await checkDomainAccess(auth.email, domainId, "read");
+    if (!access) return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
+
+    const stream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        controller.enqueue(encoder.encode(": connected\n\n"));
+
+        const cleanup = addSseClient(auth.email, domainId, controller);
+
+        const heartbeat = setInterval(() => {
+          try { controller.enqueue(encoder.encode(": ping\n\n")); } catch { clearInterval(heartbeat); }
+        }, 30_000);
+
+        // Cleanup on abort
+        request.signal.addEventListener("abort", () => {
+          clearInterval(heartbeat);
+          cleanup();
+          try { controller.close(); } catch {}
+        });
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+      },
     });
   })
 

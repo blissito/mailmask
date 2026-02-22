@@ -3,6 +3,7 @@ import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchE
 import { checkRateLimit } from "./rate-limit.js";
 import { log } from "./logger.js";
 import cron from "node-cron";
+import { notifyBandeja } from "./sse-hub.js";
 
 // --- SNS notification types ---
 
@@ -241,7 +242,7 @@ export function extractAttachmentByIndex(raw: string, index: number): { data: Ui
 
 // --- Mesa integration ---
 
-async function saveToMesa(rawContent: string, from: string, recipient: string, subject: string, domainId: string, s3Bucket?: string, s3Key?: string): Promise<void> {
+async function saveToMesa(rawContent: string, from: string, recipient: string, subject: string, domainId: string, s3Bucket?: string, s3Key?: string): Promise<{ conversationId: string; isNew: boolean }> {
   const references = rawContent ? extractReferences(rawContent) : [];
   const messageIdHeader = rawContent ? extractHeader(rawContent, "Message-ID") : "";
 
@@ -266,6 +267,7 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
       status: "open", // Re-open on new inbound message
       threadReferences: newRefs,
     });
+    return { conversationId: conv.id, isNew: false };
   } else {
     // Create new conversation — include messageIdHeader so replies can thread
     const initialRefs = messageIdHeader
@@ -292,6 +294,7 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
       createdAt: new Date().toISOString(),
       messageId: messageIdHeader,
     });
+    return { conversationId: conv.id, isNew: true };
   }
 }
 
@@ -476,7 +479,10 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     // Mesa: save to conversation
     if (rawContent) {
       try {
-        await saveToMesa(rawContent, from, recipient, subject, domain.id, s3Bucket, s3Key);
+        const mesa = await saveToMesa(rawContent, from, recipient, subject, domain.id, s3Bucket, s3Key);
+        notifyBandeja(domain.id, mesa.isNew ? "new_conversation" : "new_message", {
+          conversationId: mesa.conversationId, from, subject,
+        });
       } catch (err) {
         log("error", "forwarding", "Failed to save to Mesa", { error: String(err), domainId: domain.id });
       }

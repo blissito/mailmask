@@ -1,16 +1,16 @@
-// @ts-nocheck — Tests need rewrite for PostgreSQL
-import { assertEquals, assertExists } from "https://deno.land/std@0.224.0/assert/mod.ts";
-
-// Tests require DATABASE_URL pointing to a test Postgres database
-// Run: deno task test
+import { describe, it, before } from "node:test";
+import assert from "node:assert/strict";
 
 import { evaluateRules, processInbound, extractPlainBody, extractHtmlBody, extractAttachments } from "./forwarding.ts";
 import {
   enqueueForward, dequeueForward, listForwardQueue, moveToDeadLetter,
-  getQueueDepth, getDeadLetterCount, _getSql,
+  getQueueDepth, getDeadLetterCount,
   createUser, createDomain, createAlias, listAliases, getAlias,
+  updateDomain, updateAlias,
   isMessageProcessed, markMessageProcessed,
-  listLogs, updateUserSubscription,
+  listLogs, updateUserSubscription, createRule,
+  findConversationByThread, listConversations,
+  deleteUser, deleteDomain,
   type Rule, type ForwardQueueItem,
 } from "./db.ts";
 import { hashPassword } from "./auth.ts";
@@ -33,127 +33,123 @@ function makeRule(overrides: Partial<Rule>): Rule {
   };
 }
 
-Deno.test("evaluateRules - contains match", async () => {
-  const rules = [makeRule({ field: "from", match: "contains", value: "spam" })];
-  const result = await evaluateRules(rules, { to: "a@b.com", from: "spammer@evil.com", subject: "hi" });
-  assertExists(result);
-  assertEquals(result!.id, "r1");
-});
+describe("evaluateRules", () => {
+  it("contains match", async () => {
+    const rules = [makeRule({ field: "from", match: "contains", value: "spam" })];
+    const result = await evaluateRules(rules, { to: "a@b.com", from: "spammer@evil.com", subject: "hi" });
+    assert.ok(result);
+    assert.equal(result!.id, "r1");
+  });
 
-Deno.test("evaluateRules - contains no match", async () => {
-  const rules = [makeRule({ field: "from", match: "contains", value: "spam" })];
-  const result = await evaluateRules(rules, { to: "a@b.com", from: "friend@good.com", subject: "hi" });
-  assertEquals(result, null);
-});
+  it("contains no match", async () => {
+    const rules = [makeRule({ field: "from", match: "contains", value: "spam" })];
+    const result = await evaluateRules(rules, { to: "a@b.com", from: "friend@good.com", subject: "hi" });
+    assert.equal(result, null);
+  });
 
-Deno.test("evaluateRules - equals match (case insensitive)", async () => {
-  const rules = [makeRule({ field: "subject", match: "equals", value: "HELLO" })];
-  const result = await evaluateRules(rules, { to: "a@b.com", from: "x@y.com", subject: "hello" });
-  assertExists(result);
-});
+  it("equals match (case insensitive)", async () => {
+    const rules = [makeRule({ field: "subject", match: "equals", value: "HELLO" })];
+    const result = await evaluateRules(rules, { to: "a@b.com", from: "x@y.com", subject: "hello" });
+    assert.ok(result);
+  });
 
-Deno.test("evaluateRules - equals no match (partial)", async () => {
-  const rules = [makeRule({ field: "subject", match: "equals", value: "hello" })];
-  const result = await evaluateRules(rules, { to: "a@b.com", from: "x@y.com", subject: "hello world" });
-  assertEquals(result, null);
-});
+  it("equals no match (partial)", async () => {
+    const rules = [makeRule({ field: "subject", match: "equals", value: "hello" })];
+    const result = await evaluateRules(rules, { to: "a@b.com", from: "x@y.com", subject: "hello world" });
+    assert.equal(result, null);
+  });
 
-Deno.test("evaluateRules - regex match", async () => {
-  const rules = [makeRule({ field: "from", match: "regex", value: "^admin@" })];
-  const result = await evaluateRules(rules, { to: "a@b.com", from: "admin@example.com", subject: "hi" });
-  assertExists(result);
-});
+  it("regex match", async () => {
+    const rules = [makeRule({ field: "from", match: "regex", value: "^admin@" })];
+    const result = await evaluateRules(rules, { to: "a@b.com", from: "admin@example.com", subject: "hi" });
+    assert.ok(result);
+  });
 
-Deno.test("evaluateRules - regex no match", async () => {
-  const rules = [makeRule({ field: "from", match: "regex", value: "^admin@" })];
-  const result = await evaluateRules(rules, { to: "a@b.com", from: "user@example.com", subject: "hi" });
-  assertEquals(result, null);
-});
+  it("regex no match", async () => {
+    const rules = [makeRule({ field: "from", match: "regex", value: "^admin@" })];
+    const result = await evaluateRules(rules, { to: "a@b.com", from: "user@example.com", subject: "hi" });
+    assert.equal(result, null);
+  });
 
-Deno.test("evaluateRules - invalid regex doesn't crash", async () => {
-  const rules = [makeRule({ field: "from", match: "regex", value: "[invalid" })];
-  const result = await evaluateRules(rules, { to: "a@b.com", from: "admin@example.com", subject: "hi" });
-  assertEquals(result, null);
-});
+  it("invalid regex doesn't crash", async () => {
+    const rules = [makeRule({ field: "from", match: "regex", value: "[invalid" })];
+    const result = await evaluateRules(rules, { to: "a@b.com", from: "admin@example.com", subject: "hi" });
+    assert.equal(result, null);
+  });
 
-Deno.test("evaluateRules - disabled rule skipped", async () => {
-  const rules = [makeRule({ field: "from", match: "contains", value: "spam", enabled: false })];
-  const result = await evaluateRules(rules, { to: "a@b.com", from: "spammer@evil.com", subject: "hi" });
-  assertEquals(result, null);
-});
+  it("disabled rule skipped", async () => {
+    const rules = [makeRule({ field: "from", match: "contains", value: "spam", enabled: false })];
+    const result = await evaluateRules(rules, { to: "a@b.com", from: "spammer@evil.com", subject: "hi" });
+    assert.equal(result, null);
+  });
 
-Deno.test("evaluateRules - priority order (first match wins)", async () => {
-  const rules = [
-    makeRule({ id: "r1", field: "from", match: "contains", value: "user", priority: 0, action: "discard" }),
-    makeRule({ id: "r2", field: "from", match: "contains", value: "user", priority: 1, action: "forward" }),
-  ];
-  const result = await evaluateRules(rules, { to: "a@b.com", from: "user@x.com", subject: "hi" });
-  assertEquals(result!.id, "r1");
-  assertEquals(result!.action, "discard");
+  it("priority order (first match wins)", async () => {
+    const rules = [
+      makeRule({ id: "r1", field: "from", match: "contains", value: "user", priority: 0, action: "discard" }),
+      makeRule({ id: "r2", field: "from", match: "contains", value: "user", priority: 1, action: "forward" }),
+    ];
+    const result = await evaluateRules(rules, { to: "a@b.com", from: "user@x.com", subject: "hi" });
+    assert.equal(result!.id, "r1");
+    assert.equal(result!.action, "discard");
+  });
 });
 
 // --- Queue tests ---
 
-Deno.test("enqueue and dequeue forward", async () => {
-  const item = await enqueueForward({
-    rawContent: "raw email content",
-    from: "sender@test.com",
-    to: "dest@test.com",
-    domainId: "test-domain",
-    domainName: "test.com",
-    originalTo: "alias@test.com",
-    subject: "Test subject",
-    logDays: 15,
-  }, "SES throttle");
+describe("Forward queue", () => {
+  it("enqueue and dequeue forward", () => {
+    const item = enqueueForward({
+      rawContent: "raw email content",
+      from: "sender@test.com",
+      to: "dest@test.com",
+      domainId: "test-domain",
+      domainName: "test.com",
+      originalTo: "alias@test.com",
+      subject: "Test subject",
+      logDays: 15,
+    }, "SES throttle");
 
-  assertExists(item.id);
-  assertEquals(item.attemptCount, 0);
-  assertEquals(item.lastError, "SES throttle");
+    assert.ok(item.id);
+    assert.equal(item.attemptCount, 0);
+    assert.equal(item.lastError, "SES throttle");
 
-  const queue = await listForwardQueue();
-  const found = queue.find((q) => q.id === item.id);
-  assertExists(found);
+    const queue = listForwardQueue();
+    assert.ok(queue.find((q) => q.id === item.id));
 
-  await dequeueForward(item.id);
-  const afterDequeue = await listForwardQueue();
-  assertEquals(afterDequeue.find((q) => q.id === item.id), undefined);
-});
+    dequeueForward(item.id);
+    const afterDequeue = listForwardQueue();
+    assert.equal(afterDequeue.find((q) => q.id === item.id), undefined);
+  });
 
-Deno.test("moveToDeadLetter removes from queue", async () => {
-  const item = await enqueueForward({
-    rawContent: "raw",
-    from: "a@b.com",
-    to: "c@d.com",
-    domainId: "d1",
-    domainName: "b.com",
-    originalTo: "x@b.com",
-    subject: "test",
-    logDays: 15,
-  }, "error");
+  it("moveToDeadLetter removes from active queue", () => {
+    const item = enqueueForward({
+      rawContent: "raw",
+      from: "a@b.com",
+      to: "c@d.com",
+      domainId: "d1",
+      domainName: "b.com",
+      originalTo: "x@b.com",
+      subject: "test",
+      logDays: 15,
+    }, "error");
 
-  await moveToDeadLetter({ ...item, attemptCount: 3 });
+    moveToDeadLetter({ ...item, attemptCount: 3 });
 
-  const queue = await listForwardQueue();
-  assertEquals(queue.find((q) => q.id === item.id), undefined);
-
-  // Verify it's in dead-letter
-  const db = _getSql();
-  const dl = await db`SELECT 1 FROM forward_queue WHERE id = ${item.id} AND dead = TRUE`;
-  assertExists(dl.length > 0);
-
-  // Cleanup
-  await db`DELETE FROM forward_queue WHERE id = ${item.id}`;
+    const queue = listForwardQueue();
+    assert.equal(queue.find((q) => q.id === item.id), undefined);
+  });
 });
 
 // --- processInbound tests ---
 
-// Helper to build an SNS notification with raw email content included
 function makeSnsNotification(opts: {
   from: string;
   to: string;
   subject: string;
   messageId: string;
   rawContent?: string;
+  spamVerdict?: string;
+  virusVerdict?: string;
 }) {
   const raw = opts.rawContent ?? [
     `From: ${opts.from}`,
@@ -174,8 +170,8 @@ function makeSnsNotification(opts: {
       receipt: {
         action: { type: "S3", bucketName: "test-bucket", objectKey: "test-key" },
         recipients: [opts.to],
-        spamVerdict: { status: "PASS" },
-        virusVerdict: { status: "PASS" },
+        spamVerdict: { status: opts.spamVerdict ?? "PASS" },
+        virusVerdict: { status: opts.virusVerdict ?? "PASS" },
         spfVerdict: { status: "PASS" },
         dkimVerdict: { status: "PASS" },
       },
@@ -194,157 +190,302 @@ function makeSnsNotification(opts: {
   };
 }
 
-// Setup: create a user + domain + alias for processInbound tests
+// Setup test data
 const fwdSuffix = `fwd-${Date.now()}`;
 const fwdDomain = `${fwdSuffix}.test`;
 const fwdEmail = `owner-${fwdSuffix}@example.com`;
 let fwdDomainId: string;
 
-// Initialize test data
-async function setupForwardingTestData() {
-  const hash = await hashPassword("testpass123");
-  await createUser(fwdEmail, hash);
-  await updateUserSubscription(fwdEmail, {
-    plan: "developer",
-    status: "active",
-    currentPeriodEnd: new Date(Date.now() + 365 * 86400000).toISOString(),
+describe("processInbound", () => {
+  before(async () => {
+    const hash = await hashPassword("testpass123");
+    createUser(fwdEmail, hash);
+    updateUserSubscription(fwdEmail, {
+      plan: "developer",
+      status: "active",
+      currentPeriodEnd: new Date(Date.now() + 365 * 86400000).toISOString(),
+    });
+    const domain = createDomain(fwdEmail, fwdDomain, ["dkim1"], "verify1");
+    fwdDomainId = domain.id;
+    updateDomain(domain.id, { verified: true });
+    createAlias(domain.id, "info", ["dest@example.com"]);
+    createAlias(domain.id, "*", ["catchall@example.com"]);
   });
-  const domain = await createDomain(fwdEmail, fwdDomain, ["dkim1"], "verify1");
-  fwdDomainId = domain.id;
-  // Mark domain as verified
-  const kv = _getSql();
-  const existing = await kv.get(["domains", domain.id]);
-  if (existing.value) {
-    await kv.set(["domains", domain.id], { ...(existing.value as any), verified: true });
-  }
-  // Create aliases
-  await createAlias(domain.id, "info", ["dest@example.com"]);
-  await createAlias(domain.id, "*", ["catchall@example.com"]);
-}
 
-// Run setup once at module level
-await setupForwardingTestData();
+  it("forwards to matching alias and enqueues on SES failure", async () => {
+    const msgId = `fwd-test-${crypto.randomUUID()}`;
+    const result = await processInbound(makeSnsNotification({
+      from: "sender@external.com",
+      to: `info@${fwdDomain}`,
+      subject: "Hello",
+      messageId: msgId,
+    }));
 
-const fwdTestOpts = { sanitizeResources: false, sanitizeOps: false };
+    assert.equal(result.action, "processed");
+    const queue = listForwardQueue();
+    const queued = queue.find((q) => q.from === "sender@external.com" && q.to === "dest@example.com");
+    assert.ok(queued, "Email should be enqueued for retry after SES failure");
 
-Deno.test({ name: "processInbound - forwards to matching alias and enqueues on SES failure", ...fwdTestOpts, fn: async () => {
-  const msgId = `fwd-test-${crypto.randomUUID()}`;
-  const result = await processInbound(makeSnsNotification({
-    from: "sender@external.com",
-    to: `info@${fwdDomain}`,
-    subject: "Hello",
-    messageId: msgId,
-  }));
+    await new Promise((r) => setTimeout(r, 100));
+    const al = getAlias(fwdDomainId, "info");
+    assert.ok(al);
 
-  assertEquals(result.action, "processed");
-  // forwardEmail will fail (no AWS) so it should be enqueued for retry
-  const queue = await listForwardQueue();
-  const queued = queue.find((q) => q.from === "sender@external.com" && q.to === "dest@example.com");
-  assertExists(queued, "Email should be enqueued for retry after SES failure");
+    const processed = isMessageProcessed(msgId);
+    assert.equal(processed, true);
 
-  // Verify alias stats were bumped (fire-and-forget, give it a moment)
-  await new Promise((r) => setTimeout(r, 100));
-  const alias = await getAlias(fwdDomainId, "info");
-  assertExists(alias);
+    if (queued) dequeueForward(queued.id);
+  });
 
-  // Verify dedup mark
-  const processed = await isMessageProcessed(msgId);
-  assertEquals(processed, true);
+  it("dedup prevents reprocessing", async () => {
+    const msgId = `dedup-test-${crypto.randomUUID()}`;
+    await processInbound(makeSnsNotification({
+      from: "sender@external.com",
+      to: `info@${fwdDomain}`,
+      subject: "Dedup test",
+      messageId: msgId,
+    }));
 
-  // Cleanup
-  if (queued) await dequeueForward(queued.id);
-}});
+    const result = await processInbound(makeSnsNotification({
+      from: "sender@external.com",
+      to: `info@${fwdDomain}`,
+      subject: "Dedup test",
+      messageId: msgId,
+    }));
 
-Deno.test({ name: "processInbound - dedup prevents reprocessing", ...fwdTestOpts, fn: async () => {
-  const msgId = `dedup-test-${crypto.randomUUID()}`;
-  // Process once
-  await processInbound(makeSnsNotification({
-    from: "sender@external.com",
-    to: `info@${fwdDomain}`,
-    subject: "Dedup test",
-    messageId: msgId,
-  }));
+    assert.equal(result.action, "skipped");
+    assert.equal(result.details, "Duplicate SNS delivery");
+  });
 
-  // Process again — should be skipped
-  const result = await processInbound(makeSnsNotification({
-    from: "sender@external.com",
-    to: `info@${fwdDomain}`,
-    subject: "Dedup test",
-    messageId: msgId,
-  }));
+  it("catch-all matches when specific alias doesn't exist", async () => {
+    const msgId = `catchall-test-${crypto.randomUUID()}`;
+    const result = await processInbound(makeSnsNotification({
+      from: "sender@external.com",
+      to: `nonexistent@${fwdDomain}`,
+      subject: "Catch-all test",
+      messageId: msgId,
+    }));
 
-  assertEquals(result.action, "skipped");
-  assertEquals(result.details, "Duplicate SNS delivery");
-}});
+    assert.equal(result.action, "processed");
+    const queue = listForwardQueue();
+    const queued = queue.find((q) => q.to === "catchall@example.com" && q.originalTo === `nonexistent@${fwdDomain}`);
+    assert.ok(queued, "Catch-all should forward to catchall destination");
 
-Deno.test({ name: "processInbound - catch-all matches when specific alias doesn't exist", ...fwdTestOpts, fn: async () => {
-  const msgId = `catchall-test-${crypto.randomUUID()}`;
-  const result = await processInbound(makeSnsNotification({
-    from: "sender@external.com",
-    to: `nonexistent@${fwdDomain}`,
-    subject: "Catch-all test",
-    messageId: msgId,
-  }));
+    if (queued) dequeueForward(queued.id);
+  });
 
-  assertEquals(result.action, "processed");
-  // Should forward via catch-all to catchall@example.com
-  const queue = await listForwardQueue();
-  const queued = queue.find((q) => q.to === "catchall@example.com" && q.originalTo === `nonexistent@${fwdDomain}`);
-  assertExists(queued, "Catch-all should forward to catchall destination");
+  it("disabled alias is not forwarded", async () => {
+    updateAlias(fwdDomainId, "info", { enabled: false });
+    updateAlias(fwdDomainId, "*", { enabled: false });
 
-  // Cleanup
-  if (queued) await dequeueForward(queued.id);
-}});
+    const msgId = `disabled-test-${crypto.randomUUID()}`;
+    const result = await processInbound(makeSnsNotification({
+      from: "sender@external.com",
+      to: `info@${fwdDomain}`,
+      subject: "Disabled test",
+      messageId: msgId,
+    }));
 
-Deno.test({ name: "processInbound - disabled alias is not forwarded", ...fwdTestOpts, fn: async () => {
-  // Disable the info alias
-  const kv = _getSql();
-  const aliasEntry = await kv.get(["aliases", fwdDomainId, "info"]);
-  const aliasData = aliasEntry.value as any;
-  await kv.set(["aliases", fwdDomainId, "info"], { ...aliasData, enabled: false });
+    assert.equal(result.action, "processed");
+    assert.equal(result.details, "forwarded=0 discarded=1");
 
-  // Also disable catch-all so it doesn't match as fallback
-  const catchAllEntry = await kv.get(["aliases", fwdDomainId, "*"]);
-  const catchAllData = catchAllEntry.value as any;
-  await kv.set(["aliases", fwdDomainId, "*"], { ...catchAllData, enabled: false });
+    // Restore
+    updateAlias(fwdDomainId, "info", { enabled: true });
+    updateAlias(fwdDomainId, "*", { enabled: true });
+  });
 
-  const msgId = `disabled-test-${crypto.randomUUID()}`;
-  const result = await processInbound(makeSnsNotification({
-    from: "sender@external.com",
-    to: `info@${fwdDomain}`,
-    subject: "Disabled test",
-    messageId: msgId,
-  }));
+  it("source rewrite in raw email", async () => {
+    const msgId = `rewrite-test-${crypto.randomUUID()}`;
+    await processInbound(makeSnsNotification({
+      from: "original@sender.com",
+      to: `info@${fwdDomain}`,
+      subject: "Rewrite test",
+      messageId: msgId,
+    }));
 
-  assertEquals(result.action, "processed");
-  assertEquals(result.details, "forwarded=0 discarded=1");
+    const queue = listForwardQueue();
+    const queued = queue.find((q) => q.from === "original@sender.com" && q.domainName === fwdDomain);
+    assert.ok(queued, "Should be enqueued");
+    assert.equal(queued!.rawContent.includes("From: original@sender.com"), true);
 
-  // Restore aliases
-  await kv.set(["aliases", fwdDomainId, "info"], { ...aliasData, enabled: true });
-  await kv.set(["aliases", fwdDomainId, "*"], { ...catchAllData, enabled: true });
-}});
+    if (queued) dequeueForward(queued.id);
+  });
 
-Deno.test({ name: "processInbound - source rewrite in raw email", ...fwdTestOpts, fn: async () => {
-  // Verify the raw email rewrite logic directly: From is rewritten, Reply-To added
-  // We test this by checking what gets enqueued (since SES will fail)
-  const msgId = `rewrite-test-${crypto.randomUUID()}`;
-  await processInbound(makeSnsNotification({
-    from: "original@sender.com",
-    to: `info@${fwdDomain}`,
-    subject: "Rewrite test",
-    messageId: msgId,
-  }));
+  // --- New tests ---
 
-  const queue = await listForwardQueue();
-  const queued = queue.find((q) => q.from === "original@sender.com" && q.domainName === fwdDomain);
-  assertExists(queued, "Should be enqueued");
-  // The rawContent in the queue should be the original raw email
-  // (the rewrite happens inside forwardEmail in ses.ts, so the queue stores original)
-  assertEquals(queued!.rawContent.includes("From: original@sender.com"), true);
+  it("spam verdict FAIL → rejected", async () => {
+    const msgId = `spam-test-${crypto.randomUUID()}`;
+    const result = await processInbound(makeSnsNotification({
+      from: "spammer@evil.com",
+      to: `info@${fwdDomain}`,
+      subject: "Buy cheap stuff",
+      messageId: msgId,
+      spamVerdict: "FAIL",
+    }));
 
-  // Cleanup
-  if (queued) await dequeueForward(queued.id);
-}});
+    assert.equal(result.action, "rejected");
+    assert.match(result.details, /spam|virus/i);
+  });
+
+  it("virus verdict FAIL → rejected", async () => {
+    const msgId = `virus-test-${crypto.randomUUID()}`;
+    const result = await processInbound(makeSnsNotification({
+      from: "attacker@evil.com",
+      to: `info@${fwdDomain}`,
+      subject: "Open this",
+      messageId: msgId,
+      virusVerdict: "FAIL",
+    }));
+
+    assert.equal(result.action, "rejected");
+    assert.match(result.details, /spam|virus/i);
+  });
+
+  it("rules: discard action prevents forwarding", async () => {
+    const rule = createRule(fwdDomainId, {
+      field: "from", match: "contains", value: "discard-me",
+      action: "discard", target: "", priority: 0, enabled: true,
+    });
+
+    const msgId = `discard-rule-${crypto.randomUUID()}`;
+    const result = await processInbound(makeSnsNotification({
+      from: "discard-me@test.com",
+      to: `info@${fwdDomain}`,
+      subject: "Should be discarded",
+      messageId: msgId,
+    }));
+
+    assert.equal(result.action, "processed");
+    assert.match(result.details, /discarded=1/);
+
+    // Should NOT be in forward queue
+    const queue = listForwardQueue();
+    const queued = queue.find((q) => q.from === "discard-me@test.com");
+    assert.equal(queued, undefined);
+
+    // Cleanup rule
+    const { deleteRule } = await import("./db.ts");
+    deleteRule(fwdDomainId, rule.id);
+  });
+
+  it("rules: forward action with custom target", async () => {
+    const rule = createRule(fwdDomainId, {
+      field: "subject", match: "contains", value: "vip-forward",
+      action: "forward", target: "vip@custom.com", priority: 0, enabled: true,
+    });
+
+    const msgId = `rule-fwd-${crypto.randomUUID()}`;
+    const result = await processInbound(makeSnsNotification({
+      from: "sender@test.com",
+      to: `info@${fwdDomain}`,
+      subject: "vip-forward request",
+      messageId: msgId,
+    }));
+
+    assert.equal(result.action, "processed");
+    assert.match(result.details, /forwarded=1/);
+
+    const queue = listForwardQueue();
+    const queued = queue.find((q) => q.to === "vip@custom.com");
+    assert.ok(queued, "Should forward to rule's custom target");
+
+    if (queued) dequeueForward(queued.id);
+    const { deleteRule } = await import("./db.ts");
+    deleteRule(fwdDomainId, rule.id);
+  });
+
+  it("expired subscription → skip forwarding", async () => {
+    // Create a separate domain with expired owner
+    const expSuffix = `exp-${Date.now()}`;
+    const expEmail = `expired-${expSuffix}@example.com`;
+    const hash = await hashPassword("testpass123");
+    createUser(expEmail, hash);
+    updateUserSubscription(expEmail, {
+      plan: "basico",
+      status: "cancelled",
+      currentPeriodEnd: new Date(Date.now() - 86400000).toISOString(), // expired yesterday
+    });
+    const expDomain = createDomain(expEmail, `${expSuffix}.test`, ["dkim1"], "v1");
+    updateDomain(expDomain.id, { verified: true });
+    createAlias(expDomain.id, "info", ["dest@example.com"]);
+
+    const msgId = `expired-test-${crypto.randomUUID()}`;
+    const result = await processInbound(makeSnsNotification({
+      from: "sender@test.com",
+      to: `info@${expSuffix}.test`,
+      subject: "Should not forward",
+      messageId: msgId,
+    }));
+
+    assert.equal(result.action, "processed");
+    assert.equal(result.details, "forwarded=0 discarded=0");
+  });
+
+  it("saveToMesa threading: 2 emails same thread → single conversation", async () => {
+    const threadId = `thread-${crypto.randomUUID()}`;
+    const msgId1 = `mesa-thread1-${crypto.randomUUID()}`;
+    const msgId2 = `mesa-thread2-${crypto.randomUUID()}`;
+
+    const raw1 = [
+      `From: sender@external.com`,
+      `To: info@${fwdDomain}`,
+      `Subject: Thread test`,
+      `Message-ID: <${threadId}@test.com>`,
+      `Content-Type: text/plain; charset=UTF-8`,
+      ``,
+      `First message`,
+    ].join("\r\n");
+
+    await processInbound(makeSnsNotification({
+      from: "sender@external.com",
+      to: `info@${fwdDomain}`,
+      subject: "Thread test",
+      messageId: msgId1,
+      rawContent: raw1,
+    }));
+
+    const raw2 = [
+      `From: sender@external.com`,
+      `To: info@${fwdDomain}`,
+      `Subject: Re: Thread test`,
+      `Message-ID: <${msgId2}@test.com>`,
+      `In-Reply-To: <${threadId}@test.com>`,
+      `References: <${threadId}@test.com>`,
+      `Content-Type: text/plain; charset=UTF-8`,
+      ``,
+      `Reply message`,
+    ].join("\r\n");
+
+    await processInbound(makeSnsNotification({
+      from: "sender@external.com",
+      to: `info@${fwdDomain}`,
+      subject: "Re: Thread test",
+      messageId: msgId2,
+      rawContent: raw2,
+    }));
+
+    // Should have one conversation with messageCount >= 2
+    const convs = listConversations(fwdDomainId, {});
+    const threadConv = convs.find(c => c.subject === "Thread test" && c.from === "sender@external.com");
+    assert.ok(threadConv, "Should find threaded conversation");
+    assert.ok(threadConv!.messageCount >= 2, `Expected messageCount >= 2, got ${threadConv!.messageCount}`);
+  });
+
+  it("saveToMesa: unrelated email creates new conversation", async () => {
+    const convsBefore = listConversations(fwdDomainId, {});
+    const countBefore = convsBefore.length;
+
+    const msgId = `new-conv-${crypto.randomUUID()}`;
+    await processInbound(makeSnsNotification({
+      from: "unique-sender@newdomain.com",
+      to: `info@${fwdDomain}`,
+      subject: `Unique subject ${msgId}`,
+      messageId: msgId,
+    }));
+
+    const convsAfter = listConversations(fwdDomainId, {});
+    assert.ok(convsAfter.length > countBefore, "Should create a new conversation");
+  });
+});
 
 // --- MIME parsing tests ---
 
@@ -385,43 +526,41 @@ const NESTED_MULTIPART = [
   "--outer--",
 ].join("\r\n");
 
-Deno.test("extractPlainBody handles nested multipart/mixed + multipart/alternative", () => {
-  const body = extractPlainBody(NESTED_MULTIPART);
-  assertEquals(body, "Hello plain text");
-});
+describe("MIME parsing", () => {
+  it("extractPlainBody handles nested multipart", () => {
+    assert.equal(extractPlainBody(NESTED_MULTIPART), "Hello plain text");
+  });
 
-Deno.test("extractHtmlBody handles nested multipart/mixed + multipart/alternative", () => {
-  const html = extractHtmlBody(NESTED_MULTIPART);
-  assertEquals(html, "<p>Hello HTML</p>");
-});
+  it("extractHtmlBody handles nested multipart", () => {
+    assert.equal(extractHtmlBody(NESTED_MULTIPART), "<p>Hello HTML</p>");
+  });
 
-Deno.test("extractAttachments returns attachment metadata from nested multipart", () => {
-  const attachments = extractAttachments(NESTED_MULTIPART);
-  assertEquals(attachments.length, 2);
-  assertEquals(attachments[0].filename, "photo.png");
-  assertEquals(attachments[0].contentType, "image/png");
-  assertEquals(attachments[1].filename, "doc.pdf");
-  assertEquals(attachments[1].contentType, "application/pdf");
-});
+  it("extractAttachments returns metadata from nested multipart", () => {
+    const attachments = extractAttachments(NESTED_MULTIPART);
+    assert.equal(attachments.length, 2);
+    assert.equal(attachments[0].filename, "photo.png");
+    assert.equal(attachments[0].contentType, "image/png");
+    assert.equal(attachments[1].filename, "doc.pdf");
+    assert.equal(attachments[1].contentType, "application/pdf");
+  });
 
-Deno.test("extractPlainBody handles simple non-multipart email", () => {
-  const simple = ["From: a@b.com", "Content-Type: text/plain", "", "Simple body"].join("\r\n");
-  assertEquals(extractPlainBody(simple), "Simple body");
-});
+  it("extractPlainBody handles simple non-multipart email", () => {
+    const simple = ["From: a@b.com", "Content-Type: text/plain", "", "Simple body"].join("\r\n");
+    assert.equal(extractPlainBody(simple), "Simple body");
+  });
 
-const QUOTED_PRINTABLE = [
-  "From: sender@example.com",
-  'Content-Type: multipart/alternative; boundary="qp"',
-  "",
-  "--qp",
-  "Content-Type: text/plain; charset=utf-8",
-  "Content-Transfer-Encoding: quoted-printable",
-  "",
-  "Hello =C3=A1cento y l=C3=ADnea",
-  "--qp--",
-].join("\r\n");
-
-Deno.test("extractPlainBody decodes quoted-printable", () => {
-  const body = extractPlainBody(QUOTED_PRINTABLE);
-  assertEquals(body, "Hello ácento y línea");
+  it("extractPlainBody decodes quoted-printable", () => {
+    const qp = [
+      "From: sender@example.com",
+      'Content-Type: multipart/alternative; boundary="qp"',
+      "",
+      "--qp",
+      "Content-Type: text/plain; charset=utf-8",
+      "Content-Transfer-Encoding: quoted-printable",
+      "",
+      "Hello =C3=A1cento y l=C3=ADnea",
+      "--qp--",
+    ].join("\r\n");
+    assert.equal(extractPlainBody(qp), "Hello ácento y línea");
+  });
 });

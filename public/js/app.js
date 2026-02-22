@@ -95,7 +95,7 @@ function renderBillingBanner() {
         <span class="text-sm text-green-400">Plan ${esc(planName)} — Activo</span>
         <div class="flex items-center gap-4">
           <span class="text-xs text-zinc-500">Hasta ${periodEnd ? periodEnd.toLocaleDateString("es-MX") : "—"}</span>
-          <a href="/pricing" class="text-xs text-mask-400 hover:text-mask-300 transition-colors underline">Mejorar plan</a>
+          <a href="https://wa.me/527757609276?text=${encodeURIComponent(`Hola, quiero cambiar mi plan.\nPlan actual: ${planName}\nEmail: ${currentUser.email}`)}" target="_blank" rel="noopener" class="text-xs text-mask-400 hover:text-mask-300 transition-colors underline">Cambiar plan</a>
           <button id="btn-cancel-sub" class="text-xs text-zinc-500 hover:text-red-400 transition-colors underline">Cancelar</button>
         </div>
       </div>`;
@@ -104,9 +104,12 @@ function renderBillingBanner() {
     container.innerHTML = `
       <div class="bg-yellow-900/20 border border-yellow-800/50 rounded-lg px-4 py-3 flex items-center justify-between">
         <span class="text-sm text-yellow-400">Plan ${esc(planName)} — Tu plan se cancela el ${periodEnd.toLocaleDateString("es-MX")}</span>
-        <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-          Reactivar Plan
-        </button>
+        <div class="flex items-center gap-3">
+          <a href="https://wa.me/527757609276?text=${encodeURIComponent(`Hola, quiero cambiar mi plan.\nPlan actual: ${planName}\nEmail: ${currentUser.email}`)}" target="_blank" rel="noopener" class="text-xs text-mask-400 hover:text-mask-300 transition-colors underline">Cambiar plan</a>
+          <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+            Reactivar Plan
+          </button>
+        </div>
       </div>`;
     document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
   } else if (isExpired) {
