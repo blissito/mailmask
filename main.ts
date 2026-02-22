@@ -433,7 +433,7 @@ const app = new Elysia({ adapter: node() })
       );
       response.headers.set(
         "content-security-policy",
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'",
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.googletagmanager.com https://www.clarity.ms; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms; connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms; frame-src https://www.googletagmanager.com",
       );
     }
     return response;
