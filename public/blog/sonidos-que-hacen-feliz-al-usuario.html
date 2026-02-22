@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sonidos que hacen feliz al usuario: por qué tu app web debería sonar — MailMask</title>
+    <meta name="description" content="Cómo usar Web Audio API para crear micro-interacciones sonoras que transforman la experiencia de tu app. Nuestra historia construyendo MailMask con curiosidad y cariño." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/sonidos-que-hacen-feliz-al-usuario" />
+    <meta property="og:title" content="Sonidos que hacen feliz al usuario: por qué tu app web debería sonar" />
+    <meta property="og:description" content="Web Audio API, curiosidad genuina, y la alegría de construir productos con alma. La historia detrás de los soniditos de MailMask." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/sonidos-que-hacen-feliz-al-usuario" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="article:published_time" content="2026-02-22" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Sonidos que hacen feliz al usuario: por qué tu app web debería sonar" />
+    <meta name="twitter:description" content="Web Audio API, curiosidad genuina, y la alegría de construir productos con alma." />
+    <script src="/js/analytics.js"></script>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Sonidos que hacen feliz al usuario: por qué tu app web debería sonar",
+      "description": "Cómo usar Web Audio API para crear micro-interacciones sonoras que transforman la experiencia de tu app.",
+      "datePublished": "2026-02-22",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/favicon.svg" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/sonidos-que-hacen-feliz-al-usuario"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Sonidos que hacen feliz al usuario", "item": "https://www.mailmask.studio/blog/sonidos-que-hacen-feliz-al-usuario" }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
+      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Sonidos que hacen feliz al usuario: por qué tu app web debería sonar</h1>
+        <div class="meta">
+          <span>📅 22 Feb 2026</span>
+          <span>⏱ 6 min de lectura</span>
+        </div>
+      </header>
+
+      <div class="blog-content">
+        <p>Todo empezó con una pregunta que nadie nos hizo: ¿por qué las apps web son silenciosas?</p>
+
+        <p>Estábamos trabajando en la bandeja de MailMask — el panel donde nuestros usuarios ven los emails que llegan a sus aliases — y queríamos que supieran cuando llegaba algo nuevo sin tener que estar mirando la pantalla. Un toast visual está bien, pero si estás en otra pestaña, no lo ves. Necesitábamos <strong>sonido</strong>.</p>
+
+        <p>Y ahí fue donde se puso divertido.</p>
+
+        <h2>La libertad de construir sin pedir permiso</h2>
+
+        <p>Hay algo que pasa cuando construyes tu propio producto: no hay un Jira ticket que diga "agregar sonido de notificación". No hay un PM que apruebe la prioridad. Hay una idea, un editor de texto, y la curiosidad de ver qué sale.</p>
+
+        <p>Nos sentamos a explorar Web Audio API — la misma tecnología que usan los sintetizadores de música en el browser — y descubrimos que con <strong>7 líneas de JavaScript</strong> puedes crear un beep que suena mejor que cualquier archivo MP3 descargado de internet. Sin dependencias. Sin archivos de audio. Sin latencia.</p>
+
+        <p>Un oscilador, una frecuencia, un fade. Eso es todo.</p>
+
+        <h2>De un beep a una personalidad</h2>
+
+        <p>El primer sonido fue práctico: una notificación cuando llega un email nuevo. Pero una vez que oímos ese pequeño "ding" por primera vez, la conversación cambió de "necesitamos esto" a "¿dónde más podemos poner sonido?".</p>
+
+        <p>Así nacieron cuatro sonidos distintos en MailMask:</p>
+
+        <ul>
+          <li><strong>Acorde ascendente</strong> — cuando tu dominio se verifica. Tres notas que suben, como un logro desbloqueado. Porque configurar DNS y ver que todo conecta <em>merece</em> una celebración.</li>
+          <li><strong>Pop</strong> — al crear un alias. Un sweep de frecuencia de 50 milisegundos. Rápido, satisfactorio, como hacer click en una burbuja.</li>
+          <li><strong>Whoosh</strong> — al enviar una respuesta. Ruido blanco filtrado que se desvanece. Tu mensaje salió volando.</li>
+          <li><strong>Bonk</strong> — cuando algo falla. Una nota grave y corta. No asusta, pero te dice "algo no salió bien".</li>
+        </ul>
+
+        <p>Ninguno dura más de 200 milisegundos. Son tan cortos que los sientes más de lo que los escuchas. Están ahí para confirmar que la acción ocurrió, no para distraerte.</p>
+
+        <h2>El truco técnico: un AudioContext, no cien</h2>
+
+        <p>El error más común al implementar sonido en web es crear un <code>AudioContext</code> nuevo cada vez. Los browsers modernos lo bloquean si no hubo interacción previa del usuario. La solución es crear uno solo, activarlo en el primer click, y reutilizarlo:</p>
+
+        <pre><code>let audioCtx = null;
+document.addEventListener("click", () => {
+  if (!audioCtx)
+    audioCtx = new AudioContext();
+  if (audioCtx.state === "suspended")
+    audioCtx.resume();
+});
+
+// Después, en cualquier momento:
+const osc = audioCtx.createOscillator();
+osc.frequency.value = 800;
+osc.start();</code></pre>
+
+        <p>Cero dependencias. Funciona en todos los browsers modernos. El sonido se sintetiza en tiempo real — no hay archivos que cargar, no hay requests extra, no hay nada que cachear.</p>
+
+        <h2>Por qué importa (más de lo que crees)</h2>
+
+        <p>Los sonidos no son decoración. Son feedback. Cada vez que un usuario hace click y <em>escucha</em> que la acción se completó, su cerebro registra certeza. No tiene que buscar visualmente la confirmación. No se pregunta "¿funcionó?". Lo sabe.</p>
+
+        <p>En una app de email, donde esperar respuestas genera ansiedad, ese feedback instantáneo cambia la experiencia. Un "whoosh" al enviar es más tranquilizador que cualquier mensaje de "Enviado correctamente".</p>
+
+        <h2>Construir con curiosidad, no con obligación</h2>
+
+        <p>Nada de esto estaba en el roadmap. No era un feature request. Fue curiosidad pura: "¿se puede hacer sonido sin archivos de audio?" → "sí" → "¿cómo suena?" → "qué cool" → "¿dónde más lo ponemos?".</p>
+
+        <p>Ese es el tipo de decisiones que tomamos construyendo MailMask. No preguntamos "¿cuál es el ROI de un sonidito?". Preguntamos "¿esto hace más satisfactorio usar el producto?". Si la respuesta es sí, lo hacemos.</p>
+
+        <p>Porque al final, las herramientas que más disfrutas usar son las que alguien disfrutó construir. Y nosotros disfrutamos mucho esto.</p>
+
+        <h2>Pruébalo tú mismo</h2>
+
+        <p>Si quieres experimentar la diferencia que hacen estas micro-interacciones, <a href="/register">crea una cuenta en MailMask</a>. Agrega un dominio, crea un alias, envía un email de prueba. Vas a escuchar cada paso.</p>
+
+        <p>Y si eres developer y quieres implementar esto en tu propia app, ya tienes el código arriba. Son menos de 20 líneas. No hay excusa para que tu app sea silenciosa.</p>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Construimos MailMask con cariño. Pruébalo.</h2>
+      <p>Email profesional en tu dominio desde $49 MXN/mes. Con soniditos incluidos.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-zinc-800 py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">
+        © 2026 by fixter.org
+      </p>
+    </footer>
+  </body>
+</html>

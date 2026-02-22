@@ -297,6 +297,7 @@ async function sendReply() {
     btn.disabled = false;
     if (res.ok) {
       textarea.value = "";
+      if (typeof playSound === "function") playSound("whoosh");
       toast("Respuesta enviada");
       openConversation(activeConv);
     } else {

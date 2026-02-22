@@ -236,7 +236,80 @@ async function cancelSubscription() {
   }
 }
 
+// --- Sounds (Web Audio API) ---
+let audioCtx = null;
+document.addEventListener("click", () => {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+});
+
+function playSound(type) {
+  if (!audioCtx || audioCtx.state !== "running") return;
+  const t = audioCtx.currentTime;
+  if (type === "success") {
+    // Achievement: 3-note ascending chord
+    [520, 660, 840].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.value = 0.12;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.12 + 0.2);
+      osc.stop(t + i * 0.12 + 0.2);
+    });
+  } else if (type === "pop") {
+    // Quick pop: frequency sweep 400→600
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(400, t);
+    osc.frequency.exponentialRampToValueAtTime(600, t + 0.05);
+    gain.gain.value = 0.13;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    osc.stop(t + 0.08);
+  } else if (type === "whoosh") {
+    // Whoosh: filtered noise burst
+    const bufferSize = audioCtx.sampleRate * 0.12;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 1200;
+    filter.Q.value = 0.8;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    src.start(t);
+    src.stop(t + 0.12);
+  } else if (type === "error") {
+    // Bonk: low frequency blip
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 200;
+    gain.gain.value = 0.15;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    osc.stop(t + 0.1);
+  }
+}
+
 function showToast(message, isError = false) {
+  if (isError) playSound("error");
   const toast = document.createElement("div");
   toast.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg text-sm font-medium transition-opacity ${isError ? 'bg-red-900/90 text-red-200' : 'bg-green-900/90 text-green-200'}`;
   toast.textContent = message;
@@ -794,6 +867,7 @@ async function verifyDns() {
   if (data.verified) {
     resultEl.textContent = "✓ Dominio verificado";
     resultEl.className = "ml-3 text-sm text-green-400";
+    playSound("success");
     selectedDomain.verified = true;
     // Update status badge
     const statusEl = document.getElementById("detail-status");
@@ -1156,6 +1230,7 @@ function setupEventListeners() {
     });
 
     if (res.ok) {
+      playSound("pop");
       hideModal("modal-add-alias");
       form.reset();
       await loadAliases();
