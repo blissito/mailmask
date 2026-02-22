@@ -24,13 +24,16 @@ function demoSound(type) {
     g.gain.value = 0.13; o.connect(g); g.connect(ctx.destination);
     o.start(t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08); o.stop(t + 0.08);
   } else if (type === "whoosh") {
-    const bs = ctx.sampleRate * 0.12, buf = ctx.createBuffer(1, bs, ctx.sampleRate);
+    const dur = 0.3;
+    const bs = ctx.sampleRate * dur, buf = ctx.createBuffer(1, bs, ctx.sampleRate);
     const d = buf.getChannelData(0); for (let i = 0; i < bs; i++) d[i] = Math.random() * 2 - 1;
     const s = ctx.createBufferSource(); s.buffer = buf;
-    const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 1200; f.Q.value = 0.8;
-    const g = ctx.createGain(); g.gain.setValueAtTime(0.1, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-    s.connect(f); f.connect(g); g.connect(ctx.destination); s.start(t); s.stop(t + 0.12);
+    const f = ctx.createBiquadFilter(); f.type = "bandpass";
+    f.frequency.setValueAtTime(600, t); f.frequency.exponentialRampToValueAtTime(2400, t + dur); f.Q.value = 1.2;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(0.12, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    s.connect(f); f.connect(g); g.connect(ctx.destination); s.start(t); s.stop(t + dur);
   } else if (type === "error") {
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = "sine"; o.frequency.value = 200; g.gain.value = 0.15;

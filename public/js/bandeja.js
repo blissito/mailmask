@@ -687,24 +687,27 @@ function playSound(type) {
   if (!audioCtx || audioCtx.state !== "running") return;
   const t = audioCtx.currentTime;
   if (type === "whoosh") {
-    const bufferSize = audioCtx.sampleRate * 0.12;
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const dur = 0.3;
+    const bs = audioCtx.sampleRate * dur;
+    const buf = audioCtx.createBuffer(1, bs, audioCtx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bs; i++) d[i] = Math.random() * 2 - 1;
     const src = audioCtx.createBufferSource();
-    src.buffer = buffer;
+    src.buffer = buf;
     const filter = audioCtx.createBiquadFilter();
     filter.type = "bandpass";
-    filter.frequency.value = 1200;
-    filter.Q.value = 0.8;
+    filter.frequency.setValueAtTime(600, t);
+    filter.frequency.exponentialRampToValueAtTime(2400, t + dur);
+    filter.Q.value = 1.2;
     const gain = audioCtx.createGain();
-    gain.gain.setValueAtTime(0.1, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(0.12, t + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
     src.connect(filter);
     filter.connect(gain);
     gain.connect(audioCtx.destination);
     src.start(t);
-    src.stop(t + 0.12);
+    src.stop(t + dur);
   } else if (type === "urgent") {
     // Two quick high beeps — alarm feel
     [0, 0.1].forEach(offset => {
