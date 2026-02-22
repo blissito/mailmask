@@ -708,33 +708,33 @@ function renderDnsRecords() {
   const dnsItems = [
     {
       type: "MX",
-      name: d,
+      name: "@",
       value: "10 inbound-smtp.us-east-1.amazonaws.com",
       hints: [
-        `Algunos proveedores usan <strong>@</strong> en vez de <strong>${esc(d)}</strong> para el dominio raíz.`,
+        `<strong>@</strong> significa el dominio raíz (<strong>${esc(d)}</strong>). La mayoría de proveedores usan <strong>@</strong>.`,
         `Si tu proveedor tiene un campo separado de <strong>Prioridad</strong>, pon <strong>10</strong> ahí y solo la dirección como valor.`,
       ],
     },
     {
       type: "TXT",
-      name: `_amazonses.${d}`,
+      name: "_amazonses",
       value: selectedDomain.verificationToken,
       hints: [
-        `Algunos proveedores agregan <strong>.${esc(d)}</strong> automáticamente al nombre — si es así, pon solo <strong>_amazonses</strong>.`,
+        `Pon solo <strong>_amazonses</strong> como nombre — tu proveedor agrega <strong>.${esc(d)}</strong> automáticamente.`,
         `Si tu proveedor pide comillas alrededor del valor, agrégalas: <strong>"${esc(selectedDomain.verificationToken)}"</strong>.`,
       ],
     },
     ...selectedDomain.dkimTokens.map(token => ({
       type: "CNAME",
-      name: `${token}._domainkey.${d}`,
+      name: `${token}._domainkey`,
       value: `${token}.dkim.amazonses.com`,
       hints: [
-        `Si tu proveedor agrega <strong>.${esc(d)}</strong> automáticamente, pon solo <strong>${esc(token)}._domainkey</strong>.`,
+        `Pon solo <strong>${esc(token)}._domainkey</strong> como nombre — tu proveedor agrega <strong>.${esc(d)}</strong> automáticamente.`,
       ],
     })),
     {
       type: "TXT",
-      name: d,
+      name: "@",
       value: "v=spf1 include:amazonses.com ~all",
       hints: [
         `Este registro <strong>SPF</strong> autoriza a Amazon SES a enviar emails en nombre de tu dominio.`,
