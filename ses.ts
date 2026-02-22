@@ -467,12 +467,12 @@ let _iam: any;
 async function getIam() {
   if (!_iam) {
     const { IAMClient } = await import("@aws-sdk/client-iam");
-    _iam = new IAMClient({ region: process.env.AWS_REGION ?? "us-east-2" });
+    _iam = new IAMClient({ region: process.env.AWS_REGION ?? "us-east-1" });
   }
   return _iam;
 }
 
-const SES_SMTP_REGION = process.env.AWS_REGION ?? "us-east-2";
+const SES_SMTP_REGION = process.env.AWS_REGION ?? "us-east-1";
 
 export async function deriveSesSmtpPassword(secretAccessKey: string, region: string): Promise<string> {
   const enc = new TextEncoder();
