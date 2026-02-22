@@ -50,6 +50,21 @@ deno task test    # Run tests
 - [x] ~~**Retry en forwarding**~~: resuelto.
 - [x] ~~**Revisar `cron.ts`**~~: resuelto.
 
+### Hardening — detectado en auditoría pre-beta
+- [ ] **Global error handler**: Agregar `.onError()` a Elysia y `process.on('uncaughtException'/'unhandledRejection')`. Algunas rutas (ej. admin coupons) hacen `throw` sin catch.
+- [ ] **Ignorar spam/virus de SES**: `processInbound` no revisa `spamVerdict`/`virusVerdict` del receipt — reenvía spam, daña reputación SES. Rechazar o marcar.
+- [ ] **Sanitizar `fromLocal` en `/api/domains/:id/send`**: valor controlado por usuario va directo al header `From:`. Riesgo de header injection. Validar con regex de local-part.
+- [ ] **Validar email en registro**: `/api/auth/register` no valida formato de email. Agregar regex básica.
+- [ ] **Índices faltantes en DB**: `email_logs(domain_id, timestamp)`, `conversations(domain_id, status, deleted_at)`, `messages(conversation_id)`, `forward_queue(next_retry_at, dead)`, `tokens(kind, expires_at)`.
+- [ ] **Race condition de cupón**: `markCouponUsed()` se llama antes del API call a MP. Si MP falla, cupón queda quemado sin suscripción. Mover después de respuesta exitosa o al webhook.
+- [ ] **Rate limit en checkout y cupones**: `/api/billing/checkout` y `/api/coupons/:code` sin rate limit. Permite abuso de API de MP y enumeración de cupones.
+- [ ] **Default de `SES_RULE_SET`**: cae a `"formmy-email-forwarding"` si no hay env var — nombre legacy. Cambiar default o requerir.
+- [ ] **Sanitizar filename de attachments**: `Content-Disposition` usa filename del email sin sanitizar — riesgo de header injection con `\r\n`.
+- [ ] **Validar recipients en bulk send**: `/api/domains/:id/send-bulk` no valida emails individuales antes de enviar a SES.
+- [ ] **Separar bucket de backups**: `S3_BACKUP_BUCKET` cae al bucket de inbound si no está seteado. Un bug de limpieza podría borrar emails entrantes.
+- [ ] **Agregar HSTS header**: no se envía `Strict-Transport-Security` a nivel aplicación.
+- [ ] **Tests rotos**: todos los test files (`forwarding.test.ts`, `webhook.test.ts`, `integration.test.ts`) referencian KV/Postgres viejo. No corren contra SQLite actual.
+
 ### Alto — primeras semanas
 - [x] ~~Pagina de pricing publica en landing~~: `/pricing` standalone + sección en landing con smooth scroll.
 - [x] ~~Agregar endpoint PUT para editar reglas~~: `PUT /api/domains/:id/rules/:ruleId` con validación completa.
