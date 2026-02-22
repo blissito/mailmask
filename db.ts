@@ -186,7 +186,7 @@ function rowToConversation(r: typeof conversations.$inferSelect): Conversation {
     assignedTo: r.assignedTo ?? undefined,
     priority: r.priority as any,
     lastMessageAt: r.lastMessageAt,
-    messageCount: r.messageCount,
+    messageCount: r.messageCount ?? 0,
     tags: r.tags ?? [],
     threadReferences: r.threadRefs ?? [],
     deletedAt: r.deletedAt ?? undefined,
@@ -856,7 +856,7 @@ export function updateConversation(domainId: string, id: string, updates: Partia
     tags: merged.tags,
     threadRefs: merged.threadReferences,
     lastMessageAt: merged.lastMessageAt,
-    messageCount: merged.messageCount,
+    messageCount: merged.messageCount ?? 1,
   }).where(and(eq(conversations.domainId, domainId), eq(conversations.id, id))).returning().all();
   return rows.length ? rowToConversation(rows[0]) : null;
 }
@@ -871,7 +871,17 @@ export function findConversationByThread(domainId: string, _from: string, refere
     )
     LIMIT 1
   `).get(domainId, ...references) as any;
-  return row ? rowToConversation(row) : null;
+  if (!row) return null;
+  // Raw SQL returns snake_case — map to camelCase for rowToConversation
+  return rowToConversation({
+    ...row,
+    domainId: row.domain_id,
+    assignedTo: row.assigned_to,
+    lastMessageAt: row.last_message_at,
+    messageCount: row.message_count,
+    threadRefs: row.thread_refs,
+    deletedAt: row.deleted_at,
+  });
 }
 
 export function softDeleteConversation(domainId: string, id: string): boolean {
