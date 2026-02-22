@@ -377,6 +377,7 @@ async function toggleUrgent() {
     body: JSON.stringify({ domainId: selectedDomainId, priority: newPriority }),
   });
   if (res.ok) {
+    if (newPriority === "urgent") playSound("urgent");
     toast(newPriority === "urgent" ? "Marcada como urgente" : "Prioridad normal");
     activeConv.priority = newPriority;
     document.getElementById("btn-urgent").classList.toggle("active", newPriority === "urgent");
@@ -704,6 +705,18 @@ function playSound(type) {
     gain.connect(audioCtx.destination);
     src.start(t);
     src.stop(t + 0.12);
+  } else if (type === "urgent") {
+    // Two quick high beeps — alarm feel
+    [0, 0.1].forEach(offset => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "square";
+      o.frequency.value = 880;
+      g.gain.value = 0.1;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t + offset);
+      g.gain.exponentialRampToValueAtTime(0.001, t + offset + 0.06);
+      o.stop(t + offset + 0.06);
+    });
   }
 }
 
