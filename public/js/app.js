@@ -338,6 +338,9 @@ async function selectDomain(id) {
   // Load default tab
   switchTab("aliases");
   await loadAliases();
+
+  // Fetch health in background
+  loadDomainHealth();
 }
 
 function goBack() {
@@ -617,6 +620,84 @@ function renderLogs(logs) {
     <tbody>${rows}</tbody>`;
 }
 
+// --- Domain Health ---
+
+async function loadDomainHealth() {
+  if (!selectedDomain) return;
+  const statusEl = document.getElementById("detail-status");
+
+  // Show loading state
+  statusEl.textContent = "Verificando...";
+  statusEl.className = "text-xs px-2 py-1 rounded-full bg-zinc-800 text-zinc-400 animate-pulse";
+
+  try {
+    const res = await fetch(`/api/domains/${selectedDomain.id}/health`);
+    if (!res.ok) return;
+    const health = await res.json();
+    selectedDomain._health = health;
+
+    // Update badge
+    const badgeStyles = {
+      ok: "bg-green-900/50 text-green-400",
+      warning: "bg-yellow-900/50 text-yellow-400",
+      error: "bg-red-900/50 text-red-400",
+    };
+    const badgeLabels = { ok: "Saludable", warning: "Atención", error: "Error" };
+    statusEl.textContent = badgeLabels[health.status] || health.status;
+    statusEl.className = `text-xs px-2 py-1 rounded-full ${badgeStyles[health.status] || badgeStyles.error}`;
+
+    // Render health panel in DNS tab if it's visible
+    renderHealthPanel();
+  } catch {
+    statusEl.textContent = selectedDomain.verified ? "Verificado" : "Pendiente DNS";
+    statusEl.className = `text-xs px-2 py-1 rounded-full ${selectedDomain.verified ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}`;
+  }
+}
+
+function renderHealthPanel() {
+  const health = selectedDomain?._health;
+  if (!health) return;
+
+  let panel = document.getElementById("health-panel");
+  if (!panel) {
+    panel = document.createElement("div");
+    panel.id = "health-panel";
+    const dnsTab = document.getElementById("tab-dns");
+    if (dnsTab) dnsTab.prepend(panel);
+    else return;
+  }
+
+  const iconOk = `<svg class="w-4 h-4 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+  const iconWarn = `<svg class="w-4 h-4 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+  const iconErr = `<svg class="w-4 h-4 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
+
+  const summaryBg = { ok: "border-green-800/50 bg-green-900/20", warning: "border-yellow-800/50 bg-yellow-900/20", error: "border-red-800/50 bg-red-900/20" };
+  const summaryText = { ok: "text-green-400", warning: "text-yellow-400", error: "text-red-400" };
+
+  const checkOrder = ["verified", "mx", "spf", "dkim", "aliases", "plan"];
+  const checkLabels = { verified: "Verificación", mx: "MX (recepción)", spf: "SPF", dkim: "DKIM", aliases: "Aliases", plan: "Plan" };
+
+  panel.innerHTML = `
+    <div class="mb-6 border ${summaryBg[health.status]} rounded-xl p-4">
+      <p class="text-sm font-medium ${summaryText[health.status]} mb-3">${esc(health.summary)}</p>
+      <div class="space-y-2">
+        ${checkOrder.map(key => {
+          const c = health.checks[key];
+          if (!c) return "";
+          const icon = c.ok ? iconOk : (health.status === "error" && !c.ok ? iconErr : iconWarn);
+          return `<div class="flex items-start gap-2">
+            ${icon}
+            <div>
+              <span class="text-xs font-medium text-zinc-300">${checkLabels[key]}</span>
+              <span class="text-xs text-zinc-500 ml-1">— ${esc(c.detail)}</span>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+      <button onclick="loadDomainHealth()" class="mt-3 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Actualizar diagnóstico</button>
+    </div>`;
+}
+
 // --- DNS ---
 
 function renderDnsRecords() {
@@ -717,6 +798,8 @@ async function verifyDns() {
     const statusEl = document.getElementById("detail-status");
     statusEl.textContent = "Verificado";
     statusEl.className = "text-xs px-2 py-1 rounded-full bg-green-900/50 text-green-400";
+    // Refresh health after verification
+    loadDomainHealth();
   } else {
     resultEl.textContent = "✗ DNS no configurado aún. Verifica los registros e intenta de nuevo.";
     resultEl.className = "ml-3 text-sm text-yellow-400";
@@ -937,7 +1020,7 @@ function switchTab(tab) {
   if (tab === "aliases") loadAliases();
   else if (tab === "rules") loadRules();
   else if (tab === "logs") loadLogs();
-  else if (tab === "dns") renderDnsRecords();
+  else if (tab === "dns") { renderDnsRecords(); renderHealthPanel(); }
   else if (tab === "members") loadMembers();
   else if (tab === "smtp") loadSmtpCredentials();
 }

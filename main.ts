@@ -2,6 +2,7 @@ import { Elysia } from "elysia";
 import { node } from "@elysiajs/node";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as dns from "node:dns/promises";
 import cron from "node-cron";
 import { db } from "./pg.js";
 import { users as usersTable } from "./schema.js";
@@ -975,6 +976,113 @@ const app = new Elysia({ adapter: node() })
     const domain = access.domain;
 
     return new Response(JSON.stringify(domain), {
+      headers: { "content-type": "application/json" },
+    });
+  })
+
+  .get("/api/domains/:id/health", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user)
+      return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access)
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const domain = access.domain;
+    const d = domain.domain;
+    const checks: Record<string, { ok: boolean; detail: string }> = {};
+
+    // 1. Verified in DB
+    checks.verified = domain.verified
+      ? { ok: true, detail: "Dominio verificado en SES" }
+      : { ok: false, detail: "Dominio no verificado — configura los registros DNS" };
+
+    // 2. MX records
+    try {
+      const mxRecords = await dns.resolveMx(d);
+      const sesHost = "inbound-smtp.us-east-1.amazonaws.com";
+      const sesRecord = mxRecords.find(r => r.exchange.toLowerCase() === sesHost);
+      if (!sesRecord) {
+        checks.mx = { ok: false, detail: `MX no apunta a MailMask. Registros actuales: ${mxRecords.map(r => `${r.priority} ${r.exchange}`).join(", ")}` };
+      } else {
+        const higherPriority = mxRecords.filter(r => r.priority < sesRecord.priority && r.exchange.toLowerCase() !== sesHost);
+        if (higherPriority.length > 0) {
+          checks.mx = { ok: false, detail: `MX de SES tiene prioridad ${sesRecord.priority}, pero hay otros con mayor prioridad: ${higherPriority.map(r => `${r.priority} ${r.exchange}`).join(", ")}` };
+        } else {
+          checks.mx = { ok: true, detail: `MX configurado correctamente (prioridad ${sesRecord.priority})` };
+        }
+      }
+    } catch {
+      checks.mx = { ok: false, detail: "No se encontraron registros MX" };
+    }
+
+    // 3. SPF
+    try {
+      const txtRecords = await dns.resolveTxt(d);
+      const spf = txtRecords.flat().find(r => r.includes("v=spf1") && r.includes("amazonses.com"));
+      checks.spf = spf
+        ? { ok: true, detail: "SPF configurado correctamente" }
+        : { ok: false, detail: "Falta include:amazonses.com en el registro SPF" };
+    } catch {
+      checks.spf = { ok: false, detail: "No se encontró registro SPF" };
+    }
+
+    // 4. DKIM
+    const dkimTokens = domain.dkimTokens || [];
+    if (dkimTokens.length === 0) {
+      checks.dkim = { ok: false, detail: "No hay tokens DKIM configurados" };
+    } else {
+      let verified = 0;
+      for (const token of dkimTokens) {
+        try {
+          await dns.resolveCname(`${token}._domainkey.${d}`);
+          verified++;
+        } catch { /* not configured */ }
+      }
+      checks.dkim = verified === dkimTokens.length
+        ? { ok: true, detail: `${verified}/${dkimTokens.length} CNAMEs configurados` }
+        : { ok: false, detail: `${verified}/${dkimTokens.length} CNAMEs configurados` };
+    }
+
+    // 5. Aliases
+    const aliases = listAliases(domain.id).filter(a => a.enabled);
+    checks.aliases = aliases.length > 0
+      ? { ok: true, detail: `${aliases.length} alias${aliases.length === 1 ? "" : "es"} activo${aliases.length === 1 ? "" : "s"}` }
+      : { ok: false, detail: "No hay aliases activos — los emails no se reenviarán" };
+
+    // 6. Plan
+    const ownerUser = getUser(domain.ownerEmail);
+    if (ownerUser) {
+      const limits = getUserPlanLimits(ownerUser);
+      checks.plan = limits.domains > 0
+        ? { ok: true, detail: `Plan ${ownerUser.plan || "basico"} activo` }
+        : { ok: false, detail: "Plan sin dominios disponibles" };
+    } else {
+      checks.plan = { ok: false, detail: "Usuario propietario no encontrado" };
+    }
+
+    // Global status
+    const allOk = Object.values(checks).every(c => c.ok);
+    const hasError = !checks.verified.ok || !checks.plan.ok;
+    const status = allOk ? "ok" : hasError ? "error" : "warning";
+
+    let summary = "";
+    if (allOk) {
+      summary = "Todo configurado correctamente — tu dominio puede enviar y recibir emails";
+    } else if (!checks.verified.ok) {
+      summary = "Tu dominio no está verificado — configura los registros DNS y verifica";
+    } else if (!checks.mx.ok) {
+      summary = "Tu dominio no puede recibir emails: el registro MX no apunta a MailMask";
+    } else if (!checks.spf.ok || !checks.dkim.ok) {
+      summary = "Tu dominio puede tener problemas de entregabilidad — revisa SPF y DKIM";
+    } else if (!checks.aliases.ok) {
+      summary = "No hay aliases activos — los emails recibidos no se reenviarán";
+    } else {
+      summary = "Hay problemas con la configuración de tu dominio";
+    }
+
+    return new Response(JSON.stringify({ domain: d, checks, status, summary }), {
       headers: { "content-type": "application/json" },
     });
   })

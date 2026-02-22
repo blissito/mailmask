@@ -11,7 +11,7 @@ let _s3: any;
 async function getSesOutbound() {
   if (!_sesOutbound) {
     const { SESClient } = await import("@aws-sdk/client-ses");
-    _sesOutbound = new SESClient({ region: process.env.AWS_REGION ?? "us-east-2" });
+    _sesOutbound = new SESClient({ region: process.env.AWS_REGION ?? "us-east-1" });
   }
   return _sesOutbound;
 }
@@ -297,7 +297,8 @@ export async function forwardEmail(originalRaw: string, from: string, to: string
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
 
-  const forwardingAddress = process.env.FORWARDING_FROM ?? "reenvio@mailmask.studio";
+  // Use the alias domain for From so emails show the user's domain, not mailmask.studio
+  const forwardingAddress = `reenvio@${aliasDomain}`;
 
   // Rewrite From header and add Reply-To so replies go to original sender
   let rewrittenRaw = originalRaw.replace(
