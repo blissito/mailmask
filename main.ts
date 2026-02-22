@@ -1028,21 +1028,24 @@ const app = new Elysia({ adapter: node() })
       checks.spf = { ok: false, detail: "No se encontró registro SPF" };
     }
 
-    // 4. DKIM
+    // 4. DKIM — check via SES API (more reliable than DNS lookup which fails with CNAME flattening)
     const dkimTokens = domain.dkimTokens || [];
     if (dkimTokens.length === 0) {
       checks.dkim = { ok: false, detail: "No hay tokens DKIM configurados" };
     } else {
-      let verified = 0;
-      for (const token of dkimTokens) {
-        try {
-          await dns.resolveCname(`${token}._domainkey.${d}`);
-          verified++;
-        } catch { /* not configured */ }
+      try {
+        const { SESClient, GetIdentityDkimAttributesCommand } = await import("@aws-sdk/client-ses");
+        const sesClient = new SESClient({ region: process.env.AWS_SES_INBOUND_REGION ?? "us-east-1" });
+        const dkimRes = await sesClient.send(new GetIdentityDkimAttributesCommand({ Identities: [d] }));
+        const dkimAttrs = dkimRes.DkimAttributes?.[d];
+        if (dkimAttrs?.DkimVerificationStatus === "Success") {
+          checks.dkim = { ok: true, detail: "DKIM verificado por SES" };
+        } else {
+          checks.dkim = { ok: false, detail: `DKIM ${dkimAttrs?.DkimVerificationStatus ?? "no configurado"} — verifica los 3 CNAMEs` };
+        }
+      } catch {
+        checks.dkim = { ok: false, detail: "No se pudo verificar DKIM" };
       }
-      checks.dkim = verified === dkimTokens.length
-        ? { ok: true, detail: `${verified}/${dkimTokens.length} CNAMEs configurados` }
-        : { ok: false, detail: `${verified}/${dkimTokens.length} CNAMEs configurados` };
     }
 
     // 5. Aliases
