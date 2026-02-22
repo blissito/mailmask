@@ -651,6 +651,15 @@ function renderDnsRecords() {
         `Si tu proveedor agrega <strong>.${esc(d)}</strong> automáticamente, pon solo <strong>${esc(token)}._domainkey</strong>.`,
       ],
     })),
+    {
+      type: "TXT",
+      name: d,
+      value: "v=spf1 include:amazonses.com ~all",
+      hints: [
+        `Este registro <strong>SPF</strong> autoriza a Amazon SES a enviar emails en nombre de tu dominio.`,
+        `Si ya tienes un registro SPF, agrega <strong>include:amazonses.com</strong> antes del <strong>~all</strong> existente en vez de crear uno nuevo.`,
+      ],
+    },
   ];
 
   // Only show DKIM hint once (on first CNAME)

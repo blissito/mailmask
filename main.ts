@@ -945,6 +945,11 @@ const app = new Elysia({ adapter: node() })
             name: `${token}._domainkey.${domain}`,
             value: `${token}.dkim.amazonses.com`,
           })),
+          spf: {
+            type: "TXT",
+            name: domain,
+            value: "v=spf1 include:amazonses.com ~all",
+          },
         },
       }),
       {
