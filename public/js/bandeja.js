@@ -661,21 +661,24 @@ function updateTitle() {
   document.title = unreadCount > 0 ? `(${unreadCount}) Bandeja` : "Bandeja";
 }
 
+let audioCtx = null;
+document.addEventListener("click", () => {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+});
+
 function playNotifSound() {
-  if (document.hasFocus()) return;
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.value = 800;
-    gain.gain.value = 0.15;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-    osc.stop(ctx.currentTime + 0.1);
-  } catch (e) { /* ignore audio errors */ }
+  if (!audioCtx || audioCtx.state !== "running") return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = "sine";
+  osc.frequency.value = 800;
+  gain.gain.value = 0.15;
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+  osc.stop(audioCtx.currentTime + 0.1);
 }
 
 // --- SSE for real-time updates ---
