@@ -402,7 +402,7 @@ export async function deleteEmailFromS3(bucket: string, key: string): Promise<vo
 
 // --- S3 backup helpers ---
 
-const BACKUP_BUCKET = process.env.S3_BACKUP_BUCKET ?? "mailmask-inbound";
+const BACKUP_BUCKET = process.env.S3_BACKUP_BUCKET ?? "mailmask-backups";
 const BACKUP_PREFIX = "backups/";
 const BACKUP_RETENTION = 7;
 

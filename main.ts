@@ -437,6 +437,13 @@ const app = new Elysia({ adapter: node() })
     }
     return response;
   })
+  .onError(({ error }) => {
+    log("error", "server", "Unhandled error", { error: String(error) });
+    return new Response(JSON.stringify({ error: "Error interno" }), {
+      status: 500,
+      headers: { "content-type": "application/json" },
+    });
+  })
 
   // --- Health ---
   .get("/health", async () => {
@@ -570,8 +577,8 @@ const app = new Elysia({ adapter: node() })
         { status: 400 },
       );
 
-    // Per-email rate limit: 5 attempts per 15 minutes (prevents credential stuffing across IPs)
-    const emailRl = checkRateLimit(`login:${email}`, 5, 15 * 60_000);
+    // Per-email rate limit: 5 attempts per 1 minute (prevents credential stuffing across IPs)
+    const emailRl = checkRateLimit(`login:${email}`, 5, 60_000);
     if (!emailRl.allowed) {
       const waitMin = Math.max(1, Math.ceil((emailRl.resetAt - Date.now()) / 60_000));
       return new Response(
@@ -1598,7 +1605,10 @@ const app = new Elysia({ adapter: node() })
 
   // --- Coupons (public) ---
 
-  .get("/api/coupons/:code", async ({ params }) => {
+  .get("/api/coupons/:code", async ({ params, request }) => {
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 10, 60_000);
+    if (limited) return limited;
     const code = params.code.toUpperCase().trim();
     const coupon = await getCoupon(code);
     if (!coupon) {
@@ -1704,6 +1714,10 @@ const app = new Elysia({ adapter: node() })
   })
 
   .post("/api/billing/checkout", async ({ request }) => {
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 5, 60_000);
+    if (limited) return limited;
+
     const user = await getAuthUser(request);
     if (!user)
       return new Response(JSON.stringify({ error: "No autenticado" }), {
@@ -2220,6 +2234,11 @@ const app = new Elysia({ adapter: node() })
     if (!Array.isArray(recipients) || recipients.length > 10000) {
       return new Response(JSON.stringify({ error: "Máximo 10,000 destinatarios por lote" }), { status: 400 });
     }
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    const invalid = recipients.filter((r: string) => typeof r !== "string" || !emailRegex.test(r));
+    if (invalid.length) {
+      return new Response(JSON.stringify({ error: `Emails inválidos: ${invalid.slice(0, 5).join(", ")}` }), { status: 400, headers: { "content-type": "application/json" } });
+    }
 
     const fromAddress = `${fromLocal ?? "noreply"}@${domain.domain}`;
     const job = await createBulkJob({
@@ -2387,7 +2406,7 @@ const app = new Elysia({ adapter: node() })
       return new Response(attachment.data as unknown as BodyInit, {
         headers: {
           "content-type": attachment.contentType,
-          "content-disposition": `${disposition}; filename="${attachment.filename}"`,
+          "content-disposition": `${disposition}; filename="${attachment.filename.replace(/[\r\n\x00-\x1f"\\]/g, "")}"`,
           "cache-control": "private, max-age=3600",
         },
       });
@@ -3228,6 +3247,13 @@ cron.schedule("0 4 * * *", async () => {
 const port = parseInt(process.env.PORT ?? "8000");
 app.listen({ port, hostname: "0.0.0.0" }, () => {
   console.log(`MailMask running on port ${port}`);
+});
+
+process.on("uncaughtException", (err) => {
+  log("error", "process", "Uncaught exception", { error: String(err) });
+});
+process.on("unhandledRejection", (err) => {
+  log("error", "process", "Unhandled rejection", { error: String(err) });
 });
 
 

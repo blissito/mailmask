@@ -109,6 +109,7 @@ function parseMimeParts(body: string, boundary: string): MimePart[] {
       const fnMatch = disp.match(/filename="?([^";\r\n]+)"?/i);
       if (fnMatch) filename = fnMatch[1].trim();
     }
+    if (filename) filename = filename.replace(/[\r\n\x00-\x1f]/g, "").trim();
     if (!filename) {
       const nameMatch = contentType.match(/name="?([^";\r\n]+)"?/i);
       if (nameMatch) filename = nameMatch[1].trim();
@@ -400,9 +401,21 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     return { action: "ignored", details: `Not a received email: ${notification.notificationType}` };
   }
 
-  const recipients = notification.receipt.recipients;
+  const receipt = notification.receipt;
   const from = notification.mail.source;
   const subject = notification.mail.commonHeaders?.subject ?? "(sin asunto)";
+
+  if (receipt?.spamVerdict?.status === "FAIL" || receipt?.virusVerdict?.status === "FAIL") {
+    log("warn", "forwarding", "Spam/virus rejected", {
+      spam: receipt.spamVerdict?.status,
+      virus: receipt.virusVerdict?.status,
+      from,
+      subject,
+    });
+    return { action: "rejected", details: "Spam or virus detected" };
+  }
+
+  const recipients = receipt.recipients;
 
   // Fetch raw email from S3 (SNS notification only has metadata)
   let rawContent = notification.content ?? "";

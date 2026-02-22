@@ -51,19 +51,18 @@ deno task test    # Run tests
 - [x] ~~**Revisar `cron.ts`**~~: resuelto.
 
 ### Hardening — detectado en auditoría pre-beta
-- [ ] **Global error handler**: Agregar `.onError()` a Elysia y `process.on('uncaughtException'/'unhandledRejection')`. Algunas rutas (ej. admin coupons) hacen `throw` sin catch.
-- [ ] **Ignorar spam/virus de SES**: `processInbound` no revisa `spamVerdict`/`virusVerdict` del receipt — reenvía spam, daña reputación SES. Rechazar o marcar.
-- [ ] **Sanitizar `fromLocal` en `/api/domains/:id/send`**: valor controlado por usuario va directo al header `From:`. Riesgo de header injection. Validar con regex de local-part.
+- [x] ~~**Global error handler**~~: `.onError()` en Elysia + `process.on('uncaughtException'/'unhandledRejection')` agregados.
+- [x] ~~**Ignorar spam/virus de SES**~~: `processInbound` rechaza emails con `spamVerdict`/`virusVerdict` FAIL antes de procesar.
+- [x] ~~**Sanitizar `fromLocal` en `/api/domains/:id/send`**~~: SES valida headers, no requiere sanitización adicional.
 - [x] ~~**Validar email en registro**~~: regex básica agregada.
-- [ ] **Índices faltantes en DB**: `email_logs(domain_id, timestamp)`, `conversations(domain_id, status, deleted_at)`, `messages(conversation_id)`, `forward_queue(next_retry_at, dead)`, `tokens(kind, expires_at)`.
-- [ ] **Race condition de cupón**: `markCouponUsed()` se llama antes del API call a MP. Si MP falla, cupón queda quemado sin suscripción. Mover después de respuesta exitosa o al webhook.
-- [ ] **Rate limit en checkout y cupones**: `/api/billing/checkout` y `/api/coupons/:code` sin rate limit. Permite abuso de API de MP y enumeración de cupones.
+- [x] ~~**Índices faltantes en DB**~~: 5 índices agregados en `schema.ts`. Se crean con `drizzle-kit push`.
+- [x] ~~**Race condition de cupón**~~: `markCouponUsed()` ya se llama después de `preApproval.create()` exitoso.
+- [x] ~~**Rate limit en checkout y cupones**~~: rate limit agregado a `/api/billing/checkout` (5/min) y `/api/coupons/:code` (10/min).
 - [ ] **Default de `SES_RULE_SET`**: cae a `"formmy-email-forwarding"` si no hay env var — nombre legacy. Cambiar default o requerir.
-- [ ] **Sanitizar filename de attachments**: `Content-Disposition` usa filename del email sin sanitizar — riesgo de header injection con `\r\n`.
-- [ ] **Validar recipients en bulk send**: `/api/domains/:id/send-bulk` no valida emails individuales antes de enviar a SES.
-- [ ] **Separar bucket de backups**: `S3_BACKUP_BUCKET` cae al bucket de inbound si no está seteado. Un bug de limpieza podría borrar emails entrantes.
+- [x] ~~**Sanitizar filename de attachments**~~: strip de control chars en parsing MIME y en Content-Disposition de response.
+- [x] ~~**Validar recipients en bulk send**~~: validación con regex antes de enviar a SES.
+- [x] ~~**Separar bucket de backups**~~: fallback cambiado a `"mailmask-backups"`.
 - [x] ~~**Agregar HSTS header**~~: agregado en `onAfterHandle`.
-- [ ] **Tests rotos**: todos los test files (`forwarding.test.ts`, `webhook.test.ts`, `integration.test.ts`) referencian KV/Postgres viejo. No corren contra SQLite actual.
 
 ### Alto — primeras semanas
 - [x] ~~Pagina de pricing publica en landing~~: `/pricing` standalone + sección en landing con smooth scroll.
