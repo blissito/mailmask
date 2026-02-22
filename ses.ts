@@ -376,7 +376,19 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
   };
   if (opts?.configSet) cmd.ConfigurationSetName = opts.configSet;
 
-  await ses.send(new SendRawEmailCommand(cmd));
+  try {
+    await ses.send(new SendRawEmailCommand(cmd));
+  } catch (err: any) {
+    // Auto-create configuration set if it doesn't exist in this region
+    if (opts?.configSet && String(err).includes("ConfigurationSetDoesNotExist")) {
+      const domain = from.split("@")[1] ?? "";
+      try { await createConfigurationSet(domain); } catch { /* best effort */ }
+      delete cmd.ConfigurationSetName;
+      await ses.send(new SendRawEmailCommand(cmd));
+    } else {
+      throw err;
+    }
+  }
   return messageId;
 }
 
