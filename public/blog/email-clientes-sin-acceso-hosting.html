@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cómo dar de alta emails a clientes sin darles acceso al hosting — MailMask</title>
+    <meta name="description" content="Configura emails profesionales para tus clientes sin compartir acceso a cPanel o al hosting. Reenvío y aliases desde un panel independiente y seguro." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/email-clientes-sin-acceso-hosting" />
+    <meta property="og:title" content="Cómo dar de alta emails a clientes sin darles acceso al hosting" />
+    <meta property="og:description" content="Email profesional para clientes sin compartir cPanel ni credenciales del servidor." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/email-clientes-sin-acceso-hosting" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="article:published_time" content="2026-02-21" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Cómo dar de alta emails a clientes sin darles acceso al hosting" />
+    <meta name="twitter:description" content="Email profesional para clientes sin compartir cPanel ni credenciales del servidor." />
+    <script src="/js/analytics.js"></script>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Cómo dar de alta emails a clientes sin darles acceso al hosting",
+      "description": "Configura emails profesionales para clientes sin compartir acceso al hosting.",
+      "datePublished": "2026-02-21",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/favicon.svg" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/email-clientes-sin-acceso-hosting"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Emails sin acceso al hosting", "item": "https://www.mailmask.studio/blog/email-clientes-sin-acceso-hosting" }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
+      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Cómo dar de alta emails a clientes sin darles acceso al hosting</h1>
+        <div class="meta">
+          <span>📅 21 Feb 2026</span>
+          <span>⏱ 4 min de lectura</span>
+        </div>
+      </header>
+
+      <div class="blog-content">
+        <p>Si eres desarrollador web o administras sitios para clientes, conoces esta situación: el cliente quiere <code>contacto@sudominio.com</code> y la única forma que conoces es crearle una cuenta en cPanel. Pero darle acceso a cPanel significa que puede romper el sitio, borrar archivos o cambiar configuraciones.</p>
+
+        <p>No debería ser así. El email y el hosting son cosas distintas — no hay razón para mezclarlas.</p>
+
+        <h2>El riesgo de mezclar email con hosting</h2>
+
+        <p>Cuando creas cuentas de email en cPanel o Plesk, el cliente inevitablemente pide "su acceso". Y con ese acceso puede:</p>
+
+        <ul>
+          <li>Borrar archivos del sitio por accidente</li>
+          <li>Cambiar configuraciones de PHP o bases de datos</li>
+          <li>Crear subdominios o cuentas que no pediste</li>
+          <li>Saturar el almacenamiento con adjuntos pesados</li>
+        </ul>
+
+        <p>Además, los emails del hosting compartido suelen tener mala reputación. Los mensajes caen en spam porque comparten IP con otros dominios que envían correo basura.</p>
+
+        <h2>Separa el email del hosting</h2>
+
+        <p>La solución es usar un servicio de email independiente. Con MailMask, el email de tu cliente no toca el hosting. Solo necesitas apuntar los registros MX del dominio a MailMask, y todo el correo entrante se reenvía al inbox personal del cliente.</p>
+
+        <p>El cliente recibe su email en Gmail, Outlook o donde quiera. Tú no le das acceso a nada. Todos contentos.</p>
+
+        <h2>Cómo funciona paso a paso</h2>
+
+        <ol>
+          <li>Agrega el dominio del cliente en tu dashboard de MailMask.</li>
+          <li>Cambia los registros MX en el DNS del dominio (probablemente ya tienes acceso como quien administra el sitio).</li>
+          <li>Crea los aliases que necesite el cliente: <code>contacto@</code>, <code>info@</code>, <code>ventas@</code>.</li>
+          <li>Define el destino de cada alias — el Gmail o correo personal del cliente.</li>
+        </ol>
+
+        <p>Si el cliente necesita un email nuevo, lo agregas tú desde MailMask en 10 segundos. El cliente no necesita saber qué es DNS, MX, ni cPanel.</p>
+
+        <h2>Ventajas para ti como proveedor</h2>
+
+        <ul>
+          <li><strong>Cero soporte de email en hosting:</strong> no más "se me llenó el buzón" o "no me llegan los correos".</li>
+          <li><strong>Seguridad:</strong> el cliente no tiene acceso al servidor. Punto.</li>
+          <li><strong>Escalabilidad:</strong> aliases ilimitados por dominio, sin crear cuentas de servidor.</li>
+          <li><strong>Servicio adicional:</strong> puedes cobrar por la configuración y gestión de email como servicio recurrente.</li>
+        </ul>
+
+        <h2>¿Qué plan necesito?</h2>
+
+        <p>Si manejas un solo cliente, el plan Básico (<strong>$49 MXN/mes</strong>) es suficiente. Para 2-3 clientes, el plan Freelancer (<strong>$449 MXN/mes</strong>) te da hasta 3 dominios con envío autenticado. Si manejas más, el plan Developer incluye dominios ilimitados.</p>
+
+        <h2>El email no debería complicarte el hosting</h2>
+
+        <p>Deja de crear cuentas de email en cPanel. Separa el email del hosting, protege tus servidores, y dale a tus clientes un servicio profesional sin riesgos. Es más seguro, más barato y más fácil de mantener.</p>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Prueba MailMask hoy</h2>
+      <p>Email profesional en tu dominio desde $49 MXN/mes. Configura en 2 minutos.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-zinc-800 py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">
+        © 2026 by fixter.org
+      </p>
+    </footer>
+  </body>
+</html>
