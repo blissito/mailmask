@@ -313,6 +313,18 @@ function initCoupons() {
     document.getElementById("coupon-modal").classList.add("hidden");
   });
 
+  document.getElementById("coupon-price").addEventListener("input", (e) => {
+    const v = Number(e.target.value);
+    const preview = document.getElementById("coupon-price-preview");
+    if (v < 100) {
+      preview.textContent = "⚠ Mínimo 100 centavos ($1 MXN)";
+      preview.className = "text-xs text-red-400 mt-1 block";
+    } else {
+      preview.textContent = `= $${(v / 100).toLocaleString("es-MX", { minimumFractionDigits: 0 })} MXN/mes`;
+      preview.className = "text-xs text-green-400 mt-1 block";
+    }
+  });
+
   document.getElementById("btn-gen-code").addEventListener("click", () => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let code = "";

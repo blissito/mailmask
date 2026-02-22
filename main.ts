@@ -1517,11 +1517,6 @@ const app = new Elysia({ adapter: node() })
     const token = crypto.randomUUID();
     await createPendingCheckout(token, isYearly ? `${planKey}:yearly` : planKey);
 
-    // Mark single-use coupon as used
-    if (activeCoupon?.singleUse && couponCode) {
-      await markCouponUsed(couponCode);
-    }
-
     const { PreApproval } = await import("mercadopago");
     const mpAccessToken = process.env.MP_ACCESS_TOKEN;
     if (!mpAccessToken) {
@@ -1540,6 +1535,9 @@ const app = new Elysia({ adapter: node() })
       const amount = activeCoupon
         ? activeCoupon.fixedPrice / 100
         : isYearly ? PLANS[planKey].yearlyPrice / 100 : PLANS[planKey].price / 100;
+      if (amount < 1) {
+        return new Response(JSON.stringify({ error: "El monto del cupón es inválido. Contacta soporte." }), { status: 400, headers: { "content-type": "application/json" } });
+      }
       // deno-lint-ignore no-explicit-any
       const body: any = {
         reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)} (${billingLabel})${couponSuffix}`,
@@ -1561,11 +1559,17 @@ const app = new Elysia({ adapter: node() })
       };
       const result = await preApproval.create({ body });
 
+      // Mark single-use coupon as used AFTER successful MP call
+      if (activeCoupon?.singleUse && couponCode) {
+        await markCouponUsed(couponCode);
+      }
+
       return new Response(JSON.stringify({ init_point: result.init_point }), {
         headers: { "content-type": "application/json" },
       });
-    } catch (err) {
-      log("error", "billing", "MP guest-checkout error", { error: String(err) });
+    } catch (err: any) {
+      const errDetail = err?.cause ?? err?.message ?? JSON.stringify(err);
+      log("error", "billing", "MP guest-checkout error", { error: errDetail, amount });
       return new Response(
         JSON.stringify({ error: "Error al crear suscripción en MercadoPago" }),
         {
@@ -1599,11 +1603,6 @@ const app = new Elysia({ adapter: node() })
     const couponData2 = couponCode ? await getCoupon(couponCode) : null;
     const activeCoupon = couponData2 && couponData2.plan === planKey ? couponData2 : undefined;
 
-    // Mark single-use coupon as used
-    if (activeCoupon?.singleUse && couponCode) {
-      await markCouponUsed(couponCode);
-    }
-
     const { PreApproval } = await import("mercadopago");
     const mpAccessToken = process.env.MP_ACCESS_TOKEN;
     if (!mpAccessToken) {
@@ -1622,6 +1621,9 @@ const app = new Elysia({ adapter: node() })
       const amount = activeCoupon
         ? activeCoupon.fixedPrice / 100
         : isYearly ? PLANS[planKey].yearlyPrice / 100 : PLANS[planKey].price / 100;
+      if (amount < 1) {
+        return new Response(JSON.stringify({ error: "El monto del cupón es inválido. Contacta soporte." }), { status: 400, headers: { "content-type": "application/json" } });
+      }
       // deno-lint-ignore no-explicit-any
       const body: any = {
         reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)} (${billingLabel})${couponSuffix}`,
@@ -1642,6 +1644,11 @@ const app = new Elysia({ adapter: node() })
         external_reference: user.email,
       };
       const result = await preApproval.create({ body });
+
+      // Mark single-use coupon as used AFTER successful MP call
+      if (activeCoupon?.singleUse && couponCode) {
+        await markCouponUsed(couponCode);
+      }
 
       return new Response(JSON.stringify({ init_point: result.init_point }), {
         headers: { "content-type": "application/json" },
@@ -2977,6 +2984,9 @@ const app = new Elysia({ adapter: node() })
     const validPlans = ["basico", "freelancer", "developer", "pro", "agencia"];
     if (!validPlans.includes(body.plan)) {
       return new Response(JSON.stringify({ error: "Plan inválido" }), { status: 400, headers: { "content-type": "application/json" } });
+    }
+    if (Number(body.fixedPrice) < 100) {
+      return new Response(JSON.stringify({ error: "Precio mínimo: 100 centavos ($1 MXN)" }), { status: 400, headers: { "content-type": "application/json" } });
     }
 
     try {
