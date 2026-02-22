@@ -402,7 +402,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
 
   const recipients = notification.receipt.recipients;
   const from = notification.mail.source;
-  const subject = notification.mail.commonHeaders.subject ?? "(sin asunto)";
+  const subject = notification.mail.commonHeaders?.subject ?? "(sin asunto)";
 
   // Fetch raw email from S3 (SNS notification only has metadata)
   let rawContent = notification.content ?? "";
