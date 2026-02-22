@@ -58,7 +58,7 @@ deno task test    # Run tests
 - [x] ~~**Índices faltantes en DB**~~: 5 índices agregados en `schema.ts`. Se crean con `drizzle-kit push`.
 - [x] ~~**Race condition de cupón**~~: `markCouponUsed()` ya se llama después de `preApproval.create()` exitoso.
 - [x] ~~**Rate limit en checkout y cupones**~~: rate limit agregado a `/api/billing/checkout` (5/min) y `/api/coupons/:code` (10/min).
-- [ ] **Default de `SES_RULE_SET`**: cae a `"formmy-email-forwarding"` si no hay env var — nombre legacy. Cambiar default o requerir.
+- [x] ~~**Default de `SES_RULE_SET`**~~: se mantiene `"formmy-email-forwarding"` como nombre permanente.
 - [x] ~~**Sanitizar filename de attachments**~~: strip de control chars en parsing MIME y en Content-Disposition de response.
 - [x] ~~**Validar recipients en bulk send**~~: validación con regex antes de enviar a SES.
 - [x] ~~**Separar bucket de backups**~~: fallback cambiado a `"mailmask-backups"`.
