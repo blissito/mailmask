@@ -95,7 +95,8 @@ function renderBillingBanner() {
         <span class="text-sm text-green-400">Plan ${esc(planName)} — Activo</span>
         <div class="flex items-center gap-4">
           <span class="text-xs text-zinc-500">Hasta ${periodEnd ? periodEnd.toLocaleDateString("es-MX") : "—"}</span>
-          <button id="btn-cancel-sub" class="text-xs text-zinc-500 hover:text-red-400 transition-colors underline">Cancelar suscripción</button>
+          <a href="/pricing" class="text-xs text-mask-400 hover:text-mask-300 transition-colors underline">Mejorar plan</a>
+          <button id="btn-cancel-sub" class="text-xs text-zinc-500 hover:text-red-400 transition-colors underline">Cancelar</button>
         </div>
       </div>`;
     document.getElementById("btn-cancel-sub")?.addEventListener("click", cancelSubscription);

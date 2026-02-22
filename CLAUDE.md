@@ -73,6 +73,8 @@ deno task test    # Run tests
 
 ### Medio — primer mes
 - [ ] Tests: cubrir forwarding y webhook billing. (no urgente por ahora)
+- [ ] **SSE en Bandeja**: Implementar Server-Sent Events para actualizar la bandeja en tiempo real cuando llegan nuevos emails. Evitar que el usuario tenga que navegar/refrescar para ver mensajes nuevos.
+- [ ] **Upgrade/downgrade de plan**: MP PreApproval no soporta mutación. Implementar flujo de cancelar suscripción actual + crear nueva con plan diferente. Considerar: prorrateo del período actual, transición sin interrupción de servicio, UX de selección de plan desde dashboard.
 - [ ] Logs centralizados: se migrará a solución propia cuando esté lista.
 - [ ] Backup/export de datos de usuario (aliases, reglas)
 - [ ] **Email de "certificado" al verificar dominio**: Cuando un dominio pasa a verificado (DNS confirmado), enviar email estilo AWS Health Event — diseño tipo certificado/notificación con: nombre del dominio, región/fecha, estado DKIM/MX, badge de "verificado", CTA al dashboard. Inspirado en las notificaciones de AWS SES DKIM_PENDING_TO_VERIFIED. Pendiente: detectar el momento exacto de verificación (¿cron de chequeo DNS? ¿webhook SES?).
