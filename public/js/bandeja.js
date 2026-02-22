@@ -29,6 +29,7 @@ async function checkAuth() {
   if (!res.ok) return window.location.href = "/login";
   currentUser = await res.json();
   document.getElementById("user-email").textContent = currentUser.email;
+  if (currentUser.isAdmin) { const al = document.getElementById("admin-link"); if (al) al.style.display = ""; }
 
   const plan = currentUser.subscription?.plan ?? "basico";
   canDoActions = true;
