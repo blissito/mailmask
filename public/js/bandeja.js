@@ -297,7 +297,7 @@ async function sendReply() {
     btn.disabled = false;
     if (res.ok) {
       textarea.value = "";
-      if (typeof playSound === "function") playSound("whoosh");
+      playSound("whoosh");
       toast("Respuesta enviada");
       openConversation(activeConv);
     } else {
@@ -680,6 +680,31 @@ function playNotifSound() {
   osc.start();
   gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
   osc.stop(audioCtx.currentTime + 0.1);
+}
+
+function playSound(type) {
+  if (!audioCtx || audioCtx.state !== "running") return;
+  const t = audioCtx.currentTime;
+  if (type === "whoosh") {
+    const bufferSize = audioCtx.sampleRate * 0.12;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 1200;
+    filter.Q.value = 0.8;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.1, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    src.start(t);
+    src.stop(t + 0.12);
+  }
 }
 
 // --- SSE for real-time updates ---
