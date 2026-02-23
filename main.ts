@@ -88,6 +88,7 @@ import {
   listSmtpCredentials,
   revokeSmtpCredential,
   // Referrals
+  generateReferralSlug,
   setReferralSlug,
   getUserByReferralSlug,
   createReferral,
@@ -557,6 +558,7 @@ const app = new Elysia({ adapter: node() })
 
     const hash = await hashPassword(password);
     await createUser(email, hash);
+    generateReferralSlug(email);
 
     // Handle referral
     const ref = body.ref;

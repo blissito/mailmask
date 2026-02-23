@@ -235,7 +235,7 @@ function renderReferrals() {
   if (!stats) { container.innerHTML = ""; return; }
 
   const slug = stats.slug || "";
-  const link = slug ? `mailmask.lat/?ref=${esc(slug)}` : "";
+  const link = slug ? `mailmask.studio/?ref=${esc(slug)}` : "";
   const progressPct = Math.min(100, Math.round((stats.converted / 2) * 100));
 
   container.innerHTML = `

@@ -1243,6 +1243,18 @@ export function revokeSmtpCredential(domainId: string, id: string): { iamUsernam
 
 // --- Referrals ---
 
+export function generateReferralSlug(email: string): string | null {
+  const local = email.split("@")[0].toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const base = local.length < 3 ? local.padEnd(3, "0") : local.slice(0, 30);
+  if (setReferralSlug(email, base)) return base;
+  for (let i = 0; i < 10; i++) {
+    const suffix = Math.random().toString(36).slice(2, 6);
+    const candidate = `${base.slice(0, 25)}-${suffix}`;
+    if (setReferralSlug(email, candidate)) return candidate;
+  }
+  return null;
+}
+
 export function setReferralSlug(email: string, slug: string): boolean {
   if (!/^[a-z0-9-]+$/.test(slug) || slug.length < 3 || slug.length > 30) return false;
   try {
