@@ -458,7 +458,15 @@ const app = new Elysia({ adapter: node() })
     }
     return response;
   })
-  .onError(({ error }) => {
+  .onError(({ code, error }) => {
+    if (code === "NOT_FOUND") {
+      try {
+        const html = fs.readFileSync(`${PUBLIC_DIR}/404.html`);
+        return new Response(html, { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
+      } catch {
+        return new Response("Not found", { status: 404 });
+      }
+    }
     log("error", "server", "Unhandled error", { error: String(error) });
     return new Response(JSON.stringify({ error: "Error interno" }), {
       status: 500,
