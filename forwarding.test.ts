@@ -14,6 +14,7 @@ import {
   type Rule, type ForwardQueueItem,
 } from "./db.ts";
 import { hashPassword } from "./auth.ts";
+import { checkRateLimit } from "./rate-limit.ts";
 
 // --- evaluateRules tests ---
 
@@ -484,6 +485,242 @@ describe("processInbound", () => {
 
     const convsAfter = listConversations(fwdDomainId, {});
     assert.ok(convsAfter.length > countBefore, "Should create a new conversation");
+  });
+});
+
+// --- Rate limit, S3, multi-recipient, webhook rule, SNS confirmation tests ---
+
+describe("processInbound edge cases", () => {
+  const rlSuffix = `rl-${Date.now()}`;
+  const rlDomain = `${rlSuffix}.test`;
+  const rlEmail = `owner-${rlSuffix}@example.com`;
+  let rlDomainId: string;
+
+  before(async () => {
+    const hash = await hashPassword("testpass123");
+    createUser(rlEmail, hash);
+    updateUserSubscription(rlEmail, {
+      plan: "basico",
+      status: "active",
+      currentPeriodEnd: new Date(Date.now() + 365 * 86400000).toISOString(),
+    });
+    const domain = createDomain(rlEmail, rlDomain, ["dkim1"], "verify1");
+    rlDomainId = domain.id;
+    updateDomain(domain.id, { verified: true });
+    createAlias(domain.id, "info", ["dest@example.com"]);
+  });
+
+  it("rate-limited domain discards email", async () => {
+    // basico plan has 100/hr limit — burn through it
+    for (let i = 0; i < 100; i++) {
+      checkRateLimit(`fwd:${rlDomainId}`, 100, 3600_000);
+    }
+
+    const msgId = `ratelimit-test-${crypto.randomUUID()}`;
+    const result = await processInbound(makeSnsNotification({
+      from: "sender@external.com",
+      to: `info@${rlDomain}`,
+      subject: "Rate limited",
+      messageId: msgId,
+    }));
+
+    assert.equal(result.action, "processed");
+    assert.match(result.details, /discarded=1/);
+
+    // Should NOT be in forward queue (discarded, not enqueued)
+    const queue = listForwardQueue();
+    const queued = queue.find((q) => q.from === "sender@external.com" && q.domainName === rlDomain);
+    assert.equal(queued, undefined);
+  });
+
+  it("S3 fetch failure enqueues retry with S3 coords", async () => {
+    // Build notification WITHOUT content field so it tries S3 fetch (which will fail)
+    const msgId = `s3fail-${crypto.randomUUID()}`;
+    const s3Suffix = `s3-${Date.now()}`;
+    const s3Domain = `${s3Suffix}.test`;
+    const s3Email = `owner-${s3Suffix}@example.com`;
+    const hash = await hashPassword("testpass123");
+    createUser(s3Email, hash);
+    updateUserSubscription(s3Email, {
+      plan: "developer",
+      status: "active",
+      currentPeriodEnd: new Date(Date.now() + 365 * 86400000).toISOString(),
+    });
+    const domain = createDomain(s3Email, s3Domain, ["dkim1"], "verify1");
+    updateDomain(domain.id, { verified: true });
+    createAlias(domain.id, "info", ["dest@example.com"]);
+
+    const notification = {
+      Type: "Notification",
+      MessageId: msgId,
+      TopicArn: "arn:aws:sns:us-east-1:123456:test",
+      Message: JSON.stringify({
+        notificationType: "Received",
+        receipt: {
+          action: { type: "S3", bucketName: "test-bucket", objectKey: "emails/test-key" },
+          recipients: [`info@${s3Domain}`],
+          spamVerdict: { status: "PASS" },
+          virusVerdict: { status: "PASS" },
+          spfVerdict: { status: "PASS" },
+          dkimVerdict: { status: "PASS" },
+        },
+        mail: {
+          source: "sender@external.com",
+          destination: [`info@${s3Domain}`],
+          commonHeaders: {
+            from: ["sender@external.com"],
+            to: [`info@${s3Domain}`],
+            subject: "S3 fail test",
+          },
+          messageId: msgId,
+        },
+        // NO content field — forces S3 fetch which will fail
+      }),
+    };
+
+    const result = await processInbound(notification as any);
+    assert.equal(result.action, "processed");
+
+    // Should have enqueued with s3 coords
+    const queue = listForwardQueue();
+    const queued = queue.find((q) => q.domainName === s3Domain && q.to === "dest@example.com");
+    assert.ok(queued, "Should enqueue for S3 retry");
+    assert.equal(queued!.s3Bucket, "test-bucket");
+    assert.equal(queued!.s3Key, "emails/test-key");
+    assert.equal(queued!.rawContent, "");
+
+    if (queued) dequeueForward(queued.id);
+  });
+
+  it("multiple recipients processed", async () => {
+    const mrSuffix = `mr-${Date.now()}`;
+    const mrDomain = `${mrSuffix}.test`;
+    const mrEmail = `owner-${mrSuffix}@example.com`;
+    const hash = await hashPassword("testpass123");
+    createUser(mrEmail, hash);
+    updateUserSubscription(mrEmail, {
+      plan: "developer",
+      status: "active",
+      currentPeriodEnd: new Date(Date.now() + 365 * 86400000).toISOString(),
+    });
+    const domain = createDomain(mrEmail, mrDomain, ["dkim1"], "verify1");
+    updateDomain(domain.id, { verified: true });
+    createAlias(domain.id, "info", ["dest1@example.com"]);
+    createAlias(domain.id, "*", ["catchall@example.com"]);
+
+    const msgId = `multi-rcpt-${crypto.randomUUID()}`;
+    const raw = [
+      `From: sender@external.com`,
+      `To: info@${mrDomain}, random@${mrDomain}`,
+      `Subject: Multi recipient test`,
+      `Message-ID: <${msgId}@test.com>`,
+      `Content-Type: text/plain; charset=UTF-8`,
+      ``,
+      `Test body`,
+    ].join("\r\n");
+
+    const notification = {
+      Type: "Notification",
+      MessageId: msgId,
+      TopicArn: "arn:aws:sns:us-east-1:123456:test",
+      Message: JSON.stringify({
+        notificationType: "Received",
+        receipt: {
+          action: { type: "S3", bucketName: "test-bucket", objectKey: "test-key" },
+          recipients: [`info@${mrDomain}`, `random@${mrDomain}`],
+          spamVerdict: { status: "PASS" },
+          virusVerdict: { status: "PASS" },
+          spfVerdict: { status: "PASS" },
+          dkimVerdict: { status: "PASS" },
+        },
+        mail: {
+          source: "sender@external.com",
+          destination: [`info@${mrDomain}`, `random@${mrDomain}`],
+          commonHeaders: {
+            from: ["sender@external.com"],
+            to: [`info@${mrDomain}`, `random@${mrDomain}`],
+            subject: "Multi recipient test",
+          },
+          messageId: msgId,
+        },
+        content: raw,
+      }),
+    };
+
+    const result = await processInbound(notification as any);
+    assert.equal(result.action, "processed");
+    // info@ -> dest1, random@ -> catchall -> both forwarded
+    assert.match(result.details, /forwarded=2/);
+
+    // Cleanup queue
+    const queue = listForwardQueue();
+    queue.filter((q) => q.domainName === mrDomain).forEach((q) => dequeueForward(q.id));
+  });
+
+  it("webhook rule action fires and logs", async () => {
+    const whSuffix = `wh-${Date.now()}`;
+    const whDomain = `${whSuffix}.test`;
+    const whEmail = `owner-${whSuffix}@example.com`;
+    const hash = await hashPassword("testpass123");
+    createUser(whEmail, hash);
+    updateUserSubscription(whEmail, {
+      plan: "developer",
+      status: "active",
+      currentPeriodEnd: new Date(Date.now() + 365 * 86400000).toISOString(),
+    });
+    const domain = createDomain(whEmail, whDomain, ["dkim1"], "verify1");
+    updateDomain(domain.id, { verified: true });
+    createAlias(domain.id, "info", ["dest@example.com"]);
+
+    const webhookUrl = "http://localhost:9999/hook";
+    createRule(domain.id, {
+      field: "from", match: "contains", value: "webhook-trigger",
+      action: "webhook", target: webhookUrl, priority: 0, enabled: true,
+    });
+
+    const msgId = `webhook-rule-${crypto.randomUUID()}`;
+    const result = await processInbound(makeSnsNotification({
+      from: "webhook-trigger@test.com",
+      to: `info@${whDomain}`,
+      subject: "Webhook test",
+      messageId: msgId,
+    }));
+
+    assert.equal(result.action, "processed");
+
+    // Check logs for rule_matched entry
+    const logs = listLogs(domain.id, 10);
+    const webhookLog = logs.find((l) => l.status === "rule_matched" && l.forwardedTo === webhookUrl);
+    assert.ok(webhookLog, "Should log rule_matched with webhook URL");
+  });
+
+  it("SNS SubscriptionConfirmation branch", async () => {
+    // Mock fetch to capture the SubscribeURL call
+    const originalFetch = globalThis.fetch;
+    let subscribeCalled = false;
+    globalThis.fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === "http://localhost:9999/confirm") {
+        subscribeCalled = true;
+        return new Response("OK");
+      }
+      return originalFetch(input, init);
+    };
+
+    try {
+      const result = await processInbound({
+        Type: "SubscriptionConfirmation",
+        SubscribeURL: "http://localhost:9999/confirm",
+        MessageId: "sub-confirm-test",
+        TopicArn: "arn:aws:sns:us-east-1:123456:test",
+        Message: "",
+      } as any);
+
+      assert.equal(result.action, "subscribed");
+      assert.ok(subscribeCalled, "Should have called SubscribeURL");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 

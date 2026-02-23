@@ -5,8 +5,8 @@ MailMask — email alias/forwarding service. Elysia monolith with SQLite, AWS SE
 
 ## Commands
 ```bash
-deno task dev     # Run dev server on :8000
-deno task test    # Run tests
+npm run dev       # Run dev server on :8000 (tsx --watch)
+npm test          # Run tests (tsx --test)
 ```
 
 ## Architecture
@@ -71,7 +71,7 @@ deno task test    # Run tests
 - [x] ~~Email de confirmación de pago para usuarios autenticados~~: ya implementado.
 
 ### Medio — primer mes
-- [ ] Tests: cubrir forwarding y webhook billing. (no urgente por ahora)
+- [x] ~~Tests: cubrir forwarding y webhook billing~~: edge cases cubiertos — rate limiting, S3 failure retry, multi-recipient, webhook rules, SNS confirmation, renewal extension, plan from `reason` fallback.
 - [ ] **SSE en Bandeja**: Implementar Server-Sent Events para actualizar la bandeja en tiempo real cuando llegan nuevos emails. Evitar que el usuario tenga que navegar/refrescar para ver mensajes nuevos.
 - [ ] **Upgrade/downgrade de plan**: MP PreApproval no soporta mutación. Implementar flujo de cancelar suscripción actual + crear nueva con plan diferente. Considerar: prorrateo del período actual, transición sin interrupción de servicio, UX de selección de plan desde dashboard.
 - [ ] Logs centralizados: se migrará a solución propia cuando esté lista.

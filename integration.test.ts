@@ -613,4 +613,92 @@ describe("Webhook", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("renewal extends subscription period (not resets)", async () => {
+    const email = `webhook-renew-${suffix}@example.com`;
+    const hash = await hashPassword("testpass123");
+    createUser(email, hash);
+
+    const subId = `sub-renew-${crypto.randomUUID()}`;
+    const originalEnd = new Date(Date.now() + 15 * 86400000); // 15 days from now
+    updateUserSubscription(email, {
+      plan: "freelancer",
+      status: "active",
+      mpSubscriptionId: subId,
+      currentPeriodEnd: originalEnd.toISOString(),
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, _init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("api.mercadopago.com/preapproval/")) {
+        return new Response(JSON.stringify({
+          payer_email: email,
+          external_reference: email,
+          status: "authorized",
+          auto_recurring: { transaction_amount: 449, frequency: 1 },
+        }));
+      }
+      return originalFetch(input, _init);
+    };
+
+    try {
+      const res = await postWebhook(
+        { type: "subscription_preapproval", data: { id: subId } },
+        subId,
+      );
+      assert.equal(res.status, 200);
+      await res.body?.cancel();
+
+      const user = getUser(email);
+      assert.equal(user?.subscription?.status, "active");
+      assert.equal(user?.subscription?.plan, "freelancer");
+      // Period should be extended from the original end, not from now
+      const newEnd = new Date(user!.subscription!.currentPeriodEnd!);
+      assert.ok(newEnd > originalEnd, `Expected ${newEnd.toISOString()} > ${originalEnd.toISOString()}`);
+      // Should be ~35 days from original end (monthly buffer)
+      const diffDays = (newEnd.getTime() - originalEnd.getTime()) / 86400000;
+      assert.ok(diffDays >= 34 && diffDays <= 36, `Expected ~35 days extension, got ${diffDays}`);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("plan determined from sub.reason fallback (coupon with non-standard amount)", async () => {
+    const email = `webhook-reason-${suffix}@example.com`;
+    const hash = await hashPassword("testpass123");
+    createUser(email, hash);
+
+    const subId = `sub-reason-${crypto.randomUUID()}`;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, _init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("api.mercadopago.com/preapproval/")) {
+        return new Response(JSON.stringify({
+          payer_email: email,
+          external_reference: email,
+          status: "authorized",
+          reason: "MailMask — Plan Developer (Mensual) — 50% OFF",
+          auto_recurring: { transaction_amount: 1, frequency: 1 }, // non-standard coupon amount
+        }));
+      }
+      return originalFetch(input, _init);
+    };
+
+    try {
+      const res = await postWebhook(
+        { type: "subscription_preapproval", data: { id: subId } },
+        subId,
+      );
+      assert.equal(res.status, 200);
+      await res.body?.cancel();
+
+      const user = getUser(email);
+      assert.equal(user?.subscription?.plan, "developer");
+      assert.equal(user?.subscription?.status, "active");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
