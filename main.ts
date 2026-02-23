@@ -1695,9 +1695,18 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
 
-    const { plan = "basico", billing = "monthly", coupon } = await request
+    const { plan = "basico", billing = "monthly", coupon, email: rawEmail } = await request
       .json()
-      .catch(() => ({ plan: "basico", billing: "monthly", coupon: undefined }));
+      .catch(() => ({ plan: "basico", billing: "monthly", coupon: undefined, email: undefined }));
+
+    const payerEmail = typeof rawEmail === "string" ? rawEmail.toLowerCase().trim() : "";
+    if (!payerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail)) {
+      return new Response(JSON.stringify({ error: "Ingresa tu email para continuar" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
     const planKey = plan as keyof typeof PLANS;
     if (!PLANS[planKey]) {
       return new Response(JSON.stringify({ error: "Plan inválido" }), {
@@ -1750,7 +1759,7 @@ const app = new Elysia({ adapter: node() })
             },
           }),
         },
-        payer_email: "guest@mailmask.studio",
+        payer_email: payerEmail,
         back_url: backUrl,
         external_reference: token,
       };
@@ -1835,12 +1844,12 @@ const app = new Elysia({ adapter: node() })
           currency_id: "MXN",
           ...(isYearly ? {} : {
             free_trial: {
-              frequency: 1,
+              frequency: getUserReferredBy(user.email) ? 2 : 1,
               frequency_type: "months",
             },
           }),
         },
-        payer_email: "guest@mailmask.studio",
+        payer_email: user.email,
         back_url: backUrl,
         external_reference: user.email,
       };

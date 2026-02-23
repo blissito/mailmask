@@ -80,7 +80,51 @@ function toggleBilling() {
   applyCouponToCard();
 }
 
+function showEmailModal(plan, billing, btn) {
+  const modal = document.getElementById("email-modal");
+  const input = document.getElementById("email-modal-input");
+  const error = document.getElementById("email-modal-error");
+  const form = document.getElementById("email-modal-form");
+  input.value = "";
+  error.textContent = "";
+  modal.dataset.plan = plan;
+  modal.dataset.billing = billing;
+  modal._btn = btn;
+  modal.classList.remove("hidden");
+  setTimeout(() => input.focus(), 100);
+}
+
+function hideEmailModal() {
+  document.getElementById("email-modal").classList.add("hidden");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("email-modal-close")?.addEventListener("click", hideEmailModal);
+  document.getElementById("email-modal")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) hideEmailModal();
+  });
+  document.getElementById("email-modal-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const modal = document.getElementById("email-modal");
+    const input = document.getElementById("email-modal-input");
+    const error = document.getElementById("email-modal-error");
+    const email = input.value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      error.textContent = "Ingresa un email válido";
+      return;
+    }
+    error.textContent = "";
+    const btn = modal._btn;
+    hideEmailModal();
+    await doCheckout(modal.dataset.plan, modal.dataset.billing, btn, email);
+  });
+});
+
 async function startCheckout(plan, billing, btn) {
+  showEmailModal(plan, billing, btn);
+}
+
+async function doCheckout(plan, billing, btn, email) {
   btn.disabled = true;
   btn.textContent = "Redirigiendo...";
   try {
@@ -88,7 +132,7 @@ async function startCheckout(plan, billing, btn) {
     const res = await fetch("/api/billing/guest-checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ plan, billing: (loadedCoupon && plan === loadedCoupon.plan) ? "monthly" : billing, coupon }),
+      body: JSON.stringify({ plan, billing: (loadedCoupon && plan === loadedCoupon.plan) ? "monthly" : billing, coupon, email }),
     });
     const data = await res.json();
     if (data.init_point) {
