@@ -28,10 +28,31 @@
       <p class="text-zinc-400 text-sm mt-1">Empieza a usar tu dominio en 2 minutos</p>
     </div>
 
-    <div id="referral-card" class="hidden mb-6 bg-gradient-to-br from-mask-600/10 to-yellow-500/10 border border-mask-600/30 rounded-xl p-4 text-center">
-      <span class="text-yellow-400 text-lg">&#x1f381;</span>
-      <p class="text-sm font-semibold text-zinc-100 mt-1">Te invitaron a MailMask</p>
-      <p class="text-xs text-zinc-400 mt-1">Al crear tu cuenta, ambos reciben <span class="text-mask-400 font-medium">1 mes gratis</span> cuando actives un plan de pago.</p>
+    <div id="referral-card" class="hidden mb-8 relative overflow-hidden rounded-2xl border border-yellow-500/30 bg-gradient-to-br from-yellow-500/10 via-mask-600/10 to-purple-500/10 p-6">
+      <div class="absolute -top-6 -right-6 text-7xl opacity-10 rotate-12 select-none">&#x1f381;</div>
+      <div class="flex items-start gap-4">
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-500/20 to-yellow-600/20 border border-yellow-500/30 flex items-center justify-center text-2xl">&#x1f381;</div>
+        <div class="flex-1 min-w-0">
+          <p class="text-base font-bold text-zinc-50"><span id="referral-inviter" class="text-yellow-400"></span> te invitó a MailMask</p>
+          <p class="text-sm text-zinc-400 mt-1">Regístrate con esta invitación y obtén:</p>
+        </div>
+      </div>
+      <div class="mt-4 space-y-2.5">
+        <div class="flex items-center gap-3 bg-white/[0.03] rounded-lg px-3.5 py-2.5">
+          <span class="text-lg">&#x1f389;</span>
+          <div>
+            <p class="text-sm font-semibold text-zinc-100">Tu primer mes es gratis</p>
+            <p class="text-xs text-zinc-500">Activa cualquier plan y no pagas el primer mes</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 bg-white/[0.03] rounded-lg px-3.5 py-2.5">
+          <span class="text-lg">&#x1f91d;</span>
+          <div>
+            <p class="text-sm font-semibold text-zinc-100">Quien te invitó recibe 50% de descuento</p>
+            <p class="text-xs text-zinc-500">Tu registro le da un crédito de 50% en su próximo mes</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <form id="register-form" class="space-y-4">

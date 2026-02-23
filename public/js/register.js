@@ -7,9 +7,11 @@ fetch("/api/auth/me").then(r => {
 
 const _refParam = new URLSearchParams(location.search).get("ref");
 if (_refParam) localStorage.setItem("mailmask_ref", _refParam);
-const _hasRef = localStorage.getItem("mailmask_ref") || _refParam;
+const _hasRef = _refParam || localStorage.getItem("mailmask_ref");
 if (_hasRef) {
   document.getElementById("referral-card")?.classList.remove("hidden");
+  const inviterEl = document.getElementById("referral-inviter");
+  if (inviterEl) inviterEl.textContent = _hasRef;
 }
 
 document.getElementById("register-form").addEventListener("submit", async (e) => {
