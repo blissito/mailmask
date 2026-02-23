@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cómo evitar que tus emails caigan en spam — MailMask</title>
+    <meta name="description" content="Guía práctica para mejorar la entregabilidad de tus emails. Configura SPF, DKIM y DMARC correctamente." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/evitar-emails-caigan-en-spam" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="Cómo evitar que tus emails caigan en spam" />
+    <meta property="og:description" content="Guía práctica para mejorar la entregabilidad de tus emails. Configura SPF, DKIM y DMARC correctamente." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/evitar-emails-caigan-en-spam" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="article:published_time" content="2026-02-23" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Cómo evitar que tus emails caigan en spam" />
+    <meta name="twitter:description" content="Guía práctica para mejorar la entregabilidad de tus emails. Configura SPF, DKIM y DMARC correctamente." />
+    <script src="/js/analytics.js"></script>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Cómo evitar que tus emails caigan en spam",
+      "description": "Guía práctica para mejorar la entregabilidad de tus emails. Configura SPF, DKIM y DMARC correctamente.",
+      "datePublished": "2026-02-23",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/favicon.svg" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/evitar-emails-caigan-en-spam"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Cómo evitar que tus emails caigan en spam", "item": "https://www.mailmask.studio/blog/evitar-emails-caigan-en-spam" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "Cómo evitar que tus emails caigan en spam",
+      "description": "Pasos prácticos para configurar autenticación de email y mejorar la entregabilidad.",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Configurar SPF",
+          "text": "Agrega un registro TXT en tu DNS que autorice a los servidores que envían email en nombre de tu dominio."
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Configurar DKIM",
+          "text": "Agrega los registros CNAME de DKIM para firmar criptográficamente tus emails salientes."
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Configurar DMARC",
+          "text": "Publica una política DMARC que indique a los servidores receptores cómo manejar emails no autenticados."
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Cuidar la reputación del dominio",
+          "text": "Evita enviar contenido tipo spam, mantén listas limpias y monitorea tasas de rebote."
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
+      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Cómo evitar que tus emails caigan en spam</h1>
+        <div class="meta">
+          <span>📅 23 Feb 2026</span>
+          <span>⏱ 6 min de lectura</span>
+        </div>
+      </header>
+
+      <div class="blog-content">
+        <p>Enviaste un email importante — una cotización, una confirmación de pedido, un mensaje a un cliente — y nunca llegó. O peor: llegó directo a la carpeta de spam. Es frustrante, pero tiene solución. En esta guía te explico <strong>por qué pasa</strong> y <strong>qué puedes hacer hoy</strong> para que tus emails lleguen al inbox.</p>
+
+        <h2>¿Por qué los emails caen en spam?</h2>
+
+        <p>Los proveedores de correo (Gmail, Outlook, Yahoo) usan filtros cada vez más agresivos para proteger a sus usuarios. Estos filtros evalúan cada email entrante con base en varios factores:</p>
+
+        <ul>
+          <li><strong>Autenticación del remitente:</strong> ¿El servidor que envió el email está autorizado para hacerlo? Aquí entran SPF, DKIM y DMARC.</li>
+          <li><strong>Reputación del dominio:</strong> ¿Tu dominio tiene historial de enviar spam? ¿Es nuevo sin reputación?</li>
+          <li><strong>Contenido del mensaje:</strong> ¿Tiene palabras típicas de spam? ¿Muchos links? ¿Imágenes sin texto?</li>
+          <li><strong>Comportamiento del destinatario:</strong> ¿Los usuarios anteriores marcaron tus emails como spam?</li>
+        </ul>
+
+        <p>Si fallas en cualquiera de estos puntos, tu email puede terminar en la carpeta equivocada. Pero el factor más importante — y el que más se ignora — es la <strong>autenticación</strong>.</p>
+
+        <h2>Los tres pilares de la autenticación: SPF, DKIM y DMARC</h2>
+
+        <p>Si no estás familiarizado con estos protocolos, tenemos una <a href="/blog/que-son-dkim-spf-dmarc">guía completa para no-técnicos</a>. Aquí va el resumen práctico:</p>
+
+        <h3>SPF (Sender Policy Framework)</h3>
+
+        <p>SPF le dice al mundo qué servidores tienen permiso de enviar email usando tu dominio. Se configura como un registro TXT en tu DNS:</p>
+
+        <pre><code>v=spf1 include:amazonses.com ~all</code></pre>
+
+        <p>Sin SPF, cualquier servidor puede enviar emails "desde" tu dominio, y los filtros desconfían. Con SPF, los servidores receptores verifican que el email viene de un servidor autorizado.</p>
+
+        <h3>DKIM (DomainKeys Identified Mail)</h3>
+
+        <p>DKIM agrega una firma criptográfica a cada email saliente. El servidor receptor usa una clave pública (publicada en tu DNS) para verificar que el email no fue alterado en tránsito y realmente viene de tu dominio.</p>
+
+        <p>Se configura con registros CNAME que apuntan a las claves de tu proveedor de email. Son 3 registros típicamente.</p>
+
+        <h3>DMARC (Domain-based Message Authentication)</h3>
+
+        <p>DMARC une SPF y DKIM con una política. Le dice a los servidores receptores: "Si un email dice venir de mi dominio pero no pasa SPF ni DKIM, haz esto." Las opciones son:</p>
+
+        <ul>
+          <li><code>p=none</code> — No hagas nada (solo monitoreo)</li>
+          <li><code>p=quarantine</code> — Mándalo a spam</li>
+          <li><code>p=reject</code> — Recházalo</li>
+        </ul>
+
+        <pre><code>v=DMARC1; p=quarantine; rua=mailto:dmarc@tudominio.com</code></pre>
+
+        <p>Empezar con <code>p=none</code> es buena idea para monitorear antes de aplicar políticas estrictas.</p>
+
+        <h2>Factores de reputación que afectan la entregabilidad</h2>
+
+        <p>Más allá de la autenticación, hay factores de reputación que los filtros consideran:</p>
+
+        <ul>
+          <li><strong>Dominio nuevo:</strong> Los dominios recién registrados tienen reputación neutra o baja. Envía volumen bajo las primeras semanas y ve incrementando gradualmente.</li>
+          <li><strong>Tasa de rebote:</strong> Si muchos de tus emails rebotan (direcciones inválidas), los proveedores asumen que no mantienes tu lista limpia.</li>
+          <li><strong>Reportes de spam:</strong> Si los destinatarios marcan tus emails como spam, tu reputación cae rápido. Mantén tasas de queja por debajo del 0.1%.</li>
+          <li><strong>Consistencia de volumen:</strong> Pasar de enviar 10 emails al día a 10,000 de golpe levanta banderas rojas.</li>
+          <li><strong>Contenido:</strong> Evita texto en mayúsculas, exceso de signos de exclamación, y frases como "GRATIS" o "COMPRA AHORA". Mantén un balance entre texto e imágenes.</li>
+        </ul>
+
+        <h2>Pasos prácticos para mejorar tu entregabilidad</h2>
+
+        <ol>
+          <li><strong>Configura SPF, DKIM y DMARC.</strong> Es el paso más importante. Sin autenticación, todo lo demás es cosmético.</li>
+          <li><strong>Usa un dominio dedicado para email transaccional.</strong> Si envías newsletters y emails transaccionales, considera separarlos en subdominios diferentes.</li>
+          <li><strong>Mantén tus listas limpias.</strong> Elimina direcciones que rebotan. No compres listas de emails.</li>
+          <li><strong>Incluye un link de desuscripción.</strong> Gmail ahora lo exige para remitentes que envían más de 5,000 emails al día.</li>
+          <li><strong>Monitorea tus métricas.</strong> Revisa tasas de apertura, rebote y quejas de spam regularmente.</li>
+          <li><strong>Envía contenido relevante.</strong> La mejor defensa contra el spam es que la gente quiera recibir tus emails.</li>
+        </ol>
+
+        <h2>Cómo MailMask resuelve la autenticación por ti</h2>
+
+        <p>Si usas MailMask para manejar el email de tu dominio, la autenticación viene incluida. Al agregar tu dominio en el dashboard:</p>
+
+        <ul>
+          <li>MailMask genera automáticamente las claves <strong>DKIM</strong> y te muestra los registros CNAME exactos que debes agregar.</li>
+          <li>El registro <strong>SPF</strong> se configura al apuntar tus registros MX a MailMask.</li>
+          <li>Te indicamos cómo configurar <strong>DMARC</strong> con la política adecuada para tu caso.</li>
+        </ul>
+
+        <p>No necesitas entender la criptografía detrás de DKIM ni memorizar la sintaxis de SPF. MailMask te da las instrucciones exactas para copiar y pegar en tu panel de DNS. Todo el proceso toma menos de 5 minutos.</p>
+
+        <p>Con los planes <a href="/pricing">Freelancer y Developer</a>, además del reenvío, puedes <strong>enviar emails autenticados</strong> desde tu dominio — firmados con DKIM y verificados por SPF — directamente desde la bandeja integrada o vía SMTP relay.</p>
+
+        <h2>Resumen</h2>
+
+        <p>La entregabilidad no es magia. Es configuración correcta + buenas prácticas. Si tus emails caen en spam, lo más probable es que te falte autenticación. Configura SPF, DKIM y DMARC, cuida tu reputación, y tus emails llegarán al inbox.</p>
+
+        <p>¿Quieres empezar con buen pie? <a href="/register">Crea tu cuenta en MailMask</a> y deja que la autenticación se configure sola.</p>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Deja de caer en spam</h2>
+      <p>MailMask configura DKIM y SPF automáticamente. Email profesional desde $49 MXN/mes.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-zinc-800 py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">
+        © 2026 by fixter.org
+      </p>
+    </footer>
+  </body>
+</html>

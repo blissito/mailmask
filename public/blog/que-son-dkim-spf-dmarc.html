@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>¿Qué son DKIM, SPF y DMARC? Guía para no-técnicos — MailMask</title>
+    <meta name="description" content="Explicación simple de DKIM, SPF y DMARC: qué son, por qué importan y cómo configurarlos sin ser experto." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/que-son-dkim-spf-dmarc" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="¿Qué son DKIM, SPF y DMARC? Guía para no-técnicos" />
+    <meta property="og:description" content="Explicación simple de DKIM, SPF y DMARC: qué son, por qué importan y cómo configurarlos sin ser experto." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/que-son-dkim-spf-dmarc" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="article:published_time" content="2026-02-23" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="¿Qué son DKIM, SPF y DMARC? Guía para no-técnicos" />
+    <meta name="twitter:description" content="Explicación simple de DKIM, SPF y DMARC: qué son, por qué importan y cómo configurarlos sin ser experto." />
+    <script src="/js/analytics.js"></script>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "¿Qué son DKIM, SPF y DMARC? Guía para no-técnicos",
+      "description": "Explicación simple de DKIM, SPF y DMARC: qué son, por qué importan y cómo configurarlos sin ser experto.",
+      "datePublished": "2026-02-23",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/favicon.svg" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/que-son-dkim-spf-dmarc"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "¿Qué son DKIM, SPF y DMARC?", "item": "https://www.mailmask.studio/blog/que-son-dkim-spf-dmarc" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Qué es SPF y para qué sirve?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "SPF (Sender Policy Framework) es un registro DNS que indica qué servidores tienen permiso de enviar email en nombre de tu dominio. Ayuda a prevenir que terceros envíen emails falsos usando tu dirección."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué es DKIM y cómo funciona?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "DKIM (DomainKeys Identified Mail) firma cada email saliente con una clave criptográfica. El servidor receptor verifica la firma usando una clave pública en tu DNS, confirmando que el email es auténtico y no fue modificado."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué es DMARC y por qué lo necesito?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "DMARC (Domain-based Message Authentication, Reporting and Conformance) es una política que le dice a los servidores receptores qué hacer con emails que no pasan SPF o DKIM. Puede ser none (monitorear), quarantine (mandar a spam) o reject (rechazar)."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Necesito configurar SPF, DKIM y DMARC manualmente?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Depende de tu proveedor de email. Con servicios como MailMask, DKIM y SPF se configuran automáticamente al agregar tu dominio. Solo necesitas copiar los registros DNS que te proporcionan."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué pasa si no configuro SPF, DKIM ni DMARC?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Tus emails tienen alta probabilidad de caer en spam. Además, cualquier persona podría enviar emails falsos pretendiendo ser tu dominio (spoofing), lo que dañaría tu reputación."
+          }
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
+      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>¿Qué son DKIM, SPF y DMARC? Guía para no-técnicos</h1>
+        <div class="meta">
+          <span>📅 23 Feb 2026</span>
+          <span>⏱ 7 min de lectura</span>
+        </div>
+      </header>
+
+      <div class="blog-content">
+        <p>Si alguna vez configuraste email con dominio propio, probablemente te topaste con estas siglas: SPF, DKIM, DMARC. Suenan intimidantes, pero el concepto detrás de cada una es simple. En esta guía te explico qué hace cada protocolo, por qué importa y cómo configurarlos — sin necesidad de ser ingeniero.</p>
+
+        <h2>El problema que resuelven</h2>
+
+        <p>El email se inventó en los 70s, cuando internet era un grupo pequeño de universidades que se confiaban mutuamente. No se diseñó con seguridad en mente. El resultado: <strong>cualquiera puede enviar un email diciendo ser cualquier persona</strong>.</p>
+
+        <p>Imagina que pudieras enviar una carta por correo postal con el remitente que quisieras — sin verificación. Eso es exactamente lo que pasa con el email sin autenticación. SPF, DKIM y DMARC son los protocolos que se crearon para cerrar esa brecha.</p>
+
+        <h2>SPF: la lista de invitados</h2>
+
+        <h3>¿Qué es?</h3>
+
+        <p><strong>SPF</strong> (Sender Policy Framework) es un registro en tu DNS que dice: "Estos son los servidores autorizados para enviar email en nombre de mi dominio." Piensa en él como la lista de invitados de una fiesta — si tu nombre no está en la lista, no entras.</p>
+
+        <h3>¿Cómo se ve?</h3>
+
+        <p>Es un registro TXT en tu DNS con un formato específico:</p>
+
+        <pre><code>v=spf1 include:amazonses.com -all</code></pre>
+
+        <p>Esto dice: "Solo Amazon SES puede enviar email por mí. Rechaza todo lo demás." El <code>include</code> autoriza un servicio. El <code>-all</code> al final rechaza todo lo que no esté listado (también puedes usar <code>~all</code> para un rechazo suave).</p>
+
+        <h3>¿Qué pasa sin SPF?</h3>
+
+        <p>Sin SPF, un spammer puede enviar emails "desde" <code>tu@tudominio.com</code> usando cualquier servidor del mundo. Los filtros de Gmail y Outlook no tienen forma de saber si el email es legítimo o falso, así que probablemente lo manden a spam.</p>
+
+        <h2>DKIM: la firma digital</h2>
+
+        <h3>¿Qué es?</h3>
+
+        <p><strong>DKIM</strong> (DomainKeys Identified Mail) funciona como una firma manuscrita, pero digital. Cada email que envías lleva una firma criptográfica invisible. El servidor que recibe el email verifica esa firma con una clave pública que tú publicas en tu DNS.</p>
+
+        <h3>La analogía</h3>
+
+        <p>Piensa en un documento notariado. El notario (tu servidor de email) pone un sello único en el documento (tu email). Cuando alguien lo recibe, puede verificar el sello con el registro del notario (tu DNS). Si el sello coincide, saben que:</p>
+
+        <ul>
+          <li>El documento realmente viene de quien dice ser.</li>
+          <li>Nadie lo alteró después de sellarlo.</li>
+        </ul>
+
+        <h3>¿Cómo se configura?</h3>
+
+        <p>Tu proveedor de email genera un par de claves (pública y privada). Tú publicas la clave pública en tu DNS como registros CNAME. Generalmente son 3 registros que se ven así:</p>
+
+        <pre><code>abcdef._domainkey.tudominio.com → dkim1.proveedor.com
+ghijkl._domainkey.tudominio.com → dkim2.proveedor.com
+mnopqr._domainkey.tudominio.com → dkim3.proveedor.com</code></pre>
+
+        <p>La clave privada se queda en el servidor y firma cada email automáticamente. Nunca la ves ni la tocas.</p>
+
+        <h2>DMARC: el árbitro</h2>
+
+        <h3>¿Qué es?</h3>
+
+        <p><strong>DMARC</strong> (Domain-based Message Authentication, Reporting and Conformance) es la política que une SPF y DKIM. Le dice a los servidores receptores: "Si un email de mi dominio no pasa SPF <em>o</em> DKIM, haz esto con él."</p>
+
+        <h3>Las tres políticas</h3>
+
+        <ul>
+          <li><code>p=none</code> — Solo monitorea. No hagas nada con los emails que fallen. Útil para empezar y ver qué está pasando.</li>
+          <li><code>p=quarantine</code> — Manda a spam los emails que fallen. La opción recomendada una vez que confirmas que tu configuración está bien.</li>
+          <li><code>p=reject</code> — Rechaza completamente los emails que fallen. La opción más estricta.</li>
+        </ul>
+
+        <h3>¿Cómo se ve?</h3>
+
+        <pre><code>v=DMARC1; p=quarantine; rua=mailto:dmarc@tudominio.com</code></pre>
+
+        <p>El campo <code>rua</code> es opcional pero útil — te envía reportes periódicos sobre quién está intentando enviar email desde tu dominio.</p>
+
+        <h3>Consejo práctico</h3>
+
+        <p>Empieza con <code>p=none</code> durante una o dos semanas. Revisa los reportes para asegurarte de que tus emails legítimos pasan SPF y DKIM. Luego sube a <code>p=quarantine</code>. Solo usa <code>p=reject</code> si estás seguro de que toda tu infraestructura de email está correctamente autenticada.</p>
+
+        <h2>Errores comunes</h2>
+
+        <ul>
+          <li><strong>"Solo necesito uno de los tres."</strong> No. SPF, DKIM y DMARC se complementan. SPF sin DKIM deja huecos. DKIM sin SPF también. DMARC sin los otros dos no tiene qué evaluar.</li>
+          <li><strong>"Ya lo configuré hace años y no lo he tocado."</strong> Si cambiaste de proveedor de email o agregaste uno nuevo (como un servicio de newsletters), tu SPF y DKIM necesitan actualizarse.</li>
+          <li><strong>"Mi proveedor se encarga de todo."</strong> Algunos proveedores configuran DKIM automáticamente, pero SPF y DMARC casi siempre requieren que tú agregues registros en tu DNS.</li>
+          <li><strong>"DMARC en reject desde el día uno."</strong> Mala idea. Si algo está mal configurado, tus propios emails serán rechazados. Empieza con <code>none</code>, luego <code>quarantine</code>, luego <code>reject</code>.</li>
+        </ul>
+
+        <h2>¿Cómo verificar tu configuración actual?</h2>
+
+        <p>Puedes comprobar rápidamente si tu dominio tiene SPF, DKIM y DMARC configurados:</p>
+
+        <ol>
+          <li><strong>SPF:</strong> Busca un registro TXT que empiece con <code>v=spf1</code> en tu DNS.</li>
+          <li><strong>DKIM:</strong> Busca registros CNAME con <code>_domainkey</code> en el nombre.</li>
+          <li><strong>DMARC:</strong> Busca un registro TXT en <code>_dmarc.tudominio.com</code> que empiece con <code>v=DMARC1</code>.</li>
+        </ol>
+
+        <p>También puedes enviarte un email a ti mismo y revisar las cabeceras. En Gmail, abre el email, haz clic en los tres puntos y selecciona "Mostrar original". Busca las líneas de SPF, DKIM y DMARC — cada una debería decir <code>PASS</code>.</p>
+
+        <h2>MailMask lo configura por ti</h2>
+
+        <p>Si la idea de editar registros DNS te parece complicada, MailMask simplifica el proceso. Cuando agregas un dominio en el dashboard:</p>
+
+        <ul>
+          <li>Se generan automáticamente las <strong>claves DKIM</strong> para tu dominio.</li>
+          <li>El dashboard te muestra los <strong>registros DNS exactos</strong> que necesitas agregar — con un botón de copiar para cada uno.</li>
+          <li>MailMask verifica automáticamente que los registros estén correctos y te avisa cuando todo está listo.</li>
+        </ul>
+
+        <p>No necesitas entender criptografía asimétrica ni la sintaxis de los registros TXT. Solo copias, pegas y MailMask se encarga del resto. Si tu dominio necesita enviar emails (no solo recibir), los planes <a href="/pricing">Freelancer y Developer</a> incluyen envío autenticado con DKIM+SPF ya configurado.</p>
+
+        <p>¿Quieres saber más sobre entregabilidad? Lee nuestra guía sobre <a href="/blog/evitar-emails-caigan-en-spam">cómo evitar que tus emails caigan en spam</a>.</p>
+
+        <h2>Resumen rápido</h2>
+
+        <ul>
+          <li><strong>SPF</strong> = lista de servidores autorizados para enviar por tu dominio.</li>
+          <li><strong>DKIM</strong> = firma digital que prueba autenticidad e integridad.</li>
+          <li><strong>DMARC</strong> = política que decide qué hacer con emails que fallan SPF/DKIM.</li>
+          <li><strong>Los tres juntos</strong> = emails que llegan al inbox, no al spam.</li>
+        </ul>
+
+        <p>Configurarlos es la inversión de 5 minutos más rentable que puedes hacer por tu email profesional. <a href="/register">Empieza con MailMask</a> y deja que la autenticación se configure sola.</p>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Email autenticado sin complicaciones</h2>
+      <p>MailMask configura DKIM y SPF automáticamente para tu dominio. Desde $49 MXN/mes.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-zinc-800 py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">
+        © 2026 by fixter.org
+      </p>
+    </footer>
+  </body>
+</html>

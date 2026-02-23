@@ -169,7 +169,12 @@ async function serveStatic(path: string): Promise<Response> {
       headers: { "content-type": types[ext] ?? "application/octet-stream" },
     });
   } catch {
-    return new Response("Not found", { status: 404 });
+    try {
+      const notFoundPage = Bun.file("public/404.html");
+      return new Response(notFoundPage, { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
+    } catch {
+      return new Response("Not found", { status: 404 });
+    }
   }
 }
 
@@ -3002,8 +3007,13 @@ const app = new Elysia({ adapter: node() })
     if (!user || !isAdmin(user.email))
       return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
 
-    const backups = await listBackups();
-    return new Response(JSON.stringify(backups), { headers: { "content-type": "application/json" } });
+    try {
+      const backups = await listBackups();
+      return new Response(JSON.stringify(backups), { headers: { "content-type": "application/json" } });
+    } catch (err) {
+      log("error", "admin", "Failed to list backups", { error: String(err) });
+      return new Response(JSON.stringify([]), { headers: { "content-type": "application/json" } });
+    }
   })
 
   .get("/api/admin/backups/:key", async ({ request, params }) => {
@@ -3189,7 +3199,7 @@ const app = new Elysia({ adapter: node() })
       log("info", "admin", "Coupon created", { admin: auth.email, code: coupon.code });
       return new Response(JSON.stringify(coupon), { status: 201, headers: { "content-type": "application/json" } });
     } catch (err: any) {
-      if (String(err).includes("duplicate key")) {
+      if (String(err).includes("UNIQUE constraint failed") || String(err).includes("duplicate key")) {
         return new Response(JSON.stringify({ error: "Ya existe un cupón con ese código" }), { status: 409, headers: { "content-type": "application/json" } });
       }
       throw err;

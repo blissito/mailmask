@@ -39,6 +39,10 @@
   transition: transform 0.3s;
 }
 
+img.post-card-img {
+  display: block;
+}
+
 .post-card:hover .post-card-img {
   transform: scale(1.05);
 }

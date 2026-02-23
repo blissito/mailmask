@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404 — MailMask</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen flex flex-col items-center justify-center px-4">
+    <div class="text-center max-w-md">
+      <!-- Mascarita confundida -->
+      <svg class="w-32 h-32 mx-auto mb-6 animate-float" viewBox="0 0 80 80" fill="none">
+        <ellipse cx="40" cy="42" rx="28" ry="24" fill="rgb(var(--mask-600))" />
+        <ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mask-500))" />
+        <!-- Ojos confundidos -->
+        <ellipse cx="28" cy="36" rx="8" ry="6" fill="#18181b" />
+        <ellipse cx="52" cy="36" rx="8" ry="6" fill="#18181b" />
+        <!-- Ojo izquierdo: X -->
+        <path d="M25 33l6 6M31 33l-6 6" stroke="#fafafa" stroke-width="1.5" stroke-linecap="round" opacity="0.8" />
+        <!-- Ojo derecho: ? -->
+        <text x="49" y="39" fill="#fafafa" font-size="10" font-weight="bold" text-anchor="middle" opacity="0.8">?</text>
+        <!-- Boca de confusión -->
+        <path d="M34 50 Q37 46 40 50 Q43 54 46 50" stroke="rgb(var(--mask-800))" stroke-width="2" fill="none" stroke-linecap="round" />
+        <!-- Lacing -->
+        <path d="M40 18 L40 26" stroke="#facc15" stroke-width="2" stroke-linecap="round" />
+        <path d="M36 19 L40 26 L44 19" stroke="#facc15" stroke-width="1.5" fill="none" stroke-linecap="round" />
+      </svg>
+
+      <h1 class="text-6xl font-extrabold text-mask-500 mb-2">404</h1>
+      <p class="text-xl font-semibold text-zinc-200 mb-2">Esta página no existe</p>
+      <p class="text-zinc-400 mb-8">La máscara que buscas no se encontró. Quizá fue desactivada o nunca existió.</p>
+
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="/" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-6 py-3 rounded-lg transition-all glow-btn">
+          Ir al inicio
+        </a>
+        <a href="/blog" class="border border-zinc-700 hover:border-zinc-500 text-zinc-300 font-semibold px-6 py-3 rounded-lg transition-colors">
+          Leer el blog
+        </a>
+      </div>
+    </div>
+
+    <footer class="absolute bottom-4 text-center text-zinc-600 text-xs">
+      © 2026 MailMask · <a href="/" class="hover:text-zinc-400 transition-colors">mailmask.studio</a>
+    </footer>
+  </body>
+</html>

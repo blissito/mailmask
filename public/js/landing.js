@@ -101,6 +101,50 @@ async function startCheckout(plan, billing, btn) {
   }
 }
 
+// --- Calculator ---
+(function initCalc() {
+  const usersSlider = document.getElementById("calc-users");
+  const domainsSlider = document.getElementById("calc-domains");
+  if (!usersSlider || !domainsSlider) return;
+
+  const usersVal = document.getElementById("calc-users-val");
+  const domainsVal = document.getElementById("calc-domains-val");
+  const gwPrice = document.getElementById("calc-gw-price");
+  const gwUsers = document.getElementById("calc-gw-users");
+  const mmPrice = document.getElementById("calc-mm-price");
+  const mmPlan = document.getElementById("calc-mm-plan");
+  const badge = document.getElementById("calc-badge");
+
+  let prevGw = 324, prevMm = 49;
+
+  function update() {
+    const u = +usersSlider.value;
+    const d = +domainsSlider.value;
+    usersVal.textContent = u;
+    domainsVal.textContent = d;
+
+    const gw = u * 108;
+    let mm, planName;
+    if (d <= 1) { mm = 49; planName = "Plan Básico · 1 dominio"; }
+    else if (d <= 3) { mm = 449; planName = "Plan Freelancer · hasta 15 dominios"; }
+    else { mm = 899; planName = "Plan Developer · hasta 20 dominios"; }
+
+    animatePrice(gwPrice, prevGw, gw, 400);
+    animatePrice(mmPrice, prevMm, mm, 400);
+    prevGw = gw;
+    prevMm = mm;
+
+    gwUsers.textContent = u;
+    mmPlan.textContent = planName;
+
+    const pct = Math.round((1 - mm / gw) * 100);
+    badge.textContent = pct > 0 ? `Ahorras ${pct}%` : "Mismo precio";
+  }
+
+  usersSlider.addEventListener("input", update);
+  domainsSlider.addEventListener("input", update);
+})();
+
 // Scroll-triggered animations using IntersectionObserver
 document.addEventListener("DOMContentLoaded", () => {
   const animatedEls = document.querySelectorAll(".animate-on-scroll");

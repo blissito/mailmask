@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cómo migrar de Google Workspace a MailMask — MailMask</title>
+    <meta name="description" content="Guía paso a paso para dejar Google Workspace y configurar email profesional en tu dominio con MailMask." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/migrar-google-workspace-a-mailmask" />
+    <meta property="og:title" content="Cómo migrar de Google Workspace a MailMask" />
+    <meta property="og:description" content="Deja Google Workspace sin perder tu email profesional. Guía completa de migración." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/migrar-google-workspace-a-mailmask" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="article:published_time" content="2026-02-23" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Cómo migrar de Google Workspace a MailMask" />
+    <meta name="twitter:description" content="Deja Google Workspace sin perder tu email profesional. Guía completa de migración." />
+    <script src="/js/analytics.js"></script>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Cómo migrar de Google Workspace a MailMask",
+      "description": "Guía paso a paso para dejar Google Workspace y configurar email profesional en tu dominio con MailMask.",
+      "datePublished": "2026-02-23",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/favicon.svg" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/migrar-google-workspace-a-mailmask"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Migrar de Google Workspace a MailMask", "item": "https://www.mailmask.studio/blog/migrar-google-workspace-a-mailmask" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "Cómo migrar de Google Workspace a MailMask",
+      "description": "Proceso completo para dejar Google Workspace y configurar email profesional con MailMask en tu dominio.",
+      "totalTime": "PT30M",
+      "step": [
+        { "@type": "HowToStep", "position": 1, "name": "Inventariar direcciones activas", "text": "Haz una lista de todas las direcciones de email que usas en Google Workspace: usuarios, aliases y grupos." },
+        { "@type": "HowToStep", "position": 2, "name": "Crear cuenta en MailMask", "text": "Regístrate en mailmask.studio/register y selecciona el plan que cubra tu número de dominios." },
+        { "@type": "HowToStep", "position": 3, "name": "Agregar dominio", "text": "En el dashboard de MailMask, agrega tu dominio y copia los registros DNS proporcionados." },
+        { "@type": "HowToStep", "position": 4, "name": "Configurar registros DNS", "text": "Cambia los registros MX en tu proveedor de dominio para apuntar a MailMask. Agrega los registros DKIM y SPF." },
+        { "@type": "HowToStep", "position": 5, "name": "Crear aliases", "text": "Recrea cada dirección de Workspace como un alias en MailMask, apuntando al Gmail personal de cada miembro." },
+        { "@type": "HowToStep", "position": 6, "name": "Probar el flujo completo", "text": "Envía emails de prueba a cada alias y verifica que llegan correctamente. Prueba también el envío desde aliases." },
+        { "@type": "HowToStep", "position": 7, "name": "Cancelar Google Workspace", "text": "Una vez confirmado que todo funciona, cancela tu suscripción de Google Workspace." }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
+      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Cómo migrar de Google Workspace a MailMask</h1>
+        <div class="meta">
+          <span>📅 23 Feb 2026</span>
+          <span>⏱ 6 min de lectura</span>
+        </div>
+      </header>
+
+      <div class="blog-content">
+        <p>Google Workspace funciona. Nadie dice que no. El problema es que para la mayoría de negocios pequeños en México, funciona <em>demasiado</em> para lo que realmente necesitan — y cobran en dólares por cada usuario. Si lo único que usas de Workspace es el email con dominio propio, estás pagando por Drive, Meet, Calendar y Docs que podrías reemplazar con herramientas gratuitas.</p>
+
+        <p>Esta guía te lleva paso a paso por el proceso de migración. No necesitas conocimientos técnicos avanzados, y el cambio completo toma menos de una hora.</p>
+
+        <h2>Por qué tiene sentido migrar</h2>
+
+        <p>El plan más barato de Google Workspace cuesta <strong>$6 USD/mes por usuario</strong> (~$100 MXN). Si tienes un equipo de 5 personas, son $500 MXN mensuales solo por email. Con MailMask, el <a href="/pricing">plan Básico</a> cuesta $49 MXN/mes con aliases ilimitados en un dominio. El plan Freelancer ($449 MXN/mes) cubre hasta 15 dominios con envío autenticado.</p>
+
+        <p>La diferencia clave: MailMask no te cobra por usuario. Creas todos los aliases que necesites y cada uno reenvía al inbox personal (Gmail, Outlook, lo que sea) de cada miembro del equipo. Todos reciben email en <code>@tudominio.com</code>, pero cada quien lo lee en su bandeja habitual.</p>
+
+        <h3>Lo que conservas al migrar</h3>
+
+        <ul>
+          <li><strong>Email profesional:</strong> tus direcciones <code>@tudominio.com</code> siguen funcionando exactamente igual.</li>
+          <li><strong>DKIM y SPF:</strong> MailMask configura autenticación automáticamente, así que tus emails no caen en spam.</li>
+          <li><strong>Múltiples direcciones:</strong> aliases ilimitados sin costo extra por cada uno.</li>
+          <li><strong>Bandeja compartida:</strong> la <a href="/blog/gestionar-emails-dominio-equipo">Bandeja de MailMask</a> reemplaza los grupos de Google para soporte en equipo.</li>
+        </ul>
+
+        <h3>Lo que no incluye MailMask</h3>
+
+        <p>MailMask es un servicio de email forwarding, no una suite ofimática. No incluye:</p>
+
+        <ul>
+          <li><strong>Google Drive / Docs / Sheets:</strong> usa las versiones gratuitas con tu cuenta personal de Google, o alternativas como Notion o Dropbox.</li>
+          <li><strong>Google Calendar:</strong> tu cuenta personal de Google Calendar funciona igual.</li>
+          <li><strong>Google Meet:</strong> la versión gratuita de Meet, Zoom o Teams cubre la mayoría de casos.</li>
+          <li><strong>Almacenamiento de buzón:</strong> los emails se reenvían a tu inbox existente, MailMask no almacena correos a largo plazo.</li>
+        </ul>
+
+        <p>Si tu equipo depende fuertemente de la integración entre Gmail, Drive y Calendar dentro de Workspace, evalúa si las alternativas gratuitas cubren tu flujo antes de migrar.</p>
+
+        <h2>Antes de empezar: prepara tu inventario</h2>
+
+        <p>Abre la consola de administración de Google Workspace y anota:</p>
+
+        <ol>
+          <li><strong>Usuarios activos:</strong> cada persona que tiene buzón (ej. <code>maria@tudominio.com</code>).</li>
+          <li><strong>Aliases de cada usuario:</strong> direcciones secundarias como <code>ventas@tudominio.com</code> que redirigen a un usuario.</li>
+          <li><strong>Grupos:</strong> direcciones compartidas como <code>soporte@tudominio.com</code> que van a varias personas.</li>
+          <li><strong>Email personal de cada miembro:</strong> la dirección Gmail, Outlook o similar donde recibirán los emails reenviados.</li>
+        </ol>
+
+        <p>Guarda esta lista. La vas a necesitar para crear los aliases en MailMask.</p>
+
+        <h2>Paso a paso: la migración</h2>
+
+        <h3>1. Crea tu cuenta en MailMask</h3>
+
+        <p><a href="/register">Regístrate en mailmask.studio</a> con el email personal del administrador (no el de Workspace). Elige el plan según tus necesidades:</p>
+
+        <ul>
+          <li><strong>Básico ($49 MXN/mes):</strong> 1 dominio, aliases ilimitados, recepción.</li>
+          <li><strong>Freelancer ($449 MXN/mes):</strong> hasta 15 dominios, envío autenticado (DKIM+SPF), responder desde aliases.</li>
+          <li><strong>Developer ($899 MXN/mes):</strong> 20 dominios, SMTP relay, API completa.</li>
+        </ul>
+
+        <h3>2. Agrega tu dominio</h3>
+
+        <p>En el dashboard, haz clic en "Agregar dominio" e ingresa tu dominio. MailMask te mostrará los registros DNS que necesitas configurar: registros MX para recepción, CNAME para DKIM y TXT para SPF.</p>
+
+        <h3>3. Configura los registros DNS</h3>
+
+        <p>Este es el paso más importante. Ve al panel de tu proveedor de dominio (GoDaddy, Namecheap, Cloudflare, etc.) y:</p>
+
+        <ol>
+          <li><strong>Elimina los registros MX</strong> que apuntan a Google (<code>aspmx.l.google.com</code> y similares).</li>
+          <li><strong>Agrega los nuevos registros MX</strong> que MailMask te indica.</li>
+          <li><strong>Agrega los registros CNAME</strong> para DKIM (3 registros).</li>
+          <li><strong>Modifica el registro TXT de SPF</strong> para incluir MailMask (reemplaza <code>include:_spf.google.com</code>).</li>
+        </ol>
+
+        <p><strong>Importante:</strong> una vez que cambies los registros MX, los emails nuevos dejarán de llegar a Workspace y empezarán a llegar a MailMask. Planea hacer este cambio cuando puedas dedicar 15-20 minutos a verificar que todo funciona.</p>
+
+        <h3>4. Crea los aliases</h3>
+
+        <p>Usando tu inventario, crea un alias por cada dirección que tenías en Workspace:</p>
+
+        <ul>
+          <li><code>maria@tudominio.com</code> → <code>maria.personal@gmail.com</code></li>
+          <li><code>ventas@tudominio.com</code> → <code>maria.personal@gmail.com</code> (o múltiples destinatarios)</li>
+          <li><code>soporte@tudominio.com</code> → configúralo en la Bandeja para que todo el equipo lo vea</li>
+        </ul>
+
+        <p>Para direcciones compartidas tipo <code>soporte@</code>, la <a href="/blog/gestionar-emails-dominio-equipo">Bandeja compartida</a> es mejor que un alias simple porque permite asignar conversaciones a miembros específicos del equipo.</p>
+
+        <h3>5. Prueba todo</h3>
+
+        <p>Desde una cuenta externa (no la de tu dominio), envía emails de prueba a cada alias. Verifica que:</p>
+
+        <ul>
+          <li>Los emails llegan al destinatario correcto.</li>
+          <li>Los headers de DKIM y SPF pasan (revisa en Gmail: menú de 3 puntos → "Mostrar original").</li>
+          <li>Si tienes plan Freelancer o superior, prueba responder desde el alias.</li>
+        </ul>
+
+        <h3>6. Cancela Google Workspace</h3>
+
+        <p>Una vez confirmado que todo funciona (dale al menos 24-48 horas de prueba), cancela tu suscripción de Workspace. <strong>Antes de cancelar:</strong></p>
+
+        <ul>
+          <li>Descarga cualquier archivo importante de Drive.</li>
+          <li>Exporta tus contactos de Gmail de Workspace.</li>
+          <li>Si necesitas emails históricos, usa Google Takeout para descargar un respaldo.</li>
+        </ul>
+
+        <h2>Errores comunes al migrar</h2>
+
+        <h3>Olvidar cambiar el SPF</h3>
+
+        <p>Si dejas el registro SPF apuntando a Google después de migrar, los servidores de destino podrían rechazar emails enviados desde MailMask. Asegúrate de actualizar el TXT de SPF.</p>
+
+        <h3>No esperar la propagación DNS</h3>
+
+        <p>Los cambios de DNS pueden tardar hasta 48 horas en propagarse completamente, aunque normalmente toman menos de una hora. No entres en pánico si los primeros minutos no funciona.</p>
+
+        <h3>Migrar en viernes</h3>
+
+        <p>Haz la migración a inicio de semana. Si algo sale mal, tienes días laborales para resolverlo sin perder emails del fin de semana que nadie está monitoreando.</p>
+
+        <h3>No avisar al equipo</h3>
+
+        <p>Si tienes equipo, avísales antes de cambiar los DNS. Deben saber que los emails empezarán a llegar a su inbox personal en lugar de la bandeja de Workspace.</p>
+
+        <h2>Cuánto ahorras al año</h2>
+
+        <p>Hagamos la cuenta para un equipo de 5 personas:</p>
+
+        <ul>
+          <li><strong>Google Workspace:</strong> $6 USD × 5 usuarios × 12 meses = $360 USD/año (~$6,000 MXN)</li>
+          <li><strong>MailMask Freelancer:</strong> $449 MXN × 12 meses = $5,388 MXN/año</li>
+        </ul>
+
+        <p>Con un equipo de 5, ya ahorras. Con 10 personas, Workspace cuesta $12,000 MXN/año vs los mismos $5,388 MXN de MailMask — porque MailMask no cobra por usuario. Mientras más crece tu equipo, mayor es el ahorro.</p>
+
+        <h2>Conclusión</h2>
+
+        <p>Migrar de Google Workspace a MailMask no es complicado, pero sí requiere planificación. La clave es hacer un buen inventario de direcciones, cambiar los DNS en un momento controlado, y probar antes de cancelar Workspace. El resultado: email profesional idéntico al que tenías, a una fracción del costo.</p>
+
+        <p>Si necesitas ayuda durante la migración, escríbenos a <code>hola@mailmask.studio</code>. Te guiamos sin costo.</p>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Empieza tu migración hoy</h2>
+      <p>Email profesional en tu dominio desde $49 MXN/mes. Sin cobro por usuario.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-zinc-800 py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">© 2026 by fixter.org</p>
+    </footer>
+  </body>
+</html>

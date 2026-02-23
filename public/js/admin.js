@@ -44,7 +44,8 @@ async function init() {
     document.getElementById("user-email").textContent = u.email;
   }
 
-  renderBackups(await res.json());
+  const backupsData = await res.json();
+  renderBackups(Array.isArray(backupsData) ? backupsData : []);
 
   document.getElementById("backups-list").addEventListener("click", async (e) => {
     const btn = e.target.closest(".btn-delete-backup");

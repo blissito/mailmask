@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Automatiza tu email con n8n, Make y Zapier usando aliases — MailMask</title>
+    <meta name="description" content="Crea aliases dedicados para automatizar workflows de email con n8n, Make o Zapier. Guía práctica con ejemplos." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/automatizar-email-n8n-make-zapier-aliases" />
+    <meta property="og:title" content="Automatiza tu email con n8n, Make y Zapier usando aliases" />
+    <meta property="og:description" content="Crea aliases dedicados para automatizar workflows de email con n8n, Make o Zapier. Guía práctica con ejemplos." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/automatizar-email-n8n-make-zapier-aliases" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="article:published_time" content="2026-02-23" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Automatiza tu email con n8n, Make y Zapier usando aliases" />
+    <meta name="twitter:description" content="Crea aliases dedicados para automatizar workflows de email con n8n, Make o Zapier. Guía práctica con ejemplos." />
+    <script src="/js/analytics.js"></script>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Automatiza tu email con n8n, Make y Zapier usando aliases",
+      "description": "Crea aliases dedicados para automatizar workflows de email con n8n, Make o Zapier. Guía práctica con ejemplos.",
+      "datePublished": "2026-02-23",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/favicon.svg" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/automatizar-email-n8n-make-zapier-aliases"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Automatiza tu email con n8n, Make y Zapier usando aliases", "item": "https://www.mailmask.studio/blog/automatizar-email-n8n-make-zapier-aliases" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "Cómo automatizar tu email con aliases y herramientas de automatización",
+      "description": "Guía paso a paso para crear aliases dedicados en MailMask y conectarlos con n8n, Make o Zapier para automatizar workflows de email.",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "position": 1,
+          "name": "Crear un alias dedicado en MailMask",
+          "text": "En el dashboard de MailMask, crea un alias específico para tu automatización, por ejemplo leads@tudominio.com o alertas@tudominio.com."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 2,
+          "name": "Configurar el reenvío hacia tu herramienta",
+          "text": "Configura el alias para reenviar a la dirección de email que tu herramienta de automatización te proporciona (n8n, Make o Zapier generan direcciones únicas para recibir emails)."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 3,
+          "name": "Crear el workflow de automatización",
+          "text": "En tu herramienta de automatización, crea un workflow que se active cuando llegue un email al trigger. Configura las acciones: guardar en CRM, notificar en Slack, clasificar con IA, etc."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 4,
+          "name": "Probar y activar",
+          "text": "Envía un email de prueba al alias y verifica que el workflow se ejecute correctamente. Ajusta filtros y acciones según sea necesario."
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
+      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Automatiza tu email con n8n, Make y Zapier usando aliases</h1>
+        <div class="meta">
+          <span>📅 23 Feb 2026</span>
+          <span>⏱ 6 min de lectura</span>
+        </div>
+      </header>
+
+      <div class="blog-content">
+        <p>El email sigue siendo el canal principal de comunicación para negocios, pero procesarlo manualmente consume horas cada semana. La combinación de aliases dedicados con herramientas de automatización como n8n, Make o Zapier te permite crear workflows que procesan, clasifican y responden emails sin intervención manual.</p>
+
+        <p>En esta guía te mostramos cómo configurar aliases en <a href="/">MailMask</a> como triggers para tus automatizaciones, con ejemplos concretos que puedes implementar hoy.</p>
+
+        <h2>¿Por qué un alias dedicado para automatización?</h2>
+
+        <p>La mayoría de las herramientas de automatización ofrecen un trigger de email: una dirección generada por la plataforma que activa un workflow cuando recibe un mensaje. El problema es que esas direcciones son largas, genéricas y poco profesionales — algo como <code>hook-a7f3x@hooks.zapier.com</code>.</p>
+
+        <p>Con un alias de MailMask, pones tu dominio al frente:</p>
+
+        <ul>
+          <li><code>leads@tudominio.com</code> reenvía a tu trigger de Zapier para capturar leads</li>
+          <li><code>facturas@tudominio.com</code> reenvía a Make para extraer datos de facturas</li>
+          <li><code>alertas@tudominio.com</code> reenvía a n8n para clasificar y notificar</li>
+        </ul>
+
+        <p>El resultado: dirección profesional por fuera, automatización por dentro. Y si cambias de herramienta (de Zapier a n8n, por ejemplo), solo actualizas el destino del alias — el email público no cambia.</p>
+
+        <h2>Configuración paso a paso</h2>
+
+        <h3>Paso 1: Crea el alias en MailMask</h3>
+
+        <p>En el dashboard de MailMask, ve a tu dominio y crea un alias nuevo. Dale un nombre descriptivo según su función:</p>
+
+        <ul>
+          <li><code>leads@</code> para captura de prospectos</li>
+          <li><code>soporte@</code> para tickets de atención</li>
+          <li><code>notificaciones@</code> para alertas de sistemas</li>
+          <li><code>facturas@</code> para procesamiento de documentos</li>
+        </ul>
+
+        <h3>Paso 2: Obtén la dirección de trigger de tu herramienta</h3>
+
+        <p><strong>En Zapier</strong>: crea un nuevo Zap con el trigger "Email by Zapier". Zapier te genera una dirección única como <code>robot@robot.zapier.com</code>. Cada email que llegue ahí activa el Zap.</p>
+
+        <p><strong>En Make (antes Integromat)</strong>: usa el módulo "Email > Watch Emails" o "Mailhook". Make genera un webhook con dirección de email que activa tu escenario.</p>
+
+        <p><strong>En n8n</strong>: usa el nodo "Email Trigger (IMAP)" apuntando a un buzón que reciba los emails, o configura un webhook que procese el contenido reenviado. Si usas n8n self-hosted, también puedes configurar IMAP directo.</p>
+
+        <h3>Paso 3: Conecta el alias al trigger</h3>
+
+        <p>En MailMask, edita el alias y configura el destino de reenvío con la dirección de trigger que obtuviste. Todo email que llegue al alias se reenviará automáticamente a tu herramienta de automatización.</p>
+
+        <h3>Paso 4: Diseña tu workflow</h3>
+
+        <p>Ahora configura las acciones que se ejecutan cuando llega un email. Aquí es donde la magia sucede.</p>
+
+        <h2>Ejemplos de workflows prácticos</h2>
+
+        <h3>Captura automática de leads</h3>
+
+        <p>Imagina que publicas <code>contacto@tudominio.com</code> en tu sitio web. Cada email que llega:</p>
+
+        <ol>
+          <li>Se reenvía al trigger de Zapier/Make</li>
+          <li>El workflow extrae nombre, email y mensaje del cuerpo</li>
+          <li>Crea un registro en tu CRM (HubSpot, Pipedrive, Google Sheets)</li>
+          <li>Envía una notificación a Slack: "Nuevo lead: Juan Pérez - juan@empresa.com"</li>
+          <li>Activa un email de respuesta automática con información de tu servicio</li>
+        </ol>
+
+        <p>Sin alias dedicado, tendrías que dar la dirección fea del trigger o configurar reglas complicadas en tu email principal.</p>
+
+        <h3>Clasificación automática con IA</h3>
+
+        <p>Con n8n o Make puedes conectar un paso de IA (OpenAI, Claude) para clasificar emails entrantes:</p>
+
+        <ol>
+          <li>Email llega a <code>soporte@tudominio.com</code></li>
+          <li>El workflow envía el contenido a una API de IA con un prompt de clasificación</li>
+          <li>La IA responde con la categoría: "facturación", "bug", "feature request", "spam"</li>
+          <li>Según la categoría, el workflow rutea a diferentes canales de Slack, etiqueta en Notion o crea un ticket en Linear</li>
+        </ol>
+
+        <h3>Procesamiento de facturas</h3>
+
+        <p>Crea <code>facturas@tudominio.com</code> y dile a tus proveedores que envíen ahí:</p>
+
+        <ol>
+          <li>El email llega y se reenvía a Make</li>
+          <li>Make extrae el PDF adjunto</li>
+          <li>Lo envía a un servicio de OCR o IA para extraer datos (monto, fecha, RFC)</li>
+          <li>Crea una fila en Google Sheets o tu sistema contable</li>
+          <li>Te notifica en Slack con el resumen</li>
+        </ol>
+
+        <h3>Alertas de monitoreo</h3>
+
+        <p>Muchos servicios de infraestructura (UptimeRobot, Grafana, AWS) envían alertas por email. Crea <code>alertas@tudominio.com</code>:</p>
+
+        <ol>
+          <li>La alerta llega al alias</li>
+          <li>Se reenvía a n8n</li>
+          <li>n8n analiza la severidad (el asunto suele indicar "CRITICAL", "WARNING", etc.)</li>
+          <li>Si es crítica: envía mensaje a Slack, SMS por Twilio, y crea incidente en PagerDuty</li>
+          <li>Si es warning: solo registra en un log de Google Sheets</li>
+        </ol>
+
+        <h2>Reglas de reenvío avanzadas</h2>
+
+        <p>En MailMask puedes configurar <strong>reglas de reenvío</strong> por dominio que filtran emails antes de reenviarlos. Esto es útil para evitar que spam o emails irrelevantes activen tus workflows:</p>
+
+        <ul>
+          <li><strong>Filtrar por remitente</strong>: solo reenviar emails de dominios específicos</li>
+          <li><strong>Filtrar por asunto</strong>: solo procesar emails que contengan ciertas palabras clave</li>
+          <li><strong>Múltiples destinos</strong>: un alias puede reenviar a tu herramienta de automatización <em>y</em> a tu bandeja personal al mismo tiempo</li>
+        </ul>
+
+        <h2>Tips para automatizar sin dolor</h2>
+
+        <ul>
+          <li><strong>Un alias por workflow</strong>: no mezcles propósitos. Si tienes un workflow para leads y otro para facturas, usa aliases separados. Así puedes desactivar uno sin afectar al otro.</li>
+          <li><strong>Nombra descriptivamente</strong>: <code>leads-zapier@</code> o <code>facturas-make@</code> te dicen exactamente qué hace cada alias y a dónde va.</li>
+          <li><strong>Prueba antes de publicar</strong>: envía emails de prueba al alias y verifica que el workflow se active correctamente antes de darlo como dirección de contacto.</li>
+          <li><strong>Monitorea en la Bandeja</strong>: la <a href="/blog/bandeja-compartida-vs-helpdesk">Bandeja de MailMask</a> te muestra todos los emails que pasan por tus aliases, así puedes verificar que nada se pierda.</li>
+          <li><strong>Documenta tus flows</strong>: mantén una lista de qué alias conecta con qué herramienta y qué acción ejecuta. Tu yo del futuro te lo agradecerá.</li>
+        </ul>
+
+        <h2>¿Qué herramienta elegir?</h2>
+
+        <p><strong>Zapier</strong> es la opción más simple si no quieres tocar código. Tiene la mayor cantidad de integraciones pre-hechas y una interfaz visual muy intuitiva. Ideal para workflows de 2-5 pasos.</p>
+
+        <p><strong>Make</strong> es más potente que Zapier para workflows complejos con múltiples ramas y condiciones. Su modelo visual de escenarios facilita diseñar flujos con lógica avanzada. Mejor relación precio/funcionalidad.</p>
+
+        <p><strong>n8n</strong> es la opción para equipos técnicos. Es open source, puedes hostearlo tú mismo, y tiene la mayor flexibilidad para integraciones custom con código. Si ya tienes infraestructura propia, n8n se integra naturalmente.</p>
+
+        <p>Las tres funcionan perfectamente con aliases de MailMask. La diferencia está en tu nivel técnico y la complejidad de lo que quieras automatizar.</p>
+
+        <h2>Empieza con un workflow simple</h2>
+
+        <p>No intentes automatizar todo de golpe. Elige el proceso manual que más tiempo te consume — captura de leads, clasificación de soporte, procesamiento de facturas — y crea un alias + workflow para eso. Una vez que veas el resultado, naturalmente vas a querer automatizar más.</p>
+
+        <p><a href="/register">Crea tu cuenta en MailMask</a>, configura tu primer alias de automatización y conecta tu herramienta favorita. En 15 minutos puedes tener tu primer workflow funcionando.</p>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Aliases ilimitados para tus automatizaciones</h2>
+      <p>Conecta MailMask con n8n, Make o Zapier. Aliases profesionales desde $49 MXN/mes.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-zinc-800 py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">© 2026 by fixter.org</p>
+    </footer>
+  </body>
+</html>

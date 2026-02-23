@@ -305,6 +305,57 @@
       </div>
     </section>
 
+    <!-- Calculator: ¿Cuánto ahorras? -->
+    <section id="calculadora" class="max-w-4xl mx-auto px-4 py-16">
+      <h2 class="text-2xl font-bold text-center mb-2">¿Cuánto ahorras vs Google Workspace?</h2>
+      <p class="text-center text-zinc-400 mb-10">Mueve los sliders y compara el costo mensual.</p>
+
+      <div class="grid sm:grid-cols-2 gap-6 mb-10 max-w-xl mx-auto">
+        <div>
+          <label class="block text-sm font-medium text-zinc-300 mb-2">
+            Usuarios: <span id="calc-users-val" class="text-mask-400 font-bold">3</span>
+          </label>
+          <input type="range" id="calc-users" min="1" max="20" value="3"
+            class="w-full accent-mask-500 h-2 rounded-lg appearance-none bg-zinc-700 cursor-pointer" />
+          <div class="flex justify-between text-xs text-zinc-500 mt-1"><span>1</span><span>20</span></div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-zinc-300 mb-2">
+            Dominios: <span id="calc-domains-val" class="text-mask-400 font-bold">1</span>
+          </label>
+          <input type="range" id="calc-domains" min="1" max="10" value="1"
+            class="w-full accent-mask-500 h-2 rounded-lg appearance-none bg-zinc-700 cursor-pointer" />
+          <div class="flex justify-between text-xs text-zinc-500 mt-1"><span>1</span><span>10</span></div>
+        </div>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+        <!-- Google Workspace -->
+        <div class="relative border border-zinc-700 rounded-xl p-6 bg-zinc-900/50 text-center">
+          <p class="text-sm font-semibold text-zinc-400 mb-1">Google Workspace</p>
+          <p id="calc-gw-price" class="text-3xl font-extrabold text-red-400">$324</p>
+          <p class="text-sm text-zinc-500">/mes</p>
+          <p class="text-xs text-zinc-600 mt-2">$108 MXN × <span id="calc-gw-users">3</span> usuarios</p>
+        </div>
+        <!-- MailMask -->
+        <div class="relative border-2 border-mask-600 rounded-xl p-6 bg-zinc-900/50 text-center shadow-lg shadow-mask-500/10">
+          <div id="calc-badge" class="absolute -top-3 left-1/2 -translate-x-1/2 bg-mask-600 text-white text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
+            Ahorras 85%
+          </div>
+          <p class="text-sm font-semibold text-zinc-400 mb-1">MailMask</p>
+          <p id="calc-mm-price" class="text-3xl font-extrabold text-mask-400">$49</p>
+          <p class="text-sm text-zinc-500">/mes</p>
+          <p id="calc-mm-plan" class="text-xs text-zinc-600 mt-2">Plan Básico · 1 dominio</p>
+        </div>
+      </div>
+
+      <div class="text-center mt-8">
+        <a href="/register" class="inline-block bg-mask-600 hover:bg-mask-700 text-white font-semibold px-8 py-3 rounded-lg transition-all text-lg glow-btn">
+          Empieza a ahorrar →
+        </a>
+      </div>
+    </section>
+
     <!-- How it works -->
     <section class="max-w-4xl mx-auto px-4 py-16">
       <h2 class="text-2xl font-bold text-center mb-12">Cómo funciona</h2>
