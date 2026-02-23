@@ -458,7 +458,7 @@ const app = new Elysia({ adapter: node() })
     }
     return response;
   })
-  .onError(({ code, error }) => {
+  .onError({ as: "global" }, ({ code, error }) => {
     if (code === "NOT_FOUND") {
       try {
         const html = fs.readFileSync(`${PUBLIC_DIR}/404.html`);
