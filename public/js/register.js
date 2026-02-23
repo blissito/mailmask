@@ -11,12 +11,14 @@ document.getElementById("register-form").addEventListener("submit", async (e) =>
   const errEl = document.getElementById("error");
   errEl.classList.add("hidden");
 
+  const ref = localStorage.getItem("mailmask_ref") || undefined;
   const res = await fetch("/api/auth/register", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       email: form.email.value,
       password: form.password.value,
+      ref,
     }),
   });
 

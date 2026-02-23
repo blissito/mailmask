@@ -17,6 +17,9 @@ export const users = sqliteTable("users", {
   subStatus: text("sub_status"),
   subMpId: text("sub_mp_id"),
   subPeriodEnd: text("sub_period_end"),
+  referralSlug: text("referral_slug").unique(),
+  referredBy: text("referred_by"),
+  paymentCount: integer("payment_count").notNull().default(0),
 });
 
 export const domains = sqliteTable("domains", {
@@ -217,4 +220,27 @@ export const rateLimits = sqliteTable("rate_limits", {
   count: integer("count").notNull().default(0),
   windowStart: integer("window_start", { mode: "number" }).notNull(),
   expiresAt: text("expires_at").notNull(),
+});
+
+export const referrals = sqliteTable("referrals", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  referrerEmail: text("referrer_email").notNull().references(() => users.email),
+  referredEmail: text("referred_email").notNull().references(() => users.email),
+  status: text("status").notNull().default("pending"),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
+  convertedAt: text("converted_at"),
+  creditedAt: text("credited_at"),
+}, (table) => [
+  index("idx_referrals_referrer").on(table.referrerEmail),
+  index("idx_referrals_referred").on(table.referredEmail),
+]);
+
+export const referralCredits = sqliteTable("referral_credits", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  email: text("email").notNull().references(() => users.email),
+  referralId: text("referral_id").notNull().references(() => referrals.id),
+  discountPercent: integer("discount_percent").notNull().default(50),
+  used: integer("used", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
+  usedAt: text("used_at"),
 });

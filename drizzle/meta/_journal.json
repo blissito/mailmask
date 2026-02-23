@@ -15,6 +15,13 @@
       "when": 1771703277621,
       "tag": "0001_cheerful_hellcat",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1771862227512,
+      "tag": "0002_next_barracuda",
+      "breakpoints": true
     }
   ]
 }

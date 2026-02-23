@@ -11,7 +11,9 @@ async function refreshUsage() {
   const res = await fetch("/api/auth/me");
   if (!res.ok) return;
   currentUser = await res.json();
-  renderUsage();
+  renderStats();
+  renderReferrals();
+  renderReferralBanner();
 }
 
 // --- Init ---
@@ -31,9 +33,19 @@ async function checkAuth() {
   currentUser = await res.json();
   document.getElementById("user-email").textContent = currentUser.email;
   if (currentUser.isAdmin) document.getElementById("admin-link")?.classList.remove("hidden");
+
+  // Plan badge in nav
+  const badge = document.getElementById("plan-badge");
+  if (badge && currentUser.subscription?.plan) {
+    badge.textContent = currentUser.subscription.plan;
+    badge.classList.remove("hidden");
+  }
+
   renderVerifyBanner();
   renderBillingBanner();
-  renderUsage();
+  renderStats();
+  renderReferralBanner();
+  renderReferrals();
 
   // Handle query param redirects
   const params = new URLSearchParams(window.location.search);
@@ -49,9 +61,9 @@ async function checkAuth() {
 
 function renderVerifyBanner() {
   const container = document.getElementById("verify-banner");
-  if (!container || currentUser.emailVerified) return;
+  if (!container || currentUser.emailVerified) { if (container) container.innerHTML = ""; return; }
   container.innerHTML = `
-    <div class="bg-yellow-900/20 border border-yellow-800/50 rounded-lg px-4 py-3 flex items-center justify-between">
+    <div class="bg-yellow-900/20 border border-yellow-800/50 rounded-xl px-4 py-3 flex items-center justify-between">
       <span class="text-sm text-yellow-400">Verifica tu email para acceder a todas las funciones.</span>
       <button id="btn-resend-verify" class="text-xs text-yellow-400 hover:text-yellow-300 underline transition-colors">Reenviar email</button>
     </div>`;
@@ -91,40 +103,40 @@ function renderBillingBanner() {
 
   if (isActive) {
     container.innerHTML = `
-      <div class="bg-green-900/20 border border-green-800/50 rounded-lg px-4 py-3 flex items-center justify-between">
-        <span class="text-sm text-green-400">Plan ${esc(planName)} — Activo</span>
+      <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="w-2 h-2 rounded-full bg-green-400"></span>
+          <span class="text-sm text-zinc-300">Plan ${esc(planName)}</span>
+          <span class="text-xs text-zinc-500">hasta ${periodEnd ? periodEnd.toLocaleDateString("es-MX") : "—"}</span>
+        </div>
         <div class="flex items-center gap-4">
-          <span class="text-xs text-zinc-500">Hasta ${periodEnd ? periodEnd.toLocaleDateString("es-MX") : "—"}</span>
-          <a href="https://wa.me/527757609276?text=${encodeURIComponent(`Hola, quiero cambiar mi plan.\nPlan actual: ${planName}\nEmail: ${currentUser.email}`)}" target="_blank" rel="noopener" class="text-xs text-mask-400 hover:text-mask-300 transition-colors underline">Cambiar plan</a>
-          <button id="btn-cancel-sub" class="text-xs text-zinc-500 hover:text-red-400 transition-colors underline">Cancelar</button>
+          <a href="https://wa.me/527757609276?text=${encodeURIComponent(`Hola, quiero cambiar mi plan.\nPlan actual: ${planName}\nEmail: ${currentUser.email}`)}" target="_blank" rel="noopener" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Cambiar plan</a>
+          <button id="btn-cancel-sub" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Cancelar</button>
         </div>
       </div>`;
     document.getElementById("btn-cancel-sub")?.addEventListener("click", cancelSubscription);
   } else if (isCancelledWithAccess) {
     container.innerHTML = `
-      <div class="bg-yellow-900/20 border border-yellow-800/50 rounded-lg px-4 py-3 flex items-center justify-between">
-        <span class="text-sm text-yellow-400">Plan ${esc(planName)} — Tu plan se cancela el ${periodEnd.toLocaleDateString("es-MX")}</span>
-        <div class="flex items-center gap-3">
-          <a href="https://wa.me/527757609276?text=${encodeURIComponent(`Hola, quiero cambiar mi plan.\nPlan actual: ${planName}\nEmail: ${currentUser.email}`)}" target="_blank" rel="noopener" class="text-xs text-mask-400 hover:text-mask-300 transition-colors underline">Cambiar plan</a>
-          <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-            Reactivar Plan
-          </button>
-        </div>
+      <div class="bg-yellow-900/20 border border-yellow-800/50 rounded-xl px-4 py-3 flex items-center justify-between">
+        <span class="text-sm text-yellow-400">Plan ${esc(planName)} se cancela el ${periodEnd.toLocaleDateString("es-MX")}</span>
+        <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+          Reactivar
+        </button>
       </div>`;
     document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
   } else if (isExpired) {
     container.innerHTML = `
-      <div class="bg-red-900/20 border border-red-800/50 rounded-lg px-4 py-3 flex items-center justify-between">
-        <span class="text-sm text-red-400">Tu plan expiró — Reactiva para continuar</span>
+      <div class="bg-red-900/20 border border-red-800/50 rounded-xl px-4 py-3 flex items-center justify-between">
+        <span class="text-sm text-red-400">Tu plan expiró</span>
         <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-          Reactivar Plan
+          Reactivar
         </button>
       </div>`;
     document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
   } else {
     container.innerHTML = `
-      <div class="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 flex items-center justify-between">
-        <span class="text-sm text-zinc-400">Sin plan activo — Activa tu plan para agregar dominios</span>
+      <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 flex items-center justify-between">
+        <span class="text-sm text-zinc-400">Sin plan activo</span>
         <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
           ${getCheckoutLabel()}
         </button>
@@ -132,47 +144,144 @@ function renderBillingBanner() {
     document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
   }
 
-  // Hide header add-domain button when no domains (empty state handles it)
+  // Disable add-domain when no plan
   const addDomainBtn = document.getElementById("btn-add-domain");
   if (addDomainBtn) {
-    addDomainBtn.classList.remove("hidden");
     if (!isActive && !isCancelledWithAccess) {
-      addDomainBtn.disabled = true;
-      addDomainBtn.classList.add("opacity-50", "cursor-not-allowed");
+      addDomainBtn.classList.add("opacity-50", "pointer-events-none");
       addDomainBtn.title = "Necesitas un plan activo";
     } else {
-      addDomainBtn.disabled = false;
-      addDomainBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      addDomainBtn.classList.remove("opacity-50", "pointer-events-none");
       addDomainBtn.title = "";
     }
   }
 }
 
-function renderUsage() {
-  const container = document.getElementById("usage-banner");
+// --- Stats row (big numbers) ---
+function renderStats() {
+  const container = document.getElementById("stats-row");
   if (!container || !currentUser?.usage) return;
 
   const u = currentUser.usage;
   if (u.domains.limit === 0) { container.innerHTML = ""; return; }
 
-  const items = [`Dominios ${u.domains.current}/${u.domains.limit}`];
-  for (const a of u.aliasesPerDomain) {
-    items.push(`Alias — ${esc(a.domain)} ${a.current}/${a.limit}`);
-  }
-  if (u.rulesPerDomain) {
-    for (const r of u.rulesPerDomain) {
-      if (r.limit > 0) items.push(`Reglas — ${esc(r.domain)} ${r.current}/${r.limit}`);
-    }
-  }
-  if (u.sendsPerDomain) {
-    for (const s of u.sendsPerDomain) {
-      if (s.limit > 0) items.push(`Envíos — ${esc(s.domain)} ${s.current}/${s.limit}/día`);
-    }
-  }
+  const totalAliases = u.aliasesPerDomain.reduce((s, a) => s + a.current, 0);
+  const totalForwards = domains.reduce((s, d) => s + (d.monthlyForwards ?? 0), 0);
 
   container.innerHTML = `
-    <div class="flex flex-wrap gap-3 text-xs text-zinc-400 px-1 py-2">
-      ${items.map(i => `<span class="bg-zinc-800/60 border border-zinc-800 rounded px-2 py-1">${i}</span>`).join("")}
+    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5">
+      <div class="grid grid-cols-3 gap-6">
+        <div>
+          <span class="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Dominios</span>
+          <div class="text-3xl font-light text-zinc-100 mt-1">${u.domains.current}<span class="text-lg text-zinc-600">/${u.domains.limit}</span></div>
+        </div>
+        <div>
+          <span class="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Alias</span>
+          <div class="text-3xl font-light text-zinc-100 mt-1">${totalAliases}</div>
+        </div>
+        <div>
+          <span class="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Forwards</span>
+          <div class="text-3xl font-light text-zinc-100 mt-1">${totalForwards.toLocaleString("es-MX")}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// --- Referral credit banner ---
+function renderReferralBanner() {
+  const container = document.getElementById("referral-credit-banner");
+  if (!container) return;
+  const stats = currentUser?.referralStats;
+  if (!stats || stats.creditsAvailable < 2) { container.innerHTML = ""; return; }
+
+  // Celebration sound
+  playCelebration();
+
+  container.innerHTML = `
+    <div class="border border-mask-500/30 bg-mask-950/20 rounded-xl px-5 py-4">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🎉</span>
+        <div>
+          <p class="text-sm font-semibold text-mask-400">No pagas este mes — $5 MXN*</p>
+          <p class="text-xs text-zinc-500 mt-0.5">*Mínimo requerido por procesador de pagos</p>
+        </div>
+      </div>
+    </div>`;
+}
+
+function playCelebration() {
+  if (!audioCtx || audioCtx.state !== "running") return;
+  const t = audioCtx.currentTime;
+  // Ascending celebration: C5 E5 G5 C6
+  [523, 659, 784, 1047].forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.value = 0.1;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t + i * 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.15 + 0.3);
+    osc.stop(t + i * 0.15 + 0.3);
+  });
+}
+
+// --- Referrals section ---
+function renderReferrals() {
+  const container = document.getElementById("referrals-section");
+  if (!container) return;
+  const stats = currentUser?.referralStats;
+  if (!stats) { container.innerHTML = ""; return; }
+
+  const slug = stats.slug || "";
+  const link = slug ? `mailmask.lat/?ref=${esc(slug)}` : "";
+  const progressPct = Math.min(100, Math.round((stats.converted / 2) * 100));
+
+  container.innerHTML = `
+    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5">
+      <span class="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Referidos</span>
+
+      <div class="mt-3 space-y-3">
+        ${slug ? `
+          <div class="flex items-center gap-2">
+            <code class="text-sm text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 flex-1 select-all">${link}</code>
+            <button data-action="copy-referral" data-value="${esc(link)}" class="text-sm text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-2 rounded-lg transition-colors">Copiar</button>
+            <button data-action="edit-slug" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Editar</button>
+          </div>
+        ` : `
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-zinc-500">Configura tu link de referido</span>
+            <button data-action="edit-slug" class="text-sm text-mask-400 hover:text-mask-300 transition-colors">Crear slug</button>
+          </div>
+        `}
+
+        ${stats.total > 0 ? `
+          <div class="space-y-2 mt-2">
+            ${currentUser._referralsList ? currentUser._referralsList.map(r => {
+              const isConverted = r.status === "converted" || r.status === "credited";
+              const masked = r.referredEmail.replace(/^(.{2}).*(@.*)$/, "$1***$2");
+              return `
+                <div class="flex items-center gap-3 text-sm">
+                  <span class="w-2 h-2 rounded-full ${isConverted ? 'bg-green-400' : 'bg-zinc-600'}"></span>
+                  <span class="text-zinc-400 font-mono text-xs">${esc(masked)}</span>
+                  <span class="text-xs ${isConverted ? 'text-green-400' : 'text-zinc-500'}">${isConverted ? 'Activo' : 'Pendiente'}</span>
+                  <span class="text-xs text-zinc-600 ml-auto">${relativeTime(r.createdAt)}</span>
+                </div>`;
+            }).join("") : ""}
+          </div>
+        ` : ""}
+
+        <div class="mt-3">
+          <div class="flex items-center justify-between text-xs text-zinc-500 mb-1">
+            <span>${stats.converted}/2 referidos para mes gratis</span>
+            <span>${progressPct}%</span>
+          </div>
+          <div class="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div class="h-full bg-mask-500 rounded-full transition-all duration-500" style="width: ${progressPct}%"></div>
+          </div>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -247,7 +356,6 @@ function playSound(type) {
   if (!audioCtx || audioCtx.state !== "running") return;
   const t = audioCtx.currentTime;
   if (type === "success") {
-    // Achievement: 3-note ascending chord
     [520, 660, 840].forEach((freq, i) => {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
@@ -261,7 +369,6 @@ function playSound(type) {
       osc.stop(t + i * 0.12 + 0.2);
     });
   } else if (type === "pop") {
-    // Quick pop: frequency sweep 400→600
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = "sine";
@@ -274,7 +381,6 @@ function playSound(type) {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
     osc.stop(t + 0.08);
   } else if (type === "whoosh") {
-    // Whoosh: rising bandpass noise burst (acceleration effect)
     const dur = 0.3;
     const bs = audioCtx.sampleRate * dur;
     const buf = audioCtx.createBuffer(1, bs, audioCtx.sampleRate);
@@ -297,7 +403,6 @@ function playSound(type) {
     src.start(t);
     src.stop(t + dur);
   } else if (type === "error") {
-    // Bonk: low frequency blip
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = "sine";
@@ -327,70 +432,63 @@ async function loadDomains() {
   if (!res.ok) return;
   domains = await res.json();
   renderDomains();
+  renderStats(); // update after domains loaded (for forward counts)
+
+  // Load referrals list
+  try {
+    const rRes = await fetch("/api/referrals");
+    if (rRes.ok) {
+      const data = await rRes.json();
+      currentUser._referralsList = data.referrals;
+      renderReferrals();
+    }
+  } catch { /* ignore */ }
 }
 
 function renderDomains() {
   const list = document.getElementById("domains-list");
   const empty = document.getElementById("empty-state");
+  const header = document.getElementById("domains-header");
 
   if (domains.length === 0) {
     list.innerHTML = "";
     empty.classList.remove("hidden");
+    if (header) header.classList.add("hidden");
 
-    // Style empty-state CTA based on plan status
     const emptyBtn = document.getElementById("btn-add-domain-empty");
     if (emptyBtn) {
       const sub = currentUser?.subscription;
       const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
       const isExpired = periodEnd && periodEnd < new Date();
       const hasActivePlan = sub && (sub.status === "active" || sub.status === "cancelled") && !isExpired;
-
-      if (hasActivePlan) {
-        // Primary CTA: user has plan, needs to add domain
-        emptyBtn.classList.remove("hidden");
-        emptyBtn.className = "bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-6 py-3 rounded-lg transition-colors";
-      } else {
-        // No plan: hide entirely — billing banner is the sole CTA
-        emptyBtn.classList.add("hidden");
-      }
+      emptyBtn.classList.toggle("hidden", !hasActivePlan);
     }
     return;
   }
 
   empty.classList.add("hidden");
+  if (header) header.classList.remove("hidden");
+
   list.innerHTML = domains.map(d => {
-    const accentClass = d.verified ? 'border-l-green-500' : 'border-l-yellow-500';
-    const dotClass = d.verified ? 'bg-green-400' : 'bg-yellow-400';
-    const badgeBg = d.verified ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400';
-    const badgeText = d.verified ? 'Verificado' : 'Pendiente DNS';
-    const created = d.createdAt ? new Date(d.createdAt).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    const verified = d.verified;
+    const dotClass = verified ? 'bg-green-400' : 'bg-yellow-400';
+    const statusText = verified ? 'Verificado' : 'Pendiente';
+    const fwds = d.monthlyForwards ?? 0;
     return `
-    <div class="bg-zinc-900 border border-zinc-800 ${accentClass} border-l-4 rounded-xl px-6 py-5 cursor-pointer hover:border-zinc-600 hover:-translate-y-0.5 transition-all"
+    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl px-5 py-4 cursor-pointer hover:border-zinc-700 transition-all"
          data-action="select-domain" data-domain-id="${esc(d.id)}">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <svg class="w-5 h-5 text-zinc-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
-          </svg>
-          <span class="font-bold text-lg">${esc(d.domain)}</span>
-          <span class="text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${badgeBg}">
-            <span class="w-1.5 h-1.5 rounded-full ${dotClass}"></span>
-            ${badgeText}
-          </span>
+          <span class="w-2 h-2 rounded-full ${dotClass}"></span>
+          <span class="font-semibold">${esc(d.domain)}</span>
+          <span class="text-xs text-zinc-500">${statusText}</span>
         </div>
-        <svg class="w-5 h-5 text-zinc-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-        </svg>
-      </div>
-      <div class="flex items-center gap-4 text-xs text-zinc-500 mt-2 ml-8">
-        <span class="inline-flex items-center gap-1">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-          ${d.monthlyForwards ?? 0} reenvío${(d.monthlyForwards ?? 0) === 1 ? '' : 's'} este mes
-        </span>
-        ${created ? `<span class="inline-flex items-center gap-1">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          ${created}
-        </span>` : ''}
+        <div class="flex items-center gap-4 text-xs text-zinc-500">
+          <span>${fwds} fwd${fwds === 1 ? '' : 's'}</span>
+          <svg class="w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </div>
       </div>
     </div>`;
   }).join("");
@@ -403,7 +501,10 @@ async function selectDomain(id) {
   document.getElementById("domains-list").classList.add("hidden");
   document.getElementById("empty-state").classList.add("hidden");
   document.getElementById("domain-detail").classList.remove("hidden");
-  document.querySelector(".flex.items-center.justify-between.mb-6").classList.add("hidden");
+  document.getElementById("domains-header")?.classList.add("hidden");
+  document.getElementById("stats-row")?.classList.add("hidden");
+  document.getElementById("referrals-section")?.classList.add("hidden");
+  document.getElementById("referral-credit-banner")?.classList.add("hidden");
 
   document.getElementById("detail-domain-name").textContent = selectedDomain.domain;
   const statusEl = document.getElementById("detail-status");
@@ -412,11 +513,8 @@ async function selectDomain(id) {
 
   document.getElementById("alias-domain-suffix").textContent = `@${selectedDomain.domain}`;
 
-  // Load default tab
   switchTab("aliases");
   await loadAliases();
-
-  // Fetch health in background
   loadDomainHealth();
 }
 
@@ -424,7 +522,10 @@ function goBack() {
   selectedDomain = null;
   document.getElementById("domain-detail").classList.add("hidden");
   document.getElementById("domains-list").classList.remove("hidden");
-  document.querySelector(".flex.items-center.justify-between.mb-6").classList.remove("hidden");
+  document.getElementById("domains-header")?.classList.remove("hidden");
+  document.getElementById("stats-row")?.classList.remove("hidden");
+  document.getElementById("referrals-section")?.classList.remove("hidden");
+  document.getElementById("referral-credit-banner")?.classList.remove("hidden");
   renderDomains();
 }
 
@@ -554,7 +655,6 @@ async function loadMembers() {
   const upgrade = document.getElementById("members-upgrade");
   const inviteBtn = document.getElementById("btn-invite-member");
 
-  // Check plan limits
   const sub = currentUser?.subscription;
   const plan = sub?.plan ?? "basico";
   const agentLimits = { basico: 0, freelancer: 3, developer: 10 };
@@ -703,7 +803,6 @@ async function loadDomainHealth() {
   if (!selectedDomain) return;
   const statusEl = document.getElementById("detail-status");
 
-  // Show loading state
   statusEl.textContent = "Verificando...";
   statusEl.className = "text-xs px-2 py-1 rounded-full bg-zinc-800 text-zinc-400 animate-pulse";
 
@@ -713,7 +812,6 @@ async function loadDomainHealth() {
     const health = await res.json();
     selectedDomain._health = health;
 
-    // Update badge
     const badgeStyles = {
       ok: "bg-green-900/50 text-green-400",
       warning: "bg-yellow-900/50 text-yellow-400",
@@ -723,7 +821,6 @@ async function loadDomainHealth() {
     statusEl.textContent = badgeLabels[health.status] || health.status;
     statusEl.className = `text-xs px-2 py-1 rounded-full ${badgeStyles[health.status] || badgeStyles.error}`;
 
-    // Render health panel in DNS tab if it's visible
     renderHealthPanel();
   } catch {
     statusEl.textContent = selectedDomain.verified ? "Verificado" : "Pendiente DNS";
@@ -820,7 +917,6 @@ function renderDnsRecords() {
     },
   ];
 
-  // Only show DKIM hint once (on first CNAME)
   const sharedDkimHint = `Los 3 registros CNAME son para <strong>DKIM</strong> — la firma digital que evita que tus emails caigan en spam.`;
   if (dnsItems.length > 2) dnsItems[2].hints.unshift(sharedDkimHint);
 
@@ -872,11 +968,9 @@ async function verifyDns() {
     resultEl.className = "ml-3 text-sm text-green-400";
     playSound("success");
     selectedDomain.verified = true;
-    // Update status badge
     const statusEl = document.getElementById("detail-status");
     statusEl.textContent = "Verificado";
     statusEl.className = "text-xs px-2 py-1 rounded-full bg-green-900/50 text-green-400";
-    // Refresh health after verification
     loadDomainHealth();
   } else {
     resultEl.textContent = "✗ DNS no configurado aún. Verifica los registros e intenta de nuevo.";
@@ -916,7 +1010,10 @@ function relativeTime(dateStr) {
   if (hrs < 24) return `hace ${hrs}h`;
   const days = Math.floor(hrs / 24);
   if (days === 1) return "hace 1 día";
-  if (days < 30) return `hace ${days} días`;
+  if (days < 7) return `hace ${days} días`;
+  const weeks = Math.floor(days / 7);
+  if (weeks === 1) return "hace 1 sem";
+  if (weeks < 5) return `hace ${weeks} sem`;
   const months = Math.floor(days / 30);
   if (months === 1) return "hace 1 mes";
   return `hace ${months} meses`;
@@ -930,7 +1027,6 @@ async function loadSmtpCredentials() {
   const empty = document.getElementById("smtp-empty");
   const upgrade = document.getElementById("smtp-upgrade");
 
-  // Check plan
   const sub = currentUser?.subscription;
   const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
   const isExpired = periodEnd && periodEnd < new Date();
@@ -986,7 +1082,7 @@ function renderSmtpCredentials(creds) {
   `).join("");
 }
 
-async function createSmtpCredential(label) {
+async function createSmtpCredentialUI(label) {
   if (!selectedDomain) return;
   const res = await fetch(`/api/domains/${selectedDomain.id}/smtp-credentials`, {
     method: "POST",
@@ -1003,7 +1099,6 @@ async function createSmtpCredential(label) {
 
   hideModal("modal-smtp-label");
 
-  // Reset copy tracking and disable close button
   _smtpCopied.clear();
   const closeBtn = document.getElementById("btn-smtp-close");
   if (closeBtn) {
@@ -1011,13 +1106,12 @@ async function createSmtpCredential(label) {
     closeBtn.classList.add("opacity-50", "cursor-not-allowed");
   }
 
-  // Show credentials modal with step-by-step copy fields
   const info = document.getElementById("smtp-creds-info");
   const domain = selectedDomain.domain;
   const copyIcon = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`;
 
   info.innerHTML = `
-    <p class="text-sm text-zinc-400 mb-4">Usa estas credenciales en tu aplicaci\u00f3n para enviar emails desde <strong class="text-zinc-200">${esc(domain)}</strong>.</p>
+    <p class="text-sm text-zinc-400 mb-4">Usa estas credenciales en tu aplicación para enviar emails desde <strong class="text-zinc-200">${esc(domain)}</strong>.</p>
 
     <div class="space-y-3">
       <div class="smtp-field">
@@ -1054,9 +1148,9 @@ async function createSmtpCredential(label) {
 
       <div class="smtp-field">
         <div class="flex items-center justify-between mb-1">
-          <span class="text-xs font-semibold text-yellow-400 uppercase tracking-wide">Contrase\u00f1a</span>
+          <span class="text-xs font-semibold text-yellow-400 uppercase tracking-wide">Contraseña</span>
         </div>
-        <p class="text-xs text-yellow-400/70 mb-1.5">Copia esta contrase\u00f1a ahora — no podr\u00e1s verla de nuevo.</p>
+        <p class="text-xs text-yellow-400/70 mb-1.5">Copia esta contraseña ahora — no podrás verla de nuevo.</p>
         <div class="flex items-center gap-2">
           <code class="flex-1 bg-zinc-800 border border-yellow-800/50 rounded-lg px-3 py-2.5 text-sm text-zinc-100 font-mono select-all break-all">${esc(data.password)}</code>
           <button data-copy="${esc(data.password)}" data-copy-key="password" class="smtp-copy shrink-0 bg-zinc-800 hover:bg-zinc-700 border border-yellow-800/50 rounded-lg p-2.5 text-yellow-400 hover:text-yellow-300 transition-colors" title="Copiar">${copyIcon}</button>
@@ -1068,7 +1162,7 @@ async function createSmtpCredential(label) {
   await loadSmtpCredentials();
 }
 
-async function revokeSmtpCredential(credId) {
+async function revokeSmtpCredentialUI(credId) {
   if (!selectedDomain) return;
   if (!confirm("¿Revocar esta credencial SMTP? Tu aplicación dejará de poder enviar emails.")) return;
   const res = await fetch(`/api/domains/${selectedDomain.id}/smtp-credentials/${credId}`, { method: "DELETE" });
@@ -1078,6 +1172,30 @@ async function revokeSmtpCredential(credId) {
     return;
   }
   await loadSmtpCredentials();
+}
+
+// --- Referral slug ---
+
+async function saveSlug(slug) {
+  const errEl = document.getElementById("edit-slug-error");
+  errEl.classList.add("hidden");
+
+  const res = await fetch("/api/referrals/slug", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ slug }),
+  });
+
+  if (res.ok) {
+    hideModal("modal-edit-slug");
+    playSound("pop");
+    showToast("Slug guardado");
+    await refreshUsage();
+  } else {
+    const data = await res.json();
+    errEl.textContent = data.error || "Error al guardar slug";
+    errEl.classList.remove("hidden");
+  }
 }
 
 // --- Tabs ---
@@ -1094,7 +1212,6 @@ function switchTab(tab) {
   activeBtn.classList.add("active-tab", "text-zinc-100");
   activeBtn.classList.remove("text-zinc-500");
 
-  // Load tab data
   if (tab === "aliases") loadAliases();
   else if (tab === "rules") loadRules();
   else if (tab === "logs") loadLogs();
@@ -1158,11 +1275,11 @@ function setupEventListeners() {
     const form = e.target;
     const errEl = document.getElementById("smtp-label-error");
     errEl.classList.add("hidden");
-    await createSmtpCredential(form.label.value.trim());
+    await createSmtpCredentialUI(form.label.value.trim());
     form.reset();
   });
 
-  // SMTP delegated click handlers (CSP-safe, no inline onclick)
+  // Delegated click handlers
   document.addEventListener("click", (e) => {
     const copyBtn = e.target.closest("[data-copy]");
     if (copyBtn) {
@@ -1171,9 +1288,31 @@ function setupEventListeners() {
     }
     const revokeBtn = e.target.closest("[data-revoke]");
     if (revokeBtn) {
-      revokeSmtpCredential(revokeBtn.dataset.revoke);
+      revokeSmtpCredentialUI(revokeBtn.dataset.revoke);
       return;
     }
+    // Copy referral link
+    const copyRef = e.target.closest("[data-action='copy-referral']");
+    if (copyRef) {
+      navigator.clipboard.writeText(copyRef.dataset.value);
+      playSound("pop");
+      showToast("Link copiado");
+      return;
+    }
+    // Edit slug
+    const editSlug = e.target.closest("[data-action='edit-slug']");
+    if (editSlug) {
+      const form = document.getElementById("form-edit-slug");
+      if (form && currentUser?.referralSlug) form.slug.value = currentUser.referralSlug;
+      showModal("modal-edit-slug");
+      return;
+    }
+  });
+
+  // Form: Edit slug
+  document.getElementById("form-edit-slug")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await saveSlug(e.target.slug.value.trim().toLowerCase());
   });
 
   // Form: Add domain
@@ -1195,7 +1334,6 @@ function setupEventListeners() {
       form.reset();
       await loadDomains();
       await refreshUsage();
-      // Auto-select the new domain and show DNS tab
       selectDomain(data.domain.id);
       switchTab("dns");
     } else {

@@ -17,6 +17,8 @@ import {
   bulkJobs,
   coupons,
   smtpCredentials,
+  referrals,
+  referralCredits,
 } from "./schema.js";
 
 export { db };
@@ -1237,4 +1239,97 @@ export function revokeSmtpCredential(domainId: string, id: string): { iamUsernam
     .where(eq(smtpCredentials.id, id))
     .run();
   return { iamUsername: cred.iamUsername, accessKeyId: cred.accessKeyId };
+}
+
+// --- Referrals ---
+
+export function setReferralSlug(email: string, slug: string): boolean {
+  if (!/^[a-z0-9-]+$/.test(slug) || slug.length < 3 || slug.length > 30) return false;
+  try {
+    db.update(users).set({ referralSlug: slug }).where(eq(users.email, email)).run();
+    return true;
+  } catch {
+    return false; // unique constraint violation
+  }
+}
+
+export function getUserByReferralSlug(slug: string): { email: string } | null {
+  const rows = db.select({ email: users.email }).from(users).where(eq(users.referralSlug, slug)).all();
+  return rows.length ? rows[0] : null;
+}
+
+export function createReferral(referrerEmail: string, referredEmail: string): void {
+  db.insert(referrals).values({ referrerEmail, referredEmail }).onConflictDoNothing().run();
+}
+
+export function getReferralByReferred(referredEmail: string): { id: string; referrerEmail: string; status: string } | null {
+  const rows = db.select().from(referrals).where(eq(referrals.referredEmail, referredEmail)).all();
+  return rows.length ? { id: rows[0].id, referrerEmail: rows[0].referrerEmail, status: rows[0].status } : null;
+}
+
+export function listReferrals(email: string): { id: string; referredEmail: string; status: string; createdAt: string; convertedAt?: string }[] {
+  const rows = db.select().from(referrals).where(eq(referrals.referrerEmail, email)).orderBy(desc(referrals.createdAt)).all();
+  return rows.map(r => ({
+    id: r.id,
+    referredEmail: r.referredEmail,
+    status: r.status,
+    createdAt: r.createdAt,
+    convertedAt: r.convertedAt ?? undefined,
+  }));
+}
+
+export function markReferralConverted(referralId: string): void {
+  db.update(referrals).set({ status: "converted", convertedAt: new Date().toISOString() })
+    .where(and(eq(referrals.id, referralId), eq(referrals.status, "pending"))).run();
+}
+
+export function createReferralCredit(email: string, referralId: string): void {
+  db.insert(referralCredits).values({ email, referralId }).run();
+  db.update(referrals).set({ status: "credited", creditedAt: new Date().toISOString() })
+    .where(eq(referrals.id, referralId)).run();
+}
+
+export function getUnusedCredits(email: string): { id: string; discountPercent: number }[] {
+  const rows = db.select().from(referralCredits)
+    .where(and(eq(referralCredits.email, email), eq(referralCredits.used, false)))
+    .all();
+  return rows.map(r => ({ id: r.id, discountPercent: r.discountPercent }));
+}
+
+export function markCreditsUsed(creditIds: string[]): void {
+  if (!creditIds.length) return;
+  db.update(referralCredits).set({ used: true, usedAt: new Date().toISOString() })
+    .where(and(inArray(referralCredits.id, creditIds), eq(referralCredits.used, false))).run();
+}
+
+export function getReferralStats(email: string): { total: number; pending: number; converted: number; creditsAvailable: number; slug: string | null } {
+  const rows = db.select().from(referrals).where(eq(referrals.referrerEmail, email)).all();
+  const total = rows.length;
+  const pending = rows.filter(r => r.status === "pending").length;
+  const converted = rows.filter(r => r.status === "converted" || r.status === "credited").length;
+  const credits = db.select({ c: count() }).from(referralCredits)
+    .where(and(eq(referralCredits.email, email), eq(referralCredits.used, false))).all();
+  const userRow = db.select({ referralSlug: users.referralSlug }).from(users).where(eq(users.email, email)).all();
+  return {
+    total,
+    pending,
+    converted,
+    creditsAvailable: credits[0]?.c ?? 0,
+    slug: userRow[0]?.referralSlug ?? null,
+  };
+}
+
+export function incrementPaymentCount(email: string): number {
+  db.update(users).set({ paymentCount: rawSql`${users.paymentCount} + 1` }).where(eq(users.email, email)).run();
+  const rows = db.select({ paymentCount: users.paymentCount }).from(users).where(eq(users.email, email)).all();
+  return rows[0]?.paymentCount ?? 0;
+}
+
+export function getUserReferredBy(email: string): string | null {
+  const rows = db.select({ referredBy: users.referredBy }).from(users).where(eq(users.email, email)).all();
+  return rows[0]?.referredBy ?? null;
+}
+
+export function setUserReferredBy(email: string, referrerEmail: string): void {
+  db.update(users).set({ referredBy: referrerEmail }).where(eq(users.email, email)).run();
 }

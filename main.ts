@@ -87,6 +87,20 @@ import {
   createSmtpCredential,
   listSmtpCredentials,
   revokeSmtpCredential,
+  // Referrals
+  setReferralSlug,
+  getUserByReferralSlug,
+  createReferral,
+  getReferralByReferred,
+  listReferrals,
+  markReferralConverted,
+  createReferralCredit,
+  getUnusedCredits,
+  markCreditsUsed,
+  getReferralStats,
+  incrementPaymentCount,
+  getUserReferredBy,
+  setUserReferredBy,
 } from "./db.js";
 import {
   hashPassword,
@@ -544,6 +558,16 @@ const app = new Elysia({ adapter: node() })
     const hash = await hashPassword(password);
     await createUser(email, hash);
 
+    // Handle referral
+    const ref = body.ref;
+    if (ref && typeof ref === "string") {
+      const referrer = await getUserByReferralSlug(ref);
+      if (referrer && referrer.email !== email) {
+        await setUserReferredBy(email, referrer.email);
+        await createReferral(referrer.email, email);
+      }
+    }
+
     // Send verification email
     const verifyToken = crypto.randomUUID();
     await setVerifyToken(email, verifyToken);
@@ -671,6 +695,8 @@ const app = new Elysia({ adapter: node() })
       })),
     );
 
+    const referralStats = getReferralStats(user.email);
+
     return new Response(
       JSON.stringify({
         email: user.email,
@@ -688,6 +714,8 @@ const app = new Elysia({ adapter: node() })
           rulesPerDomain,
           sendsPerDomain,
         },
+        referralSlug: referralStats.slug,
+        referralStats,
       }),
       {
         headers: { "content-type": "application/json" },
@@ -824,6 +852,32 @@ const app = new Elysia({ adapter: node() })
         "set-cookie": makeAuthCookie(jwt),
       },
     });
+  })
+
+  // --- Referrals ---
+
+  .get("/api/referrals", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const stats = getReferralStats(auth.email);
+    const refs = listReferrals(auth.email);
+    return new Response(JSON.stringify({ ...stats, referrals: refs }), { headers: { "content-type": "application/json" } });
+  })
+
+  .put("/api/referrals/slug", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 5, 60_000);
+    if (limited) return limited;
+    const body = await request.json();
+    const slug = (body.slug ?? "").toLowerCase().trim();
+    if (!slug || !/^[a-z0-9-]+$/.test(slug) || slug.length < 3 || slug.length > 30) {
+      return new Response(JSON.stringify({ error: "Slug inválido: 3-30 caracteres, solo letras minúsculas, números y guiones" }), { status: 400 });
+    }
+    const ok = setReferralSlug(auth.email, slug);
+    if (!ok) return new Response(JSON.stringify({ error: "Slug no disponible" }), { status: 409 });
+    return new Response(JSON.stringify({ ok: true, slug }), { headers: { "content-type": "application/json" } });
   })
 
   // --- Domains ---
@@ -1895,11 +1949,31 @@ const app = new Elysia({ adapter: node() })
 
         if (email) {
           if (sub.status === "authorized") {
+            // Increment payment count and check referral conversion
+            const newPaymentCount = incrementPaymentCount(email);
+            if (newPaymentCount === 2) {
+              const referral = getReferralByReferred(email);
+              if (referral && referral.status === "pending") {
+                markReferralConverted(referral.id);
+                createReferralCredit(referral.referrerEmail, referral.id);
+                log("info", "webhook", "Referral converted, credit created", { referrer: referral.referrerEmail, referred: email });
+              }
+            }
+
             // Check if this is a renewal for an existing active user
             const existingUser = await getUser(email);
             const existingSub = existingUser?.subscription;
             const isYearlyBilling = sub.auto_recurring?.frequency === 12;
             const bufferDays = isYearlyBilling ? 370 : 35;
+
+            // Apply referral credits if available (2 credits = 100% = 30 extra days)
+            const credits = getUnusedCredits(email);
+            if (credits.length >= 2) {
+              const toUse = credits.slice(0, 2);
+              markCreditsUsed(toUse.map(c => c.id));
+              extendSubscriptionPeriod(email, 30);
+              log("info", "webhook", "Referral credits applied — 30 day extension", { email, creditsUsed: 2 });
+            }
 
             if (existingSub && existingSub.mpSubscriptionId === body.data.id && existingSub.status === "active") {
               // Recurring charge — just extend the period
