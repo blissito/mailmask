@@ -1,3 +1,7 @@
+// Capture referral slug from URL
+const _refParam = new URLSearchParams(location.search).get("ref");
+if (_refParam) localStorage.setItem("mailmask_ref", _refParam);
+
 // Success banner (guest checkout redirect)
 if (new URLSearchParams(location.search).get("success") === "1") {
   document.getElementById("success-banner")?.classList.remove("hidden");
@@ -127,7 +131,7 @@ async function startCheckout(plan, billing, btn) {
     let mm, planName;
     if (d <= 1) { mm = 49; planName = "Plan Básico · 1 dominio"; }
     else if (d <= 3) { mm = 449; planName = "Plan Freelancer · hasta 15 dominios"; }
-    else { mm = 899; planName = "Plan Developer · hasta 20 dominios"; }
+    else { mm = 999; planName = "Plan Developer · hasta 20 dominios"; }
 
     animatePrice(gwPrice, prevGw, gw, 400);
     animatePrice(mmPrice, prevMm, mm, 400);
