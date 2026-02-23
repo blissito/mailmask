@@ -5,7 +5,10 @@ fetch("/api/auth/me").then(r => {
   }
 });
 
-if (localStorage.getItem("mailmask_ref") || new URLSearchParams(location.search).get("ref")) {
+const _refParam = new URLSearchParams(location.search).get("ref");
+if (_refParam) localStorage.setItem("mailmask_ref", _refParam);
+const _hasRef = localStorage.getItem("mailmask_ref") || _refParam;
+if (_hasRef) {
   document.getElementById("referral-card")?.classList.remove("hidden");
 }
 
