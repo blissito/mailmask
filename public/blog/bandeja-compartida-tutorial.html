@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cómo usar la Bandeja compartida de MailMask para atender clientes — MailMask</title>
+    <meta name="description" content="Tutorial paso a paso para configurar y usar la Bandeja compartida de MailMask. Crea aliases de soporte, invita agentes, asigna conversaciones y responde desde tu dominio." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/bandeja-compartida-tutorial" />
+    <meta property="og:title" content="Cómo usar la Bandeja compartida de MailMask para atender clientes" />
+    <meta property="og:description" content="Tutorial paso a paso para usar la Bandeja compartida de MailMask. Coordina soporte, ventas y facturación desde un solo lugar." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/bandeja-compartida-tutorial" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="article:published_time" content="2026-02-24" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Cómo usar la Bandeja compartida de MailMask para atender clientes" />
+    <meta name="twitter:description" content="Tutorial paso a paso para usar la Bandeja compartida de MailMask." />
+    <script src="/js/analytics.js"></script>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Cómo usar la Bandeja compartida de MailMask para atender clientes",
+      "description": "Tutorial paso a paso para configurar y usar la Bandeja compartida de MailMask.",
+      "datePublished": "2026-02-24",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/favicon.svg" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/bandeja-compartida-tutorial"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Tutorial Bandeja compartida", "item": "https://www.mailmask.studio/blog/bandeja-compartida-tutorial" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Cuántos agentes puedo invitar a la Bandeja compartida?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No hay límite de agentes. Puedes invitar a tantos miembros del equipo como necesites sin costo adicional. Cada agente accede con su propia cuenta de MailMask."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Los clientes ven quién respondió el email?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Cuando un agente responde desde la Bandeja, el email sale desde el alias del equipo (por ejemplo soporte@tudominio.com). El cliente no ve el nombre ni email personal del agente."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Puedo usar la Bandeja compartida en el plan Básico?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí. La Bandeja compartida está disponible en todos los planes de MailMask, incluyendo el plan Básico de $49 MXN/mes."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿La Bandeja funciona en tiempo real?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí. La Bandeja usa Server-Sent Events (SSE) para mostrar emails nuevos en tiempo real sin necesidad de recargar la página."
+          }
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
+      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Cómo usar la Bandeja compartida de MailMask para atender clientes</h1>
+        <div class="meta">
+          <span>📅 24 Feb 2026</span>
+          <span>⏱ 8 min de lectura</span>
+        </div>
+      </header>
+
+      <div class="blog-content">
+        <p>Un cliente escribe a <code>soporte@tuempresa.com</code>. Tres personas del equipo lo ven. Nadie responde porque asumen que el otro ya lo hizo. O peor: dos personas responden con información diferente. Este caos es el día a día de equipos que comparten un buzón de correo sin herramientas de coordinación.</p>
+
+        <p>La Bandeja compartida de MailMask resuelve esto. En este tutorial te mostramos cómo configurarla paso a paso para que tu equipo atienda clientes de forma organizada.</p>
+
+        <h2>Paso 1: Crea los aliases de tu equipo</h2>
+
+        <p>Antes de usar la Bandeja, necesitas aliases que reciban los emails de tus clientes. Desde el dashboard de MailMask, crea los aliases que tu equipo necesita:</p>
+
+        <ul>
+          <li><code>soporte@tudominio.com</code> — para consultas y problemas técnicos</li>
+          <li><code>ventas@tudominio.com</code> — para cotizaciones y nuevos clientes</li>
+          <li><code>facturacion@tudominio.com</code> — para temas de pago y facturas</li>
+          <li><code>hola@tudominio.com</code> — buzón general de contacto</li>
+        </ul>
+
+        <p>Cada alias puede reenviar a uno o más correos personales del equipo. Pero lo importante es que todos los emails entrantes también aparecen automáticamente en la Bandeja compartida del dominio.</p>
+
+        <h2>Paso 2: Invita agentes a tu dominio</h2>
+
+        <p>Para que otros miembros de tu equipo accedan a la Bandeja, necesitas invitarlos como agentes:</p>
+
+        <ol>
+          <li>Ve a la sección de <strong>Miembros</strong> en tu dominio</li>
+          <li>Ingresa el email del miembro que quieres invitar</li>
+          <li>Selecciona su rol: <strong>agente</strong> (puede ver y responder), <strong>admin</strong> (puede además gestionar aliases y configuración)</li>
+          <li>El invitado recibe un email y acepta la invitación</li>
+        </ol>
+
+        <p>Una vez aceptada, el agente ve la Bandeja del dominio en su propio dashboard de MailMask. No necesita compartir contraseñas ni acceso a cuentas de otros.</p>
+
+        <h2>Paso 3: Entiende la vista de la Bandeja</h2>
+
+        <p>La Bandeja muestra todas las conversaciones entrantes a los aliases de tu dominio. Cada conversación tiene:</p>
+
+        <ul>
+          <li><strong>Remitente</strong>: quién envió el email</li>
+          <li><strong>Alias</strong>: a qué dirección escribieron (<code>soporte@</code>, <code>ventas@</code>, etc.)</li>
+          <li><strong>Asunto</strong>: el subject del email</li>
+          <li><strong>Estado</strong>: abierto, en espera o resuelto</li>
+          <li><strong>Asignado a</strong>: qué agente está encargado (o sin asignar)</li>
+          <li><strong>Urgente</strong>: marcador de prioridad</li>
+        </ul>
+
+        <p>Los emails nuevos aparecen en tiempo real gracias a Server-Sent Events — no necesitas recargar la página para ver mensajes nuevos.</p>
+
+        <h2>Paso 4: Asigna conversaciones</h2>
+
+        <p>Cuando llega un email nuevo, aparece como "sin asignar". Cualquier agente puede tomarlo o asignarlo a otro miembro del equipo:</p>
+
+        <ol>
+          <li>Abre la conversación</li>
+          <li>Haz clic en <strong>Asignar</strong></li>
+          <li>Selecciona al agente responsable</li>
+        </ol>
+
+        <p>Una vez asignada, los demás agentes saben que alguien ya se está encargando. Esto elimina las respuestas duplicadas y los emails que se quedan sin atender.</p>
+
+        <p><strong>Tip</strong>: Define una regla simple con tu equipo — por ejemplo, "si ves un email sin asignar que puedes responder, tómalo". Esto evita que todo el equipo espere a que alguien más actúe.</p>
+
+        <h2>Paso 5: Responde desde el alias</h2>
+
+        <p>Cuando respondes desde la Bandeja, el email sale con la dirección del alias (<code>soporte@tudominio.com</code>), no con tu email personal. El cliente nunca ve quién del equipo respondió — solo ve la dirección profesional del equipo.</p>
+
+        <ol>
+          <li>Abre la conversación asignada a ti</li>
+          <li>Escribe tu respuesta en el campo de texto</li>
+          <li>Haz clic en <strong>Responder</strong></li>
+        </ol>
+
+        <p>La respuesta queda registrada en la conversación. Si otro agente necesita dar seguimiento después, puede ver todo el historial de la conversación sin pedirte que le reenvíes emails.</p>
+
+        <h2>Paso 6: Gestiona estados</h2>
+
+        <p>Usa los estados para mantener tu Bandeja organizada:</p>
+
+        <ul>
+          <li><strong>Abierto</strong>: el email necesita atención. Es el estado por defecto de todo email nuevo.</li>
+          <li><strong>En espera</strong>: respondiste y estás esperando respuesta del cliente, o necesitas información de alguien interno.</li>
+          <li><strong>Resuelto</strong>: la conversación se cerró. El problema se solucionó o la consulta se respondió.</li>
+        </ul>
+
+        <p>Marca como <strong>urgente</strong> las conversaciones que necesitan respuesta inmediata. Esto las coloca visualmente por encima del resto.</p>
+
+        <h2>Casos de uso</h2>
+
+        <h3>Soporte técnico</h3>
+        <p>Alias <code>soporte@tudominio.com</code> con 3 agentes. Los clientes escriben con problemas, el equipo los asigna por especialidad (frontend, backend, infraestructura) y resuelven. El cliente siempre ve respuestas desde <code>soporte@</code>, manteniendo una experiencia profesional y consistente.</p>
+
+        <h3>Ventas</h3>
+        <p>Alias <code>ventas@tudominio.com</code> con 2 agentes. Leads de la landing page llegan a la Bandeja. Cada vendedor toma los leads que puede atender. Si un vendedor sale de vacaciones, el otro ve las conversaciones pendientes y da seguimiento sin que el lead se pierda.</p>
+
+        <h3>Facturación</h3>
+        <p>Alias <code>facturacion@tudominio.com</code>. Un agente administrativo gestiona solicitudes de facturas, cambios de datos fiscales y aclaraciones de pago. Cuando necesita escalar algo al contador externo, le reenvía el hilo completo con el contexto.</p>
+
+        <h3>Buzón general para agencias</h3>
+        <p>Si <a href="/blog/email-agencia-dominio-por-cliente">manejas dominios de varios clientes</a>, cada dominio tiene su propia Bandeja. El agente de la cuenta del cliente A ve solo los emails de ese dominio. El de la cuenta B, solo los suyos. Sin mezcla, sin confusión.</p>
+
+        <h2>Tips para aprovechar la Bandeja al máximo</h2>
+
+        <h3>Nomenclatura clara de aliases</h3>
+        <p>Usa nombres que indiquen claramente el propósito:</p>
+        <ul>
+          <li><code>soporte@</code> en lugar de <code>ayuda@</code> o <code>help@</code></li>
+          <li><code>ventas@</code> en lugar de <code>comercial@</code> o <code>sales@</code></li>
+          <li><code>hola@</code> como buzón general en lugar de <code>info@</code> o <code>contacto@</code></li>
+        </ul>
+        <p>Que el nombre deje claro qué tipo de emails llegan ahí. Esto ayuda cuando tienes múltiples aliases en la Bandeja.</p>
+
+        <h3>Define turno de "guardia"</h3>
+        <p>En equipos de 3+ personas, rota quién es responsable de revisar la Bandeja y asignar emails nuevos cada día o semana. Esto evita que todos asuman que alguien más lo está haciendo.</p>
+
+        <h3>Usa "en espera" para no perder hilos</h3>
+        <p>Cuando respondes un email y esperas respuesta del cliente, márcalo como "en espera". Si pasan 48-72 horas sin respuesta, haz seguimiento. Los emails "en espera" son tu lista de pendientes de follow-up.</p>
+
+        <h3>¿Cuándo escalar a un helpdesk?</h3>
+        <p>La Bandeja compartida cubre bien a equipos que manejan hasta ~50 conversaciones diarias. Si tu volumen crece más allá de eso, o necesitas SLAs formales y métricas avanzadas, lee nuestra <a href="/blog/bandeja-compartida-vs-helpdesk">comparativa de bandeja compartida vs helpdesk</a> para decidir cuándo dar el salto.</p>
+
+        <h2>Preguntas frecuentes</h2>
+
+        <h3>¿Cuántos agentes puedo invitar?</h3>
+        <p>No hay límite. Invita a tantos miembros como necesite tu equipo, sin costo adicional por agente.</p>
+
+        <h3>¿Los clientes ven quién del equipo respondió?</h3>
+        <p>No. Las respuestas salen desde el alias del equipo. El cliente ve <code>soporte@tudominio.com</code>, no el email personal del agente.</p>
+
+        <h3>¿Puedo usar la Bandeja en el plan Básico?</h3>
+        <p>Sí. La Bandeja compartida está disponible en todos los planes, incluyendo el <a href="/pricing">plan Básico de $49 MXN/mes</a>.</p>
+
+        <h3>¿Los emails llegan en tiempo real?</h3>
+        <p>Sí. Usamos Server-Sent Events para que los emails nuevos aparezcan instantáneamente en la Bandeja sin recargar la página.</p>
+
+        <h3>¿Qué pasa si nadie asigna un email?</h3>
+        <p>Se queda en la Bandeja como "sin asignar" y "abierto". Cualquier agente puede tomarlo en cualquier momento. Te recomendamos revisar los emails sin asignar al inicio de cada jornada.</p>
+
+        <h2>Conclusión</h2>
+
+        <p>La Bandeja compartida transforma el caos de "quién responde qué" en un flujo organizado donde cada email tiene dueño, estado y visibilidad para todo el equipo. No necesitas un helpdesk de $20 USD por agente al mes para coordinar la atención al cliente — necesitas aliases bien configurados y una bandeja donde todos puedan trabajar juntos.</p>
+
+        <p><a href="/register">Crea tu cuenta en MailMask</a>, configura tus aliases de equipo y empieza a atender clientes de forma profesional desde hoy.</p>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Coordina el email de tu equipo en un solo lugar</h2>
+      <p>Bandeja compartida incluida en todos los planes. Desde $49 MXN/mes.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-zinc-800 py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">© 2026 by fixter.org</p>
+    </footer>
+  </body>
+</html>
