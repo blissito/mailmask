@@ -9,6 +9,14 @@ npm run dev       # Run dev server on :8000 (tsx --watch)
 npm test          # Run tests (tsx --test)
 ```
 
+## AWS S3 Buckets
+These buckets must exist before the app works correctly. Create them manually if they don't exist:
+```bash
+aws s3 mb s3://mailmask-inbound --region us-east-1   # Inbound email storage (SES writes here)
+aws s3 mb s3://mailmask-backups --region us-east-1   # Daily DB backups (cron + admin panel)
+```
+Override with env vars `S3_BUCKET` and `S3_BACKUP_BUCKET` respectively.
+
 ## Architecture
 - Single-file API server (`main.ts`) with all routes
 - No framework router separation — everything is chained `.get()/.post()` on one Elysia instance
@@ -82,6 +90,7 @@ npm test          # Run tests (tsx --test)
 - [ ] **Definir estrategia de historial/almacenamiento**: retención por plan (15-30 días basico/freelancer, ilimitado developer), flush automático, add-on de almacenamiento, UI de uso. Diferenciador clave vs competencia — discutir antes de implementar.
 - [ ] **Configurar SES multi-tenancy y estrategia de reputación**: Sesión de investigación para definir arquitectura de tenants SES, configuration sets por dominio, políticas de envío (Standard vs Strict), métricas de reputación a monitorear, y plan de acción para aislar dominios de clientes. Estudiar docs de SES Tenants, VDM, y EventBridge antes de implementar.
 - [ ] Evaluar pattern de almacenamiento de mensajes en Bandeja: ¿leer body de S3 on demand vs duplicar en SQLite? Investigar otros patterns (cache intermedio, pre-procesado a formato ligero, CDN/signed URLs). Concluir cuál es el mejor approach antes de implementar.
+- [ ] **Radar de Actividad por Alias**: Dashboard analítico por alias — volumen de emails por día/semana, horas pico, ratio legítimo vs marketing/spam, aliases "muertos" (30+ días sin actividad) con sugerencia de desactivarlos. Layer de IA (via formmy.app) que genera resumen semanal en lenguaje natural ("Tu alias newsletter@ recibió 47 emails esta semana, 82% son marketing — considera desactivarlo"). El 90% son queries SQL sobre datos existentes (logs/mensajes), la IA solo genera el resumen. Email semanal via SES con cron. Implementación: 3-4 días. Disponible en todos los planes como feature de retención.
 
 ### Contenido / Educación
 - [ ] **Guías de automatización con IA + aliases**: Blog posts y/o sección educativa enseñando a usuarios a automatizar workflows usando aliases específicos de MailMask + herramientas de IA. Ejemplos: alias dedicado para recibir notificaciones de n8n/Make/Zapier, alias como trigger de workflows AI, alias para clasificación automática de leads, alias temporal para campañas con análisis automático. Doble propósito: educar usuarios existentes y atraer audiencia técnica vía SEO. Investigar y documentar patrones concretos antes de escribir.

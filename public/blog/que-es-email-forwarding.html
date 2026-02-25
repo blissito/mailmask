@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>¿Qué es email forwarding y cómo funciona? Guía completa — MailMask</title>
+    <meta name="description" content="Email forwarding te permite recibir emails de tu dominio sin comprar buzones. Aprende cómo funciona, cuándo usarlo y cómo configurarlo en minutos." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/que-es-email-forwarding" />
+    <meta property="og:title" content="¿Qué es email forwarding y cómo funciona?" />
+    <meta property="og:description" content="Email forwarding te permite recibir emails de tu dominio sin comprar buzones. Guía completa." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/que-es-email-forwarding" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="article:published_time" content="2026-02-24" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="¿Qué es email forwarding y cómo funciona?" />
+    <meta name="twitter:description" content="Email forwarding te permite recibir emails de tu dominio sin comprar buzones." />
+    <script src="/js/analytics.js"></script>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "¿Qué es email forwarding y cómo funciona? Guía completa",
+      "description": "Email forwarding te permite recibir emails de tu dominio sin comprar buzones. Guía completa.",
+      "datePublished": "2026-02-24",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/favicon.svg" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/que-es-email-forwarding"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Qué es email forwarding", "item": "https://www.mailmask.studio/blog/que-es-email-forwarding" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Qué es email forwarding?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Email forwarding (reenvío de correo) es un servicio que toma los emails enviados a una dirección de tu dominio y los reenvía automáticamente a tu correo personal (Gmail, Outlook, etc.). No necesitas un buzón dedicado — usas el que ya tienes."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Email forwarding es lo mismo que tener un buzón de correo?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Un buzón de correo (como Google Workspace) almacena emails en su propio servidor. Email forwarding reenvía los emails a un buzón que ya tienes. Es más barato, más simple, y no requiere cambiar de app de correo."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Puedo enviar emails desde mi dominio con forwarding?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí. Servicios como MailMask permiten responder desde tu alias vía la Bandeja compartida o configurar send-as en Gmail. También puedes usar SMTP relay para enviar desde código o herramientas de automatización."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿El email forwarding es seguro?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí, siempre que el servicio configure correctamente DKIM, SPF y DMARC. MailMask firma los emails reenviados con DKIM de tu dominio para que no caigan en spam y mantiene la autenticación completa."
+          }
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
+      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>¿Qué es email forwarding y cómo funciona?</h1>
+        <div class="meta">
+          <span>📅 24 Feb 2026</span>
+          <span>⏱ 7 min de lectura</span>
+        </div>
+      </header>
+
+      <div class="blog-content">
+        <div class="tldr">
+          <strong>En resumen</strong>
+          Email forwarding reenvía automáticamente los correos de tu dominio (<code>hola@tunegocio.com</code>) a tu email personal (Gmail, Outlook, etc.). No necesitas buzón dedicado, no cambias de app, y cuesta una fracción de Google Workspace.
+        </div>
+
+        <p>Tienes un dominio. Quieres recibir emails en <code>hola@tunegocio.com</code>. La opción tradicional es comprar un buzón de correo — Google Workspace, Microsoft 365, o el email de tu hosting. Pero hay otra forma más simple y barata: email forwarding.</p>
+
+        <p>En esta guía te explicamos qué es, cómo funciona por dentro, y cuándo tiene sentido usarlo en lugar de un buzón tradicional.</p>
+
+        <h2>El concepto en 30 segundos</h2>
+
+        <p>Email forwarding es una redirección. Alguien envía un email a <code>ventas@tunegocio.com</code>. En lugar de almacenarse en un buzón dedicado, el email se reenvía automáticamente a tu dirección personal — por ejemplo, tu Gmail.</p>
+
+        <div class="callout">
+          <p>Piénsalo como el reenvío de llamadas de un teléfono de oficina. El número es profesional, pero la llamada llega a tu celular. El que llama nunca sabe la diferencia.</p>
+        </div>
+
+        <p>El resultado: tus clientes ven una dirección profesional, tú lees los emails donde siempre — sin aprender herramientas nuevas, sin gestionar otro buzón, sin pagar por usuario.</p>
+
+        <h2>Cómo funciona por dentro</h2>
+
+        <p>Cuando alguien envía un email a una dirección de tu dominio, esto es lo que pasa:</p>
+
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <div>
+            <h4>El email llega a tu dominio</h4>
+            <p>Los registros MX de tu DNS apuntan al servidor de forwarding (por ejemplo, AWS SES en el caso de MailMask). El servidor de correo del remitente lo entrega ahí.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <div>
+            <h4>El servicio de forwarding lo procesa</h4>
+            <p>Se verifica que el alias existe y está activo. Se revisan filtros de spam y virus. Se aplican las reglas configuradas (si las hay).</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <div>
+            <h4>Se reenvía al destino</h4>
+            <p>El email se envía al correo personal que configuraste como destino. Se firma con DKIM de tu dominio para que no caiga en spam. Todo pasa en milisegundos.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <div>
+            <h4>Lo lees en tu app de siempre</h4>
+            <p>El email aparece en tu Gmail, Outlook, Apple Mail o donde sea que leas tu correo. Sin apps nuevas, sin contraseñas adicionales.</p>
+          </div>
+        </div>
+
+        <h2>Forwarding vs buzón dedicado</h2>
+
+        <p>La pregunta obvia: ¿por qué no simplemente comprar un buzón en Google Workspace? Depende de lo que necesites.</p>
+
+        <div class="comparison-row">
+          <div class="comparison-card">
+            <h4>Buzón dedicado</h4>
+            <p>Google Workspace, Microsoft 365, etc. Cada usuario tiene su propia bandeja de entrada, calendario, Drive. Cobro por usuario (~$6-18 USD/mes). Ideal si necesitas la suite completa de productividad integrada.</p>
+          </div>
+          <div class="comparison-card accent">
+            <h4>Email forwarding</h4>
+            <p>Reenvío a tu email actual. Sin buzón nuevo, sin app nueva. Precio fijo sin importar usuarios. Ideal si solo necesitas email profesional con dominio propio y ya tienes un email que te gusta.</p>
+          </div>
+        </div>
+
+        <div class="highlight-box">
+          <h4>La pregunta clave</h4>
+          <p>¿Necesitas Google Drive, Calendar empresarial y admin console para cada miembro del equipo? → Workspace. ¿Solo necesitas que <code>nombre@tudominio.com</code> funcione? → Forwarding.</p>
+        </div>
+
+        <p>La realidad es que la mayoría de los negocios pequeños en LATAM ya usan Gmail gratuito o Outlook personal. Todos en el equipo tienen su Drive personal, su Calendar personal. Lo único que falta es que el email tenga el dominio de la empresa. Forwarding resuelve exactamente eso, sin cambiar nada más.</p>
+
+        <h2>¿Qué puedes hacer con email forwarding?</h2>
+
+        <p>Más de lo que imaginas. El forwarding moderno va mucho más allá de una simple redirección:</p>
+
+        <ul>
+          <li><strong>Múltiples aliases</strong>: crea <code>hola@</code>, <code>ventas@</code>, <code>soporte@</code>, <code>nombre@</code> — todos reenvían a donde tú decidas (5 en plan Básico, hasta 100 en Developer)</li>
+          <li><strong>Múltiples destinos</strong>: un alias puede reenviar a varias personas. <code>soporte@</code> llega a los 3 agentes de soporte simultáneamente</li>
+          <li><strong>Responder desde el alias</strong>: con la <a href="/blog/bandeja-compartida-tutorial">Bandeja compartida</a> o configurando send-as en Gmail, puedes responder como <code>ventas@tudominio.com</code></li>
+          <li><strong>Reglas de forwarding</strong>: reenviar solo si el asunto contiene cierta palabra, o solo de ciertos remitentes</li>
+          <li><strong>SMTP relay</strong>: enviar emails desde código o herramientas de automatización usando tu dominio</li>
+          <li><strong>Bandeja compartida</strong>: ver y coordinar todos los emails entrantes con tu equipo en un solo lugar</li>
+        </ul>
+
+        <h2>¿Es seguro?</h2>
+
+        <p>Sí, pero depende de cómo esté implementado. Un buen servicio de forwarding debe:</p>
+
+        <ul>
+          <li><strong>Firmar con DKIM</strong>: cada email reenviado se firma criptográficamente para probar que viene de tu dominio. Sin esto, los emails caen en spam. Lee más sobre <a href="/blog/que-son-dkim-spf-dmarc">DKIM, SPF y DMARC</a>.</li>
+          <li><strong>Filtrar spam y virus</strong>: rechazar emails maliciosos antes de reenviarlos a tu buzón personal</li>
+          <li><strong>Usar TLS</strong>: cifrar la conexión durante el reenvío</li>
+          <li><strong>No almacenar contenido innecesariamente</strong>: el email pasa por el servidor de forwarding, se reenvía, y no queda una copia flotando por ahí</li>
+        </ul>
+
+        <div class="callout">
+          <p>MailMask usa AWS SES (el mismo servicio que Amazon usa internamente) para procesar y reenviar emails. Cada email se firma con DKIM de tu dominio y pasa por filtros de spam y virus antes de llegar a tu buzón.</p>
+        </div>
+
+        <h2>¿Cuándo NO usar forwarding?</h2>
+
+        <p>Email forwarding no es la solución para todos. Considera un buzón dedicado si:</p>
+
+        <ul>
+          <li><strong>Necesitas la suite de Google completa</strong>: Drive compartido empresarial, Calendar con salas de reuniones, Vault para compliance legal</li>
+          <li><strong>Regulaciones de tu industria</strong>: algunos sectores (financiero, salud) requieren control total del almacenamiento de emails para auditoría</li>
+          <li><strong>Email como herramienta de trabajo principal</strong>: si pasas 6+ horas al día en email y necesitas búsqueda avanzada, etiquetas, filtros complejos — Gmail/Outlook como buzón dedicado tiene más sentido</li>
+        </ul>
+
+        <p>Para el 90% de los negocios pequeños, freelancers y equipos remotos en LATAM, el forwarding cubre todo lo necesario.</p>
+
+        <h2>Cómo configurar email forwarding con MailMask</h2>
+
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <div>
+            <h4>Crea tu cuenta</h4>
+            <p>Regístrate en <a href="/register">mailmask.studio</a>. Toma menos de un minuto.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <div>
+            <h4>Agrega tu dominio</h4>
+            <p>Ingresa tu dominio y configura los registros MX y DKIM en tu registrador (Namecheap, GoDaddy, Cloudflare, etc.). MailMask te dice exactamente qué valores copiar.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <div>
+            <h4>Crea aliases</h4>
+            <p>Define <code>hola@</code>, <code>ventas@</code>, <code>soporte@</code> — cada uno con el destino de reenvío que quieras (tu Gmail, Outlook, o varios emails).</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <div>
+            <h4>Listo — recibe y responde</h4>
+            <p>Los emails a tu dominio llegan a tu correo personal. Responde desde la <a href="/blog/bandeja-compartida-tutorial">Bandeja compartida</a> o <a href="/blog/enviar-emails-desde-dominio">configura send-as</a> en Gmail.</p>
+          </div>
+        </div>
+
+        <p>Todo el proceso toma entre 10 y 30 minutos, dependiendo de cuánto tarde la propagación de DNS.</p>
+
+        <h2>Preguntas frecuentes</h2>
+
+        <h3>¿El forwarding retrasa la entrega del email?</h3>
+        <p>No de forma perceptible. El reenvío agrega milisegundos al proceso. En la práctica, los emails llegan igual de rápido que a un buzón directo.</p>
+
+        <h3>¿Puedo reenviar a más de una dirección?</h3>
+        <p>Sí. Un alias puede tener múltiples destinos. <code>soporte@tudominio.com</code> puede llegar simultáneamente al email de 3 personas del equipo.</p>
+
+        <h3>¿Qué pasa si mi Gmail está lleno?</h3>
+        <p>El email se reenvía igual — es el servidor de Gmail el que decide si lo acepta o no. Si tu buzón de destino está lleno, el email rebota como rebotaría cualquier email directo a esa dirección.</p>
+
+        <h3>¿Puedo cambiar el destino de reenvío después?</h3>
+        <p>Sí, en cualquier momento desde el dashboard. Útil cuando alguien del equipo cambia de email o cuando reasignas la responsabilidad de un alias.</p>
+
+        <h3>¿Hay límite de aliases?</h3>
+        <p>Depende del plan. El plan Básico incluye 5 aliases (suficiente para la mayoría de negocios pequeños), Freelancer 50, y Developer 100. Lo que cambia entre planes es también el número de dominios que puedes conectar.</p>
+
+        <h2>Conclusión</h2>
+
+        <p>Email forwarding es la forma más simple y barata de tener email profesional con dominio propio. No necesitas migrar a una nueva plataforma, no necesitas aprender una herramienta nueva, y no pagas por cada persona que necesita un email del dominio.</p>
+
+        <p>Si ya tienes un dominio y un email que te gusta, <a href="/register">configura MailMask</a> y empieza a recibir en <code>hola@tudominio.com</code> en menos de 15 minutos.</p>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Email forwarding configurado en minutos</h2>
+      <p>Tu dominio. Tu email de siempre. Desde $49 MXN/mes.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-zinc-800 py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">© 2026 by fixter.org</p>
+    </footer>
+  </body>
+</html>

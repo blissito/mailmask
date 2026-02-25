@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Un solo correo de contacto, cero desorden: clasifica emails automáticamente con IA — MailMask</title>
+    <meta name="description" content="MailMask está desarrollando clasificación automática de emails con IA. Cada email entrante se etiqueta como venta, soporte o facturación — y se enruta al equipo correcto." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/clasificador-automatico-emails-ia" />
+    <meta property="og:title" content="Un solo correo de contacto, cero desorden: clasifica emails con IA" />
+    <meta property="og:description" content="Clasificación automática de emails con IA. Un alias genérico que enruta inteligentemente a tu equipo." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/clasificador-automatico-emails-ia" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="article:published_time" content="2026-02-24" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Clasifica emails automáticamente con IA — MailMask" />
+    <meta name="twitter:description" content="Clasificación automática de emails con IA. Un alias genérico que enruta inteligentemente." />
+    <script src="/js/analytics.js"></script>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Un solo correo de contacto, cero desorden: clasifica emails automáticamente con IA",
+      "description": "MailMask está desarrollando clasificación automática de emails con IA powered by formmy.app.",
+      "datePublished": "2026-02-24",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/favicon.svg" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/clasificador-automatico-emails-ia"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Clasificador automático con IA", "item": "https://www.mailmask.studio/blog/clasificador-automatico-emails-ia" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Qué es el clasificador automático de emails de MailMask?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Es una feature en desarrollo que usa agentes de IA para analizar cada email entrante y clasificarlo automáticamente por intención: venta, soporte, facturación, spam o marketing. La clasificación se muestra como etiqueta en la Bandeja y puede usarse para enrutar emails automáticamente."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué tecnología de IA usa el clasificador?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "El clasificador está siendo desarrollado con los agentes de IA de formmy.app, nuestro partner tecnológico. Los agentes de Formmy procesan el contenido del email de forma segura y devuelven la clasificación sin almacenar datos del usuario."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿El clasificador lee el contenido completo de mis emails?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "El agente de IA analiza el asunto y las primeras líneas del cuerpo del email para determinar la intención. No almacena el contenido ni lo usa para entrenar modelos. La privacidad del email se mantiene intacta."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cuándo estará disponible el clasificador automático?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Estamos explorando las capacidades de los agentes de Formmy y desarrollando la integración. Publicaremos actualizaciones en nuestro blog conforme avancemos."
+          }
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
+      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Un solo correo de contacto, cero desorden: clasifica emails automáticamente con IA</h1>
+        <div class="meta">
+          <span>📅 24 Feb 2026</span>
+          <span>⏱ 6 min de lectura</span>
+        </div>
+      </header>
+
+      <div class="blog-content">
+        <div class="tldr">
+          <strong>Feature en desarrollo</strong>
+          Estamos construyendo un clasificador automático de emails que usa agentes de IA de <a href="https://formmy.app">formmy.app</a> para etiquetar cada email entrante por intención: venta, soporte, facturación, marketing. La etiqueta aparece en la Bandeja y puede usarse para enrutar emails al equipo correcto — todo desde un solo alias de contacto.
+        </div>
+
+        <p>Tienes un negocio pequeño. Publicas <code>hola@tunegocio.com</code> en tu sitio web, redes sociales y tarjetas. Todo llega al mismo lugar: cotizaciones, quejas, solicitudes de factura, newsletters a las que alguien te suscribió, y spam. Tú o tu equipo abre la bandeja y tiene que descifrar email por email qué es cada cosa y quién debería responder.</p>
+
+        <p>La solución obvia es crear aliases separados — <code>ventas@</code>, <code>soporte@</code>, <code>facturacion@</code>. Pero los clientes no leen. Escriben a <code>hola@</code> para todo. Y ahí estás tú, clasificando manualmente.</p>
+
+        <h2>El problema de la bandeja desordenada</h2>
+
+        <p>Si manejas la <a href="/blog/bandeja-compartida-tutorial">Bandeja compartida</a> de un negocio que recibe 20-50 emails al día, sabes que:</p>
+
+        <ul>
+          <li>El 30-40% son marketing, newsletters y notificaciones automáticas que nadie pidió</li>
+          <li>Los emails de venta se mezclan con los de soporte</li>
+          <li>Un email urgente de un cliente se pierde entre 10 de spam</li>
+          <li>El equipo gasta tiempo decidiendo "¿esto es para mí?" antes de poder actuar</li>
+        </ul>
+
+        <p>Esto no escala. Y crear más aliases no resuelve el problema porque los clientes siempre escriben a la dirección genérica.</p>
+
+        <h2>La idea: clasificación automática con IA</h2>
+
+        <p>Estamos desarrollando una feature que resuelve esto en la capa más temprana posible — cuando el email llega, antes de que ningún humano lo vea:</p>
+
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <div>
+            <h4>El email llega a tu alias</h4>
+            <p>Un cliente escribe a <code>hola@tunegocio.com</code> con una pregunta sobre precios.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <div>
+            <h4>Un agente de IA lo analiza</h4>
+            <p>Un agente de <a href="https://formmy.app">Formmy</a> lee el asunto y las primeras líneas del email. Determina: "esto es una consulta de venta".</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <div>
+            <h4>Se etiqueta automáticamente</h4>
+            <p>El email aparece en tu Bandeja con la etiqueta <strong>venta</strong>. Tu equipo de ventas lo ve de inmediato. Tu equipo de soporte lo ignora sin perder tiempo.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <div>
+            <h4>Se enruta si tienes reglas</h4>
+            <p>Opcionalmente: si tienes una regla "intención = venta → reenviar a ventas@", el email se enruta automáticamente sin intervención humana.</p>
+          </div>
+        </div>
+
+        <h2>¿Por qué agentes de Formmy?</h2>
+
+        <p>Cuando decidimos agregar IA a MailMask, evaluamos varias opciones. Elegimos trabajar con <a href="https://formmy.app">formmy.app</a> como partner tecnológico por tres razones:</p>
+
+        <div class="highlight-box">
+          <h4>Agentes potentes y seguros</h4>
+          <p><a href="https://formmy.app">Formmy</a> provee agentes de inteligencia artificial diseñados para procesar datos de forma segura. El email es información sensible — no cualquier modelo sirve. Los agentes de Formmy procesan el contenido, devuelven la clasificación, y no almacenan datos del usuario. La privacidad no se negocia.</p>
+        </div>
+
+        <ul>
+          <li><strong>Precisión en español</strong>: los agentes de Formmy están optimizados para procesar contenido en español — nuestro mercado principal. Un email que dice "¿cuánto cuesta?" se clasifica como venta, no como soporte.</li>
+          <li><strong>Velocidad</strong>: la clasificación toma milisegundos. El email aparece en la Bandeja ya etiquetado, sin delay perceptible.</li>
+          <li><strong>Costo por email bajísimo</strong>: al usar modelos eficientes a través de Formmy, el costo por clasificación es de fracciones de centavo. Esto nos permite ofrecer la feature sin encarecer los planes.</li>
+        </ul>
+
+        <h2>Categorías de clasificación</h2>
+
+        <p>Estamos definiendo las categorías iniciales basándonos en los patrones más comunes de negocios pequeños en LATAM:</p>
+
+        <div class="comparison-row">
+          <div class="comparison-card accent">
+            <h4>Venta</h4>
+            <p>Cotizaciones, preguntas sobre precios, interés en productos/servicios, solicitudes de demo.</p>
+          </div>
+          <div class="comparison-card">
+            <h4>Soporte</h4>
+            <p>Problemas técnicos, quejas, solicitudes de ayuda, bugs, preguntas de uso.</p>
+          </div>
+        </div>
+
+        <div class="comparison-row">
+          <div class="comparison-card">
+            <h4>Facturación</h4>
+            <p>Solicitudes de factura, datos fiscales, aclaraciones de cobro, recibos.</p>
+          </div>
+          <div class="comparison-card">
+            <h4>Marketing / Spam</h4>
+            <p>Newsletters, promociones, emails automáticos de plataformas, spam puro.</p>
+          </div>
+        </div>
+
+        <p>El plan a futuro es permitir categorías personalizadas por dominio — que definas tus propias etiquetas según tu negocio. Pero empezamos con estas cuatro porque cubren el 90% de los casos.</p>
+
+        <h2>Integración con reglas de forwarding</h2>
+
+        <p>La clasificación por sí sola ya es útil — ver etiquetas en la Bandeja te ahorra tiempo. Pero el verdadero poder está en combinarla con las reglas de forwarding de MailMask.</p>
+
+        <p>Imagina estas reglas:</p>
+
+        <ul>
+          <li><strong>Si intención = venta</strong> → reenviar a <code>ventas@tunegocio.com</code> (que va al equipo comercial)</li>
+          <li><strong>Si intención = soporte</strong> → reenviar a <code>soporte@tunegocio.com</code> (que va al equipo técnico)</li>
+          <li><strong>Si intención = marketing</strong> → archivar automáticamente (no molesta a nadie)</li>
+          <li><strong>Si intención = facturación</strong> → reenviar al administrador</li>
+        </ul>
+
+        <div class="callout">
+          <p>Con esto, <code>hola@tunegocio.com</code> se convierte en un mini-router inteligente. Los clientes escriben a una sola dirección, pero cada email llega automáticamente a la persona correcta.</p>
+        </div>
+
+        <h2>Privacidad y seguridad</h2>
+
+        <p>Somos un servicio de email — la privacidad es lo primero. Así es como funciona la clasificación sin comprometer datos:</p>
+
+        <ul>
+          <li><strong>Procesamiento mínimo</strong>: el agente de Formmy solo lee el asunto y las primeras líneas del cuerpo. No procesa adjuntos ni el email completo.</li>
+          <li><strong>Sin almacenamiento</strong>: el contenido del email no se guarda en los servidores de Formmy. Entra, se clasifica, se descarta.</li>
+          <li><strong>Sin entrenamiento</strong>: tus emails no se usan para entrenar modelos de IA. Nunca.</li>
+          <li><strong>Opt-in</strong>: la clasificación automática se activará por dominio. Si no la quieres, no se activa.</li>
+        </ul>
+
+        <h2>¿Cuándo estará disponible?</h2>
+
+        <p>Estamos explorando activamente las capacidades de los agentes de <a href="https://formmy.app">Formmy</a> y construyendo la integración. No tenemos fecha exacta todavía — preferimos hacerlo bien que hacerlo rápido.</p>
+
+        <p>Lo que sí sabemos:</p>
+
+        <ul>
+          <li>La clasificación básica (4 categorías) será la primera en salir</li>
+          <li>Estará disponible en la Bandeja antes de integrarse con reglas de forwarding</li>
+          <li>Publicaremos actualizaciones en este blog conforme avancemos</li>
+        </ul>
+
+        <h2>¿Qué significa esto para ti?</h2>
+
+        <p>Si hoy usas <code>hola@</code> como buzón genérico y pasas tiempo clasificando emails manualmente, esta feature te va a cambiar el flujo de trabajo. Si tienes equipo, multiplica el impacto — cada persona deja de gastar tiempo en "¿esto es para mí?" y empieza a actuar directamente.</p>
+
+        <p>Y todo sin cambiar tu dirección de contacto. <code>hola@tunegocio.com</code> sigue siendo simple para tus clientes, pero inteligente por dentro.</p>
+
+        <p><a href="/register">Crea tu cuenta en MailMask</a> para tener todo listo cuando la feature esté disponible.</p>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>IA que clasifica tus emails — próximamente</h2>
+      <p>Crea tu cuenta hoy y sé de los primeros en probarlo.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-zinc-800 py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">© 2026 by fixter.org</p>
+    </footer>
+  </body>
+</html>
