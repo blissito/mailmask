@@ -247,7 +247,7 @@ function renderReferrals() {
   if (!stats) { container.innerHTML = ""; return; }
 
   const slug = stats.slug || "";
-  const link = slug ? `mailmask.studio/register?ref=${esc(slug)}` : "";
+  const link = slug ? `www.mailmask.studio/register?ref=${esc(slug)}` : "";
   const progressPct = Math.min(100, Math.round((stats.converted / 2) * 100));
   const clicks = stats.clicks || { total: 0, last30Days: 0, byWeek: [] };
 
