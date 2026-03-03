@@ -2067,13 +2067,11 @@ const app = new Elysia({ adapter: node() })
               const periodEnd = new Date();
               periodEnd.setDate(periodEnd.getDate() + bufferDays);
 
-              // 2nd month free for referred users (1st month is MP trial)
-              if (newPaymentCount === 1) {
-                const referredBy = getUserReferredBy(email);
-                if (referredBy) {
-                  periodEnd.setDate(periodEnd.getDate() + 30);
-                  log("info", "webhook", "Referred user gets 2nd month free", { email, referrer: referredBy });
-                }
+              // 2nd month free for referred users on first activation
+              const referredBy = getUserReferredBy(email);
+              if (referredBy && (!existingSub || existingSub.status === "none")) {
+                periodEnd.setDate(periodEnd.getDate() + 30);
+                log("info", "webhook", "Referred user gets 2nd month free", { email, referrer: referredBy });
               }
 
               await updateUserSubscription(email, {
