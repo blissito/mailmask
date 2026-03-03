@@ -604,11 +604,17 @@ async function searchDomainAvailability() {
   resultEl.classList.add("hidden");
   resultEl.innerHTML = "";
 
-  if (!q || !q.includes(".")) {
-    errEl.textContent = "Incluye la extensión, ej: miempresa.com";
-    errEl.classList.remove("hidden");
+  if (!q) { renderTldGrid(""); return; }
+
+  // If no TLD or just a trailing dot, update TLD grid with the name
+  const base = q.replace(/\.$/, "");
+  if (!q.includes(".") || q.endsWith(".")) {
+    renderTldGrid(base);
     return;
   }
+
+  // Hide TLD grid, show result area
+  document.getElementById("add-domain-tld-grid")?.classList.add("hidden");
 
   resultEl.innerHTML = `<p class="text-sm text-zinc-400">Buscando disponibilidad...</p>`;
   resultEl.classList.remove("hidden");
@@ -658,9 +664,9 @@ async function searchDomainAvailability() {
       resultEl.querySelector("#btn-connect-existing").addEventListener("click", () => connectExistingDomain(q));
     } else {
       resultEl.innerHTML = `
-        <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
+        <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg px-4 py-4">
           <p class="text-sm text-zinc-300 mb-1"><span class="font-semibold">${esc(data.domain)}</span> ya está registrado</p>
-          <p class="text-xs text-zinc-500 mb-3">Si es tuyo, conéctalo para usarlo con MailMask.</p>
+          <p class="text-xs text-zinc-500 mb-4">Si es tuyo, conéctalo para usarlo con MailMask.</p>
           <button type="button" id="btn-connect-existing" class="w-full bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors mb-2">
             Ya es mío, conectarlo →
           </button>
@@ -673,6 +679,7 @@ async function searchDomainAvailability() {
         resultEl.classList.add("hidden");
         input.value = "";
         input.focus();
+        renderTldGrid("");
       });
     }
     playSound("pop");
@@ -1463,14 +1470,56 @@ function hideModal(id) {
   document.getElementById(id).classList.add("hidden");
 }
 
+const AVAILABLE_TLDS = [
+  { tld: ".com", price: 59900, popular: true },
+  { tld: ".mx", price: 159900 },
+  { tld: ".com.mx", price: 159900 },
+  { tld: ".net", price: 49900 },
+  { tld: ".org", price: 54900 },
+  { tld: ".dev", price: 64900, popular: true },
+  { tld: ".app", price: 64900 },
+  { tld: ".io", price: 179900, popular: true },
+  { tld: ".co", price: 114900 },
+  { tld: ".click", price: 13900 },
+  { tld: ".link", price: 22900 },
+  { tld: ".xyz", price: 54900 },
+  { tld: ".info", price: 54900 },
+  { tld: ".me", price: 86900 },
+];
+
+function renderTldGrid(base) {
+  const container = document.getElementById("add-domain-tld-list");
+  const gridEl = document.getElementById("add-domain-tld-grid");
+  if (!container || !gridEl) return;
+
+  const name = base || "tudominio";
+  container.innerHTML = AVAILABLE_TLDS.map(t => {
+    const p = (t.price / 100).toLocaleString("es-MX", { style: "currency", currency: "MXN", currencyDisplay: "narrowSymbol" });
+    return `<button type="button" class="tld-suggestion group text-left bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 hover:border-mask-600/50 rounded-xl px-4 py-3 transition-all" data-domain="${esc(name + t.tld)}">
+      <div class="flex items-center justify-between">
+        <span class="text-sm font-medium text-zinc-300 group-hover:text-zinc-100">${esc(name)}<span class="text-mask-400">${t.tld}</span></span>
+        ${t.popular ? '<span class="text-[9px] bg-mask-600/20 text-mask-400 px-1.5 py-0.5 rounded-full">Popular</span>' : ''}
+      </div>
+      <span class="text-xs text-zinc-500">${p} MXN/año</span>
+    </button>`;
+  }).join("");
+  gridEl.classList.remove("hidden");
+  container.querySelectorAll(".tld-suggestion").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.getElementById("add-domain-input").value = btn.dataset.domain;
+      searchDomainAvailability();
+    });
+  });
+}
+
 function showAddDomainModal() {
-  // Reset modal state
   const input = document.getElementById("add-domain-input");
   const errEl = document.getElementById("add-domain-error");
   const resultEl = document.getElementById("add-domain-step-result");
   if (input) input.value = "";
   if (errEl) errEl.classList.add("hidden");
   if (resultEl) { resultEl.classList.add("hidden"); resultEl.innerHTML = ""; }
+  renderTldGrid("");
   showModal("modal-add-domain");
 }
 
@@ -1490,6 +1539,13 @@ function setupEventListeners() {
   document.getElementById("btn-add-domain-search")?.addEventListener("click", searchDomainAvailability);
   document.getElementById("add-domain-input")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); searchDomainAvailability(); }
+  });
+  document.getElementById("add-domain-input")?.addEventListener("input", (e) => {
+    const v = e.target.value.trim().toLowerCase().replace(/\.$/, "");
+    if (!v || !v.includes(".")) {
+      document.getElementById("add-domain-step-result")?.classList.add("hidden");
+      renderTldGrid(v);
+    }
   });
 
   // Back button

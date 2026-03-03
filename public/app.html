@@ -224,26 +224,42 @@
 
   <!-- Modal: Add domain (unified search + connect flow) -->
   <div id="modal-add-domain" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
-      <h3 class="text-lg font-bold mb-4">¿Qué dominio quieres usar?</h3>
-
-      <!-- Step 1: Search -->
-      <div id="add-domain-step-search">
-        <div class="flex gap-2">
-          <input type="text" id="add-domain-input" placeholder="miempresa.com" required
-            class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-mask-500 focus:outline-none">
-          <button type="button" id="btn-add-domain-search" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-3 rounded-lg transition-colors whitespace-nowrap">
-            Buscar
+    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-2xl p-0 overflow-hidden">
+      <!-- Header -->
+      <div class="px-8 pt-8 pb-4">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-xl font-bold">Agregar dominio</h3>
+          <button type="button" class="btn-cancel-modal text-zinc-500 hover:text-zinc-300 transition-colors" data-modal="modal-add-domain">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
-        <div id="add-domain-error" class="text-red-400 text-sm mt-2 hidden"></div>
+        <p class="text-sm text-zinc-500">Busca un dominio para comprar o conecta uno que ya tengas.</p>
       </div>
 
-      <!-- Step 2: Result (injected dynamically) -->
-      <div id="add-domain-step-result" class="hidden mt-4"></div>
+      <!-- Search bar -->
+      <div class="px-8 pb-4">
+        <div id="add-domain-step-search">
+          <div class="flex gap-2">
+            <div class="flex-1 relative">
+              <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input type="text" id="add-domain-input" placeholder="Escribe un dominio, ej: miempresa.com" required
+                class="w-full bg-zinc-800 border border-zinc-700 rounded-xl pl-10 pr-4 py-3.5 text-zinc-100 placeholder-zinc-500 focus:border-mask-500 focus:outline-none text-sm">
+            </div>
+            <button type="button" id="btn-add-domain-search" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-6 py-3.5 rounded-xl transition-colors whitespace-nowrap text-sm">
+              Buscar
+            </button>
+          </div>
+          <div id="add-domain-error" class="text-red-400 text-sm mt-2 hidden"></div>
+        </div>
+      </div>
 
-      <div class="flex justify-end mt-6">
-        <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-add-domain">Cancelar</button>
+      <!-- Result area -->
+      <div id="add-domain-step-result" class="hidden px-8 pb-8"></div>
+
+      <!-- Default: TLD grid (shown when no search yet) -->
+      <div id="add-domain-tld-grid" class="px-8 pb-8">
+        <p class="text-xs text-zinc-500 mb-3 uppercase tracking-wider font-medium">Extensiones disponibles</p>
+        <div id="add-domain-tld-list" class="grid grid-cols-2 sm:grid-cols-3 gap-2"></div>
       </div>
     </div>
   </div>
