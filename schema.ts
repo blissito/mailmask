@@ -235,6 +235,17 @@ export const referrals = sqliteTable("referrals", {
   index("idx_referrals_referred").on(table.referredEmail),
 ]);
 
+export const referralClicks = sqliteTable("referral_clicks", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  referrerEmail: text("referrer_email").notNull().references(() => users.email),
+  clickedAt: text("clicked_at").$defaultFn(() => new Date().toISOString()).notNull(),
+  ip: text("ip").notNull(),
+  userAgent: text("user_agent"),
+}, (table) => [
+  index("idx_referral_clicks_referrer").on(table.referrerEmail),
+  index("idx_referral_clicks_referrer_time").on(table.referrerEmail, table.clickedAt),
+]);
+
 export const referralCredits = sqliteTable("referral_credits", {
   id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
   email: text("email").notNull().references(() => users.email),

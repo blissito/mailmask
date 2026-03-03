@@ -19,6 +19,7 @@ import {
   smtpCredentials,
   referrals,
   referralCredits,
+  referralClicks,
 } from "./schema.js";
 
 export { db };
@@ -1314,7 +1315,7 @@ export function markCreditsUsed(creditIds: string[]): void {
     .where(and(inArray(referralCredits.id, creditIds), eq(referralCredits.used, false))).run();
 }
 
-export function getReferralStats(email: string): { total: number; pending: number; converted: number; creditsAvailable: number; slug: string | null } {
+export function getReferralStats(email: string) {
   const rows = db.select().from(referrals).where(eq(referrals.referrerEmail, email)).all();
   const total = rows.length;
   const pending = rows.filter(r => r.status === "pending").length;
@@ -1322,13 +1323,53 @@ export function getReferralStats(email: string): { total: number; pending: numbe
   const credits = db.select({ c: count() }).from(referralCredits)
     .where(and(eq(referralCredits.email, email), eq(referralCredits.used, false))).all();
   const userRow = db.select({ referralSlug: users.referralSlug }).from(users).where(eq(users.email, email)).all();
+  const clickStats = getReferralClickStats(email);
   return {
     total,
     pending,
     converted,
     creditsAvailable: credits[0]?.c ?? 0,
     slug: userRow[0]?.referralSlug ?? null,
+    clicks: clickStats,
   };
+}
+
+export function recordReferralClick(email: string, ip: string, ua: string | null): boolean {
+  // Deduplicate same IP within 10 minutes
+  const tenMinAgo = new Date(Date.now() - 10 * 60_000).toISOString();
+  const existing = db.select({ id: referralClicks.id }).from(referralClicks)
+    .where(and(eq(referralClicks.referrerEmail, email), eq(referralClicks.ip, ip), gt(referralClicks.clickedAt, tenMinAgo)))
+    .all();
+  if (existing.length > 0) return false;
+  db.insert(referralClicks).values({ referrerEmail: email, ip, userAgent: ua }).run();
+  return true;
+}
+
+export function getReferralClickStats(email: string): { total: number; last30Days: number; byWeek: { week: string; count: number }[] } {
+  const allClicks = db.select({ c: count() }).from(referralClicks)
+    .where(eq(referralClicks.referrerEmail, email)).all();
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const recentClicks = db.select({ c: count() }).from(referralClicks)
+    .where(and(eq(referralClicks.referrerEmail, email), gt(referralClicks.clickedAt, thirtyDaysAgo))).all();
+
+  // Group by week (last 8 weeks)
+  const eightWeeksAgo = new Date(Date.now() - 56 * 86400_000).toISOString();
+  const weekRows = db.select({ clickedAt: referralClicks.clickedAt }).from(referralClicks)
+    .where(and(eq(referralClicks.referrerEmail, email), gt(referralClicks.clickedAt, eightWeeksAgo))).all();
+
+  const weekMap = new Map<string, number>();
+  for (const r of weekRows) {
+    const d = new Date(r.clickedAt);
+    const weekStart = new Date(d);
+    weekStart.setDate(d.getDate() - d.getDay());
+    const key = weekStart.toISOString().slice(0, 10);
+    weekMap.set(key, (weekMap.get(key) ?? 0) + 1);
+  }
+  const byWeek = Array.from(weekMap.entries())
+    .map(([week, count]) => ({ week, count }))
+    .sort((a, b) => a.week.localeCompare(b.week));
+
+  return { total: allClicks[0]?.c ?? 0, last30Days: recentClicks[0]?.c ?? 0, byWeek };
 }
 
 export function incrementPaymentCount(email: string): number {

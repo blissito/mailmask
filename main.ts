@@ -102,6 +102,7 @@ import {
   incrementPaymentCount,
   getUserReferredBy,
   setUserReferredBy,
+  recordReferralClick,
 } from "./db.js";
 import {
   hashPassword,
@@ -888,6 +889,23 @@ const app = new Elysia({ adapter: node() })
     const ok = setReferralSlug(auth.email, slug);
     if (!ok) return new Response(JSON.stringify({ error: "Slug no disponible" }), { status: 409 });
     return new Response(JSON.stringify({ ok: true, slug }), { headers: { "content-type": "application/json" } });
+  })
+
+  .post("/api/referrals/track", async ({ request }) => {
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 20, 60_000);
+    if (limited) return limited;
+    try {
+      const body = await request.json();
+      const slug = (body.slug ?? "").trim();
+      if (slug) {
+        const referrer = getUserByReferralSlug(slug);
+        if (referrer) {
+          recordReferralClick(referrer.email, ip, request.headers.get("user-agent"));
+        }
+      }
+    } catch { /* ignore malformed bodies */ }
+    return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
   })
 
   // --- Domains ---
@@ -2048,6 +2066,15 @@ const app = new Elysia({ adapter: node() })
 
               const periodEnd = new Date();
               periodEnd.setDate(periodEnd.getDate() + bufferDays);
+
+              // 2nd month free for referred users (1st month is MP trial)
+              if (newPaymentCount === 1) {
+                const referredBy = getUserReferredBy(email);
+                if (referredBy) {
+                  periodEnd.setDate(periodEnd.getDate() + 30);
+                  log("info", "webhook", "Referred user gets 2nd month free", { email, referrer: referredBy });
+                }
+              }
 
               await updateUserSubscription(email, {
                 plan,

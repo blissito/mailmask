@@ -1,6 +1,9 @@
 // Capture referral slug from URL
 const _refParam = new URLSearchParams(location.search).get("ref");
-if (_refParam) localStorage.setItem("mailmask_ref", _refParam);
+if (_refParam) {
+  localStorage.setItem("mailmask_ref", _refParam);
+  fetch("/api/referrals/track", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: _refParam }) }).catch(() => {});
+}
 
 // Success banner (guest checkout redirect)
 if (new URLSearchParams(location.search).get("success") === "1") {

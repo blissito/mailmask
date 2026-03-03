@@ -228,6 +228,18 @@ function playCelebration() {
 }
 
 // --- Referrals section ---
+function buildSparklineSvg(byWeek) {
+  if (!byWeek || !byWeek.length) return "";
+  const max = Math.max(...byWeek.map(w => w.count), 1);
+  const barW = 16, gap = 4, h = 40;
+  const w = byWeek.length * (barW + gap) - gap;
+  const bars = byWeek.map((wk, i) => {
+    const barH = Math.max(2, (wk.count / max) * h);
+    return `<rect x="${i * (barW + gap)}" y="${h - barH}" width="${barW}" height="${barH}" rx="2" fill="currentColor" opacity="0.7"><title>${wk.week}: ${wk.count}</title></rect>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${w} ${h}" class="text-mask-400" style="width:${w}px;height:${h}px">${bars}</svg>`;
+}
+
 function renderReferrals() {
   const container = document.getElementById("referrals-section");
   if (!container) return;
@@ -237,6 +249,7 @@ function renderReferrals() {
   const slug = stats.slug || "";
   const link = slug ? `mailmask.studio/register?ref=${esc(slug)}` : "";
   const progressPct = Math.min(100, Math.round((stats.converted / 2) * 100));
+  const clicks = stats.clicks || { total: 0, last30Days: 0, byWeek: [] };
 
   container.innerHTML = `
     <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5">
@@ -255,6 +268,30 @@ function renderReferrals() {
             <button data-action="edit-slug" class="text-sm text-mask-400 hover:text-mask-300 transition-colors">Crear slug</button>
           </div>
         `}
+
+        <!-- Funnel cards -->
+        <div class="grid grid-cols-3 gap-2 mt-2">
+          <div class="bg-zinc-800/50 rounded-lg p-3 text-center">
+            <div class="text-lg font-bold text-zinc-200">${clicks.last30Days}</div>
+            <div class="text-[10px] text-zinc-500 uppercase tracking-wide">Clics</div>
+          </div>
+          <div class="bg-zinc-800/50 rounded-lg p-3 text-center">
+            <div class="text-lg font-bold text-zinc-200">${stats.total}</div>
+            <div class="text-[10px] text-zinc-500 uppercase tracking-wide">Registros</div>
+          </div>
+          <div class="bg-zinc-800/50 rounded-lg p-3 text-center">
+            <div class="text-lg font-bold text-zinc-200">${stats.converted}</div>
+            <div class="text-[10px] text-zinc-500 uppercase tracking-wide">Activos</div>
+          </div>
+        </div>
+
+        <!-- Sparkline -->
+        ${clicks.byWeek.length > 0 ? `
+          <div class="mt-2">
+            <div class="text-[10px] text-zinc-500 mb-1">Clics por semana</div>
+            ${buildSparklineSvg(clicks.byWeek)}
+          </div>
+        ` : ""}
 
         ${stats.total > 0 ? `
           <div class="space-y-2 mt-2">
