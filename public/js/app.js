@@ -21,6 +21,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadCoupon();
   await checkAuth();
   await loadDomains();
+  loadDomainRegistrations();
   setupEventListeners();
 });
 
@@ -519,6 +520,7 @@ function renderDomains() {
           <span class="w-2 h-2 rounded-full ${dotClass}"></span>
           <span class="font-semibold">${esc(d.domain)}</span>
           <span class="text-xs text-zinc-500">${statusText}</span>
+          ${d.registeredViaMailmask ? '<span class="text-[10px] bg-mask-600/20 text-mask-400 px-1.5 py-0.5 rounded-full">MailMask</span>' : ''}
         </div>
         <div class="flex items-center gap-4 text-xs text-zinc-500">
           <span>${fwds} fwd${fwds === 1 ? '' : 's'}</span>
@@ -550,6 +552,16 @@ async function selectDomain(id) {
 
   document.getElementById("alias-domain-suffix").textContent = `@${selectedDomain.domain}`;
 
+  // Hide DNS tab for domains registered via MailMask (DNS is automatic)
+  const dnsBtn = document.querySelector('.tab-btn[data-tab="dns"]');
+  if (dnsBtn) {
+    if (selectedDomain.registeredViaMailmask) {
+      dnsBtn.classList.add("hidden");
+    } else {
+      dnsBtn.classList.remove("hidden");
+    }
+  }
+
   switchTab("aliases");
   await loadAliases();
   loadDomainHealth();
@@ -578,6 +590,181 @@ async function deleteDomain() {
   goBack();
   await loadDomains();
   await refreshUsage();
+}
+
+// --- Domain Registration (Route 53) ---
+
+async function searchDomainAvailability() {
+  const input = document.getElementById("add-domain-input");
+  const errEl = document.getElementById("add-domain-error");
+  const resultEl = document.getElementById("add-domain-step-result");
+  const q = input.value.trim().toLowerCase();
+
+  errEl.classList.add("hidden");
+  resultEl.classList.add("hidden");
+  resultEl.innerHTML = "";
+
+  if (!q || !q.includes(".")) {
+    errEl.textContent = "Incluye la extensión, ej: miempresa.com";
+    errEl.classList.remove("hidden");
+    return;
+  }
+
+  resultEl.innerHTML = `<p class="text-sm text-zinc-400">Buscando disponibilidad...</p>`;
+  resultEl.classList.remove("hidden");
+
+  try {
+    const res = await fetch(`/api/domains/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      // API error — could be unsupported TLD or other
+      resultEl.innerHTML = `
+        <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
+          <p class="text-sm text-zinc-300 mb-3">${esc(data.error || `Extensión no disponible para compra`)}</p>
+          <button type="button" id="btn-connect-existing" class="w-full bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
+            Ya tengo este dominio, conectarlo →
+          </button>
+        </div>`;
+      resultEl.querySelector("#btn-connect-existing").addEventListener("click", () => connectExistingDomain(q));
+      playSound("pop");
+      return;
+    }
+
+    if (data.available) {
+      const priceStr = (data.price / 100).toLocaleString("es-MX", { style: "currency", currency: "MXN", currencyDisplay: "narrowSymbol" });
+      resultEl.innerHTML = `
+        <div class="bg-green-900/20 border border-green-800/50 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <span class="font-semibold text-green-400">${esc(data.domain)}</span>
+              <span class="text-xs text-green-500 ml-2">Disponible</span>
+              <div class="text-xs text-zinc-400 mt-0.5">${priceStr} MXN/año</div>
+            </div>
+          </div>
+          <button type="button" id="btn-buy-domain" class="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors mb-2">
+            Comprar dominio
+          </button>
+          <div class="flex items-center gap-3 my-3">
+            <div class="flex-1 border-t border-zinc-700"></div>
+            <span class="text-xs text-zinc-500">o</span>
+            <div class="flex-1 border-t border-zinc-700"></div>
+          </div>
+          <button type="button" id="btn-connect-existing" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
+            Ya tengo este dominio →
+          </button>
+        </div>`;
+      resultEl.querySelector("#btn-buy-domain").addEventListener("click", () => registerDomainAction(data.domain));
+      resultEl.querySelector("#btn-connect-existing").addEventListener("click", () => connectExistingDomain(q));
+    } else {
+      resultEl.innerHTML = `
+        <div class="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
+          <p class="text-sm text-zinc-300 mb-1"><span class="font-semibold">${esc(data.domain)}</span> ya está registrado</p>
+          <p class="text-xs text-zinc-500 mb-3">Si es tuyo, conéctalo para usarlo con MailMask.</p>
+          <button type="button" id="btn-connect-existing" class="w-full bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors mb-2">
+            Ya es mío, conectarlo →
+          </button>
+          <button type="button" id="btn-search-another" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
+            Buscar otro dominio
+          </button>
+        </div>`;
+      resultEl.querySelector("#btn-connect-existing").addEventListener("click", () => connectExistingDomain(q));
+      resultEl.querySelector("#btn-search-another").addEventListener("click", () => {
+        resultEl.classList.add("hidden");
+        input.value = "";
+        input.focus();
+      });
+    }
+    playSound("pop");
+  } catch {
+    resultEl.innerHTML = `<p class="text-sm text-red-400">Error de conexión</p>`;
+  }
+}
+
+async function connectExistingDomain(domain) {
+  const resultEl = document.getElementById("add-domain-step-result");
+  resultEl.innerHTML = `<p class="text-sm text-zinc-400">Agregando dominio...</p>`;
+
+  try {
+    const res = await fetch("/api/domains", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ domain }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      hideModal("modal-add-domain");
+      await loadDomains();
+      await refreshUsage();
+      selectDomain(data.domain.id);
+      switchTab("dns");
+    } else {
+      resultEl.innerHTML = `<p class="text-sm text-red-400">${esc(data.error || "Error al agregar dominio")}</p>`;
+    }
+  } catch {
+    resultEl.innerHTML = `<p class="text-sm text-red-400">Error de conexión</p>`;
+  }
+}
+
+async function registerDomainAction(domain) {
+  const resultEl = document.getElementById("add-domain-step-result");
+  resultEl.innerHTML = `<p class="text-sm text-zinc-400">Creando pago...</p>`;
+
+  try {
+    const res = await fetch("/api/domains/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ domain }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      resultEl.innerHTML = `<p class="text-sm text-red-400">${esc(data.error)}</p>`;
+      return;
+    }
+    // Redirect to MercadoPago
+    window.location.href = data.initPoint;
+  } catch {
+    resultEl.innerHTML = `<p class="text-sm text-red-400">Error de conexión</p>`;
+  }
+}
+
+async function loadDomainRegistrations() {
+  try {
+    const res = await fetch("/api/domains/registrations");
+    if (!res.ok) return;
+    const regs = await res.json();
+    const container = document.getElementById("domain-registrations-list");
+    if (!container) return;
+
+    const active = regs.filter(r => r.status !== "registered" && r.status !== "pending_payment");
+    if (!active.length) { container.innerHTML = ""; return; }
+
+    container.innerHTML = active.map(r => {
+      const statusMap = {
+        paid: { label: "Pagado — esperando registro", color: "text-yellow-400", dot: "bg-yellow-400", animate: true },
+        registering: { label: "Registrando dominio...", color: "text-blue-400", dot: "bg-blue-400", animate: true },
+        failed: { label: "Error: " + (r.lastError || "fallo desconocido"), color: "text-red-400", dot: "bg-red-400", animate: false },
+      };
+      const s = statusMap[r.status] || { label: r.status, color: "text-zinc-400", dot: "bg-zinc-400", animate: false };
+      return `
+      <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl px-5 py-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="w-2 h-2 rounded-full ${s.dot} ${s.animate ? 'animate-pulse' : ''}"></span>
+            <span class="font-semibold text-sm">${esc(r.domainName)}</span>
+          </div>
+          <span class="text-xs ${s.color}">${s.label}</span>
+        </div>
+      </div>`;
+    }).join("");
+
+    // Poll while there are registering domains
+    if (active.some(r => r.status === "registering" || r.status === "paid")) {
+      setTimeout(loadDomainRegistrations, 5000);
+      // Also reload domains in case one just finished
+      setTimeout(loadDomains, 6000);
+    }
+  } catch { /* ignore */ }
 }
 
 // --- Aliases ---
@@ -914,6 +1101,15 @@ function renderHealthPanel() {
 function renderDnsRecords() {
   if (!selectedDomain) return;
   const records = document.getElementById("dns-records");
+
+  if (selectedDomain.registeredViaMailmask) {
+    records.innerHTML = `
+      <div class="flex items-center gap-2 bg-green-900/20 border border-green-800/50 rounded-lg px-4 py-3">
+        <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <span class="text-sm text-green-400 font-medium">DNS configurado automáticamente por MailMask</span>
+      </div>`;
+    return;
+  }
 
   const d = selectedDomain.domain;
   const dnsItems = [
@@ -1268,6 +1464,13 @@ function hideModal(id) {
 }
 
 function showAddDomainModal() {
+  // Reset modal state
+  const input = document.getElementById("add-domain-input");
+  const errEl = document.getElementById("add-domain-error");
+  const resultEl = document.getElementById("add-domain-step-result");
+  if (input) input.value = "";
+  if (errEl) errEl.classList.add("hidden");
+  if (resultEl) { resultEl.classList.add("hidden"); resultEl.innerHTML = ""; }
   showModal("modal-add-domain");
 }
 
@@ -1282,6 +1485,12 @@ function setupEventListeners() {
 
   // Add domain button
   document.getElementById("btn-add-domain").addEventListener("click", showAddDomainModal);
+
+  // Domain search in modal
+  document.getElementById("btn-add-domain-search")?.addEventListener("click", searchDomainAvailability);
+  document.getElementById("add-domain-input")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); searchDomainAvailability(); }
+  });
 
   // Back button
   document.getElementById("btn-back").addEventListener("click", goBack);
@@ -1352,33 +1561,7 @@ function setupEventListeners() {
     await saveSlug(e.target.slug.value.trim().toLowerCase());
   });
 
-  // Form: Add domain
-  document.getElementById("form-add-domain").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const errEl = document.getElementById("add-domain-error");
-    errEl.classList.add("hidden");
-
-    const res = await fetch("/api/domains", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ domain: form.domain.value.trim().toLowerCase() }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      hideModal("modal-add-domain");
-      form.reset();
-      await loadDomains();
-      await refreshUsage();
-      selectDomain(data.domain.id);
-      switchTab("dns");
-    } else {
-      const data = await res.json();
-      errEl.textContent = data.error || "Error al agregar dominio";
-      errEl.classList.remove("hidden");
-    }
-  });
+  // (Add domain form replaced by unified search modal — handled via btn-add-domain-search)
 
   // Form: Add alias
   document.getElementById("form-add-alias").addEventListener("submit", async (e) => {

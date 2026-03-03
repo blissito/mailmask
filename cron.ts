@@ -4,7 +4,7 @@ import { log } from "./logger.js";
 import { db } from "./pg.js";
 import { tokens, emailLogs, forwardQueue, rateLimits, sendCounts, bulkJobs, users } from "./schema.js";
 import { lte, and, inArray, isNotNull, gt, sql as rawSql } from "drizzle-orm";
-import { purgeDeletedConversations } from "./db.js";
+import { purgeDeletedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, createDomain } from "./db.js";
 
 // Daily at 14:00 UTC — warn users whose subscription expires within 3 days
 cron.schedule("0 14 * * *", async () => {
@@ -100,5 +100,81 @@ cron.schedule("0 3 * * *", async () => {
     if (s3Keys.length > 0) log("info", "cron", "Purged deleted conversations", { s3Objects: s3Keys.length });
   } catch (err) {
     log("error", "cron", "Purge deleted conversations failed", { error: String(err) });
+  }
+});
+
+// Every minute — poll Route 53 domain registrations in "registering" status
+cron.schedule("* * * * *", async () => {
+  let regs;
+  try {
+    regs = getDomainRegistrationsByStatus("registering");
+  } catch {
+    return; // table may not exist yet
+  }
+  if (!regs.length) return;
+
+  for (const reg of regs) {
+    if (!reg.route53OperationId) continue;
+    try {
+      const { getOperationStatus, createHostedZone, updateNameservers, configureDnsRecords } = await import("./route53.js");
+      const { verifyDomain, createReceiptRule } = await import("./ses.js");
+
+      const status = await getOperationStatus(reg.route53OperationId);
+      log("info", "cron", "Domain registration poll", { domain: reg.domainName, status });
+
+      if (status === "SUCCESSFUL") {
+        // 1. Create hosted zone
+        const { hostedZoneId, nameservers } = await createHostedZone(reg.domainName);
+
+        // 2. Update nameservers to point to our hosted zone
+        await updateNameservers(reg.domainName, nameservers);
+
+        // 3. Verify domain with SES (get tokens)
+        const dnsRecords = await verifyDomain(reg.domainName);
+
+        // 4. Configure DNS records (MX, TXT, DKIM, SPF)
+        await configureDnsRecords(hostedZoneId, reg.domainName, dnsRecords.verificationToken, dnsRecords.dkimTokens);
+
+        // 5. Create SES receipt rule
+        try {
+          await createReceiptRule(reg.domainName);
+        } catch (err: any) {
+          // May fail if SNS_TOPIC_ARN not set, non-fatal
+          log("warn", "cron", "Receipt rule creation failed (non-fatal)", { domain: reg.domainName, error: String(err) });
+        }
+
+        // 6. Insert into domains table
+        const domainRow = createDomain(reg.ownerEmail, reg.domainName, dnsRecords.dkimTokens, dnsRecords.verificationToken);
+
+        // 7. Mark domain as verified + registeredViaMailmask
+        // We need to update directly since createDomain doesn't set these
+        const { domains } = await import("./schema.js");
+        const { eq } = await import("drizzle-orm");
+        db.update(domains).set({
+          verified: true,
+          mxConfigured: true,
+          registeredViaMailmask: true,
+        }).where(eq(domains.id, domainRow.id)).run();
+
+        // 8. Update registration record
+        const expiresAt = new Date(Date.now() + 365 * 24 * 3600_000).toISOString();
+        updateDomainRegistration(reg.id, {
+          status: "registered",
+          domainId: domainRow.id,
+          hostedZoneId,
+          registeredAt: new Date().toISOString(),
+          expiresAt,
+        });
+
+        log("info", "cron", "Domain registration completed", { domain: reg.domainName, domainId: domainRow.id });
+      } else if (status === "FAILED" || status === "ERROR") {
+        updateDomainRegistration(reg.id, { status: "failed", lastError: `Route 53 operation ${status}` });
+        log("error", "cron", "Domain registration failed", { domain: reg.domainName, operationId: reg.route53OperationId });
+      }
+      // IN_PROGRESS / SUBMITTED — just wait for next poll
+    } catch (err: any) {
+      log("error", "cron", "Domain registration poll error", { domain: reg.domainName, error: String(err) });
+      updateDomainRegistration(reg.id, { lastError: String(err) });
+    }
   }
 });

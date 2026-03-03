@@ -76,6 +76,9 @@
       </button>
     </div>
 
+    <!-- Domain registrations in progress -->
+    <div id="domain-registrations-list" class="space-y-2 mb-4"></div>
+
     <!-- Domain cards -->
     <div id="domains-list" class="space-y-3"></div>
 
@@ -219,20 +222,29 @@
     </div>
   </div>
 
-  <!-- Modal: Add domain -->
+  <!-- Modal: Add domain (unified search + connect flow) -->
   <div id="modal-add-domain" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
     <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
-      <h3 class="text-lg font-bold mb-4">Agregar dominio</h3>
-      <form id="form-add-domain">
-        <label class="block text-sm text-zinc-400 mb-1">Dominio</label>
-        <input type="text" name="domain" required placeholder="ejemplo.com"
-          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
-        <div id="add-domain-error" class="text-red-400 text-sm mt-2 hidden"></div>
-        <div class="flex justify-end gap-3 mt-6">
-          <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-add-domain">Cancelar</button>
-          <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Agregar</button>
+      <h3 class="text-lg font-bold mb-4">¿Qué dominio quieres usar?</h3>
+
+      <!-- Step 1: Search -->
+      <div id="add-domain-step-search">
+        <div class="flex gap-2">
+          <input type="text" id="add-domain-input" placeholder="miempresa.com" required
+            class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-mask-500 focus:outline-none">
+          <button type="button" id="btn-add-domain-search" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-3 rounded-lg transition-colors whitespace-nowrap">
+            Buscar
+          </button>
         </div>
-      </form>
+        <div id="add-domain-error" class="text-red-400 text-sm mt-2 hidden"></div>
+      </div>
+
+      <!-- Step 2: Result (injected dynamically) -->
+      <div id="add-domain-step-result" class="hidden mt-4"></div>
+
+      <div class="flex justify-end mt-6">
+        <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-add-domain">Cancelar</button>
+      </div>
     </div>
   </div>
 

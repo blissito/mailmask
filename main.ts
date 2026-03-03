@@ -103,6 +103,13 @@ import {
   getUserReferredBy,
   setUserReferredBy,
   recordReferralClick,
+  // Domain registrations
+  TLD_PRICES,
+  createDomainRegistration,
+  getDomainRegistration,
+  getDomainRegistrationsByUser,
+  updateDomainRegistration,
+  getDomainRegistrationByPaymentId,
 } from "./db.js";
 import {
   hashPassword,
@@ -3336,6 +3343,236 @@ const app = new Elysia({ adapter: node() })
 
     log("info", "admin", "Coupon deleted", { admin: auth.email, code });
     return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  })
+
+  // --- Domain Registration (Route 53) ---
+
+  .get("/api/domains/search", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
+
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 10, 60_000);
+    if (limited) return limited;
+
+    const url = new URL(request.url);
+    const q = url.searchParams.get("q")?.toLowerCase().trim();
+    if (!q || !q.includes(".")) {
+      return new Response(JSON.stringify({ error: "Dominio inválido. Incluye la extensión (ej: miempresa.com)" }), { status: 400, headers: { "content-type": "application/json" } });
+    }
+
+    const tld = "." + q.split(".").slice(1).join(".");
+    const pricing = TLD_PRICES[tld];
+    if (!pricing) {
+      return new Response(JSON.stringify({ error: `Extensión ${tld} no soportada. Extensiones disponibles: ${Object.keys(TLD_PRICES).join(", ")}` }), { status: 400, headers: { "content-type": "application/json" } });
+    }
+
+    try {
+      const { checkAvailability } = await import("./route53.js");
+      const result = await checkAvailability(q);
+      return new Response(JSON.stringify({
+        available: result.available,
+        domain: result.domain,
+        tld,
+        price: pricing.userMxnCents,
+        currency: "MXN",
+      }), { headers: { "content-type": "application/json" } });
+    } catch (err: any) {
+      log("error", "route53", "Domain search failed", { domain: q, error: String(err) });
+      return new Response(JSON.stringify({ error: "Error al buscar disponibilidad" }), { status: 500, headers: { "content-type": "application/json" } });
+    }
+  })
+
+  .post("/api/domains/register", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
+
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 5, 60_000);
+    if (limited) return limited;
+
+    const user = (await getUser(auth.email))!;
+    const sub = user.subscription;
+    if (!sub || sub.status !== "active") {
+      return new Response(JSON.stringify({ error: "Necesitas un plan activo para registrar dominios" }), { status: 402, headers: { "content-type": "application/json" } });
+    }
+
+    const { domain } = await request.json();
+    if (!domain || typeof domain !== "string") {
+      return new Response(JSON.stringify({ error: "Dominio requerido" }), { status: 400, headers: { "content-type": "application/json" } });
+    }
+
+    const d = domain.toLowerCase().trim();
+    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
+    if (!domainRegex.test(d)) {
+      return new Response(JSON.stringify({ error: "Formato de dominio inválido" }), { status: 400, headers: { "content-type": "application/json" } });
+    }
+
+    const tld = "." + d.split(".").slice(1).join(".");
+    const pricing = TLD_PRICES[tld];
+    if (!pricing) {
+      return new Response(JSON.stringify({ error: `Extensión ${tld} no soportada` }), { status: 400, headers: { "content-type": "application/json" } });
+    }
+
+    // Check availability first
+    try {
+      const { checkAvailability } = await import("./route53.js");
+      const avail = await checkAvailability(d);
+      if (!avail.available) {
+        return new Response(JSON.stringify({ error: "El dominio no está disponible" }), { status: 409, headers: { "content-type": "application/json" } });
+      }
+    } catch (err: any) {
+      log("error", "route53", "Availability check failed during register", { domain: d, error: String(err) });
+      return new Response(JSON.stringify({ error: "Error al verificar disponibilidad" }), { status: 500, headers: { "content-type": "application/json" } });
+    }
+
+    // Create registration record
+    const registration = createDomainRegistration({
+      domainName: d,
+      ownerEmail: auth.email,
+      tld,
+      priceCents: pricing.userMxnCents,
+      awsCostCents: pricing.awsUsdCents,
+    });
+
+    // Create MP Preference (one-time payment, NOT PreApproval subscription)
+    const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+    if (!mpAccessToken) {
+      return new Response(JSON.stringify({ error: "MercadoPago no configurado" }), { status: 500, headers: { "content-type": "application/json" } });
+    }
+
+    try {
+      const { Preference } = await import("mercadopago");
+      const preference = new Preference({ accessToken: mpAccessToken });
+      const backUrl = getMainDomainUrl() + "/app";
+
+      const result = await preference.create({ body: {
+        items: [{
+          id: registration.id,
+          title: `Registro de dominio: ${d} (1 año)`,
+          quantity: 1,
+          unit_price: pricing.userMxnCents / 100,
+          currency_id: "MXN",
+        }],
+        external_reference: `domain-reg:${registration.id}`,
+        back_urls: {
+          success: backUrl,
+          failure: backUrl,
+          pending: backUrl,
+        },
+        auto_return: "approved",
+        notification_url: getMainDomainUrl() + "/api/webhooks/mercadopago-domain",
+      }});
+
+      // Store MP preference ID for tracking
+      updateDomainRegistration(registration.id, { mpPaymentId: result.id ?? "" });
+
+      return new Response(JSON.stringify({
+        initPoint: result.init_point,
+        registrationId: registration.id,
+      }), { headers: { "content-type": "application/json" } });
+    } catch (err: any) {
+      log("error", "billing", "MP domain preference error", { domain: d, error: String(err) });
+      return new Response(JSON.stringify({ error: "Error al crear pago en MercadoPago" }), { status: 500, headers: { "content-type": "application/json" } });
+    }
+  })
+
+  .post("/api/webhooks/mercadopago-domain", async ({ request }) => {
+    // HMAC validation (same pattern as main webhook)
+    const secret = process.env.MP_WEBHOOK_SECRET;
+    if (!secret) {
+      log("error", "webhook", "MP_WEBHOOK_SECRET not configured");
+      return new Response("Server misconfigured", { status: 500 });
+    }
+    const xSignature = request.headers.get("x-signature") ?? "";
+    const xRequestId = request.headers.get("x-request-id") ?? "";
+    const url = new URL(request.url);
+    const dataId = url.searchParams.get("data.id") ?? "";
+
+    const parts = Object.fromEntries(
+      xSignature.split(",").map((p) => {
+        const [k, ...v] = p.trim().split("=");
+        return [k, v.join("=")];
+      }),
+    );
+    const ts = parts["ts"] ?? "";
+    const v1 = parts["v1"] ?? "";
+
+    const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
+    const computed = Array.from(new Uint8Array(sig))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    if (computed !== v1) {
+      log("warn", "webhook", "MP domain webhook: invalid signature");
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    const body = await request.json();
+    log("info", "webhook", "MP domain webhook received", { type: body.type, dataId: body.data?.id });
+
+    // Handle payment notifications
+    if (body.type === "payment" && body.data?.id) {
+      try {
+        const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+        if (!mpAccessToken) return new Response("Server misconfigured", { status: 500 });
+
+        // Fetch payment details from MP
+        const payRes = await fetch(`https://api.mercadopago.com/v1/payments/${body.data.id}`, {
+          headers: { Authorization: `Bearer ${mpAccessToken}` },
+          signal: AbortSignal.timeout(10_000),
+        });
+        const payment = await payRes.json();
+
+        log("info", "webhook", "MP domain payment fetched", { status: payment.status, external_reference: payment.external_reference });
+
+        if (payment.status === "approved" && payment.external_reference?.startsWith("domain-reg:")) {
+          const regId = payment.external_reference.replace("domain-reg:", "");
+          const reg = getDomainRegistration(regId);
+          if (!reg) {
+            log("warn", "webhook", "Domain registration not found", { regId });
+            return new Response("OK", { status: 200 });
+          }
+          if (reg.status !== "pending_payment") {
+            log("info", "webhook", "Domain registration already processed", { regId, status: reg.status });
+            return new Response("OK", { status: 200 });
+          }
+
+          // Update to paid and start registration
+          updateDomainRegistration(regId, { status: "paid", mpPaymentId: String(body.data.id) });
+
+          try {
+            const { registerDomain } = await import("./route53.js");
+            const operationId = await registerDomain(reg.domainName);
+            updateDomainRegistration(regId, { status: "registering", route53OperationId: operationId });
+            log("info", "webhook", "Domain registration started", { domain: reg.domainName, operationId });
+          } catch (err: any) {
+            updateDomainRegistration(regId, { status: "failed", lastError: String(err) });
+            log("error", "webhook", "Domain registration failed", { domain: reg.domainName, error: String(err) });
+          }
+        }
+      } catch (err: any) {
+        log("error", "webhook", "MP domain webhook processing error", { error: String(err) });
+      }
+    }
+
+    return new Response("OK", { status: 200 });
+  })
+
+  .get("/api/domains/registrations", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
+
+    const registrations = getDomainRegistrationsByUser(auth.email);
+    return new Response(JSON.stringify(registrations), { headers: { "content-type": "application/json" } });
   });
 
 // --- Bulk send cron (every minute, processes 14 emails/sec) ---

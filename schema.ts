@@ -30,6 +30,7 @@ export const domains = sqliteTable("domains", {
   mxConfigured: integer("mx_configured", { mode: "boolean" }).notNull().default(false),
   dkimTokens: text("dkim_tokens", { mode: "json" }).$type<string[]>().notNull().default([]),
   verificationToken: text("verification_token").notNull(),
+  registeredViaMailmask: integer("registered_via_mailmask", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
 });
 
@@ -214,6 +215,28 @@ export const smtpCredentials = sqliteTable("smtp_credentials", {
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
   revokedAt: text("revoked_at"),
 });
+
+export const domainRegistrations = sqliteTable("domain_registrations", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  domainId: text("domain_id").references(() => domains.id),
+  domainName: text("domain_name").notNull(),
+  ownerEmail: text("owner_email").notNull().references(() => users.email, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending_payment"), // pending_payment | paid | registering | registered | failed
+  route53OperationId: text("route53_operation_id"),
+  hostedZoneId: text("hosted_zone_id"),
+  registeredAt: text("registered_at"),
+  expiresAt: text("expires_at"),
+  autoRenew: integer("auto_renew", { mode: "boolean" }).notNull().default(true),
+  tld: text("tld").notNull(),
+  priceCents: integer("price_cents").notNull(), // MXN charged to user
+  awsCostCents: integer("aws_cost_cents").notNull(), // USD cost to us
+  mpPaymentId: text("mp_payment_id"),
+  lastError: text("last_error"),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
+}, (table) => [
+  index("idx_domain_reg_owner").on(table.ownerEmail),
+  index("idx_domain_reg_status").on(table.status),
+]);
 
 export const rateLimits = sqliteTable("rate_limits", {
   key: text("key").primaryKey(),

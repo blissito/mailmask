@@ -20,6 +20,7 @@ import {
   referrals,
   referralCredits,
   referralClicks,
+  domainRegistrations,
 } from "./schema.js";
 
 export { db };
@@ -52,6 +53,7 @@ export interface Domain {
   dkimTokens: string[];
   verificationToken: string;
   createdAt: string;
+  registeredViaMailmask?: boolean;
 }
 
 export interface Alias {
@@ -132,6 +134,7 @@ function rowToDomain(r: typeof domains.$inferSelect): Domain {
     dkimTokens: r.dkimTokens ?? [],
     verificationToken: r.verificationToken,
     createdAt: r.createdAt,
+    registeredViaMailmask: r.registeredViaMailmask || false,
   };
 }
 
@@ -1393,4 +1396,107 @@ export function getUserReferredBy(email: string): string | null {
 
 export function setUserReferredBy(email: string, referrerEmail: string): void {
   db.update(users).set({ referredBy: referrerEmail }).where(eq(users.email, email)).run();
+}
+
+// --- Domain Registration (Route 53) ---
+
+// TLD → { awsUsdCents: cost to us in USD cents, userMxnCents: price to user in MXN cents }
+export const TLD_PRICES: Record<string, { awsUsdCents: number; userMxnCents: number }> = {
+  ".com":    { awsUsdCents: 1300, userMxnCents: 59900 },
+  ".net":    { awsUsdCents: 1100, userMxnCents: 49900 },
+  ".org":    { awsUsdCents: 1200, userMxnCents: 54900 },
+  ".io":     { awsUsdCents: 3900, userMxnCents: 179900 },
+  ".co":     { awsUsdCents: 2500, userMxnCents: 114900 },
+  ".dev":    { awsUsdCents: 1400, userMxnCents: 64900 },
+  ".app":    { awsUsdCents: 1400, userMxnCents: 64900 },
+  ".click":  { awsUsdCents: 300,  userMxnCents: 13900 },
+  ".link":   { awsUsdCents: 500,  userMxnCents: 22900 },
+  ".mx":     { awsUsdCents: 3500, userMxnCents: 159900 },
+  ".com.mx": { awsUsdCents: 3500, userMxnCents: 159900 },
+  ".xyz":    { awsUsdCents: 1200, userMxnCents: 54900 },
+  ".info":   { awsUsdCents: 1200, userMxnCents: 54900 },
+  ".me":     { awsUsdCents: 1900, userMxnCents: 86900 },
+};
+
+export type DomainRegistrationStatus = "pending_payment" | "paid" | "registering" | "registered" | "failed";
+
+export interface DomainRegistration {
+  id: string;
+  domainId: string | null;
+  domainName: string;
+  ownerEmail: string;
+  status: DomainRegistrationStatus;
+  route53OperationId: string | null;
+  hostedZoneId: string | null;
+  registeredAt: string | null;
+  expiresAt: string | null;
+  autoRenew: boolean;
+  tld: string;
+  priceCents: number;
+  awsCostCents: number;
+  mpPaymentId: string | null;
+  lastError: string | null;
+  createdAt: string;
+}
+
+export function createDomainRegistration(data: {
+  domainName: string;
+  ownerEmail: string;
+  tld: string;
+  priceCents: number;
+  awsCostCents: number;
+}): DomainRegistration {
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  db.insert(domainRegistrations).values({
+    id,
+    domainName: data.domainName,
+    ownerEmail: data.ownerEmail,
+    status: "pending_payment",
+    tld: data.tld,
+    priceCents: data.priceCents,
+    awsCostCents: data.awsCostCents,
+    createdAt: now,
+  }).run();
+  return getDomainRegistration(id)!;
+}
+
+export function getDomainRegistration(id: string): DomainRegistration | null {
+  const rows = db.select().from(domainRegistrations).where(eq(domainRegistrations.id, id)).all();
+  if (!rows.length) return null;
+  return rows[0] as DomainRegistration;
+}
+
+export function getDomainRegistrationsByUser(email: string): DomainRegistration[] {
+  return db.select().from(domainRegistrations)
+    .where(eq(domainRegistrations.ownerEmail, email))
+    .orderBy(desc(domainRegistrations.createdAt))
+    .all() as DomainRegistration[];
+}
+
+export function getDomainRegistrationsByStatus(status: DomainRegistrationStatus): DomainRegistration[] {
+  return db.select().from(domainRegistrations)
+    .where(eq(domainRegistrations.status, status))
+    .all() as DomainRegistration[];
+}
+
+export function updateDomainRegistration(id: string, updates: Partial<{
+  status: DomainRegistrationStatus;
+  domainId: string;
+  route53OperationId: string;
+  hostedZoneId: string;
+  registeredAt: string;
+  expiresAt: string;
+  mpPaymentId: string;
+  lastError: string;
+}>): void {
+  db.update(domainRegistrations).set(updates).where(eq(domainRegistrations.id, id)).run();
+}
+
+export function getDomainRegistrationByPaymentId(mpPaymentId: string): DomainRegistration | null {
+  const rows = db.select().from(domainRegistrations)
+    .where(eq(domainRegistrations.mpPaymentId, mpPaymentId))
+    .all();
+  if (!rows.length) return null;
+  return rows[0] as DomainRegistration;
 }

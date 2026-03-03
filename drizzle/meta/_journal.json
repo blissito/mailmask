@@ -29,6 +29,13 @@
       "when": 1772505676536,
       "tag": "0003_boring_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1772579130219,
+      "tag": "0004_fancy_fixer",
+      "breakpoints": true
     }
   ]
 }
