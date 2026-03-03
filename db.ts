@@ -1335,17 +1335,22 @@ export function getReferralStats(email: string) {
 }
 
 export function recordReferralClick(email: string, ip: string, ua: string | null): boolean {
-  // Deduplicate same IP within 10 minutes
-  const tenMinAgo = new Date(Date.now() - 10 * 60_000).toISOString();
-  const existing = db.select({ id: referralClicks.id }).from(referralClicks)
-    .where(and(eq(referralClicks.referrerEmail, email), eq(referralClicks.ip, ip), gt(referralClicks.clickedAt, tenMinAgo)))
-    .all();
-  if (existing.length > 0) return false;
-  db.insert(referralClicks).values({ referrerEmail: email, ip, userAgent: ua }).run();
-  return true;
+  try {
+    // Deduplicate same IP within 10 minutes
+    const tenMinAgo = new Date(Date.now() - 10 * 60_000).toISOString();
+    const existing = db.select({ id: referralClicks.id }).from(referralClicks)
+      .where(and(eq(referralClicks.referrerEmail, email), eq(referralClicks.ip, ip), gt(referralClicks.clickedAt, tenMinAgo)))
+      .all();
+    if (existing.length > 0) return false;
+    db.insert(referralClicks).values({ referrerEmail: email, ip, userAgent: ua }).run();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function getReferralClickStats(email: string): { total: number; last30Days: number; byWeek: { week: string; count: number }[] } {
+  try {
   const allClicks = db.select({ c: count() }).from(referralClicks)
     .where(eq(referralClicks.referrerEmail, email)).all();
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400_000).toISOString();
@@ -1370,6 +1375,9 @@ export function getReferralClickStats(email: string): { total: number; last30Day
     .sort((a, b) => a.week.localeCompare(b.week));
 
   return { total: allClicks[0]?.c ?? 0, last30Days: recentClicks[0]?.c ?? 0, byWeek };
+  } catch {
+    return { total: 0, last30Days: 0, byWeek: [] };
+  }
 }
 
 export function incrementPaymentCount(email: string): number {
