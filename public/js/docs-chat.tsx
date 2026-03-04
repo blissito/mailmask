@@ -41,7 +41,9 @@ function Chat() {
 
   // Auto-scroll
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > 0) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, status]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -143,7 +145,7 @@ function Chat() {
                 <button
                   key={q}
                   onClick={() => {
-                    setInput(q);
+                    sendMessage(q);
                   }}
                   style={{
                     background: "#18181b",
@@ -433,7 +435,7 @@ function App() {
 
 function Root() {
   return (
-    <FormmyProvider publishableKey={PK}>
+    <FormmyProvider publishableKey={PK} baseUrl="https://formmy.app">
       <App />
     </FormmyProvider>
   );

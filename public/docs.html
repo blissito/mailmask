@@ -284,7 +284,9 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
     // Active sidebar link on scroll
     const sections = document.querySelectorAll('h2[id]');
     const navLinks = document.querySelectorAll('#sidebar-nav a');
+    let observerPaused = false;
     const observer = new IntersectionObserver(entries => {
+      if (observerPaused) return;
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           navLinks.forEach(a => a.classList.remove('active'));
@@ -294,6 +296,16 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
       });
     }, { rootMargin: '-20% 0px -70% 0px' });
     sections.forEach(s => observer.observe(s));
+
+    // Pause observer on sidebar click so it doesn't override active state
+    navLinks.forEach(link => {
+      link.addEventListener('click', () => {
+        navLinks.forEach(a => a.classList.remove('active'));
+        link.classList.add('active');
+        observerPaused = true;
+        setTimeout(() => { observerPaused = false; }, 800);
+      });
+    });
   </script>
 </body>
 </html>
