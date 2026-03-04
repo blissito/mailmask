@@ -322,11 +322,6 @@ function Chat() {
           0%, 100% { opacity: 0.3; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1); }
         }
-        .streamdown-wrap .shiki,
-        .streamdown-wrap .shiki span {
-          color: var(--shiki-dark) !important;
-          background-color: transparent !important;
-        }
         .streamdown-wrap pre {
           background: #18181b !important;
           border: 1px solid #27272a;
