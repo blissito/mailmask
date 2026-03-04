@@ -24,6 +24,13 @@ aws s3 mb s3://mailmask-backups --region us-east-1   # Daily DB backups (cron + 
 ```
 Override with env vars `S3_BUCKET` and `S3_BACKUP_BUCKET` respectively.
 
+## Docs & Formmy Agent
+- Public docs page: `public/docs.html` (SDK, API, SMTP, MCP — serves as both user-facing docs AND source for AI agent knowledge base)
+- Formmy agent setup: `scripts/setup-agent.ts` (persona, instructions)
+- Formmy docs upload: `scripts/upload-docs.ts` (extracts sections from docs.html + EXTRA_DOCS, uploads as RAG documents)
+- After editing `public/docs.html` or `EXTRA_DOCS` in upload script, re-run: `FORMMY_SECRET_KEY=sk_live_xxx npx tsx scripts/upload-docs.ts`
+- Chat widget: `public/js/docs-chat.tsx` → build with `npm run build:chat`
+
 ## Architecture
 - Single-file API server (`main.ts`) with all routes
 - No framework router separation — everything is chained `.get()/.post()` on one Elysia instance
