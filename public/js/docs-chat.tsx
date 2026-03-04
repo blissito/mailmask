@@ -326,13 +326,27 @@ function Chat() {
           background: #18181b !important;
           border: 1px solid #27272a;
           border-radius: 8px;
-          overflow-x: auto;
-          font-size: 13px;
+          overflow-x: hidden;
+          font-size: 12px;
           margin: 8px 0;
-          padding: 14px 16px;
+          padding: 12px 14px;
+          white-space: pre-wrap;
+          word-break: break-all;
         }
         .streamdown-wrap code {
-          font-size: 13px;
+          font-size: 12px;
+          word-break: break-all;
+        }
+        .streamdown-wrap ::-webkit-scrollbar {
+          width: 4px;
+          height: 4px;
+        }
+        .streamdown-wrap ::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .streamdown-wrap ::-webkit-scrollbar-thumb {
+          background: #3f3f46;
+          border-radius: 4px;
         }
         .streamdown-wrap p { margin: 6px 0; }
         .streamdown-wrap ul, .streamdown-wrap ol { margin: 6px 0; padding-left: 20px; }
