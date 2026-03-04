@@ -1503,10 +1503,10 @@ function renderTldGrid(base) {
   const name = base || "tudominio";
   container.innerHTML = AVAILABLE_TLDS.map(t => {
     const p = (t.price / 100).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-    return `<button type="button" class="tld-suggestion group text-left bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/30 hover:border-mask-500/40 rounded-xl px-4 py-3 transition-all relative" data-domain="${esc(name + t.tld)}">
-      ${t.popular ? '<span class="absolute top-1.5 right-1.5 text-[8px] bg-mask-600/30 text-mask-400 px-1.5 py-0.5 rounded-md leading-none">Popular</span>' : ''}
-      <span class="block text-sm font-bold text-mask-400 group-hover:text-mask-300">${t.tld}</span>
-      <span class="block text-[11px] text-zinc-500 mt-0.5">$${p} MXN<span class="text-zinc-600">/año</span></span>
+    return `<button type="button" class="tld-suggestion group text-left bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/30 hover:border-mask-500/40 rounded-xl px-4 py-3.5 transition-all" data-domain="${esc(name + t.tld)}">
+      <span class="block text-base font-bold text-mask-400 group-hover:text-mask-300">${t.tld}</span>
+      <span class="block text-xs text-zinc-500 mt-1">$${p} MXN/año</span>
+      ${t.popular ? '<span class="inline-block text-[9px] bg-mask-600/25 text-mask-400 px-1.5 py-0.5 rounded mt-1.5 leading-none">Popular</span>' : ''}
     </button>`;
   }).join("");
   gridEl.classList.remove("hidden");
