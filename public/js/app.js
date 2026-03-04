@@ -111,7 +111,7 @@ function renderBillingBanner() {
           <span class="text-xs text-zinc-500">hasta ${periodEnd ? periodEnd.toLocaleDateString("es-MX") : "—"}</span>
         </div>
         <div class="flex items-center gap-4">
-          <a href="https://wa.me/527757609276?text=${encodeURIComponent(`Hola, quiero cambiar mi plan.\nPlan actual: ${planName}\nEmail: ${currentUser.email}`)}" target="_blank" rel="noopener" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Cambiar plan</a>
+          <a href="/pricing" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Cambiar plan</a>
           <button id="btn-cancel-sub" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Cancelar</button>
         </div>
       </div>`;

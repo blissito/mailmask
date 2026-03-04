@@ -1,3 +1,17 @@
+// Session detection (non-blocking)
+let _loggedInUser = null;
+fetch("/api/auth/me").then(r => r.ok ? r.json() : null).then(u => {
+  if (!u) return;
+  _loggedInUser = u;
+  // Update all nav login links to "Mi cuenta"
+  document.querySelectorAll('a[href="/login"]').forEach(a => {
+    if (a.textContent.trim() === "Iniciar sesión") {
+      a.href = "/app";
+      a.textContent = "Mi cuenta";
+    }
+  });
+}).catch(() => {});
+
 // Capture referral slug from URL
 const _refParam = new URLSearchParams(location.search).get("ref");
 if (_refParam) {
@@ -124,7 +138,37 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function startCheckout(plan, billing, btn) {
-  showEmailModal(plan, billing, btn);
+  if (_loggedInUser) {
+    // Authenticated checkout — skip email modal
+    await doAuthCheckout(plan, billing, btn);
+  } else {
+    showEmailModal(plan, billing, btn);
+  }
+}
+
+async function doAuthCheckout(plan, billing, btn) {
+  btn.disabled = true;
+  btn.textContent = "Redirigiendo...";
+  try {
+    const coupon = new URLSearchParams(location.search).get("coupon") || undefined;
+    const res = await fetch("/api/billing/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ plan, billing: (loadedCoupon && plan === loadedCoupon.plan) ? "monthly" : billing, coupon }),
+    });
+    const data = await res.json();
+    if (data.init_point) {
+      location.href = data.init_point;
+    } else {
+      alert(data.error || "Error al iniciar el pago");
+      btn.disabled = false;
+      btn.textContent = "Empezar";
+    }
+  } catch {
+    alert("Error de conexión");
+    btn.disabled = false;
+    btn.textContent = "Empezar";
+  }
 }
 
 async function doCheckout(plan, billing, btn, email) {
