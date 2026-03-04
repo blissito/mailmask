@@ -1,5 +1,6 @@
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { node } from "@elysiajs/node";
+import { openapi } from "@elysiajs/openapi";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as dns from "node:dns/promises";
@@ -415,6 +416,20 @@ async function checkDomainAccess(
 // --- App ---
 
 const app = new Elysia({ adapter: node() })
+  .use(openapi({
+    documentation: {
+      info: { title: "MailMask API", version: "1.0.0", description: "Email alias/forwarding service API" },
+      components: {
+        securitySchemes: {
+          cookieAuth: { type: "apiKey", in: "cookie", name: "token" },
+        },
+      },
+    },
+    exclude: {
+      paths: [/^\/(?!api\/)/, "/health"],
+      staticFile: true,
+    },
+  }))
 
   // --- Naked domain redirect ---
   .onRequest(({ request }) => {
@@ -467,6 +482,12 @@ const app = new Elysia({ adapter: node() })
     return response;
   })
   .onError({ as: "global" }, ({ code, error }) => {
+    if (code === "VALIDATION") {
+      return new Response(JSON.stringify({ error: "Datos inválidos" }), {
+        status: 422,
+        headers: { "content-type": "application/json" },
+      });
+    }
     if (code === "NOT_FOUND") {
       try {
         const html = fs.readFileSync(`${PUBLIC_DIR}/404.html`);
@@ -541,27 +562,16 @@ const app = new Elysia({ adapter: node() })
 
   // --- Auth ---
 
-  .post("/api/auth/register", async ({ request }) => {
+  .post("/api/auth/register", async ({ request, body }) => {
     const ip = getIp(request);
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
 
-    const body = await request.json();
     const email = (body.email ?? "").toLowerCase().trim();
     const password = body.password;
-    if (!email || !password)
-      return new Response(
-        JSON.stringify({ error: "Email y contraseña requeridos" }),
-        { status: 400 },
-      );
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
       return new Response(
         JSON.stringify({ error: "Email inválido" }),
-        { status: 400 },
-      );
-    if (password.length < 8)
-      return new Response(
-        JSON.stringify({ error: "Contraseña mínimo 8 caracteres" }),
         { status: 400 },
       );
 
@@ -611,21 +621,22 @@ const app = new Elysia({ adapter: node() })
         "set-cookie": makeAuthCookie(token),
       },
     });
+  }, {
+    body: t.Object({
+      email: t.String(),
+      password: t.String({ minLength: 8 }),
+      ref: t.Optional(t.String()),
+    }),
+    detail: { tags: ["Auth"], summary: "Register a new user account" },
   })
 
-  .post("/api/auth/login", async ({ request }) => {
+  .post("/api/auth/login", async ({ request, body: loginBody }) => {
     const ip = getIp(request);
     const limited = await rateLimitGuard(ip, 10, 60_000);
     if (limited) return limited;
 
-    const loginBody = await request.json();
     const email = (loginBody.email ?? "").toLowerCase().trim();
     const password = loginBody.password;
-    if (!email || !password)
-      return new Response(
-        JSON.stringify({ error: "Email y contraseña requeridos" }),
-        { status: 400 },
-      );
 
     // Per-email rate limit: 5 attempts per 1 minute (prevents credential stuffing across IPs)
     const emailRl = checkRateLimit(`login:${email}`, 5, 60_000);
@@ -662,6 +673,12 @@ const app = new Elysia({ adapter: node() })
         "set-cookie": makeAuthCookie(token),
       },
     });
+  }, {
+    body: t.Object({
+      email: t.String(),
+      password: t.String(),
+    }),
+    detail: { tags: ["Auth"], summary: "Login with email and password" },
   })
 
   .post("/api/auth/logout", () => {
@@ -671,6 +688,8 @@ const app = new Elysia({ adapter: node() })
         "set-cookie": clearAuthCookie(),
       },
     });
+  }, {
+    detail: { tags: ["Auth"], summary: "Logout and clear auth cookie" },
   })
 
   .get("/api/auth/me", async ({ request }) => {
@@ -739,11 +758,12 @@ const app = new Elysia({ adapter: node() })
         headers: { "content-type": "application/json" },
       },
     );
+  }, {
+    detail: { tags: ["Auth"], summary: "Get current user profile and usage", security: [{ cookieAuth: [] }] },
   })
 
-  .get("/api/auth/verify-email", async ({ request }) => {
-    const url = new URL(request.url);
-    const token = url.searchParams.get("token");
+  .get("/api/auth/verify-email", async ({ query }) => {
+    const token = query.token;
     if (!token) return new Response("Token inválido", { status: 400 });
 
     const user = await getUserByVerifyToken(token);
@@ -756,6 +776,9 @@ const app = new Elysia({ adapter: node() })
       status: 302,
       headers: { location: "/app?verified=true" },
     });
+  }, {
+    query: t.Object({ token: t.String() }),
+    detail: { tags: ["Auth"], summary: "Verify user email via token" },
   })
 
   .post("/api/auth/resend-verification", async ({ request }) => {
@@ -783,19 +806,16 @@ const app = new Elysia({ adapter: node() })
     }
 
     return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Auth"], summary: "Resend email verification link", security: [{ cookieAuth: [] }] },
   })
 
-  .post("/api/auth/forgot-password", async ({ request }) => {
+  .post("/api/auth/forgot-password", async ({ request, body: forgotBody }) => {
     const ip = getIp(request);
     const limited = await rateLimitGuard(ip, 3, 60_000);
     if (limited) return limited;
 
-    const forgotBody = await request.json();
     const email = (forgotBody.email ?? "").toLowerCase().trim();
-    if (!email)
-      return new Response(JSON.stringify({ error: "Email requerido" }), {
-        status: 400,
-      });
 
     const emailLimited = checkRateLimit(`forgot:${email}`, 1, 60_000);
     if (!emailLimited.allowed) {
@@ -832,24 +852,17 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    body: t.Object({ email: t.String() }),
+    detail: { tags: ["Auth"], summary: "Send password reset email" },
   })
 
-  .post("/api/auth/set-password", async ({ request }) => {
+  .post("/api/auth/set-password", async ({ request, body }) => {
     const ip = getIp(request);
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
 
-    const { token, password } = await request.json();
-    if (!token || !password)
-      return new Response(
-        JSON.stringify({ error: "Token y contraseña requeridos" }),
-        { status: 400 },
-      );
-    if (password.length < 8)
-      return new Response(
-        JSON.stringify({ error: "Contraseña mínimo 8 caracteres" }),
-        { status: 400 },
-      );
+    const { token, password } = body;
 
     const email = await getEmailByPasswordToken(token);
     if (!email)
@@ -870,6 +883,12 @@ const app = new Elysia({ adapter: node() })
         "set-cookie": makeAuthCookie(jwt),
       },
     });
+  }, {
+    body: t.Object({
+      token: t.String(),
+      password: t.String({ minLength: 8 }),
+    }),
+    detail: { tags: ["Auth"], summary: "Set new password using reset token" },
   })
 
   // --- Referrals ---
@@ -880,15 +899,16 @@ const app = new Elysia({ adapter: node() })
     const stats = getReferralStats(auth.email);
     const refs = listReferrals(auth.email);
     return new Response(JSON.stringify({ ...stats, referrals: refs }), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Referrals"], summary: "Get referral stats and list", security: [{ cookieAuth: [] }] },
   })
 
-  .put("/api/referrals/slug", async ({ request }) => {
+  .put("/api/referrals/slug", async ({ request, body }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
     const ip = getIp(request);
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
-    const body = await request.json();
     const slug = (body.slug ?? "").toLowerCase().trim();
     if (!slug || !/^[a-z0-9-]+$/.test(slug) || slug.length < 3 || slug.length > 30) {
       return new Response(JSON.stringify({ error: "Slug inválido: 3-30 caracteres, solo letras minúsculas, números y guiones" }), { status: 400 });
@@ -896,14 +916,16 @@ const app = new Elysia({ adapter: node() })
     const ok = setReferralSlug(auth.email, slug);
     if (!ok) return new Response(JSON.stringify({ error: "Slug no disponible" }), { status: 409 });
     return new Response(JSON.stringify({ ok: true, slug }), { headers: { "content-type": "application/json" } });
+  }, {
+    body: t.Object({ slug: t.String() }),
+    detail: { tags: ["Referrals"], summary: "Update referral slug", security: [{ cookieAuth: [] }] },
   })
 
-  .post("/api/referrals/track", async ({ request }) => {
+  .post("/api/referrals/track", async ({ request, body }) => {
     const ip = getIp(request);
     const limited = await rateLimitGuard(ip, 20, 60_000);
     if (limited) return limited;
     try {
-      const body = await request.json();
       const slug = (body.slug ?? "").trim();
       if (slug) {
         const referrer = getUserByReferralSlug(slug);
@@ -913,6 +935,9 @@ const app = new Elysia({ adapter: node() })
       }
     } catch { /* ignore malformed bodies */ }
     return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  }, {
+    body: t.Object({ slug: t.String() }),
+    detail: { tags: ["Referrals"], summary: "Track a referral link click" },
   })
 
   // --- Domains ---
@@ -936,9 +961,11 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(enriched), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Domains"], summary: "List all domains for the authenticated user", security: [{ cookieAuth: [] }] },
   })
 
-  .post("/api/domains", async ({ request }) => {
+  .post("/api/domains", async ({ request, body }) => {
     const auth = await getAuthUser(request);
     if (!auth)
       return new Response(JSON.stringify({ error: "No autenticado" }), {
@@ -974,12 +1001,7 @@ const app = new Elysia({ adapter: node() })
       );
     }
 
-    const { domain } = await request.json();
-    if (!domain || typeof domain !== "string") {
-      return new Response(JSON.stringify({ error: "Dominio requerido" }), {
-        status: 400,
-      });
-    }
+    const { domain } = body;
 
     // Validate domain format
     const domainRegex =
@@ -1069,6 +1091,11 @@ const app = new Elysia({ adapter: node() })
         headers: { "content-type": "application/json" },
       },
     );
+  }, {
+    body: t.Object({
+      domain: t.String(),
+    }),
+    detail: { tags: ["Domains"], summary: "Add a new domain and configure SES", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/domains/:id", async ({ request, params }) => {
@@ -1089,6 +1116,8 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(domain), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Domains"], summary: "Get a single domain by ID", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/domains/:id/health", async ({ request, params }) => {
@@ -1199,6 +1228,8 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify({ domain: d, checks, status, summary }), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Domains"], summary: "Check domain health and DNS configuration", security: [{ cookieAuth: [] }] },
   })
 
   .post("/api/domains/:id/verify", async ({ request, params }) => {
@@ -1239,6 +1270,8 @@ const app = new Elysia({ adapter: node() })
         headers: { "content-type": "application/json" },
       },
     );
+  }, {
+    detail: { tags: ["Domains"], summary: "Verify domain DNS configuration with SES", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/domains/:id", async ({ request, params }) => {
@@ -1265,6 +1298,8 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Domains"], summary: "Delete a domain and clean up SES resources", security: [{ cookieAuth: [] }] },
   })
 
   // --- Aliases ---
@@ -1288,9 +1323,11 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(aliases), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Aliases"], summary: "List all aliases for a domain", security: [{ cookieAuth: [] }] },
   })
 
-  .post("/api/domains/:id/alias", async ({ request, params }) => {
+  .post("/api/domains/:id/alias", async ({ request, params, body }) => {
     const auth = await getAuthUser(request);
     if (!auth)
       return new Response(JSON.stringify({ error: "No autenticado" }), {
@@ -1320,13 +1357,7 @@ const app = new Elysia({ adapter: node() })
       );
     }
 
-    const { alias, destinations } = await request.json();
-    if (!alias || !destinations?.length) {
-      return new Response(
-        JSON.stringify({ error: "Alias y destinos requeridos" }),
-        { status: 400 },
-      );
-    }
+    const { alias, destinations } = body;
 
     // Validate alias format (alphanumeric, dots, hyphens, or * for catch-all)
     if (alias !== "*" && !/^[a-zA-Z0-9._-]+$/.test(alias)) {
@@ -1360,9 +1391,15 @@ const app = new Elysia({ adapter: node() })
       status: 201,
       headers: { "content-type": "application/json" },
     });
+  }, {
+    body: t.Object({
+      alias: t.String(),
+      destinations: t.Array(t.String()),
+    }),
+    detail: { tags: ["Aliases"], summary: "Create a new alias for a domain", security: [{ cookieAuth: [] }] },
   })
 
-  .put("/api/domains/:id/alias/:alias", async ({ request, params }) => {
+  .put("/api/domains/:id/alias/:alias", async ({ request, params, body }) => {
     const user = await getAuthUser(request);
     if (!user)
       return new Response(JSON.stringify({ error: "No autenticado" }), {
@@ -1376,8 +1413,6 @@ const app = new Elysia({ adapter: node() })
       });
     }
     const domain = access.domain;
-
-    const body = await request.json();
 
     // Whitelist allowed fields
     const updates: Record<string, unknown> = {};
@@ -1409,6 +1444,12 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(updated), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    body: t.Object({
+      enabled: t.Optional(t.Boolean()),
+      destinations: t.Optional(t.Array(t.String())),
+    }),
+    detail: { tags: ["Aliases"], summary: "Update an alias", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/domains/:id/alias/:alias", async ({ request, params }) => {
@@ -1435,6 +1476,8 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Aliases"], summary: "Delete an alias", security: [{ cookieAuth: [] }] },
   })
 
   // --- Rules ---
@@ -1458,9 +1501,11 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(rules), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Rules"], summary: "List all rules for a domain", security: [{ cookieAuth: [] }] },
   })
 
-  .post("/api/domains/:id/rules", async ({ request, params }) => {
+  .post("/api/domains/:id/rules", async ({ request, params, body }) => {
     const auth = await getAuthUser(request);
     if (!auth)
       return new Response(JSON.stringify({ error: "No autenticado" }), {
@@ -1495,15 +1540,7 @@ const app = new Elysia({ adapter: node() })
       target,
       priority = 0,
       enabled = true,
-    } = await request.json();
-    if (!field || !match || !value || !action) {
-      return new Response(
-        JSON.stringify({
-          error: "Campos requeridos: field, match, value, action",
-        }),
-        { status: 400 },
-      );
-    }
+    } = body;
 
     const validFields = ["to", "from", "subject"];
     const validMatches = ["contains", "equals", "regex"];
@@ -1570,9 +1607,20 @@ const app = new Elysia({ adapter: node() })
       status: 201,
       headers: { "content-type": "application/json" },
     });
+  }, {
+    body: t.Object({
+      field: t.Union([t.Literal("to"), t.Literal("from"), t.Literal("subject")]),
+      match: t.Union([t.Literal("contains"), t.Literal("equals"), t.Literal("regex")]),
+      value: t.String(),
+      action: t.Union([t.Literal("forward"), t.Literal("webhook"), t.Literal("discard")]),
+      target: t.Optional(t.String()),
+      priority: t.Optional(t.Number()),
+      enabled: t.Optional(t.Boolean()),
+    }),
+    detail: { tags: ["Rules"], summary: "Create a new rule for a domain", security: [{ cookieAuth: [] }] },
   })
 
-  .put("/api/domains/:id/rules/:ruleId", async ({ request, params }) => {
+  .put("/api/domains/:id/rules/:ruleId", async ({ request, params, body }) => {
     const user = await getAuthUser(request);
     if (!user)
       return new Response(JSON.stringify({ error: "No autenticado" }), {
@@ -1587,7 +1635,6 @@ const app = new Elysia({ adapter: node() })
     }
     const domain = access.domain;
 
-    const body = await request.json();
     const { field, match, value, action, target, priority, enabled } = body;
 
     // Validate field/match/action if provided
@@ -1643,6 +1690,17 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(updated), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    body: t.Object({
+      field: t.Optional(t.Union([t.Literal("to"), t.Literal("from"), t.Literal("subject")])),
+      match: t.Optional(t.Union([t.Literal("contains"), t.Literal("equals"), t.Literal("regex")])),
+      value: t.Optional(t.String()),
+      action: t.Optional(t.Union([t.Literal("forward"), t.Literal("webhook"), t.Literal("discard")])),
+      target: t.Optional(t.String()),
+      priority: t.Optional(t.Number()),
+      enabled: t.Optional(t.Boolean()),
+    }),
+    detail: { tags: ["Rules"], summary: "Update a rule", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/domains/:id/rules/:ruleId", async ({ request, params }) => {
@@ -1669,6 +1727,8 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Rules"], summary: "Delete a rule", security: [{ cookieAuth: [] }] },
   })
 
   // --- Logs ---
@@ -1698,6 +1758,8 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(logs), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Logs"], summary: "List forwarding logs for a domain", security: [{ cookieAuth: [] }] },
   })
 
   // --- Coupons (public) ---
@@ -1719,18 +1781,16 @@ const app = new Elysia({ adapter: node() })
       fixedPrice: coupon.fixedPrice,
       description: coupon.description,
     }), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Coupons"], summary: "Validate a coupon code" },
   })
 
   // --- Billing ---
 
-  .post("/api/billing/guest-checkout", async ({ request }) => {
+  .post("/api/billing/guest-checkout", async ({ body: { plan = "basico", billing = "monthly", coupon, email: rawEmail }, request }) => {
     const ip = getIp(request);
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
-
-    const { plan = "basico", billing = "monthly", coupon, email: rawEmail } = await request
-      .json()
-      .catch(() => ({ plan: "basico", billing: "monthly", coupon: undefined, email: undefined }));
 
     const payerEmail = typeof rawEmail === "string" ? rawEmail.toLowerCase().trim() : "";
     if (!payerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail)) {
@@ -1778,7 +1838,7 @@ const app = new Elysia({ adapter: node() })
         return new Response(JSON.stringify({ error: "El monto del cupón es inválido. Contacta soporte." }), { status: 400, headers: { "content-type": "application/json" } });
       }
       // deno-lint-ignore no-explicit-any
-      const body: any = {
+      const mpBody: any = {
         reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)} (${billingLabel})${couponSuffix}`,
         auto_recurring: {
           frequency: isYearly ? 12 : 1,
@@ -1796,7 +1856,7 @@ const app = new Elysia({ adapter: node() })
         back_url: backUrl,
         external_reference: token,
       };
-      const result = await preApproval.create({ body });
+      const result = await preApproval.create({ body: mpBody });
 
       // Mark single-use coupon as used AFTER successful MP call
       if (activeCoupon?.singleUse && couponCode) {
@@ -1817,9 +1877,17 @@ const app = new Elysia({ adapter: node() })
         },
       );
     }
+  }, {
+    body: t.Object({
+      plan: t.Optional(t.String()),
+      billing: t.Optional(t.String()),
+      coupon: t.Optional(t.String()),
+      email: t.Optional(t.String()),
+    }),
+    detail: { tags: ["Billing"], summary: "Create guest checkout session via MercadoPago" },
   })
 
-  .post("/api/billing/checkout", async ({ request }) => {
+  .post("/api/billing/checkout", async ({ body: { plan = "basico", billing = "monthly", coupon }, request }) => {
     const ip = getIp(request);
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
@@ -1830,9 +1898,6 @@ const app = new Elysia({ adapter: node() })
         status: 401,
       });
 
-    const { plan = "basico", billing = "monthly", coupon } = await request
-      .json()
-      .catch(() => ({ plan: "basico", billing: "monthly", coupon: undefined }));
     const planKey = plan as keyof typeof PLANS;
     if (!PLANS[planKey]) {
       return new Response(JSON.stringify({ error: "Plan inválido" }), {
@@ -1868,7 +1933,7 @@ const app = new Elysia({ adapter: node() })
         return new Response(JSON.stringify({ error: "El monto del cupón es inválido. Contacta soporte." }), { status: 400, headers: { "content-type": "application/json" } });
       }
       // deno-lint-ignore no-explicit-any
-      const body: any = {
+      const mpBody: any = {
         reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)} (${billingLabel})${couponSuffix}`,
         auto_recurring: {
           frequency: isYearly ? 12 : 1,
@@ -1886,7 +1951,7 @@ const app = new Elysia({ adapter: node() })
         back_url: backUrl,
         external_reference: user.email,
       };
-      const result = await preApproval.create({ body });
+      const result = await preApproval.create({ body: mpBody });
 
       // Mark single-use coupon as used AFTER successful MP call
       if (activeCoupon?.singleUse && couponCode) {
@@ -1907,6 +1972,13 @@ const app = new Elysia({ adapter: node() })
         { status: 500, headers: { "content-type": "application/json" } },
       );
     }
+  }, {
+    body: t.Object({
+      plan: t.Optional(t.String()),
+      billing: t.Optional(t.String()),
+      coupon: t.Optional(t.String()),
+    }),
+    detail: { tags: ["Billing"], summary: "Create authenticated checkout session via MercadoPago", security: [{ cookieAuth: [] }] },
   })
 
   .post("/api/webhooks/mercadopago", async ({ request }) => {
@@ -2154,6 +2226,8 @@ const app = new Elysia({ adapter: node() })
     }
 
     return new Response("OK", { status: 200 });
+  }, {
+    detail: { tags: ["Webhooks"], summary: "MercadoPago subscription webhook", hide: true },
   })
 
   .post("/api/billing/cancel", async ({ request }) => {
@@ -2213,6 +2287,8 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Billing"], summary: "Cancel active MercadoPago subscription", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/billing/status", async ({ request }) => {
@@ -2230,6 +2306,8 @@ const app = new Elysia({ adapter: node() })
         headers: { "content-type": "application/json" },
       },
     );
+  }, {
+    detail: { tags: ["Billing"], summary: "Get current subscription status", security: [{ cookieAuth: [] }] },
   })
 
   // --- Export ---
@@ -2275,11 +2353,13 @@ const app = new Elysia({ adapter: node() })
         "content-disposition": `attachment; filename="mailmask-export-${Date.now()}.json"`,
       },
     });
+  }, {
+    detail: { tags: ["Export"], summary: "Export all user data as JSON", security: [{ cookieAuth: [] }] },
   })
 
   // --- Outbound send ---
 
-  .post("/api/domains/:id/send", async ({ request, params }) => {
+  .post("/api/domains/:id/send", async ({ request, params, body: sendBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
     const user = (await getUser(auth.email))!;
@@ -2303,8 +2383,8 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Dominio no verificado" }), { status: 400 });
     }
 
-    const { to, subject, html, body, replyTo, from: fromLocal } = await request.json();
-    if (!to || !subject || (!html && !body)) {
+    const { to, subject, html, body: textBody, replyTo, from: fromLocal } = sendBody;
+    if (!to || !subject || (!html && !textBody)) {
       return new Response(JSON.stringify({ error: "to, subject y body/html requeridos" }), { status: 400 });
     }
 
@@ -2319,7 +2399,7 @@ const app = new Elysia({ adapter: node() })
 
     const fromAddress = `${fromLocal ?? "noreply"}@${domain.domain}`;
     try {
-      const messageId = await sendFromDomain(fromAddress, to, subject, body ?? html, {
+      const messageId = await sendFromDomain(fromAddress, to, subject, (textBody ?? html)!, {
         html,
         replyTo,
         configSet: getConfigSetName(domain.domain),
@@ -2332,11 +2412,21 @@ const app = new Elysia({ adapter: node() })
       log("error", "ses", "Outbound send failed", { error: String(err), domainId: domain.id });
       return new Response(JSON.stringify({ error: "Error enviando email" }), { status: 500 });
     }
+  }, {
+    body: t.Object({
+      to: t.String(),
+      subject: t.String(),
+      body: t.Optional(t.String()),
+      html: t.Optional(t.String()),
+      replyTo: t.Optional(t.String()),
+      from: t.Optional(t.String()),
+    }),
+    detail: { tags: ["Send"], summary: "Send an email from a domain", security: [{ cookieAuth: [] }] },
   })
 
   // --- Bulk send ---
 
-  .post("/api/domains/:id/send-bulk", async ({ request, params }) => {
+  .post("/api/domains/:id/send-bulk", async ({ request, params, body: bulkBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
     const user = (await getUser(auth.email))!;
@@ -2360,7 +2450,7 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Dominio no verificado" }), { status: 400 });
     }
 
-    const { recipients, subject, html, from: fromLocal } = await request.json();
+    const { recipients, subject, html, from: fromLocal } = bulkBody;
     if (!recipients?.length || !subject || !html) {
       return new Response(JSON.stringify({ error: "recipients[], subject y html requeridos" }), { status: 400 });
     }
@@ -2387,6 +2477,14 @@ const app = new Elysia({ adapter: node() })
       status: 201,
       headers: { "content-type": "application/json" },
     });
+  }, {
+    body: t.Object({
+      recipients: t.Array(t.String()),
+      subject: t.String(),
+      html: t.String(),
+      from: t.Optional(t.String()),
+    }),
+    detail: { tags: ["Send"], summary: "Create a bulk email send job", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/domains/:id/bulk/:jobId", async ({ request, params }) => {
@@ -2405,6 +2503,8 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(job), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Send"], summary: "Get bulk send job status", security: [{ cookieAuth: [] }] },
   })
 
   // --- Mesa: SSE ---
@@ -2448,6 +2548,8 @@ const app = new Elysia({ adapter: node() })
         "X-Accel-Buffering": "no",
       },
     });
+  }, {
+    detail: { hide: true },
   })
 
   // --- Mesa: conversations ---
@@ -2492,6 +2594,8 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(convs), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Bandeja"], summary: "List conversations for a domain", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/bandeja/conversations/:id", async ({ request, params }) => {
@@ -2537,6 +2641,8 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify({ ...conv, messages, notes }), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Bandeja"], summary: "Get conversation detail with messages", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/bandeja/conversations/:id/attachments/:msgIdx/:attIdx", async ({ request, params }) => {
@@ -2590,14 +2696,16 @@ const app = new Elysia({ adapter: node() })
       console.error("Failed to fetch attachment from S3:", err);
       return new Response(JSON.stringify({ error: "Error al cargar attachment" }), { status: 500 });
     }
+  }, {
+    detail: { tags: ["Bandeja"], summary: "Download a message attachment", security: [{ cookieAuth: [] }] },
   })
 
-  .post("/api/bandeja/conversations/:id/reply", async ({ request, params }) => {
+  .post("/api/bandeja/conversations/:id/reply", async ({ request, params, body: replyBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
-    const { domainId, body: replyBody, html } = await request.json();
-    if (!domainId || (!replyBody && !html)) {
+    const { domainId, body: replyBodyText, html } = replyBody;
+    if (!domainId || (!replyBodyText && !html)) {
       return new Response(JSON.stringify({ error: "domainId y body/html requeridos" }), { status: 400 });
     }
 
@@ -2625,7 +2733,7 @@ const app = new Elysia({ adapter: node() })
     const lastRef = conv.threadReferences[conv.threadReferences.length - 1];
 
     try {
-      const messageId = await sendFromDomain(fromAddress, conv.from, `Re: ${conv.subject}`, replyBody ?? html, {
+      const messageId = await sendFromDomain(fromAddress, conv.from, `Re: ${conv.subject}`, (replyBodyText ?? html)!, {
         html,
         configSet: getConfigSetName(domain.domain),
         inReplyTo: lastRef,
@@ -2636,7 +2744,7 @@ const app = new Elysia({ adapter: node() })
       await addMessage({
         conversationId: conv.id,
         from: fromAddress,
-        body: replyBody ?? "",
+        body: replyBodyText ?? "",
         html: html ?? "",
         direction: "outbound",
         createdAt: new Date().toISOString(),
@@ -2656,13 +2764,20 @@ const app = new Elysia({ adapter: node() })
       log("error", "ses", "Mesa reply failed", { error: String(err) });
       return new Response(JSON.stringify({ error: "Error enviando respuesta" }), { status: 500 });
     }
+  }, {
+    body: t.Object({
+      domainId: t.String(),
+      body: t.Optional(t.String()),
+      html: t.Optional(t.String()),
+    }),
+    detail: { tags: ["Bandeja"], summary: "Reply to a conversation", security: [{ cookieAuth: [] }] },
   })
 
-  .post("/api/bandeja/conversations/:id/assign", async ({ request, params }) => {
+  .post("/api/bandeja/conversations/:id/assign", async ({ request, params, body: assignBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
-    const { domainId, assignedTo } = await request.json();
+    const { domainId, assignedTo } = assignBody;
     if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
 
     const domain = await getDomain(domainId);
@@ -2690,14 +2805,20 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(updated), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    body: t.Object({
+      domainId: t.String(),
+      assignedTo: t.Optional(t.String()),
+    }),
+    detail: { tags: ["Bandeja"], summary: "Assign a conversation", security: [{ cookieAuth: [] }] },
   })
 
-  .post("/api/bandeja/conversations/:id/note", async ({ request, params }) => {
+  .post("/api/bandeja/conversations/:id/note", async ({ request, params, body: noteBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
-    const { domainId, body: noteBody } = await request.json();
-    if (!domainId || !noteBody) return new Response(JSON.stringify({ error: "domainId y body requeridos" }), { status: 400 });
+    const { domainId, body: noteBodyText } = noteBody;
+    if (!domainId || !noteBodyText) return new Response(JSON.stringify({ error: "domainId y body requeridos" }), { status: 400 });
 
     const domain = await getDomain(domainId);
     if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
@@ -2722,7 +2843,7 @@ const app = new Elysia({ adapter: node() })
     const note = await addNote({
       conversationId: conv.id,
       author: auth.email,
-      body: noteBody,
+      body: noteBodyText,
       createdAt: new Date().toISOString(),
     });
 
@@ -2730,14 +2851,19 @@ const app = new Elysia({ adapter: node() })
       status: 201,
       headers: { "content-type": "application/json" },
     });
+  }, {
+    body: t.Object({
+      domainId: t.String(),
+      body: t.String(),
+    }),
+    detail: { tags: ["Bandeja"], summary: "Add a note to a conversation", security: [{ cookieAuth: [] }] },
   })
 
-  .patch("/api/bandeja/conversations/:id", async ({ request, params }) => {
+  .patch("/api/bandeja/conversations/:id", async ({ request, params, body: patchInput }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
-    const patchBody = await request.json();
-    const { domainId, status: newStatus, tags, priority } = patchBody;
+    const { domainId, status: newStatus, tags, priority } = patchInput;
     if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
 
     const domain = await getDomain(domainId);
@@ -2771,6 +2897,14 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(updated), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    body: t.Object({
+      domainId: t.String(),
+      status: t.Optional(t.String()),
+      tags: t.Optional(t.Array(t.String())),
+      priority: t.Optional(t.String()),
+    }),
+    detail: { tags: ["Bandeja"], summary: "Update conversation status/tags/priority", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/bandeja/conversations/:id", async ({ request, params }) => {
@@ -2803,13 +2937,15 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Bandeja"], summary: "Soft-delete a conversation", security: [{ cookieAuth: [] }] },
   })
 
-  .post("/api/bandeja/conversations/:id/restore", async ({ request, params }) => {
+  .post("/api/bandeja/conversations/:id/restore", async ({ request, params, body: restoreBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
-    const { domainId } = await request.json();
+    const { domainId } = restoreBody;
     if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
 
     const domain = await getDomain(domainId);
@@ -2834,11 +2970,16 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    body: t.Object({
+      domainId: t.String(),
+    }),
+    detail: { tags: ["Bandeja"], summary: "Restore a soft-deleted conversation", security: [{ cookieAuth: [] }] },
   })
 
   // --- Agents ---
 
-  .post("/api/domains/:id/agents/invite", async ({ request, params }) => {
+  .post("/api/domains/:id/agents/invite", async ({ request, params, body: inviteBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
@@ -2860,14 +3001,14 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: `Límite de agentes alcanzado (${mesaLimits.agents})` }), { status: 400 });
     }
 
-    const { email, name, role = "agent" } = await request.json();
+    const { email, name, role = "agent" } = inviteBody;
     if (!email || !name) return new Response(JSON.stringify({ error: "email y name requeridos" }), { status: 400 });
     if (!["admin", "agent"].includes(role)) return new Response(JSON.stringify({ error: "role inválido" }), { status: 400 });
 
     const existing = await getAgentByEmail(domain.id, email);
     if (existing) return new Response(JSON.stringify({ error: "Este email ya es agente de este dominio" }), { status: 409 });
 
-    const token = await createAgentInvite(domain.id, email, name, role);
+    const token = await createAgentInvite(domain.id, email, name, role as "agent" | "admin");
     const inviteUrl = `${getMainDomainUrl()}/api/agents/accept?token=${token}`;
 
     const alertFrom = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
@@ -2882,6 +3023,13 @@ const app = new Elysia({ adapter: node() })
       status: 201,
       headers: { "content-type": "application/json" },
     });
+  }, {
+    body: t.Object({
+      email: t.String(),
+      name: t.String(),
+      role: t.Optional(t.String()),
+    }),
+    detail: { tags: ["Agents"], summary: "Invite an agent to a domain", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/agents/accept", async ({ request }) => {
@@ -2910,6 +3058,8 @@ const app = new Elysia({ adapter: node() })
       status: 302,
       headers: { location: "/bandeja?welcome=1" },
     });
+  }, {
+    detail: { tags: ["Agents"], summary: "Accept an agent invitation via token" },
   })
 
   .get("/api/domains/:id/agents", async ({ request, params }) => {
@@ -2926,6 +3076,8 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(agents), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Agents"], summary: "List agents for a domain", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/domains/:id/agents/:agentId", async ({ request, params }) => {
@@ -2944,11 +3096,13 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["Agents"], summary: "Remove an agent from a domain", security: [{ cookieAuth: [] }] },
   })
 
   // --- SMTP Credentials ---
 
-  .post("/api/domains/:id/smtp-credentials", async ({ request, params }) => {
+  .post("/api/domains/:id/smtp-credentials", async ({ request, params, body: smtpBody }) => {
     const user = await getAuthUser(request);
     if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401 });
 
@@ -2962,8 +3116,7 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "SMTP relay no disponible en tu plan. Actualiza a Freelancer o Developer." }), { status: 403 });
     }
 
-    const body = await request.json();
-    const label = (body.label ?? "").trim();
+    const label = (smtpBody.label ?? "").trim();
     if (!label || label.length > 100) {
       return new Response(JSON.stringify({ error: "Label requerido (máx 100 caracteres)" }), { status: 400 });
     }
@@ -2988,6 +3141,11 @@ const app = new Elysia({ adapter: node() })
       status: 201,
       headers: { "content-type": "application/json" },
     });
+  }, {
+    body: t.Object({
+      label: t.String(),
+    }),
+    detail: { tags: ["SMTP"], summary: "Create SMTP credentials for a domain", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/domains/:id/smtp-credentials", async ({ request, params }) => {
@@ -3001,6 +3159,8 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(credentials), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["SMTP"], summary: "List SMTP credentials for a domain", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/domains/:id/smtp-credentials/:credId", async ({ request, params }) => {
@@ -3019,6 +3179,8 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
     });
+  }, {
+    detail: { tags: ["SMTP"], summary: "Revoke an SMTP credential", security: [{ cookieAuth: [] }] },
   })
 
   // --- SES bounce/complaint events ---
@@ -3078,6 +3240,8 @@ const app = new Elysia({ adapter: node() })
     }
 
     return new Response("OK", { status: 200 });
+  }, {
+    detail: { tags: ["Webhooks"], summary: "SES bounce/complaint events via SNS", hide: true },
   })
 
   // --- Webhook: SES inbound via SNS ---
@@ -3123,6 +3287,8 @@ const app = new Elysia({ adapter: node() })
         headers: { "content-type": "application/json" },
       });
     }
+  }, {
+    detail: { tags: ["Webhooks"], summary: "SES inbound email via SNS", hide: true },
   })
 
   // --- Admin: backups ---
@@ -3139,6 +3305,8 @@ const app = new Elysia({ adapter: node() })
       log("error", "admin", "Failed to list backups", { error: String(err) });
       return new Response(JSON.stringify([]), { headers: { "content-type": "application/json" } });
     }
+  }, {
+    detail: { tags: ["Admin"], summary: "List backups", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/admin/backups/:key", async ({ request, params }) => {
@@ -3157,6 +3325,8 @@ const app = new Elysia({ adapter: node() })
     } catch {
       return new Response(JSON.stringify({ error: "Backup no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
     }
+  }, {
+    detail: { tags: ["Admin"], summary: "Download a backup by key", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/admin/backups/:key", async ({ request, params }) => {
@@ -3171,6 +3341,8 @@ const app = new Elysia({ adapter: node() })
     } catch {
       return new Response(JSON.stringify({ error: "No se pudo eliminar el backup" }), { status: 500, headers: { "content-type": "application/json" } });
     }
+  }, {
+    detail: { tags: ["Admin"], summary: "Delete a backup by key", security: [{ cookieAuth: [] }] },
   })
 
   .post("/api/admin/backups/trigger", async ({ request }) => {
@@ -3186,6 +3358,8 @@ const app = new Elysia({ adapter: node() })
       log("error", "backup", "Manual backup failed", { error: String(err) });
       return new Response(JSON.stringify({ error: "Backup falló" }), { status: 500, headers: { "content-type": "application/json" } });
     }
+  }, {
+    detail: { tags: ["Admin"], summary: "Trigger a manual backup", security: [{ cookieAuth: [] }] },
   })
 
   // --- Admin: Users CRUD ---
@@ -3210,6 +3384,8 @@ const app = new Elysia({ adapter: node() })
       });
     }
     return new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Admin"], summary: "List all users", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/admin/users/:email", async ({ request, params }) => {
@@ -3230,9 +3406,11 @@ const app = new Elysia({ adapter: node() })
 
     const { passwordHash: _, ...safe } = target;
     return new Response(JSON.stringify({ ...safe, domains: domainsWithAliases }), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Admin"], summary: "Get user details by email", security: [{ cookieAuth: [] }] },
   })
 
-  .patch("/api/admin/users/:email", async ({ request, params }) => {
+  .patch("/api/admin/users/:email", async ({ request, params, body: userPatch }) => {
     const auth = await getAuthUser(request);
     if (!auth || !isAdmin(auth.email))
       return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
@@ -3242,28 +3420,35 @@ const app = new Elysia({ adapter: node() })
     if (!target)
       return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
 
-    const body = await request.json();
     const validPlans = ["basico", "freelancer", "developer", "pro", "agencia"];
     const validStatuses = ["active", "past_due", "cancelled", "none"];
 
     // Update subscription fields
-    if (body.plan !== undefined || body.status !== undefined || body.currentPeriodEnd !== undefined) {
+    if (userPatch.plan !== undefined || userPatch.status !== undefined || userPatch.currentPeriodEnd !== undefined) {
       const sub = target.subscription ?? { plan: "basico", status: "none" as const };
-      if (body.plan !== undefined && validPlans.includes(body.plan)) sub.plan = body.plan;
-      if (body.status !== undefined && validStatuses.includes(body.status)) sub.status = body.status;
-      if (body.currentPeriodEnd !== undefined) sub.currentPeriodEnd = body.currentPeriodEnd || undefined;
+      if (userPatch.plan !== undefined && validPlans.includes(userPatch.plan)) sub.plan = userPatch.plan as typeof sub.plan;
+      if (userPatch.status !== undefined && validStatuses.includes(userPatch.status)) sub.status = userPatch.status as typeof sub.status;
+      if (userPatch.currentPeriodEnd !== undefined) sub.currentPeriodEnd = userPatch.currentPeriodEnd || undefined;
       await updateUserSubscription(email, sub);
     }
 
     // Update emailVerified
-    if (body.emailVerified !== undefined) {
-      db.update(usersTable).set({ emailVerified: !!body.emailVerified }).where(eq(usersTable.email, email)).run();
+    if (userPatch.emailVerified !== undefined) {
+      db.update(usersTable).set({ emailVerified: !!userPatch.emailVerified }).where(eq(usersTable.email, email)).run();
     }
 
-    log("info", "admin", "User updated by admin", { admin: auth.email, target: email, changes: body });
+    log("info", "admin", "User updated by admin", { admin: auth.email, target: email, changes: userPatch });
     const updated = await getUser(email);
     const { passwordHash: _, ...safe } = updated!;
     return new Response(JSON.stringify(safe), { headers: { "content-type": "application/json" } });
+  }, {
+    body: t.Object({
+      plan: t.Optional(t.String()),
+      status: t.Optional(t.String()),
+      currentPeriodEnd: t.Optional(t.String()),
+      emailVerified: t.Optional(t.Boolean()),
+    }),
+    detail: { tags: ["Admin"], summary: "Update a user's subscription or verification status", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/admin/users/:email", async ({ request, params }) => {
@@ -3281,6 +3466,8 @@ const app = new Elysia({ adapter: node() })
 
     log("info", "admin", "User deleted by admin", { admin: auth.email, target: email });
     return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Admin"], summary: "Delete a user by email", security: [{ cookieAuth: [] }] },
   })
 
   // --- Admin: Coupons ---
@@ -3292,14 +3479,16 @@ const app = new Elysia({ adapter: node() })
 
     const coupons = await listCoupons();
     return new Response(JSON.stringify(coupons), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Admin"], summary: "List all coupons", security: [{ cookieAuth: [] }] },
   })
 
-  .post("/api/admin/coupons", async ({ request }) => {
+  .post("/api/admin/coupons", async ({ request, body: couponBody }) => {
     const auth = await getAuthUser(request);
     if (!auth || !isAdmin(auth.email))
       return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
 
-    const body = await request.json().catch(() => null);
+    const body = couponBody;
     if (!body?.code || !body?.plan || !body?.fixedPrice || !body?.description) {
       return new Response(JSON.stringify({ error: "Campos requeridos: code, plan, fixedPrice, description" }), { status: 400, headers: { "content-type": "application/json" } });
     }
@@ -3329,6 +3518,16 @@ const app = new Elysia({ adapter: node() })
       }
       throw err;
     }
+  }, {
+    body: t.Object({
+      code: t.String(),
+      plan: t.String(),
+      fixedPrice: t.Number(),
+      description: t.String(),
+      singleUse: t.Optional(t.Boolean()),
+      expiresAt: t.Optional(t.String()),
+    }),
+    detail: { tags: ["Admin"], summary: "Create a coupon", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/admin/coupons/:code", async ({ request, params }) => {
@@ -3343,6 +3542,8 @@ const app = new Elysia({ adapter: node() })
 
     log("info", "admin", "Coupon deleted", { admin: auth.email, code });
     return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Admin"], summary: "Delete a coupon by code", security: [{ cookieAuth: [] }] },
   })
 
   // --- Domain Registration (Route 53) ---
@@ -3384,9 +3585,11 @@ const app = new Elysia({ adapter: node() })
         : "Error al buscar disponibilidad";
       return new Response(JSON.stringify({ error: msg }), { status: 400, headers: { "content-type": "application/json" } });
     }
+  }, {
+    detail: { tags: ["Domain Registration"], summary: "Search domain availability", security: [{ cookieAuth: [] }] },
   })
 
-  .post("/api/domains/register", async ({ request }) => {
+  .post("/api/domains/register", async ({ request, body: regBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
 
@@ -3400,7 +3603,7 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Necesitas un plan activo para registrar dominios" }), { status: 402, headers: { "content-type": "application/json" } });
     }
 
-    const { domain } = await request.json();
+    const { domain } = regBody;
     if (!domain || typeof domain !== "string") {
       return new Response(JSON.stringify({ error: "Dominio requerido" }), { status: 400, headers: { "content-type": "application/json" } });
     }
@@ -3478,6 +3681,11 @@ const app = new Elysia({ adapter: node() })
       log("error", "billing", "MP domain preference error", { domain: d, error: String(err) });
       return new Response(JSON.stringify({ error: "Error al crear pago en MercadoPago" }), { status: 500, headers: { "content-type": "application/json" } });
     }
+  }, {
+    body: t.Object({
+      domain: t.String(),
+    }),
+    detail: { tags: ["Domain Registration"], summary: "Register a domain via Route 53 + MercadoPago", security: [{ cookieAuth: [] }] },
   })
 
   .post("/api/webhooks/mercadopago-domain", async ({ request }) => {
@@ -3568,6 +3776,8 @@ const app = new Elysia({ adapter: node() })
     }
 
     return new Response("OK", { status: 200 });
+  }, {
+    detail: { tags: ["Webhooks"], summary: "MercadoPago domain registration webhook", hide: true },
   })
 
   .get("/api/domains/registrations", async ({ request }) => {
@@ -3576,6 +3786,8 @@ const app = new Elysia({ adapter: node() })
 
     const registrations = getDomainRegistrationsByUser(auth.email);
     return new Response(JSON.stringify(registrations), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Domain Registration"], summary: "List domain registrations for current user", security: [{ cookieAuth: [] }] },
   });
 
 // --- Bulk send cron (every minute, processes 14 emails/sec) ---
