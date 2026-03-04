@@ -1503,12 +1503,12 @@ function renderTldGrid(base) {
   const name = base || "tudominio";
   container.innerHTML = AVAILABLE_TLDS.map(t => {
     const p = (t.price / 100).toLocaleString("es-MX", { style: "currency", currency: "MXN", currencyDisplay: "narrowSymbol" });
-    return `<button type="button" class="tld-suggestion group text-left bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 hover:border-mask-600/50 rounded-xl px-4 py-3 transition-all" data-domain="${esc(name + t.tld)}">
-      <div class="flex items-center justify-between">
-        <span class="text-sm font-medium text-zinc-300 group-hover:text-zinc-100">${esc(name)}<span class="text-mask-400">${t.tld}</span></span>
-        ${t.popular ? '<span class="text-[9px] bg-mask-600/20 text-mask-400 px-1.5 py-0.5 rounded-full">Popular</span>' : ''}
+    return `<button type="button" class="tld-suggestion group text-left bg-zinc-800/30 hover:bg-zinc-800 border border-zinc-700/40 hover:border-mask-600/50 rounded-lg px-3 py-2.5 transition-all" data-domain="${esc(name + t.tld)}">
+      <div class="flex items-center gap-1.5">
+        <span class="text-[13px] font-medium text-zinc-300 group-hover:text-zinc-100 truncate"><span class="text-zinc-500">${esc(name)}</span><span class="text-mask-400">${t.tld}</span></span>
+        ${t.popular ? '<span class="text-[8px] bg-mask-600/20 text-mask-400 px-1 py-px rounded shrink-0">Popular</span>' : ''}
       </div>
-      <span class="text-xs text-zinc-500">${p} MXN/año</span>
+      <span class="text-[11px] text-zinc-600">${p} MXN/año</span>
     </button>`;
   }).join("");
   gridEl.classList.remove("hidden");
