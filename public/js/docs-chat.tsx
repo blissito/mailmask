@@ -32,12 +32,25 @@ function Chat() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(0);
 
+  console.log("[docs-chat] Chat component mounting, AGENT_ID:", AGENT_ID, "PK:", PK.slice(0, 20) + "...");
+
   const { messages, sendMessage, status, reset, error } = useFormmyChat({
     agentId: AGENT_ID,
-    onFinish: () => playBeep(),
+    onFinish: () => {
+      console.log("[docs-chat] onFinish called — message complete");
+      playBeep();
+    },
+    onError: (err: any) => {
+      console.error("[docs-chat] onError callback:", err);
+    },
   });
 
   const isLoading = status === "streaming" || status === "submitted";
+
+  // Log status and error changes
+  useEffect(() => {
+    console.log("[docs-chat] status:", status, "| messages:", messages.length, "| error:", error);
+  }, [status, messages.length, error]);
 
   // Auto-scroll
   useEffect(() => {
@@ -51,7 +64,13 @@ function Chat() {
     if (!input.trim() || isLoading) return;
     const msg = input.trim();
     setInput("");
-    await sendMessage(msg);
+    console.log("[docs-chat] Sending message:", msg);
+    try {
+      await sendMessage(msg);
+      console.log("[docs-chat] sendMessage resolved");
+    } catch (err) {
+      console.error("[docs-chat] sendMessage threw:", err);
+    }
   };
 
   return (
@@ -145,6 +164,7 @@ function Chat() {
                 <button
                   key={q}
                   onClick={() => {
+                    console.log("[docs-chat] Suggestion clicked:", q);
                     sendMessage(q);
                   }}
                   style={{
@@ -442,6 +462,10 @@ function Root() {
 }
 
 const el = document.getElementById("docs-chat");
+console.log("[docs-chat] Init — container element:", el ? "found" : "NOT FOUND");
 if (el) {
+  console.log("[docs-chat] Mounting React app...");
   createRoot(el).render(<Root />);
+} else {
+  console.warn("[docs-chat] #docs-chat element not found in DOM — chat will not render");
 }
