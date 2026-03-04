@@ -107,7 +107,7 @@ function Chat() {
               background: "#22c55e",
             }}
           />
-          <span style={{ fontWeight: 600, fontSize: 14, color: "#fafafa" }}>
+          <span style={{ fontWeight: 600, fontSize: 16, color: "#fafafa" }}>
             Asistente MailMask
           </span>
         </div>
@@ -143,7 +143,7 @@ function Chat() {
             style={{
               textAlign: "center",
               color: "#52525b",
-              fontSize: 13,
+              fontSize: 15,
               marginTop: 40,
             }}
           >
@@ -178,7 +178,7 @@ function Chat() {
                     borderRadius: 8,
                     padding: "6px 12px",
                     color: "#a1a1aa",
-                    fontSize: 12,
+                    fontSize: 14,
                     cursor: "pointer",
                   }}
                 >
@@ -205,8 +205,8 @@ function Chat() {
                   maxWidth: "90%",
                   padding: isUser ? "8px 14px" : "0",
                   borderRadius: 12,
-                  fontSize: 13,
-                  lineHeight: 1.5,
+                  fontSize: 15,
+                  lineHeight: 1.6,
                   ...(isUser
                     ? {
                         background:
@@ -290,7 +290,7 @@ function Chat() {
             borderRadius: 10,
             padding: "10px 14px",
             color: "#fafafa",
-            fontSize: 13,
+            fontSize: 15,
             outline: "none",
           }}
           onFocus={(e) =>
@@ -307,7 +307,7 @@ function Chat() {
             borderRadius: 10,
             padding: "0 16px",
             color: "#fff",
-            fontSize: 13,
+            fontSize: 15,
             fontWeight: 600,
             cursor: isLoading || !input.trim() ? "not-allowed" : "pointer",
             opacity: isLoading || !input.trim() ? 0.5 : 1,
@@ -327,12 +327,12 @@ function Chat() {
           border: 1px solid #27272a;
           border-radius: 8px;
           overflow-x: auto;
-          font-size: 12px;
+          font-size: 13px;
           margin: 8px 0;
           padding: 14px 16px;
         }
         .streamdown-wrap code {
-          font-size: 12px;
+          font-size: 13px;
         }
         .streamdown-wrap p { margin: 6px 0; }
         .streamdown-wrap ul, .streamdown-wrap ol { margin: 6px 0; padding-left: 20px; }
@@ -346,7 +346,7 @@ function Chat() {
           background: #27272a;
           padding: 2px 6px;
           border-radius: 4px;
-          font-size: 12px;
+          font-size: 13px;
           color: rgb(var(--mask-400));
         }
       `}</style>
