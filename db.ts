@@ -1,5 +1,5 @@
 import { db, sqlite } from "./pg.js";
-import { eq, and, gt, lte, lt, sql as rawSql, inArray, isNull, isNotNull, desc, asc, count } from "drizzle-orm";
+import { eq, and, gt, lte, lt, sql as rawSql, inArray, isNull, isNotNull, desc, asc, count, sum } from "drizzle-orm";
 import {
   users,
   domains,
@@ -492,16 +492,15 @@ export function listLogs(domainId: string, limit = 50): EmailLog[] {
   return rows.map(rowToLog);
 }
 
-export function getMonthlyForwardCounts(domainIds: string[]): Map<string, number> {
+export function getForwardCounts(domainIds: string[]): Map<string, number> {
   if (domainIds.length === 0) return new Map();
-  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-  const rows = db.select({ domainId: emailLogs.domainId, c: count() })
-    .from(emailLogs)
-    .where(and(inArray(emailLogs.domainId, domainIds), gt(emailLogs.timestamp, firstOfMonth)))
-    .groupBy(emailLogs.domainId)
+  const rows = db.select({ domainId: alias.domainId, c: sum(alias.forwardCount) })
+    .from(alias)
+    .where(inArray(alias.domainId, domainIds))
+    .groupBy(alias.domainId)
     .all();
   const map = new Map<string, number>();
-  for (const r of rows) map.set(r.domainId, r.c);
+  for (const r of rows) map.set(r.domainId, Number(r.c) || 0);
   return map;
 }
 

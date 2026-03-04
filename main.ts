@@ -29,7 +29,7 @@ import {
   deleteRule,
   countRules,
   listLogs,
-  getMonthlyForwardCounts,
+  getForwardCounts,
   PLANS,
   updateUserSubscription,
   getUserBySubscriptionId,
@@ -927,7 +927,7 @@ const app = new Elysia({ adapter: node() })
     const domains = await listUserDomains(user.email);
     const fullUser = (await getUser(user.email))!;
     const limits = getUserPlanLimits(fullUser);
-    const counts = await getMonthlyForwardCounts(domains.map(d => d.id));
+    const counts = getForwardCounts(domains.map(d => d.id));
     const enriched = domains.map(d => ({
       ...d,
       monthlyForwards: counts.get(d.id) ?? 0,
