@@ -9,6 +9,13 @@ npm run dev       # Run dev server on :8000 (tsx --watch)
 npm test          # Run tests (tsx --test)
 ```
 
+## SDK (`sdk/`)
+When any file inside `sdk/` is modified: bump the version (`npm version patch` in `sdk/`), build, and publish to npm:
+```bash
+cd sdk && npm version patch --no-git-tag-version && npm run build && npm publish --access public
+```
+Package: `@easybits.cloud/mailmask` on npm.
+
 ## AWS S3 Buckets
 These buckets must exist before the app works correctly. Create them manually if they don't exist:
 ```bash
