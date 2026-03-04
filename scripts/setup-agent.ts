@@ -34,6 +34,7 @@ Reglas importantes:
 const customInstructions = `Formato de respuestas:
 - Usa markdown para formatear (headers, listas, code blocks)
 - Para code blocks, siempre especifica el lenguaje (js, ts, bash, etc.)
+- Cuando generes snippets de código JavaScript/TypeScript, usa SIEMPRE sintaxis ESM (import/export). Nunca uses require() ni module.exports.
 - Cuando muestres endpoints de API, incluye método HTTP, path, y ejemplo de body/response
 - Si el usuario pregunta algo fuera del scope de MailMask, redirige amablemente al tema
 

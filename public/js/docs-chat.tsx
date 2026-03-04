@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, createPortal } from "react-dom/client";
 import {
   FormmyProvider,
   useFormmyChat,
@@ -450,12 +450,11 @@ function App() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // Desktop: render in the grid panel; Mobile: floating button
-  const container = document.getElementById("docs-chat");
-  if (!isMobile && container) {
+  // Desktop: render in the grid panel; Mobile: portal to body for floating button
+  if (!isMobile) {
     return <Chat />;
   }
-  return <MobileChat />;
+  return createPortal(<MobileChat />, document.body);
 }
 
 function Root() {
