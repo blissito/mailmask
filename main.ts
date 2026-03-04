@@ -3812,7 +3812,9 @@ const app = new Elysia({ adapter: node() })
   .post("/api/api-keys", async ({ request, body }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
-    const limits = getUserPlanLimits(auth.email);
+    const user = getUser(auth.email);
+    if (!user) return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
+    const limits = getUserPlanLimits(user);
     if (!limits.api) return new Response(JSON.stringify({ error: "Tu plan no incluye acceso a la API" }), { status: 403, headers: { "content-type": "application/json" } });
     const { name } = body as { name: string };
     if (!name || typeof name !== "string" || name.length > 50) return new Response(JSON.stringify({ error: "Nombre inválido" }), { status: 400, headers: { "content-type": "application/json" } });
@@ -3826,7 +3828,9 @@ const app = new Elysia({ adapter: node() })
   .get("/api/api-keys", async ({ request }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
-    const limits = getUserPlanLimits(auth.email);
+    const user = getUser(auth.email);
+    if (!user) return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
+    const limits = getUserPlanLimits(user);
     if (!limits.api) return new Response(JSON.stringify({ error: "Tu plan no incluye acceso a la API" }), { status: 403, headers: { "content-type": "application/json" } });
     const keys = listApiKeys(auth.email);
     return new Response(JSON.stringify(keys), { headers: { "content-type": "application/json" } });

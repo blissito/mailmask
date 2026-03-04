@@ -123,7 +123,7 @@ export async function getAuthUser(request: Request): Promise<{ email: string } |
     const user = getUserByApiKey(key);
     if (!user) return null;
     // Verify plan allows API access
-    const limits = getUserPlanLimits(user.email);
+    const limits = getUserPlanLimits(user);
     if (!limits.api) return null;
     return { email: user.email };
   }
