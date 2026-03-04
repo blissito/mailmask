@@ -68,18 +68,18 @@ describe("Auth", () => {
     await res.body?.cancel();
   });
 
-  it("POST /api/auth/register — missing fields 400", async () => {
+  it("POST /api/auth/register — missing fields 422", async () => {
     const res = await jsonPost("/api/auth/register", { email: "", password: "" });
-    assert.equal(res.status, 400);
+    assert.equal(res.status, 422);
     await res.body?.cancel();
   });
 
-  it("POST /api/auth/register — short password 400", async () => {
+  it("POST /api/auth/register — short password 422", async () => {
     const res = await jsonPost("/api/auth/register", {
       email: `short-pw-${suffix}@example.com`,
       password: "123",
     });
-    assert.equal(res.status, 400);
+    assert.equal(res.status, 422);
     await res.body?.cancel();
   });
 
