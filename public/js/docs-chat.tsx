@@ -6,6 +6,11 @@ import {
   getMessageText,
 } from "@formmy.app/chat/react";
 import { Streamdown } from "streamdown";
+import { createCodePlugin } from "@streamdown/code";
+
+const codePlugin = createCodePlugin({
+  themes: ["github-dark", "github-dark"],
+});
 
 const PK = "formmy_pk_live_pw-wnkzJQh3Q02m2hEqVFebjHo39T7lg";
 const AGENT_ID = "6962a45fbe5361f571b8369e";
@@ -216,7 +221,7 @@ function Chat() {
                 ) : (
                   <div className="streamdown-wrap">
                     <Streamdown
-                      plugins={{}}
+                      plugins={{ "code-highlighter": codePlugin }}
                       isAnimating={status === "streaming"}
                     >
                       {text}
