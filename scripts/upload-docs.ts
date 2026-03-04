@@ -157,12 +157,18 @@ async function main() {
     })),
   ];
 
-  console.log(`Uploading ${allDocs.length} documents...`);
-  const result = await formmy.documents.bulkCreate(AGENT_ID, allDocs);
-  console.log(`Created ${result.documents.length} documents:`);
-  for (const doc of result.documents) {
-    console.log(`  - ${doc.title} (${doc.chunkCount} chunks)`);
+  console.log(`Uploading ${allDocs.length} documents one by one...`);
+  let created = 0;
+  for (const doc of allDocs) {
+    try {
+      const { document } = await formmy.documents.create(AGENT_ID, doc);
+      console.log(`  ✓ ${document.title} (${document.chunkCount} chunks)`);
+      created++;
+    } catch (err: any) {
+      console.error(`  ✗ ${doc.title}: ${err.message}`);
+    }
   }
+  console.log(`\n${created}/${allDocs.length} documents uploaded.`);
 
   console.log("\nDone! The agent now has access to the documentation.");
 }
