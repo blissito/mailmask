@@ -1,6 +1,6 @@
 {
   "name": "@easybits.cloud/mailmask",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "description": "Official SDK for the MailMask email alias/forwarding API",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -13,7 +13,10 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "prepublishOnly": "npm run build"
@@ -22,6 +25,12 @@
     "tsup": "^8.0.0",
     "typescript": "^5.0.0"
   },
-  "keywords": ["mailmask", "email", "alias", "forwarding", "sdk"],
+  "keywords": [
+    "mailmask",
+    "email",
+    "alias",
+    "forwarding",
+    "sdk"
+  ],
   "license": "MIT"
 }
