@@ -322,6 +322,12 @@ function Chat() {
           0%, 100% { opacity: 0.3; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1); }
         }
+        .streamdown-wrap [style*="--sdm-c"] {
+          color: var(--sdm-c) !important;
+        }
+        .streamdown-wrap [style*="--sdm-tbg"] {
+          background-color: var(--sdm-tbg) !important;
+        }
         .streamdown-wrap pre {
           background: #18181b !important;
           border: 1px solid #27272a;
