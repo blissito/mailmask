@@ -670,9 +670,17 @@ async function searchDomainAvailability() {
           <button type="button" id="btn-connect-existing" class="w-full bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors mb-2">
             Ya es mío, conectarlo →
           </button>
-          <button type="button" id="btn-search-another" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
+          <button type="button" id="btn-search-another" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors mb-2">
             Buscar otro dominio
           </button>
+          <div class="relative group">
+            <button type="button" disabled class="w-full bg-zinc-800/40 text-zinc-600 text-sm font-semibold px-4 py-2.5 rounded-lg cursor-not-allowed">
+              Transferir dominio a MailMask
+            </button>
+            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-zinc-700 text-zinc-200 text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+              Próximamente
+            </div>
+          </div>
         </div>`;
       resultEl.querySelector("#btn-connect-existing").addEventListener("click", () => connectExistingDomain(q));
       resultEl.querySelector("#btn-search-another").addEventListener("click", () => {
