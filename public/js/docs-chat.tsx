@@ -7,8 +7,8 @@ import {
 } from "@formmy.app/chat/react";
 import { Streamdown } from "streamdown";
 
-const PK = "formmy_pk_live_wMjJzYTGiFGJkxWNzETO";
-const AGENT_ID = "agent_5cBH2sWh2GKFM2L7Cvjr";
+const PK = "formmy_pk_live_pw-wnkzJQh3Q02m2hEqVFebjHo39T7lg";
+const AGENT_ID = "6962a45fbe5361f571b8369e";
 
 // Web Audio beep on assistant message
 function playBeep() {
