@@ -227,7 +227,7 @@ function Chat() {
                 ) : (
                   <div className="streamdown-wrap">
                     <Streamdown
-                      plugins={{ "code-highlighter": codePlugin }}
+                      plugins={{ code: codePlugin }}
                       isAnimating={status === "streaming"}
                     >
                       {text}
