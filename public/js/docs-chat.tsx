@@ -202,7 +202,7 @@ function Chat() {
             >
               <div
                 style={{
-                  maxWidth: "90%",
+                  maxWidth: "100%",
                   padding: isUser ? "8px 14px" : "0",
                   borderRadius: 12,
                   fontSize: 15,
@@ -327,14 +327,14 @@ function Chat() {
           border: 1px solid #27272a;
           border-radius: 8px;
           overflow-x: hidden;
-          font-size: 12px;
+          font-size: 13px;
           margin: 8px 0;
-          padding: 12px 14px;
+          padding: 10px 12px;
           white-space: pre-wrap;
           word-break: break-all;
         }
         .streamdown-wrap code {
-          font-size: 12px;
+          font-size: 13px;
           word-break: break-all;
         }
         .streamdown-wrap ::-webkit-scrollbar {
