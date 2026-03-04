@@ -382,6 +382,10 @@ function Chat() {
           overflow: hidden;
           margin: 8px 0;
           max-width: 100%;
+          min-width: 0;
+        }
+        .streamdown-wrap [data-streamdown="code-block-body"] {
+          overflow-x: auto;
         }
         .streamdown-wrap [data-streamdown="code-block"] pre {
           background: transparent !important;
@@ -402,17 +406,10 @@ function Chat() {
           font-size: 13px;
           margin: 8px 0;
           padding: 10px 12px;
-          white-space: pre-wrap;
-          word-break: break-word;
           max-width: 100%;
         }
         .streamdown-wrap code {
           font-size: 13px;
-          word-break: break-word;
-          color: inherit;
-        }
-        .streamdown-wrap pre code span[style] {
-          color: var(--sdm-c) !important;
         }
         .streamdown-wrap ::-webkit-scrollbar {
           width: 4px;
