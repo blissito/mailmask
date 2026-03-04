@@ -19,6 +19,15 @@
     code .cm { color: #71717a; }
     code .fn { color: #93c5fd; }
     .prose-section h2 { scroll-margin-top: 80px; }
+    .docs-layout { display: grid; grid-template-columns: 1fr; max-width: 1600px; margin: 0 auto; }
+    #docs-chat { display: none; }
+    @media (min-width: 768px) {
+      .docs-layout { grid-template-columns: 240px 1fr; }
+    }
+    @media (min-width: 1024px) {
+      .docs-layout { grid-template-columns: 240px 1fr 520px; }
+      #docs-chat { display: flex !important; }
+    }
   </style>
 </head>
 <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
@@ -49,15 +58,7 @@
   </nav>
 
   <!-- Layout -->
-  <div class="docs-layout mx-auto" style="display: grid; grid-template-columns: 1fr; max-width: 1600px;">
-  <style>
-    @media (min-width: 768px) {
-      .docs-layout { grid-template-columns: 240px 1fr !important; }
-    }
-    @media (min-width: 1024px) {
-      .docs-layout { grid-template-columns: 240px 1fr 520px !important; }
-    }
-  </style>
+  <div class="docs-layout">
 
     <!-- Sidebar -->
     <aside class="sidebar hidden md:block border-r border-zinc-800 py-6">
@@ -270,13 +271,7 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
     </main>
 
     <!-- Chat panel -->
-    <aside id="docs-chat" class="border-l border-zinc-800" style="height: calc(100vh - 53px); position: sticky; top: 53px; display: none;">
-    </aside>
-    <style>
-      @media (min-width: 1024px) {
-        #docs-chat { display: flex !important; }
-      }
-    </style>
+    <aside id="docs-chat" class="border-l border-zinc-800" style="height: calc(100vh - 53px); position: sticky; top: 53px;"></aside>
   </div>
 
   <script type="module" src="/js/docs-chat.js"></script>
