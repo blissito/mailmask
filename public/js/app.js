@@ -1473,16 +1473,31 @@ function renderApiKeys(keys) {
   const empty = document.getElementById("apikeys-empty");
   if (!keys.length) { list.innerHTML = ""; empty.classList.remove("hidden"); return; }
   empty.classList.add("hidden");
-  list.innerHTML = keys.map(k => `
-    <div class="flex items-center justify-between bg-zinc-800/50 border border-zinc-700 rounded-lg px-4 py-3">
-      <div>
-        <span class="text-sm font-medium">${k.name}</span>
-        <span class="text-xs text-zinc-500 ml-2">mk_...${k.id.slice(-6)}</span>
-        ${k.lastUsedAt ? `<span class="text-xs text-zinc-500 ml-2">Último uso: ${new Date(k.lastUsedAt).toLocaleDateString()}</span>` : ""}
-      </div>
-      <button onclick="revokeApiKeyUI('${k.id}')" class="text-xs text-red-400 hover:text-red-300 transition-colors">Revocar</button>
-    </div>
-  `).join("");
+  list.innerHTML = `
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-xs text-zinc-500 border-b border-zinc-800">
+          <th class="pb-2 font-medium">Nombre</th>
+          <th class="pb-2 font-medium">Key</th>
+          <th class="pb-2 font-medium">Creada</th>
+          <th class="pb-2 font-medium">Último uso</th>
+          <th class="pb-2 font-medium text-right">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${keys.map(k => `
+          <tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+            <td class="py-2.5 font-medium">${k.name}</td>
+            <td class="py-2.5 text-zinc-400 font-mono text-xs">mk_...${k.id.slice(-6)}</td>
+            <td class="py-2.5 text-zinc-500">${k.createdAt ? new Date(k.createdAt).toLocaleDateString() : "—"}</td>
+            <td class="py-2.5 text-zinc-500">${k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString() : "Nunca"}</td>
+            <td class="py-2.5 text-right">
+              <button onclick="revokeApiKeyUI('${k.id}')" class="text-xs text-red-400 hover:text-red-300 transition-colors">Revocar</button>
+            </td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>`;
 }
 
 async function revokeApiKeyUI(id) {
