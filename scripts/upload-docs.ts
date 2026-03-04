@@ -116,6 +116,147 @@ Cada credencial SMTP tiene un IAM user con policy scoped al dominio específico.
 Listar credenciales: mm.smtp.list("domain-id")
 Revocar credencial: mm.smtp.revoke("domain-id", "cred-id")`,
   },
+  {
+    title: "Servidor MCP (Model Context Protocol)",
+    content: `MailMask planea ofrecer un servidor MCP (Model Context Protocol) para integrar con asistentes de IA como Claude Desktop, Cursor, y otros clientes MCP.
+
+MCP es un protocolo abierto que permite a los modelos de IA interactuar con servicios externos de forma segura y estructurada. Con el servidor MCP de MailMask, podrás gestionar tu email directamente desde tu asistente de IA.
+
+Paquete planificado: @easybits.cloud/mailmask-mcp
+
+Ejemplo de configuración para Claude Desktop (claude_desktop_config.json):
+{
+  "mcpServers": {
+    "mailmask": {
+      "command": "npx",
+      "args": ["-y", "@easybits.cloud/mailmask-mcp"],
+      "env": {
+        "MAILMASK_API_KEY": "tu-api-key"
+      }
+    }
+  }
+}
+
+Herramientas planificadas:
+- Crear y gestionar aliases de email
+- Gestionar reglas de forwarding
+- Enviar emails desde dominios verificados
+- Listar dominios y su estado de verificación
+- Consultar bandeja de entrada
+
+Estado: próximamente. El paquete aún no está publicado en npm. Se requiere plan Developer para usar el servidor MCP (necesita API key).`,
+  },
+  {
+    title: "Bandeja de Entrada (Inbox)",
+    content: `La Bandeja de Entrada es una interfaz de inbox colaborativa para gestionar emails recibidos en tus dominios. Disponible desde el plan Freelancer.
+
+Endpoints de la API:
+
+Listar conversaciones:
+GET /api/bandeja/conversations?domainId=xxx&status=open&page=1&limit=20
+Parámetros opcionales: status (open, snoozed, closed, deleted), search, assignedTo, tag, priority
+
+Detalle de conversación:
+GET /api/bandeja/conversations/:id
+
+Responder a conversación:
+POST /api/bandeja/conversations/:id/reply
+Body: { "html": "<p>Respuesta</p>", "fromAlias": "alias@tudominio.com" }
+
+Asignar conversación a un agente:
+POST /api/bandeja/conversations/:id/assign
+Body: { "agentId": "id-del-agente" }
+
+Agregar nota interna (no visible al remitente):
+POST /api/bandeja/conversations/:id/note
+Body: { "content": "Nota interna para el equipo" }
+
+Actualizar conversación (estado, tags, prioridad):
+PATCH /api/bandeja/conversations/:id
+Body: { "status": "closed", "tags": ["soporte"], "priority": "urgent" }
+
+Eliminar conversación (soft delete):
+DELETE /api/bandeja/conversations/:id
+
+Restaurar conversación eliminada:
+POST /api/bandeja/conversations/:id/restore
+
+Descargar adjuntos:
+GET /api/bandeja/conversations/:id/attachments/:msgIdx/:attIdx
+
+Actualizaciones en tiempo real via SSE:
+GET /api/bandeja/sse?domainId=xxx
+Se envían eventos cuando llegan nuevos emails o se actualizan conversaciones.
+
+Estados de conversación: open, snoozed, closed, deleted
+Prioridades: normal, urgent
+
+Permisos: el owner del dominio tiene acceso completo. Los agentes invitados tienen acceso limitado según su rol.`,
+  },
+  {
+    title: "Envío Masivo (Bulk Send)",
+    content: `El envío masivo permite enviar un email a múltiples destinatarios en una sola operación. Requiere dominio verificado y plan Freelancer o superior.
+
+Endpoint para crear envío masivo:
+POST /api/domains/:id/send-bulk
+Body: {
+  "recipients": ["user1@example.com", "user2@example.com"],
+  "subject": "Asunto del email",
+  "html": "<p>Contenido HTML</p>",
+  "fromAlias": "noreply@tudominio.com"
+}
+Máximo 10,000 destinatarios por envío.
+Retorna un jobId para consultar el estado.
+
+Consultar estado del envío:
+GET /api/domains/:id/bulk/:jobId
+Retorna: estado del job, total de destinatarios, enviados, fallidos.
+
+Estados del job: queued, processing, completed, failed
+
+Usando el SDK:
+const job = await mm.send.bulkSend("domain-id", {
+  recipients: ["user1@example.com", "user2@example.com"],
+  subject: "Asunto",
+  html: "<p>Contenido</p>",
+  fromAlias: "noreply@tudominio.com"
+});
+
+const status = await mm.send.bulkStatus("domain-id", job.id);
+console.log(status.sent, status.failed, status.status);
+
+Nota: el SDK usa mm.send.bulkSend() y mm.send.bulkStatus() para estas operaciones.`,
+  },
+  {
+    title: "Miembros y Roles (RBAC)",
+    content: `MailMask permite invitar miembros (agentes) a un dominio con diferentes roles y permisos. Esto facilita la colaboración en equipo para gestionar emails.
+
+Roles disponibles:
+- owner: acceso completo — gestionar dominio, aliases, reglas, miembros, bandeja, envío
+- admin: lectura, escritura y gestión de miembros (no puede eliminar dominio ni transferir ownership)
+- agent: solo lectura — puede ver bandeja y responder conversaciones asignadas
+
+Invitar un agente:
+POST /api/domains/:id/agents/invite
+Body: { "email": "agente@email.com", "name": "Nombre", "role": "agent" }
+Envía un email de invitación con un link de aceptación.
+
+Aceptar invitación:
+GET /api/agents/accept?token=xxx
+El agente hace click en el link del email para unirse al dominio.
+
+Listar agentes de un dominio:
+GET /api/domains/:id/agents
+Retorna la lista de agentes con su nombre, email, rol y estado.
+
+Eliminar un agente:
+DELETE /api/domains/:id/agents/:agentId
+Solo el owner o admin puede eliminar agentes.
+
+Los planes tienen límites en el número de agentes por dominio. El plan Developer permite más agentes que Freelancer.
+
+Todos los endpoints de dominio verifican permisos usando el sistema RBAC interno (checkDomainAccess). Si un usuario no tiene el rol necesario, recibe un error 403.`,
+  },
 ];
 
 async function main() {
