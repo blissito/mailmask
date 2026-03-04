@@ -8,3 +8,6 @@ data/
 # SDK build output
 sdk/dist/
 sdk/node_modules/
+
+# Chat widget build output
+public/js/docs-chat.js

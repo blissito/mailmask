@@ -9,7 +9,8 @@
     "test": "DATABASE_PATH=./data/test.db JWT_SECRET=test-secret-key MP_ACCESS_TOKEN=test MP_WEBHOOK_SECRET=test AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_ENDPOINT_URL=http://localhost:1 tsx --test --test-timeout=60000 --test-force-exit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "build:css": "npx tailwindcss -c tailwind.config.ts -i public/css/input.css -o public/css/styles.css --minify"
+    "build:css": "npx tailwindcss -c tailwind.config.ts -i public/css/input.css -o public/css/styles.css --minify",
+    "build:chat": "esbuild public/js/docs-chat.tsx --bundle --outfile=public/js/docs-chat.js --format=esm --jsx=automatic --target=es2020 --minify"
   },
   "dependencies": {
     "@aws-sdk/client-iam": "^3",
@@ -21,19 +22,27 @@
     "@aws-sdk/client-sns": "^3",
     "@elysiajs/node": "^1.2",
     "@elysiajs/openapi": "^1.4.14",
+    "@formmy.app/chat": "^0.0.19",
+    "@streamdown/code": "^1.0.3",
     "better-sqlite3": "^11",
     "drizzle-orm": "^0.38",
     "elysia": "^1.2",
     "mercadopago": "^2",
     "node-cron": "^3",
     "postal-mime": "^2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "streamdown": "^2.3.0",
     "tsx": "^4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7",
     "@types/node": "^22",
     "@types/node-cron": "^3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "drizzle-kit": "^0.30",
+    "esbuild": "^0.27.3",
     "tailwindcss": "^3.4.19",
     "typescript": "^5"
   }

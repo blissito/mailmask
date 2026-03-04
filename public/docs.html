@@ -7,7 +7,8 @@
   <title>SDK Docs — MailMask</title>
   <link rel="stylesheet" href="/css/styles.css">
   <style>
-    .sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    html { scroll-behavior: smooth; }
+    .sidebar { position: sticky; top: 53px; height: calc(100vh - 53px); overflow-y: auto; }
     .sidebar a { display: block; padding: 6px 16px; font-size: 14px; color: rgb(161 161 170); border-left: 2px solid transparent; transition: all 0.15s; }
     .sidebar a:hover, .sidebar a.active { color: rgb(var(--mask-400)); border-left-color: rgb(var(--mask-500)); }
     pre { position: relative; }
@@ -17,7 +18,7 @@
     code .str { color: #facc15; }
     code .cm { color: #71717a; }
     code .fn { color: #93c5fd; }
-    .prose-section h2 { scroll-margin-top: 2rem; }
+    .prose-section h2 { scroll-margin-top: 80px; }
   </style>
 </head>
 <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
@@ -48,7 +49,7 @@
   </nav>
 
   <!-- Layout -->
-  <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-[280px_1fr]">
+  <div class="docs-layout max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-[240px_1fr] lg:grid-cols-[240px_1fr_380px]">
 
     <!-- Sidebar -->
     <aside class="sidebar hidden md:block border-r border-zinc-800 py-6">
@@ -259,8 +260,12 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
         <p>&copy; MailMask &mdash; <a href="/" class="text-mask-400 hover:underline">mailmask.me</a></p>
       </div>
     </main>
+
+    <!-- Chat panel -->
+    <aside id="docs-chat" class="hidden lg:flex border-l border-zinc-800" style="height: calc(100vh - 53px); position: sticky; top: 53px;"></aside>
   </div>
 
+  <script type="module" src="/js/docs-chat.js"></script>
   <script>
     // Copy buttons
     document.querySelectorAll('pre').forEach(pre => {
