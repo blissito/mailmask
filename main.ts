@@ -3379,7 +3379,10 @@ const app = new Elysia({ adapter: node() })
       }), { headers: { "content-type": "application/json" } });
     } catch (err: any) {
       log("error", "route53", "Domain search failed", { domain: q, error: String(err) });
-      return new Response(JSON.stringify({ error: "Error al buscar disponibilidad" }), { status: 500, headers: { "content-type": "application/json" } });
+      const msg = err?.name === "UnsupportedTLD"
+        ? `La extensión ${tld} no está disponible para registro`
+        : "Error al buscar disponibilidad";
+      return new Response(JSON.stringify({ error: msg }), { status: 400, headers: { "content-type": "application/json" } });
     }
   })
 

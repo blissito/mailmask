@@ -1484,8 +1484,6 @@ const AVAILABLE_TLDS = [
   { tld: ".com.mx", price: 159900 },
   { tld: ".net", price: 49900 },
   { tld: ".org", price: 54900 },
-  { tld: ".dev", price: 64900, popular: true },
-  { tld: ".app", price: 64900 },
   { tld: ".io", price: 179900, popular: true },
   { tld: ".co", price: 114900 },
   { tld: ".click", price: 13900 },
@@ -1503,9 +1501,9 @@ function renderTldGrid(base) {
   const name = base || "tudominio";
   container.innerHTML = AVAILABLE_TLDS.map(t => {
     const p = (t.price / 100).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-    return `<button type="button" class="tld-suggestion group text-left bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/30 hover:border-mask-500/40 rounded-xl px-4 py-3.5 transition-all" data-domain="${esc(name + t.tld)}">
+    return `<button type="button" class="tld-suggestion group text-left bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/30 hover:border-mask-500/40 rounded-xl px-5 py-4 transition-all" data-domain="${esc(name + t.tld)}">
       <span class="block text-base font-bold text-mask-400 group-hover:text-mask-300">${t.tld}</span>
-      <span class="block text-xs text-zinc-500 mt-1">$${p} MXN/año</span>
+      <span class="block text-xs text-zinc-500 mt-1.5">$${p} MXN/año</span>
       ${t.popular ? '<span class="inline-block text-[9px] bg-mask-600/25 text-mask-400 px-1.5 py-0.5 rounded mt-1.5 leading-none">Popular</span>' : ''}
     </button>`;
   }).join("");

@@ -1406,8 +1406,6 @@ export const TLD_PRICES: Record<string, { awsUsdCents: number; userMxnCents: num
   ".org":    { awsUsdCents: 1200, userMxnCents: 54900 },
   ".io":     { awsUsdCents: 3900, userMxnCents: 179900 },
   ".co":     { awsUsdCents: 2500, userMxnCents: 114900 },
-  ".dev":    { awsUsdCents: 1400, userMxnCents: 64900 },
-  ".app":    { awsUsdCents: 1400, userMxnCents: 64900 },
   ".click":  { awsUsdCents: 300,  userMxnCents: 13900 },
   ".link":   { awsUsdCents: 500,  userMxnCents: 22900 },
   ".mx":     { awsUsdCents: 3500, userMxnCents: 159900 },
