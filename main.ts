@@ -425,8 +425,17 @@ const app = new Elysia({ adapter: node() })
         },
       },
     },
+    scalar: {
+      favicon: "/favicon.svg",
+    },
     exclude: {
-      paths: [/^\/(?!api\/)/, "/health"],
+      paths: [
+        "/", "/login", "/register", "/app", "/css/*", "/js/*", "/img/*",
+        "/favicon.svg", "/landing", "/pricing", "/bandeja", "/admin",
+        "/set-password", "/forgot-password", "/terms", "/privacy",
+        "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
+        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/health",
+      ],
       staticFile: true,
     },
   }))
