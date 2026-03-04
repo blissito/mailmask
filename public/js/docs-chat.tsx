@@ -365,12 +365,17 @@ function Chat() {
         .streamdown-wrap .cursor-pointer { cursor: pointer; }
         .streamdown-wrap .transition-all { transition: all 150ms; }
         .streamdown-wrap .divide-y > * + * { border-top: 1px solid #27272a; }
+        .streamdown-wrap {
+          min-width: 0;
+          overflow: hidden;
+        }
         .streamdown-wrap [data-streamdown="code-block"] {
           background: #18181b;
           border: 1px solid #27272a;
           border-radius: 12px;
           overflow: hidden;
           margin: 8px 0;
+          max-width: 100%;
         }
         .streamdown-wrap [data-streamdown="code-block"] pre {
           background: transparent !important;
@@ -387,16 +392,17 @@ function Chat() {
           background: #18181b !important;
           border: 1px solid #27272a;
           border-radius: 8px;
-          overflow-x: hidden;
+          overflow-x: auto;
           font-size: 13px;
           margin: 8px 0;
           padding: 10px 12px;
           white-space: pre-wrap;
-          word-break: break-all;
+          word-break: break-word;
+          max-width: 100%;
         }
         .streamdown-wrap code {
           font-size: 13px;
-          word-break: break-all;
+          word-break: break-word;
         }
         .streamdown-wrap ::-webkit-scrollbar {
           width: 4px;
