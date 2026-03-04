@@ -35,6 +35,7 @@ function playBeep() {
 function Chat() {
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(0);
 
   console.log("[docs-chat] Chat component mounting, AGENT_ID:", AGENT_ID, "PK:", PK.slice(0, 20) + "...");
@@ -60,7 +61,9 @@ function Chat() {
   // Auto-scroll
   useEffect(() => {
     if (messages.length > 0) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      if (messagesRef.current) {
+        messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+      }
     }
   }, [messages, status]);
 
@@ -85,6 +88,7 @@ function Chat() {
         flexDirection: "column",
         height: "100%",
         background: "#09090b",
+        overflow: "hidden",
       }}
     >
       {/* Header */}
@@ -129,9 +133,11 @@ function Chat() {
 
       {/* Messages */}
       <div
+        ref={messagesRef}
         style={{
           flex: 1,
           overflowY: "auto",
+          overflowX: "hidden",
           padding: 16,
           display: "flex",
           flexDirection: "column",
@@ -329,7 +335,7 @@ function Chat() {
         .streamdown-wrap .bg-\[var\(--sdm-tbg\)\] {
           background-color: var(--sdm-tbg);
         }
-        .streamdown-wrap .bg-\[var\(--sdm-bg\,inherit\] {
+        .streamdown-wrap .bg-\[var\(--sdm-bg\,inherit\)\] {
           background-color: var(--sdm-bg, inherit);
         }
         .streamdown-wrap .bg-background { background-color: #09090b; }
@@ -403,6 +409,10 @@ function Chat() {
         .streamdown-wrap code {
           font-size: 13px;
           word-break: break-word;
+          color: inherit;
+        }
+        .streamdown-wrap pre code span[style] {
+          color: var(--sdm-c) !important;
         }
         .streamdown-wrap ::-webkit-scrollbar {
           width: 4px;
