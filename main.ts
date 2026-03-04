@@ -441,7 +441,7 @@ const app = new Elysia({ adapter: node() })
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
-        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/health",
+        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/health", "/docs",
       ],
       staticFile: true,
     },
@@ -561,6 +561,7 @@ const app = new Elysia({ adapter: node() })
   .get("/forgot-password", () => serveStatic("/forgot-password.html"))
   .get("/terms", () => serveStatic("/terms.html"))
   .get("/privacy", () => serveStatic("/privacy.html"))
+  .get("/docs", () => serveStatic("/docs.html"))
   .get("/blog", () => serveStatic("/blog/index.html"))
   .get("/blog/blog.css", () => serveStatic("/blog/blog.css"))
   .get("/blog/sounds-demo.js", () => serveStatic("/blog/sounds-demo.js"))

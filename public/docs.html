@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDK Docs — MailMask</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    .sidebar a { display: block; padding: 6px 16px; font-size: 14px; color: rgb(161 161 170); border-left: 2px solid transparent; transition: all 0.15s; }
+    .sidebar a:hover, .sidebar a.active { color: rgb(var(--mask-400)); border-left-color: rgb(var(--mask-500)); }
+    pre { position: relative; }
+    .copy-btn { position: absolute; top: 8px; right: 8px; padding: 4px 10px; font-size: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #a1a1aa; cursor: pointer; transition: all 0.15s; }
+    .copy-btn:hover { background: rgba(255,255,255,0.1); color: #fafafa; }
+    code .kw { color: rgb(var(--mask-400)); }
+    code .str { color: #facc15; }
+    code .cm { color: #71717a; }
+    code .fn { color: #93c5fd; }
+    .prose-section h2 { scroll-margin-top: 2rem; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+
+  <!-- Nav -->
+  <nav class="border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2">
+        <svg class="w-7 h-7" viewBox="0 0 80 80" fill="none">
+          <ellipse cx="40" cy="42" rx="28" ry="24" fill="rgb(var(--mask-600))"/>
+          <ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mask-500))"/>
+          <ellipse cx="28" cy="36" rx="8" ry="6" fill="#18181b"/>
+          <ellipse cx="52" cy="36" rx="8" ry="6" fill="#18181b"/>
+          <ellipse cx="30" cy="34" rx="2" ry="1.5" fill="#fafafa" opacity="0.6"/>
+          <ellipse cx="54" cy="34" rx="2" ry="1.5" fill="#fafafa" opacity="0.6"/>
+          <path d="M40 18 L40 26" stroke="#facc15" stroke-width="2" stroke-linecap="round"/>
+          <path d="M36 19 L40 26 L44 19" stroke="#facc15" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path d="M30 48 Q40 54 50 48" stroke="rgb(var(--mask-800))" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+        <span class="font-bold text-lg">MailMask</span>
+      </a>
+      <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-mask-600/15 text-mask-400 border border-mask-500/20">SDK v0.1.0</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <a href="/openapi" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">HTTP API Reference</a>
+      <a href="/app" class="text-sm text-zinc-500 hover:text-zinc-300 transition-colors">Dashboard</a>
+    </div>
+  </nav>
+
+  <!-- Layout -->
+  <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-[280px_1fr]">
+
+    <!-- Sidebar -->
+    <aside class="sidebar hidden md:block border-r border-zinc-800 py-6">
+      <p class="px-4 text-xs font-bold uppercase tracking-widest text-zinc-500 mb-3">Contenido</p>
+      <nav id="sidebar-nav">
+        <a href="#instalacion">Instalaci&oacute;n</a>
+        <a href="#autenticacion">Autenticaci&oacute;n</a>
+        <a href="#dominios">Dominios</a>
+        <a href="#aliases">Aliases</a>
+        <a href="#reglas">Reglas</a>
+        <a href="#envio">Env&iacute;o de emails</a>
+        <a href="#logs">Logs</a>
+        <a href="#smtp">Credenciales SMTP</a>
+        <a href="#api-keys">API Keys</a>
+        <a href="#errores">Manejo de errores</a>
+        <a href="#mcp">MCP Server</a>
+        <a href="#referencia">Referencia API</a>
+      </nav>
+    </aside>
+
+    <!-- Content -->
+    <main class="prose-section px-6 md:px-12 py-10 max-w-3xl">
+
+      <h1 class="text-3xl font-bold mb-2">SDK de MailMask</h1>
+      <p class="text-zinc-400 mb-8">Cliente oficial TypeScript/JavaScript para la API de MailMask. Crea aliases, gestiona dominios, env&iacute;a emails y m&aacute;s desde tu c&oacute;digo.</p>
+
+      <p class="text-sm text-zinc-500 mb-10">
+        <code class="text-mask-400">npm</code>:
+        <a href="https://www.npmjs.com/package/@easybits.cloud/mailmask" class="text-mask-400 hover:underline" target="_blank">@easybits.cloud/mailmask</a>
+      </p>
+
+      <!-- Instalacion -->
+      <h2 id="instalacion" class="text-2xl font-bold mt-12 mb-4 border-b border-zinc-800 pb-2">Instalaci&oacute;n</h2>
+      <pre class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>npm install @easybits.cloud/mailmask</code></pre>
+
+      <!-- Autenticacion -->
+      <h2 id="autenticacion" class="text-2xl font-bold mt-12 mb-4 border-b border-zinc-800 pb-2">Autenticaci&oacute;n</h2>
+      <p class="text-zinc-400 mb-4">Para usar el SDK necesitas una <strong class="text-zinc-200">API Key</strong>. Puedes crear una desde el <a href="/app" class="text-mask-400 hover:underline">Dashboard</a> en la secci&oacute;n de API Keys. Requiere plan <strong class="text-zinc-200">Developer</strong> o <strong class="text-zinc-200">Agencia</strong>.</p>
+      <p class="text-zinc-400 mb-4">Las API keys tienen el prefijo <code class="text-mask-400 bg-zinc-900 px-1.5 py-0.5 rounded text-sm">mk_</code> y solo se muestran una vez al crearlas. Gu&aacute;rdala en un lugar seguro.</p>
+      <pre class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="kw">import</span> { MailMask } <span class="kw">from</span> <span class="str">"@easybits.cloud/mailmask"</span>;
+
+<span class="kw">const</span> mm = <span class="kw">new</span> <span class="fn">MailMask</span>({ apiKey: <span class="str">"mk_..."</span> });</code></pre>
+
+      <!-- Dominios -->
+      <h2 id="dominios" class="text-2xl font-bold mt-12 mb-4 border-b border-zinc-800 pb-2">Dominios</h2>
+      <p class="text-zinc-400 mb-4">Gestiona los dominios conectados a tu cuenta. Puedes listar, agregar, verificar y consultar el estado de salud DNS.</p>
+      <pre class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Listar dominios</span>
+<span class="kw">const</span> domains = <span class="kw">await</span> mm.domains.<span class="fn">list</span>();
+
+<span class="cm">// Obtener un dominio</span>
+<span class="kw">const</span> domain = <span class="kw">await</span> mm.domains.<span class="fn">get</span>(<span class="str">"domain-id"</span>);
+
+<span class="cm">// Agregar dominio</span>
+<span class="kw">const</span> { domain } = <span class="kw">await</span> mm.domains.<span class="fn">create</span>(<span class="str">"example.com"</span>);
+
+<span class="cm">// Eliminar dominio</span>
+<span class="kw">await</span> mm.domains.<span class="fn">delete</span>(<span class="str">"domain-id"</span>);
+
+<span class="cm">// Verificar DNS</span>
+<span class="kw">await</span> mm.domains.<span class="fn">verify</span>(<span class="str">"domain-id"</span>);
+
+<span class="cm">// Estado de salud</span>
+<span class="kw">const</span> health = <span class="kw">await</span> mm.domains.<span class="fn">health</span>(<span class="str">"domain-id"</span>);</code></pre>
+
+      <!-- Aliases -->
+      <h2 id="aliases" class="text-2xl font-bold mt-12 mb-4 border-b border-zinc-800 pb-2">Aliases</h2>
+      <p class="text-zinc-400 mb-4">Crea y administra aliases de email. Cada alias reenv&iacute;a correo a uno o m&uacute;ltiples destinos.</p>
+      <pre class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Listar aliases</span>
+<span class="kw">const</span> aliases = <span class="kw">await</span> mm.aliases.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
+
+<span class="cm">// Crear alias</span>
+<span class="kw">const</span> alias = <span class="kw">await</span> mm.aliases.<span class="fn">create</span>(<span class="str">"domain-id"</span>, {
+  local: <span class="str">"hello"</span>,
+  forwardTo: <span class="str">"me@gmail.com"</span>
+});
+
+<span class="cm">// Crear alias con m&uacute;ltiples destinos</span>
+<span class="kw">const</span> alias = <span class="kw">await</span> mm.aliases.<span class="fn">create</span>(<span class="str">"domain-id"</span>, {
+  local: <span class="str">"team"</span>,
+  forwardTo: [<span class="str">"alice@company.com"</span>, <span class="str">"bob@company.com"</span>]
+});
+
+<span class="cm">// Actualizar alias</span>
+<span class="kw">await</span> mm.aliases.<span class="fn">update</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>, { enabled: <span class="kw">false</span> });
+
+<span class="cm">// Eliminar alias</span>
+<span class="kw">await</span> mm.aliases.<span class="fn">delete</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);</code></pre>
+
+      <!-- Reglas -->
+      <h2 id="reglas" class="text-2xl font-bold mt-12 mb-4 border-b border-zinc-800 pb-2">Reglas</h2>
+      <p class="text-zinc-400 mb-4">Las reglas permiten enrutar o filtrar emails autom&aacute;ticamente seg&uacute;n criterios como remitente, asunto o contenido.</p>
+      <pre class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Listar reglas</span>
+<span class="kw">const</span> rules = <span class="kw">await</span> mm.rules.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
+
+<span class="cm">// Crear regla</span>
+<span class="kw">const</span> rule = <span class="kw">await</span> mm.rules.<span class="fn">create</span>(<span class="str">"domain-id"</span>, {
+  field: <span class="str">"from"</span>,
+  match: <span class="str">"contains"</span>,
+  value: <span class="str">"@newsletter.com"</span>,
+  action: <span class="str">"forward"</span>,
+  target: <span class="str">"newsletters@gmail.com"</span>
+});
+
+<span class="cm">// Actualizar regla</span>
+<span class="kw">await</span> mm.rules.<span class="fn">update</span>(<span class="str">"domain-id"</span>, <span class="str">"rule-id"</span>, { enabled: <span class="kw">false</span> });
+
+<span class="cm">// Eliminar regla</span>
+<span class="kw">await</span> mm.rules.<span class="fn">delete</span>(<span class="str">"domain-id"</span>, <span class="str">"rule-id"</span>);</code></pre>
+
+      <!-- Envio -->
+      <h2 id="envio" class="text-2xl font-bold mt-12 mb-4 border-b border-zinc-800 pb-2">Env&iacute;o de emails</h2>
+      <p class="text-zinc-400 mb-4">Env&iacute;a emails individuales o masivos desde cualquier alias de tu dominio.</p>
+      <pre class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Enviar email</span>
+<span class="kw">await</span> mm.send.<span class="fn">send</span>(<span class="str">"domain-id"</span>, {
+  fromLocal: <span class="str">"hello"</span>,
+  to: <span class="str">"client@example.com"</span>,
+  subject: <span class="str">"Hola!"</span>,
+  html: <span class="str">"&lt;p&gt;Contenido del email&lt;/p&gt;"</span>
+});
+
+<span class="cm">// Env&iacute;o masivo</span>
+<span class="kw">const</span> job = <span class="kw">await</span> mm.send.<span class="fn">bulkSend</span>(<span class="str">"domain-id"</span>, {
+  from: <span class="str">"hello@midominio.com"</span>,
+  recipients: [<span class="str">"a@test.com"</span>, <span class="str">"b@test.com"</span>],
+  subject: <span class="str">"Newsletter"</span>,
+  html: <span class="str">"&lt;p&gt;Contenido&lt;/p&gt;"</span>
+});
+
+<span class="cm">// Consultar estado del env&iacute;o masivo</span>
+<span class="kw">const</span> status = <span class="kw">await</span> mm.send.<span class="fn">bulkStatus</span>(<span class="str">"domain-id"</span>, job.id);</code></pre>
+
+      <!-- Logs -->
+      <h2 id="logs" class="text-2xl font-bold mt-12 mb-4 border-b border-zinc-800 pb-2">Logs</h2>
+      <p class="text-zinc-400 mb-4">Consulta el historial de emails procesados por un dominio.</p>
+      <pre class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="kw">const</span> logs = <span class="kw">await</span> mm.logs.<span class="fn">list</span>(<span class="str">"domain-id"</span>);</code></pre>
+
+      <!-- SMTP -->
+      <h2 id="smtp" class="text-2xl font-bold mt-12 mb-4 border-b border-zinc-800 pb-2">Credenciales SMTP</h2>
+      <p class="text-zinc-400 mb-4">Crea credenciales SMTP para enviar emails desde tu c&oacute;digo o aplicaciones SaaS. Disponible solo en plan <strong class="text-zinc-200">Developer</strong>.</p>
+      <pre class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Listar credenciales</span>
+<span class="kw">const</span> creds = <span class="kw">await</span> mm.smtp.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
+
+<span class="cm">// Crear credencial</span>
+<span class="kw">const</span> cred = <span class="kw">await</span> mm.smtp.<span class="fn">create</span>(<span class="str">"domain-id"</span>, <span class="str">"Mi app"</span>);
+console.<span class="fn">log</span>(cred.smtpPassword); <span class="cm">// Solo se muestra una vez</span>
+
+<span class="cm">// Revocar credencial</span>
+<span class="kw">await</span> mm.smtp.<span class="fn">revoke</span>(<span class="str">"domain-id"</span>, <span class="str">"cred-id"</span>);</code></pre>
+
+      <!-- API Keys -->
+      <h2 id="api-keys" class="text-2xl font-bold mt-12 mb-4 border-b border-zinc-800 pb-2">API Keys</h2>
+      <p class="text-zinc-400 mb-4">Administra tus API keys program&aacute;ticamente. &Uacute;til para rotaci&oacute;n autom&aacute;tica de credenciales.</p>
+      <pre class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Listar keys</span>
+<span class="kw">const</span> keys = <span class="kw">await</span> mm.apiKeys.<span class="fn">list</span>();
+
+<span class="cm">// Crear key</span>
+<span class="kw">const</span> newKey = <span class="kw">await</span> mm.apiKeys.<span class="fn">create</span>(<span class="str">"Mi nueva key"</span>);
+console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mdash; solo se muestra una vez</span>
+
+<span class="cm">// Revocar key</span>
+<span class="kw">await</span> mm.apiKeys.<span class="fn">revoke</span>(<span class="str">"key-id"</span>);</code></pre>
+
+      <!-- Errores -->
+      <h2 id="errores" class="text-2xl font-bold mt-12 mb-4 border-b border-zinc-800 pb-2">Manejo de errores</h2>
+      <p class="text-zinc-400 mb-4">El SDK lanza <code class="text-mask-400 bg-zinc-900 px-1.5 py-0.5 rounded text-sm">MailMaskError</code> para respuestas HTTP no exitosas. Incluye el c&oacute;digo de estado y el mensaje del servidor.</p>
+      <pre class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="kw">import</span> { MailMask, MailMaskError } <span class="kw">from</span> <span class="str">"@easybits.cloud/mailmask"</span>;
+
+<span class="kw">try</span> {
+  <span class="kw">await</span> mm.domains.<span class="fn">create</span>(<span class="str">"example.com"</span>);
+} <span class="kw">catch</span> (err) {
+  <span class="kw">if</span> (err <span class="kw">instanceof</span> MailMaskError) {
+    console.<span class="fn">error</span>(err.status, err.message);
+  }
+}</code></pre>
+
+      <!-- MCP -->
+      <h2 id="mcp" class="text-2xl font-bold mt-12 mb-4 border-b border-zinc-800 pb-2">MCP Server</h2>
+      <div class="bg-yellow-900/20 border border-yellow-800/30 rounded-lg p-4 mb-4">
+        <p class="text-yellow-400 text-sm font-medium mb-1">Pr&oacute;ximamente</p>
+        <p class="text-zinc-400 text-sm">Estamos desarrollando un servidor MCP (Model Context Protocol) que permite a agentes de IA como Claude interactuar con tu cuenta de MailMask directamente. Podr&aacute;s crear aliases, gestionar reglas y enviar emails desde cualquier cliente MCP compatible.</p>
+      </div>
+      <pre class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto mb-4"><code><span class="cm">// claude_desktop_config.json (pr&oacute;ximamente)</span>
+{
+  <span class="str">"mcpServers"</span>: {
+    <span class="str">"mailmask"</span>: {
+      <span class="str">"command"</span>: <span class="str">"npx"</span>,
+      <span class="str">"args"</span>: [<span class="str">"@easybits.cloud/mailmask-mcp"</span>],
+      <span class="str">"env"</span>: { <span class="str">"MAILMASK_API_KEY"</span>: <span class="str">"mk_..."</span> }
+    }
+  }
+}</code></pre>
+
+      <!-- Referencia -->
+      <h2 id="referencia" class="text-2xl font-bold mt-12 mb-4 border-b border-zinc-800 pb-2">Referencia API</h2>
+      <p class="text-zinc-400 mb-4">Para la referencia completa de la API HTTP (todos los endpoints, par&aacute;metros y respuestas), consulta la documentaci&oacute;n interactiva:</p>
+      <div class="flex flex-col sm:flex-row gap-3">
+        <a href="/openapi" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-mask-600/15 text-mask-400 border border-mask-500/20 hover:bg-mask-600/25 transition-colors text-sm font-medium">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          HTTP API Reference (OpenAPI)
+        </a>
+        <a href="https://www.npmjs.com/package/@easybits.cloud/mailmask" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800/50 text-zinc-300 border border-zinc-700 hover:bg-zinc-800 transition-colors text-sm font-medium">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          npm: @easybits.cloud/mailmask
+        </a>
+      </div>
+
+      <div class="mt-16 pt-8 border-t border-zinc-800 text-zinc-500 text-sm">
+        <p>&copy; MailMask &mdash; <a href="/" class="text-mask-400 hover:underline">mailmask.me</a></p>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Copy buttons
+    document.querySelectorAll('pre').forEach(pre => {
+      const btn = document.createElement('button');
+      btn.className = 'copy-btn';
+      btn.textContent = 'Copiar';
+      btn.addEventListener('click', async () => {
+        const code = pre.querySelector('code').textContent;
+        await navigator.clipboard.writeText(code);
+        btn.textContent = 'Copiado!';
+        setTimeout(() => btn.textContent = 'Copiar', 1500);
+      });
+      pre.appendChild(btn);
+    });
+
+    // Active sidebar link on scroll
+    const sections = document.querySelectorAll('h2[id]');
+    const navLinks = document.querySelectorAll('#sidebar-nav a');
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          navLinks.forEach(a => a.classList.remove('active'));
+          const link = document.querySelector(`#sidebar-nav a[href="#${entry.target.id}"]`);
+          if (link) link.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    sections.forEach(s => observer.observe(s));
+  </script>
+</body>
+</html>
