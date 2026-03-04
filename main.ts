@@ -104,6 +104,10 @@ import {
   getUserReferredBy,
   setUserReferredBy,
   recordReferralClick,
+  // API Keys
+  createApiKey,
+  listApiKeys,
+  revokeApiKey,
   // Domain registrations
   TLD_PRICES,
   createDomainRegistration,
@@ -422,6 +426,7 @@ const app = new Elysia({ adapter: node() })
       components: {
         securitySchemes: {
           cookieAuth: { type: "apiKey", in: "cookie", name: "token" },
+          bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "API Key (mk_...)" },
         },
       },
     },
@@ -429,6 +434,8 @@ const app = new Elysia({ adapter: node() })
       favicon: "/favicon.svg",
     },
     exclude: {
+      tags: ["Auth", "Billing", "Admin", "Webhooks", "Coupons", "Referrals",
+             "Export", "Bandeja", "Agents", "Domain Registration"],
       paths: [
         "/", "/login", "/register", "/app", "/css/*", "/js/*", "/img/*",
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/admin",
@@ -971,7 +978,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["Domains"], summary: "List all domains for the authenticated user", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Domains", "SDK"], summary: "List all domains for the authenticated user", security: [{ cookieAuth: [] }] },
   })
 
   .post("/api/domains", async ({ request, body }) => {
@@ -1104,7 +1111,7 @@ const app = new Elysia({ adapter: node() })
     body: t.Object({
       domain: t.String(),
     }),
-    detail: { tags: ["Domains"], summary: "Add a new domain and configure SES", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Domains", "SDK"], summary: "Add a new domain and configure SES", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/domains/:id", async ({ request, params }) => {
@@ -1126,7 +1133,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["Domains"], summary: "Get a single domain by ID", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Domains", "SDK"], summary: "Get a single domain by ID", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/domains/:id/health", async ({ request, params }) => {
@@ -1238,7 +1245,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["Domains"], summary: "Check domain health and DNS configuration", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Domains", "SDK"], summary: "Check domain health and DNS configuration", security: [{ cookieAuth: [] }] },
   })
 
   .post("/api/domains/:id/verify", async ({ request, params }) => {
@@ -1280,7 +1287,7 @@ const app = new Elysia({ adapter: node() })
       },
     );
   }, {
-    detail: { tags: ["Domains"], summary: "Verify domain DNS configuration with SES", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Domains", "SDK"], summary: "Verify domain DNS configuration with SES", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/domains/:id", async ({ request, params }) => {
@@ -1308,7 +1315,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["Domains"], summary: "Delete a domain and clean up SES resources", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Domains", "SDK"], summary: "Delete a domain and clean up SES resources", security: [{ cookieAuth: [] }] },
   })
 
   // --- Aliases ---
@@ -1333,7 +1340,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["Aliases"], summary: "List all aliases for a domain", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Aliases", "SDK"], summary: "List all aliases for a domain", security: [{ cookieAuth: [] }] },
   })
 
   .post("/api/domains/:id/alias", async ({ request, params, body }) => {
@@ -1405,7 +1412,7 @@ const app = new Elysia({ adapter: node() })
       alias: t.String(),
       destinations: t.Array(t.String()),
     }),
-    detail: { tags: ["Aliases"], summary: "Create a new alias for a domain", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Aliases", "SDK"], summary: "Create a new alias for a domain", security: [{ cookieAuth: [] }] },
   })
 
   .put("/api/domains/:id/alias/:alias", async ({ request, params, body }) => {
@@ -1458,7 +1465,7 @@ const app = new Elysia({ adapter: node() })
       enabled: t.Optional(t.Boolean()),
       destinations: t.Optional(t.Array(t.String())),
     }),
-    detail: { tags: ["Aliases"], summary: "Update an alias", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Aliases", "SDK"], summary: "Update an alias", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/domains/:id/alias/:alias", async ({ request, params }) => {
@@ -1486,7 +1493,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["Aliases"], summary: "Delete an alias", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Aliases", "SDK"], summary: "Delete an alias", security: [{ cookieAuth: [] }] },
   })
 
   // --- Rules ---
@@ -1511,7 +1518,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["Rules"], summary: "List all rules for a domain", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Rules", "SDK"], summary: "List all rules for a domain", security: [{ cookieAuth: [] }] },
   })
 
   .post("/api/domains/:id/rules", async ({ request, params, body }) => {
@@ -1626,7 +1633,7 @@ const app = new Elysia({ adapter: node() })
       priority: t.Optional(t.Number()),
       enabled: t.Optional(t.Boolean()),
     }),
-    detail: { tags: ["Rules"], summary: "Create a new rule for a domain", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Rules", "SDK"], summary: "Create a new rule for a domain", security: [{ cookieAuth: [] }] },
   })
 
   .put("/api/domains/:id/rules/:ruleId", async ({ request, params, body }) => {
@@ -1709,7 +1716,7 @@ const app = new Elysia({ adapter: node() })
       priority: t.Optional(t.Number()),
       enabled: t.Optional(t.Boolean()),
     }),
-    detail: { tags: ["Rules"], summary: "Update a rule", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Rules", "SDK"], summary: "Update a rule", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/domains/:id/rules/:ruleId", async ({ request, params }) => {
@@ -1737,7 +1744,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["Rules"], summary: "Delete a rule", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Rules", "SDK"], summary: "Delete a rule", security: [{ cookieAuth: [] }] },
   })
 
   // --- Logs ---
@@ -1768,7 +1775,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["Logs"], summary: "List forwarding logs for a domain", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Logs", "SDK"], summary: "List forwarding logs for a domain", security: [{ cookieAuth: [] }] },
   })
 
   // --- Coupons (public) ---
@@ -2430,7 +2437,7 @@ const app = new Elysia({ adapter: node() })
       replyTo: t.Optional(t.String()),
       from: t.Optional(t.String()),
     }),
-    detail: { tags: ["Send"], summary: "Send an email from a domain", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Send", "SDK"], summary: "Send an email from a domain", security: [{ cookieAuth: [] }] },
   })
 
   // --- Bulk send ---
@@ -2493,7 +2500,7 @@ const app = new Elysia({ adapter: node() })
       html: t.String(),
       from: t.Optional(t.String()),
     }),
-    detail: { tags: ["Send"], summary: "Create a bulk email send job", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Send", "SDK"], summary: "Create a bulk email send job", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/domains/:id/bulk/:jobId", async ({ request, params }) => {
@@ -2513,7 +2520,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["Send"], summary: "Get bulk send job status", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Send", "SDK"], summary: "Get bulk send job status", security: [{ cookieAuth: [] }] },
   })
 
   // --- Mesa: SSE ---
@@ -3154,7 +3161,7 @@ const app = new Elysia({ adapter: node() })
     body: t.Object({
       label: t.String(),
     }),
-    detail: { tags: ["SMTP"], summary: "Create SMTP credentials for a domain", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["SMTP", "SDK"], summary: "Create SMTP credentials for a domain", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/domains/:id/smtp-credentials", async ({ request, params }) => {
@@ -3169,7 +3176,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["SMTP"], summary: "List SMTP credentials for a domain", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["SMTP", "SDK"], summary: "List SMTP credentials for a domain", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/domains/:id/smtp-credentials/:credId", async ({ request, params }) => {
@@ -3189,7 +3196,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["SMTP"], summary: "Revoke an SMTP credential", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["SMTP", "SDK"], summary: "Revoke an SMTP credential", security: [{ cookieAuth: [] }] },
   })
 
   // --- SES bounce/complaint events ---
@@ -3797,6 +3804,43 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify(registrations), { headers: { "content-type": "application/json" } });
   }, {
     detail: { tags: ["Domain Registration"], summary: "List domain registrations for current user", security: [{ cookieAuth: [] }] },
+  })
+
+  // --- API Keys ---
+
+  .post("/api/api-keys", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
+    const limits = getUserPlanLimits(auth.email);
+    if (!limits.api) return new Response(JSON.stringify({ error: "Tu plan no incluye acceso a la API" }), { status: 403, headers: { "content-type": "application/json" } });
+    const { name } = body as { name: string };
+    if (!name || typeof name !== "string" || name.length > 50) return new Response(JSON.stringify({ error: "Nombre inválido" }), { status: 400, headers: { "content-type": "application/json" } });
+    const apiKey = createApiKey(auth.email, name.trim());
+    return new Response(JSON.stringify(apiKey), { status: 201, headers: { "content-type": "application/json" } });
+  }, {
+    body: t.Object({ name: t.String() }),
+    detail: { tags: ["API Keys", "SDK"], summary: "Create a new API key", security: [{ cookieAuth: [] }] },
+  })
+
+  .get("/api/api-keys", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
+    const limits = getUserPlanLimits(auth.email);
+    if (!limits.api) return new Response(JSON.stringify({ error: "Tu plan no incluye acceso a la API" }), { status: 403, headers: { "content-type": "application/json" } });
+    const keys = listApiKeys(auth.email);
+    return new Response(JSON.stringify(keys), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["API Keys", "SDK"], summary: "List API keys for the authenticated user", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .delete("/api/api-keys/:id", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
+    const revoked = revokeApiKey(params.id, auth.email);
+    if (!revoked) return new Response(JSON.stringify({ error: "API key no encontrada" }), { status: 404, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["API Keys", "SDK"], summary: "Revoke an API key", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   });
 
 // --- Bulk send cron (every minute, processes 14 emails/sec) ---

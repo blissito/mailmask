@@ -1,4 +1,4 @@
-import { getUser, type User } from "./db.js";
+import { getUser, getUserByApiKey, getUserPlanLimits, type User } from "./db.js";
 
 const encoder = new TextEncoder();
 const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error("JWT_SECRET required"); })();
@@ -116,6 +116,19 @@ export function parseCookies(header: string | null): Record<string, string> {
 // --- Auth middleware helper ---
 
 export async function getAuthUser(request: Request): Promise<{ email: string } | null> {
+  // Try Bearer token (API key) first
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer mk_")) {
+    const key = authHeader.slice(7);
+    const user = getUserByApiKey(key);
+    if (!user) return null;
+    // Verify plan allows API access
+    const limits = getUserPlanLimits(user.email);
+    if (!limits.api) return null;
+    return { email: user.email };
+  }
+
+  // Fall back to cookie auth
   const cookies = parseCookies(request.headers.get("cookie"));
   const token = cookies["token"];
   if (!token) return null;

@@ -238,6 +238,19 @@ export const domainRegistrations = sqliteTable("domain_registrations", {
   index("idx_domain_reg_status").on(table.status),
 ]);
 
+export const apiKeys = sqliteTable("api_keys", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  userEmail: text("user_email").notNull().references(() => users.email, { onDelete: "cascade" }),
+  key: text("key").notNull().unique(),
+  name: text("name").notNull(),
+  lastUsedAt: text("last_used_at"),
+  revokedAt: text("revoked_at"),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
+}, (table) => [
+  index("idx_api_keys_user").on(table.userEmail),
+  index("idx_api_keys_key").on(table.key),
+]);
+
 export const rateLimits = sqliteTable("rate_limits", {
   key: text("key").primaryKey(),
   count: integer("count").notNull().default(0),

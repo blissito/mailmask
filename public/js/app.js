@@ -42,6 +42,15 @@ async function checkAuth() {
     badge.classList.remove("hidden");
   }
 
+  // Show API Keys tab for plans with API access
+  const apiPlans = ["developer", "pro", "agencia"];
+  const sub = currentUser.subscription;
+  const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
+  const isActive = sub && (sub.status === "active" || sub.status === "cancelled") && (!periodEnd || periodEnd >= new Date());
+  if (isActive && apiPlans.includes(sub.plan)) {
+    document.getElementById("tab-btn-apikeys")?.classList.remove("hidden");
+  }
+
   renderVerifyBanner();
   renderBillingBanner();
   renderStats();
@@ -1446,6 +1455,45 @@ async function saveSlug(slug) {
   }
 }
 
+// --- API Keys ---
+
+async function loadApiKeys() {
+  const list = document.getElementById("apikeys-list");
+  const empty = document.getElementById("apikeys-empty");
+  if (!list) return;
+
+  const res = await fetch("/api/api-keys");
+  if (!res.ok) { list.innerHTML = ""; empty.classList.remove("hidden"); return; }
+  const keys = await res.json();
+  renderApiKeys(keys);
+}
+
+function renderApiKeys(keys) {
+  const list = document.getElementById("apikeys-list");
+  const empty = document.getElementById("apikeys-empty");
+  if (!keys.length) { list.innerHTML = ""; empty.classList.remove("hidden"); return; }
+  empty.classList.add("hidden");
+  list.innerHTML = keys.map(k => `
+    <div class="flex items-center justify-between bg-zinc-800/50 border border-zinc-700 rounded-lg px-4 py-3">
+      <div>
+        <span class="text-sm font-medium">${k.name}</span>
+        <span class="text-xs text-zinc-500 ml-2">mk_...${k.id.slice(-6)}</span>
+        ${k.lastUsedAt ? `<span class="text-xs text-zinc-500 ml-2">Último uso: ${new Date(k.lastUsedAt).toLocaleDateString()}</span>` : ""}
+      </div>
+      <button onclick="revokeApiKeyUI('${k.id}')" class="text-xs text-red-400 hover:text-red-300 transition-colors">Revocar</button>
+    </div>
+  `).join("");
+}
+
+async function revokeApiKeyUI(id) {
+  if (!confirm("¿Revocar esta API key?")) return;
+  const res = await fetch(`/api/api-keys/${id}`, { method: "DELETE" });
+  if (res.ok) {
+    playSound("delete");
+    loadApiKeys();
+  }
+}
+
 // --- Tabs ---
 
 function switchTab(tab) {
@@ -1466,6 +1514,7 @@ function switchTab(tab) {
   else if (tab === "dns") { renderDnsRecords(); renderHealthPanel(); }
   else if (tab === "members") loadMembers();
   else if (tab === "smtp") loadSmtpCredentials();
+  else if (tab === "apikeys") loadApiKeys();
 }
 
 // --- Modals ---
@@ -1583,6 +1632,39 @@ function setupEventListeners() {
     errEl.classList.add("hidden");
     await createSmtpCredentialUI(form.label.value.trim());
     form.reset();
+  });
+
+  // API Keys
+  document.getElementById("btn-add-apikey").addEventListener("click", () => showModal("modal-apikey-name"));
+  document.getElementById("form-apikey-name").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const errEl = document.getElementById("apikey-name-error");
+    errEl.classList.add("hidden");
+    const res = await fetch("/api/api-keys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: form.name.value.trim() }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      hideModal("modal-apikey-name");
+      form.reset();
+      document.getElementById("apikey-value").textContent = data.key;
+      showModal("modal-apikey-show");
+      playSound("success");
+      loadApiKeys();
+    } else {
+      const data = await res.json();
+      errEl.textContent = data.error || "Error al crear key";
+      errEl.classList.remove("hidden");
+    }
+  });
+  document.getElementById("btn-copy-apikey").addEventListener("click", () => {
+    const key = document.getElementById("apikey-value").textContent;
+    navigator.clipboard.writeText(key);
+    playSound("copy");
+    showToast("API Key copiada");
   });
 
   // Delegated click handlers

@@ -21,6 +21,7 @@ import {
   referralCredits,
   referralClicks,
   domainRegistrations,
+  apiKeys,
 } from "./schema.js";
 
 export { db };
@@ -1496,4 +1497,61 @@ export function getDomainRegistrationByPaymentId(mpPaymentId: string): DomainReg
     .all();
   if (!rows.length) return null;
   return rows[0] as DomainRegistration;
+}
+
+// --- API Keys ---
+
+export interface ApiKey {
+  id: string;
+  userEmail: string;
+  key: string;
+  name: string;
+  lastUsedAt?: string;
+  revokedAt?: string;
+  createdAt: string;
+}
+
+function generateApiKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return "mk_" + [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+export function createApiKey(userEmail: string, name: string): ApiKey {
+  const key = generateApiKey();
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  db.insert(apiKeys).values({ id, userEmail, key, name, createdAt: now }).run();
+  return { id, userEmail, key, name, createdAt: now };
+}
+
+export function listApiKeys(userEmail: string): Omit<ApiKey, "key">[] {
+  return db.select({
+    id: apiKeys.id,
+    userEmail: apiKeys.userEmail,
+    name: apiKeys.name,
+    lastUsedAt: apiKeys.lastUsedAt,
+    revokedAt: apiKeys.revokedAt,
+    createdAt: apiKeys.createdAt,
+  }).from(apiKeys)
+    .where(and(eq(apiKeys.userEmail, userEmail), isNull(apiKeys.revokedAt)))
+    .orderBy(desc(apiKeys.createdAt))
+    .all() as Omit<ApiKey, "key">[];
+}
+
+export function revokeApiKey(id: string, userEmail: string): boolean {
+  const result = db.update(apiKeys)
+    .set({ revokedAt: new Date().toISOString() })
+    .where(and(eq(apiKeys.id, id), eq(apiKeys.userEmail, userEmail), isNull(apiKeys.revokedAt)))
+    .run();
+  return result.changes > 0;
+}
+
+export function getUserByApiKey(key: string): User | null {
+  const rows = db.select().from(apiKeys)
+    .where(and(eq(apiKeys.key, key), isNull(apiKeys.revokedAt)))
+    .all();
+  if (!rows.length) return null;
+  // Update lastUsedAt
+  db.update(apiKeys).set({ lastUsedAt: new Date().toISOString() }).where(eq(apiKeys.key, key)).run();
+  return getUser(rows[0].userEmail);
 }
