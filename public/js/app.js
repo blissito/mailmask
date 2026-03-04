@@ -42,12 +42,11 @@ async function checkAuth() {
     badge.classList.remove("hidden");
   }
 
-  // Show API Keys tab for plans with API access
-  const apiPlans = ["developer", "pro", "agencia"];
+  // Show API Keys tab for all active plans
   const sub = currentUser.subscription;
   const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
   const isActive = sub && (sub.status === "active" || sub.status === "cancelled") && (!periodEnd || periodEnd >= new Date());
-  if (isActive && apiPlans.includes(sub.plan)) {
+  if (isActive) {
     document.getElementById("tab-btn-apikeys")?.classList.remove("hidden");
   }
 
