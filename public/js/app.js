@@ -2,6 +2,27 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+// --- CSRF: inject X-CSRF-Token header on mutating requests ---
+{
+  const _fetch = window.fetch;
+  window.fetch = function(url, opts) {
+    opts = opts || {};
+    const method = (opts.method || "GET").toUpperCase();
+    if (method !== "GET" && method !== "HEAD") {
+      const csrfToken = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/)?.[1];
+      if (csrfToken) {
+        opts.headers = opts.headers instanceof Headers
+          ? opts.headers
+          : new Headers(opts.headers || {});
+        if (!opts.headers.has("x-csrf-token")) {
+          opts.headers.set("x-csrf-token", csrfToken);
+        }
+      }
+    }
+    return _fetch.call(this, url, opts);
+  };
+}
+
 // --- State ---
 let currentUser = null;
 let domains = [];

@@ -86,6 +86,24 @@ Override with env vars `S3_BUCKET` and `S3_BACKUP_BUCKET` respectively.
 - [x] ~~**Separar bucket de backups**~~: fallback cambiado a `"mailmask-backups"`.
 - [x] ~~**Agregar HSTS header**~~: agregado en `onAfterHandle`.
 
+### 🌱 Etapa Vegetativa — marzo/abril 2026
+Objetivo: solidificar el tronco del servicio. Blindar seguridad, rendimiento y resiliencia. Condición de olimpiadas.
+
+- [x] ~~**CSRF protection**~~: Double-submit cookie pattern. CSRF token en cookie no-HttpOnly + header X-CSRF-Token. Skip para webhooks (HMAC), Bearer auth, y endpoints de entrada.
+- [x] ~~**Content-Security-Policy header**~~: CSP estricto ya aplicado en `onAfterHandle`.
+- [x] ~~**Auditar API keys**~~: Keys hasheadas con SHA-256, `keyPrefix` para identificación, rate limit 60 req/min por key. Migration script: `scripts/migrate-api-keys-hash.ts`.
+- [x] ~~**Auditar SMTP relay**~~: Auditado — plan-gated (developer), domain-scoped IAM, admin-only credentials, IAM cleanup on revoke. SES rate limits per IAM user.
+- [ ] **S3 bucket permissions**: Verificar que no hay acceso público, policies mínimas
+- [ ] **JWT secret rotation**: Estrategia de rotación de secretos sin invalidar sesiones activas
+- [x] ~~**Security headers completos**~~: HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, CSP — todos en `onAfterHandle`.
+- [x] ~~**Dependency audit**~~: Solo esbuild en drizzle-kit (dev dependency, moderate, no afecta producción). Sin vulnerabilidades en runtime.
+- [x] ~~**Input validation audit**~~: Blog slug path traversal fix, parseInt radix explícito. Drizzle ORM previene SQLi, SSRF protection en webhooks, filenames sanitizados.
+- [x] ~~**Rate limiting audit**~~: Agregado rate limit a send (20/min), send-bulk (5/min), bandeja reply (20/min), alias create (20/min), agents invite (10/min), api-keys create (5/min), billing cancel (3/min), smtp-credentials create (5/min). Login, register, forgot-password, checkout ya tenían.
+- [x] ~~**Error handling audit**~~: `onError` global no filtra stack traces, devuelve "Error interno" genérico. `String(error)` solo va a logs internos.
+- [ ] **Backup & recovery drill**: Probar restauración completa desde backup de S3
+- [ ] **Load testing**: Benchmarks de rendimiento bajo carga (forwarding, API, bandeja)
+- [ ] **Logging & observability**: Structured logging para debugging en producción sin exponer datos sensibles
+
 ### Alto — primeras semanas
 - [x] ~~Pagina de pricing publica en landing~~: `/pricing` standalone + sección en landing con smooth scroll.
 - [x] ~~Agregar endpoint PUT para editar reglas~~: `PUT /api/domains/:id/rules/:ruleId` con validación completa.

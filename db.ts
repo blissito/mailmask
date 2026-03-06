@@ -1504,7 +1504,7 @@ export function getDomainRegistrationByPaymentId(mpPaymentId: string): DomainReg
 export interface ApiKey {
   id: string;
   userEmail: string;
-  key: string;
+  keyPrefix: string;
   name: string;
   lastUsedAt?: string;
   revokedAt?: string;
@@ -1516,18 +1516,27 @@ function generateApiKey(): string {
   return "mk_" + [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-export function createApiKey(userEmail: string, name: string): ApiKey {
-  const key = generateApiKey();
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
-  db.insert(apiKeys).values({ id, userEmail, key, name, createdAt: now }).run();
-  return { id, userEmail, key, name, createdAt: now };
+async function hashApiKey(key: string): Promise<string> {
+  const data = new TextEncoder().encode(key);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-export function listApiKeys(userEmail: string): Omit<ApiKey, "key">[] {
+export async function createApiKey(userEmail: string, name: string): Promise<{ apiKey: ApiKey; plaintextKey: string }> {
+  const key = generateApiKey();
+  const keyH = await hashApiKey(key);
+  const prefix = key.slice(0, 11); // "mk_" + first 8 hex chars
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  db.insert(apiKeys).values({ id, userEmail, keyHash: keyH, keyPrefix: prefix, name, createdAt: now }).run();
+  return { apiKey: { id, userEmail, keyPrefix: prefix, name, createdAt: now }, plaintextKey: key };
+}
+
+export function listApiKeys(userEmail: string): Omit<ApiKey, "keyPrefix">[] {
   return db.select({
     id: apiKeys.id,
     userEmail: apiKeys.userEmail,
+    keyPrefix: apiKeys.keyPrefix,
     name: apiKeys.name,
     lastUsedAt: apiKeys.lastUsedAt,
     revokedAt: apiKeys.revokedAt,
@@ -1535,7 +1544,7 @@ export function listApiKeys(userEmail: string): Omit<ApiKey, "key">[] {
   }).from(apiKeys)
     .where(and(eq(apiKeys.userEmail, userEmail), isNull(apiKeys.revokedAt)))
     .orderBy(desc(apiKeys.createdAt))
-    .all() as Omit<ApiKey, "key">[];
+    .all() as ApiKey[];
 }
 
 export function revokeApiKey(id: string, userEmail: string): boolean {
@@ -1546,12 +1555,13 @@ export function revokeApiKey(id: string, userEmail: string): boolean {
   return result.changes > 0;
 }
 
-export function getUserByApiKey(key: string): User | null {
+export async function getUserByApiKey(key: string): Promise<User | null> {
+  const keyH = await hashApiKey(key);
   const rows = db.select().from(apiKeys)
-    .where(and(eq(apiKeys.key, key), isNull(apiKeys.revokedAt)))
+    .where(and(eq(apiKeys.keyHash, keyH), isNull(apiKeys.revokedAt)))
     .all();
   if (!rows.length) return null;
   // Update lastUsedAt
-  db.update(apiKeys).set({ lastUsedAt: new Date().toISOString() }).where(eq(apiKeys.key, key)).run();
+  db.update(apiKeys).set({ lastUsedAt: new Date().toISOString() }).where(eq(apiKeys.keyHash, keyH)).run();
   return getUser(rows[0].userEmail);
 }

@@ -7,7 +7,7 @@ import {
   listUserDomains, listAliases, listRules, updateUserSubscription,
   createPendingCheckout,
 } from "./db.ts";
-import { hashPassword, signJwt } from "./auth.ts";
+import { hashPassword, signJwt, generateCsrfToken } from "./auth.ts";
 
 // Unique fake IP per test run to avoid rate limiter collisions
 let ipCounter = 0;
@@ -19,15 +19,17 @@ async function req(path: string, opts?: RequestInit): Promise<Response> {
   return app.fetch(new Request(`http://localhost${path}`, opts));
 }
 
-function jsonPost(path: string, body: unknown, cookie?: string): Promise<Response> {
+function jsonPost(path: string, body: unknown, cookie?: string, csrf?: string): Promise<Response> {
   const headers: Record<string, string> = { "content-type": "application/json", "x-forwarded-for": nextIp() };
-  if (cookie) headers["cookie"] = cookie;
+  if (cookie) headers["cookie"] = csrf ? `${cookie}; csrf_token=${csrf}` : cookie;
+  if (csrf) headers["x-csrf-token"] = csrf;
   return req(path, { method: "POST", headers, body: JSON.stringify(body) });
 }
 
-function jsonPut(path: string, body: unknown, cookie?: string): Promise<Response> {
+function jsonPut(path: string, body: unknown, cookie?: string, csrf?: string): Promise<Response> {
   const headers: Record<string, string> = { "content-type": "application/json", "x-forwarded-for": nextIp() };
-  if (cookie) headers["cookie"] = cookie;
+  if (cookie) headers["cookie"] = csrf ? `${cookie}; csrf_token=${csrf}` : cookie;
+  if (csrf) headers["x-csrf-token"] = csrf;
   return req(path, { method: "PUT", headers, body: JSON.stringify(body) });
 }
 
@@ -37,11 +39,23 @@ function jsonGet(path: string, cookie?: string): Promise<Response> {
   return req(path, { headers });
 }
 
+function extractCookies(res: Response): { cookie?: string; csrfToken?: string } {
+  // Try getSetCookie first, then fall back to parsing combined header
+  const all = res.headers.getSetCookie?.() ?? [];
+  const parts = all.length > 0 ? all : (res.headers.get("set-cookie") ?? "").split(/,(?=\s*\w+=)/);
+  let cookie: string | undefined;
+  let csrfToken: string | undefined;
+  for (const sc of parts) {
+    const tokenMatch = sc.match(/(?:^|[\s,])token=([^;,]+)/);
+    if (tokenMatch && !cookie) cookie = `token=${tokenMatch[1]}`;
+    const csrfMatch = sc.match(/csrf_token=([^;,]+)/);
+    if (csrfMatch && !csrfToken) csrfToken = csrfMatch[1];
+  }
+  return { cookie, csrfToken };
+}
+
 function extractCookie(res: Response): string | undefined {
-  const setCookie = res.headers.get("set-cookie");
-  if (!setCookie) return undefined;
-  const match = setCookie.match(/token=([^;]+)/);
-  return match ? `token=${match[1]}` : undefined;
+  return extractCookies(res).cookie;
 }
 
 const suffix = Date.now();
@@ -168,10 +182,10 @@ describe("Domains", () => {
       email: `test-reg-${suffix}@example.com`,
       password: "password123",
     });
-    const cookie = extractCookie(loginRes)!;
+    const { cookie, csrfToken } = extractCookies(loginRes);
     await loginRes.body?.cancel();
 
-    const res = await jsonPost("/api/domains", { domain: "test.com" }, cookie);
+    const res = await jsonPost("/api/domains", { domain: "test.com" }, cookie!, csrfToken);
     assert.equal(res.status, 402);
     await res.body?.cancel();
   });
@@ -206,13 +220,14 @@ describe("Rules", () => {
     });
     const domain = createDomain(email, `rule-${suffix}.test`, ["dkim1"], "verify1");
     const jwt = await signJwt({ email });
+    const csrf = generateCsrfToken();
     const cookie = `token=${jwt}`;
 
     // SSRF: private IP webhook
     const ssrfRes = await jsonPost(`/api/domains/${domain.id}/rules`, {
       field: "from", match: "contains", value: "test",
       action: "webhook", target: "http://169.254.169.254/latest/meta-data",
-    }, cookie);
+    }, cookie, csrf);
     assert.equal(ssrfRes.status, 400);
     const ssrfData = await ssrfRes.json();
     assert.ok(ssrfData.error.includes("privada"));
@@ -220,7 +235,7 @@ describe("Rules", () => {
     // Regex too long
     const longRes = await jsonPost(`/api/domains/${domain.id}/rules`, {
       field: "from", match: "regex", value: "a".repeat(201), action: "discard",
-    }, cookie);
+    }, cookie, csrf);
     assert.equal(longRes.status, 400);
     const longData = await longRes.json();
     assert.ok(longData.error.includes("largo"));
@@ -228,7 +243,7 @@ describe("Rules", () => {
     // Invalid regex
     const badRes = await jsonPost(`/api/domains/${domain.id}/rules`, {
       field: "from", match: "regex", value: "[invalid", action: "discard",
-    }, cookie);
+    }, cookie, csrf);
     assert.equal(badRes.status, 400);
     const badData = await badRes.json();
     assert.ok(badData.error.includes("inválido"));
@@ -236,7 +251,7 @@ describe("Rules", () => {
     // Valid rule succeeds
     const okRes = await jsonPost(`/api/domains/${domain.id}/rules`, {
       field: "from", match: "contains", value: "spam", action: "discard",
-    }, cookie);
+    }, cookie, csrf);
     assert.equal(okRes.status, 201);
     await okRes.body?.cancel();
   });
@@ -257,23 +272,24 @@ describe("Alias update", () => {
     const domain = createDomain(email, `alias-${suffix}.test`, ["dkim1"], "verify1");
     createAlias(domain.id, "info", ["dest@example.com"]);
     const jwt = await signJwt({ email });
+    const csrf = generateCsrfToken();
     const cookie = `token=${jwt}`;
 
     const badRes = await jsonPut(`/api/domains/${domain.id}/alias/info`, {
       destinations: ["not-an-email"],
-    }, cookie);
+    }, cookie, csrf);
     assert.equal(badRes.status, 400);
     await badRes.body?.cancel();
 
     const emptyRes = await jsonPut(`/api/domains/${domain.id}/alias/info`, {
       destinations: [],
-    }, cookie);
+    }, cookie, csrf);
     assert.equal(emptyRes.status, 400);
     await emptyRes.body?.cancel();
 
     const okRes = await jsonPut(`/api/domains/${domain.id}/alias/info`, {
       enabled: false, hackField: "ignored",
-    }, cookie);
+    }, cookie, csrf);
     assert.equal(okRes.status, 200);
     const data = await okRes.json();
     assert.equal(data.enabled, false);

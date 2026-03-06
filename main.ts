@@ -123,6 +123,9 @@ import {
   makeAuthCookie,
   clearAuthCookie,
   getAuthUser,
+  parseCookies,
+  generateCsrfToken,
+  makeCsrfCookie,
 } from "./auth.js";
 import { checkRateLimit } from "./rate-limit.js";
 import {
@@ -178,10 +181,14 @@ function getMainDomainUrl(): string {
 
 const PUBLIC_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), "public");
 
-async function serveStatic(path: string): Promise<Response> {
+async function serveStatic(filePath: string): Promise<Response> {
   try {
-    const file = fs.readFileSync(`${PUBLIC_DIR}${path}`);
-    const ext = path.split(".").pop() ?? "";
+    const resolved = path.resolve(PUBLIC_DIR, filePath.replace(/^\//, ""));
+    if (!resolved.startsWith(PUBLIC_DIR)) {
+      return new Response("Not found", { status: 404 });
+    }
+    const file = fs.readFileSync(resolved);
+    const ext = filePath.split(".").pop() ?? "";
     const types: Record<string, string> = {
       html: "text/html; charset=utf-8",
       js: "application/javascript; charset=utf-8",
@@ -468,10 +475,33 @@ const app = new Elysia({ adapter: node() })
         headers: {
           "access-control-allow-origin": corsOrigin,
           "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
-          "access-control-allow-headers": "content-type",
+          "access-control-allow-headers": "content-type, x-csrf-token",
           "access-control-allow-credentials": "true",
           "access-control-max-age": "86400",
         },
+      });
+    }
+  })
+  // --- CSRF protection (double-submit cookie) ---
+  .onBeforeHandle(({ request }) => {
+    const method = request.method;
+    if (method === "GET" || method === "HEAD" || method === "OPTIONS") return;
+    const url = new URL(request.url);
+    // Skip CSRF for webhook endpoints (they use HMAC/signature validation)
+    if (url.pathname.startsWith("/api/webhooks/")) return;
+    // Skip CSRF for auth entry points (user doesn't have token yet)
+    if (url.pathname.startsWith("/api/auth/") || url.pathname === "/api/referrals/track" || url.pathname === "/api/billing/checkout" || url.pathname === "/api/billing/guest-checkout") return;
+    // Skip CSRF for Bearer token auth (inherently CSRF-safe)
+    const authHeader = request.headers.get("authorization");
+    if (authHeader?.startsWith("Bearer ")) return;
+    // Validate double-submit cookie
+    const cookies = parseCookies(request.headers.get("cookie"));
+    const cookieToken = cookies["csrf_token"];
+    const headerToken = request.headers.get("x-csrf-token");
+    if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+      return new Response(JSON.stringify({ error: "Token CSRF inválido" }), {
+        status: 403,
+        headers: { "content-type": "application/json" },
       });
     }
   })
@@ -489,6 +519,10 @@ const app = new Elysia({ adapter: node() })
       response.headers.set(
         "referrer-policy",
         "strict-origin-when-cross-origin",
+      );
+      response.headers.set(
+        "permissions-policy",
+        "camera=(), microphone=(), geolocation=(), payment=(self)",
       );
       response.headers.set(
         "content-security-policy",
@@ -568,6 +602,10 @@ const app = new Elysia({ adapter: node() })
   .get("/blog/img/*", ({ params }) => serveStatic(`/blog/img/${params["*"]}`))
   .get("/blog/:slug", async ({ params }) => {
     const slug = params.slug.replace(/[^a-z0-9-]/g, "");
+    const resolved = path.resolve(PUBLIC_DIR, "blog", `${slug}.html`);
+    if (!resolved.startsWith(PUBLIC_DIR)) {
+      return new Response("Not found", { status: 404 });
+    }
     try {
       return await serveStatic(`/blog/${slug}.html`);
     } catch {
@@ -631,13 +669,11 @@ const app = new Elysia({ adapter: node() })
     }
 
     const token = await signJwt({ email });
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 201,
-      headers: {
-        "content-type": "application/json",
-        "set-cookie": makeAuthCookie(token),
-      },
-    });
+    const csrfToken = generateCsrfToken();
+    const headers = new Headers({ "content-type": "application/json" });
+    headers.append("set-cookie", makeAuthCookie(token));
+    headers.append("set-cookie", makeCsrfCookie(csrfToken));
+    return new Response(JSON.stringify({ ok: true }), { status: 201, headers });
   }, {
     body: t.Object({
       email: t.String(),
@@ -684,12 +720,11 @@ const app = new Elysia({ adapter: node() })
     }
 
     const token = await signJwt({ email });
-    return new Response(JSON.stringify({ ok: true, email }), {
-      headers: {
-        "content-type": "application/json",
-        "set-cookie": makeAuthCookie(token),
-      },
-    });
+    const csrfToken = generateCsrfToken();
+    const headers = new Headers({ "content-type": "application/json" });
+    headers.append("set-cookie", makeAuthCookie(token));
+    headers.append("set-cookie", makeCsrfCookie(csrfToken));
+    return new Response(JSON.stringify({ ok: true, email }), { headers });
   }, {
     body: t.Object({
       email: t.String(),
@@ -751,6 +786,13 @@ const app = new Elysia({ adapter: node() })
 
     const referralStats = getReferralStats(user.email);
 
+    // Issue CSRF cookie if user doesn't have one (e.g., existing session before CSRF was deployed)
+    const cookies = parseCookies(request.headers.get("cookie"));
+    const responseHeaders: Record<string, string> = { "content-type": "application/json" };
+    if (!cookies["csrf_token"]) {
+      responseHeaders["set-cookie"] = makeCsrfCookie(generateCsrfToken());
+    }
+
     return new Response(
       JSON.stringify({
         email: user.email,
@@ -772,7 +814,7 @@ const app = new Elysia({ adapter: node() })
         referralStats,
       }),
       {
-        headers: { "content-type": "application/json" },
+        headers: responseHeaders,
       },
     );
   }, {
@@ -1350,6 +1392,9 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "No autenticado" }), {
         status: 401,
       });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 20, 60_000);
+    if (limited) return limited;
     const fullUser = (await getUser(auth.email))!;
 
     const access = await checkDomainAccess(auth.email, params.id, "write");
@@ -1767,7 +1812,7 @@ const app = new Elysia({ adapter: node() })
 
     const url = new URL(request.url);
     const limit = Math.min(
-      parseInt(url.searchParams.get("limit") ?? "50"),
+      parseInt(url.searchParams.get("limit") ?? "50", 10),
       100,
     );
 
@@ -2253,6 +2298,9 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "No autenticado" }), {
         status: 401,
       });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 3, 60_000);
+    if (limited) return limited;
     const user = await getUser(auth.email);
     if (!user)
       return new Response(JSON.stringify({ error: "No autenticado" }), {
@@ -2379,6 +2427,9 @@ const app = new Elysia({ adapter: node() })
   .post("/api/domains/:id/send", async ({ request, params, body: sendBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 20, 60_000);
+    if (limited) return limited;
     const user = (await getUser(auth.email))!;
     const limits = getUserPlanLimits(user);
 
@@ -2446,6 +2497,9 @@ const app = new Elysia({ adapter: node() })
   .post("/api/domains/:id/send-bulk", async ({ request, params, body: bulkBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 5, 60_000);
+    if (limited) return limited;
     const user = (await getUser(auth.email))!;
     const limits = getUserPlanLimits(user);
 
@@ -2683,8 +2737,8 @@ const app = new Elysia({ adapter: node() })
     if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
 
     const messages = await listMessages(conv.id);
-    const msgIdx = parseInt(params.msgIdx);
-    const attIdx = parseInt(params.attIdx);
+    const msgIdx = parseInt(params.msgIdx, 10);
+    const attIdx = parseInt(params.attIdx, 10);
     if (isNaN(msgIdx) || isNaN(attIdx) || msgIdx < 0 || msgIdx >= messages.length) {
       return new Response(JSON.stringify({ error: "Índice inválido" }), { status: 400 });
     }
@@ -2720,6 +2774,9 @@ const app = new Elysia({ adapter: node() })
   .post("/api/bandeja/conversations/:id/reply", async ({ request, params, body: replyBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 20, 60_000);
+    if (limited) return limited;
 
     const { domainId, body: replyBodyText, html } = replyBody;
     if (!domainId || (!replyBodyText && !html)) {
@@ -2999,6 +3056,9 @@ const app = new Elysia({ adapter: node() })
   .post("/api/domains/:id/agents/invite", async ({ request, params, body: inviteBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 10, 60_000);
+    if (limited) return limited;
 
     const access = await checkDomainAccess(auth.email, params.id, "manage_members");
     if (!access) {
@@ -3122,6 +3182,9 @@ const app = new Elysia({ adapter: node() })
   .post("/api/domains/:id/smtp-credentials", async ({ request, params, body: smtpBody }) => {
     const user = await getAuthUser(request);
     if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401 });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 5, 60_000);
+    if (limited) return limited;
 
     const access = await checkDomainAccess(user.email, params.id, "admin");
     if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
@@ -3812,14 +3875,17 @@ const app = new Elysia({ adapter: node() })
   .post("/api/api-keys", async ({ request, body }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 5, 60_000);
+    if (limited) return limited;
     const user = getUser(auth.email);
     if (!user) return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
     const limits = getUserPlanLimits(user);
     if (!limits.api) return new Response(JSON.stringify({ error: "Tu plan no incluye acceso a la API" }), { status: 403, headers: { "content-type": "application/json" } });
     const { name } = body as { name: string };
     if (!name || typeof name !== "string" || name.length > 50) return new Response(JSON.stringify({ error: "Nombre inválido" }), { status: 400, headers: { "content-type": "application/json" } });
-    const apiKey = createApiKey(auth.email, name.trim());
-    return new Response(JSON.stringify(apiKey), { status: 201, headers: { "content-type": "application/json" } });
+    const { apiKey, plaintextKey } = await createApiKey(auth.email, name.trim());
+    return new Response(JSON.stringify({ ...apiKey, key: plaintextKey }), { status: 201, headers: { "content-type": "application/json" } });
   }, {
     body: t.Object({ name: t.String() }),
     detail: { tags: ["API Keys", "SDK"], summary: "Create a new API key", security: [{ cookieAuth: [] }] },
@@ -3928,7 +3994,7 @@ cron.schedule("0 4 * * *", async () => {
   }
 });
 
-const port = parseInt(process.env.PORT ?? "8000");
+const port = parseInt(process.env.PORT ?? "8000", 10);
 app.listen({ port, hostname: "0.0.0.0" }, () => {
   console.log(`MailMask running on port ${port}`);
 });

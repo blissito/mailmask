@@ -1,4 +1,5 @@
 import { getUser, getUserByApiKey, getUserPlanLimits, type User } from "./db.js";
+import { checkRateLimit } from "./rate-limit.js";
 
 const encoder = new TextEncoder();
 const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error("JWT_SECRET required"); })();
@@ -120,7 +121,11 @@ export async function getAuthUser(request: Request): Promise<{ email: string } |
   const authHeader = request.headers.get("authorization");
   if (authHeader?.startsWith("Bearer mk_")) {
     const key = authHeader.slice(7);
-    const user = getUserByApiKey(key);
+    const keyPrefix = key.slice(0, 11);
+    // Rate limit per API key: 60 requests per minute
+    const rl = checkRateLimit(`apikey:${keyPrefix}`, 60, 60_000);
+    if (!rl.allowed) return null;
+    const user = await getUserByApiKey(key);
     if (!user) return null;
     // Verify plan allows API access
     const limits = getUserPlanLimits(user);
@@ -146,6 +151,17 @@ export async function getAuthUser(request: Request): Promise<{ email: string } |
   }
 
   return { email: user.email };
+}
+
+// --- CSRF (double-submit cookie) ---
+
+export function generateCsrfToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+export function makeCsrfCookie(token: string): string {
+  return `csrf_token=${token};${SECURE_FLAG} SameSite=Strict; Path=/; Max-Age=${JWT_EXPIRY}`;
 }
 
 // --- Internal helpers ---
