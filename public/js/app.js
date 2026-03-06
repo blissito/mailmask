@@ -1136,8 +1136,9 @@ function renderHealthPanel() {
           </div>`;
         }).join("")}
       </div>
-      <button onclick="loadDomainHealth()" class="mt-3 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Actualizar diagnóstico</button>
+      <button id="btn-refresh-health" class="mt-3 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Actualizar diagnóstico</button>
     </div>`;
+  document.getElementById("btn-refresh-health")?.addEventListener("click", loadDomainHealth);
 }
 
 // --- DNS ---
@@ -1512,12 +1513,15 @@ function renderApiKeys(keys) {
             <td class="py-2.5 text-zinc-500">${k.createdAt ? new Date(k.createdAt).toLocaleDateString() : "—"}</td>
             <td class="py-2.5 text-zinc-500">${k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString() : "Nunca"}</td>
             <td class="py-2.5 text-right">
-              <button onclick="revokeApiKeyUI('${k.id}')" class="text-xs text-red-400 hover:text-red-300 transition-colors">Revocar</button>
+              <button data-revoke-key="${k.id}" class="text-xs text-red-400 hover:text-red-300 transition-colors">Revocar</button>
             </td>
           </tr>
         `).join("")}
       </tbody>
     </table>`;
+  list.querySelectorAll("[data-revoke-key]").forEach(btn => {
+    btn.addEventListener("click", () => revokeApiKeyUI(btn.dataset.revokeKey));
+  });
 }
 
 async function revokeApiKeyUI(id) {
