@@ -1,8 +1,14 @@
+<div align="center">
+
+<img src="public/img/logo.png" alt="MailMask" width="120" height="120">
+
 # MailMask
 
 Email profesional con tu dominio. Máscaras, forwarding y bandeja compartida — sin Google Workspace.
 
 **[mailmask.studio](https://mailmask.studio)**
+
+</div>
 
 ## Qué es
 
@@ -100,4 +106,4 @@ El `baseUrl` del SDK debe ser **`https://www.formmy.app`**. El apex `formmy.app`
 
 ---
 
-Hecho con 🚬🫁 por [@blissito](https://github.com/blissito) · [fixtergeek.com](https://www.fixtergeek.com)
+Hecho con 🚬🫁 por [@blissito](https://github.com/blissito) · [fixter.org](https://fixter.org)
