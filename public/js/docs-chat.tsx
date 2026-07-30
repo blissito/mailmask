@@ -547,7 +547,9 @@ function App() {
 
 function Root() {
   return (
-    <FormmyProvider publishableKey={PK} baseUrl="https://formmy.app">
+    // www es el host principal de Formmy; el apex formmy.app no presenta certificado TLS
+    // (handshake sin peer cert), asi que todo fetch del SDK moria con "Failed to fetch".
+    <FormmyProvider publishableKey={PK} baseUrl="https://www.formmy.app">
       <App />
     </FormmyProvider>
   );

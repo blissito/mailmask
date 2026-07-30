@@ -266,7 +266,7 @@ async function main() {
     process.exit(1);
   }
 
-  const formmy = new Formmy({ secretKey, baseUrl: "https://formmy.app" });
+  const formmy = new Formmy({ secretKey, baseUrl: "https://www.formmy.app" });
 
   // 1. Delete existing documents for idempotency
   console.log("Listing existing documents...");

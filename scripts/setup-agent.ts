@@ -53,7 +53,7 @@ async function main() {
 
   const formmy = new Formmy({
     secretKey,
-    baseUrl: "https://formmy.app",
+    baseUrl: "https://www.formmy.app",
   });
 
   console.log(`Updating agent ${AGENT_ID}...`);
