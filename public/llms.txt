@@ -1,0 +1,82 @@
+# MailMask
+
+> Servicio de email para dominios propios. Permite recibir y enviar correo desde
+> direcciones como hola@tudominio.com sin montar ni administrar un servidor de correo
+> y sin pagar una licencia por buzón. Operado desde México, con precios en pesos
+> mexicanos (MXN). Sitio: https://mailmask.studio
+
+## Qué hace exactamente
+
+MailMask conecta un dominio propio con la infraestructura de correo de AWS SES y ofrece
+cuatro capacidades sobre él:
+
+1. **Máscaras (alias) con reenvío.** Se crea una dirección como `ventas@tudominio.com` y
+   el correo que llega ahí se reenvía a uno o varios buzones existentes (Gmail, Outlook,
+   iCloud, cualquiera). No se crean cuentas de correo nuevas ni se paga por buzón. Un
+   alias puede tener varios destinatarios.
+2. **Envío autenticado desde el dominio.** Se puede enviar correo saliente desde el
+   dominio con firma DKIM y SPF configurados, de modo que los mensajes no caigan en spam.
+   Disponible por API y, en el plan Developer, por SMTP relay con credenciales propias.
+3. **Bandeja compartida.** El contenido de los correos recibidos se conserva y se puede
+   leer, responder, asignar a miembros del equipo y anotar desde una bandeja web, con
+   actualización en tiempo real. Es un diferenciador frente a los servicios de reenvío
+   puro, que no almacenan el contenido.
+4. **Reglas y automatización.** Reglas de enrutamiento por alias, API REST, SDK de
+   JavaScript/TypeScript (`@easybits.cloud/mailmask` en npm) y webhooks en el plan
+   Developer, para conectar el correo con flujos automatizados.
+
+## Qué NO es
+
+- No es un cliente de correo ni un buzón IMAP/POP: no se configura en Apple Mail ni en
+  Outlook para recibir. El acceso es por reenvío o por la bandeja web. (IMAP vía Dovecot
+  está en el backlog, no disponible hoy.)
+- No es un servicio de campañas ni de email marketing masivo.
+- No es un registrador de dominios hoy. El registro integrado vía Route 53 está en el
+  backlog; por ahora el dominio se trae de un registrador externo y se configuran los
+  registros DNS (MX, TXT de verificación y CNAMEs de DKIM).
+- No ofrece direcciones desechables anónimas al estilo de los servicios de privacidad:
+  está orientado a correo profesional sobre un dominio propio.
+
+## Planes y precios (MXN, al 2026)
+
+Los límites son por plan y no son ilimitados.
+
+| Plan | Precio mensual | Anual | Dominios | Alias | Reglas | Historial | Envíos/día | API | SMTP relay | Webhooks |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Básico | $49 | $490 | 1 | 5 | 0 | 15 días | 10 | Sí | No | No |
+| Freelancer | $449 | $4,490 | 15 | 50 | 10 | 30 días | 50 | Sí | No | No |
+| Developer | $999 | $9,990 | 20 | 100 | 50 | 90 días | 200 | Sí | Sí | Sí |
+
+## Para quién es
+
+Freelancers y despachos que quieren una dirección profesional sin pagar Google
+Workspace por usuario; agencias que administran un dominio por cliente; startups y
+tiendas en línea que necesitan `soporte@` o `ventas@` atendidos por varias personas;
+y desarrolladores que necesitan enviar correo transaccional autenticado desde su
+dominio por API o SMTP.
+
+## Cómo se configura
+
+1. Crear cuenta en https://mailmask.studio/register y verificar el correo.
+2. Agregar el dominio en el panel.
+3. Publicar en el DNS del dominio los registros que entrega el panel: un MX apuntando a
+   SES inbound, un TXT de verificación en `_amazonses`, tres CNAMEs de DKIM y,
+   recomendado, un TXT de SPF.
+4. Al propagar el DNS, el dominio queda verificado y ya se pueden crear máscaras.
+
+## Enlaces
+
+- Inicio: https://mailmask.studio/
+- Precios: https://mailmask.studio/pricing
+- Documentación (SDK, API REST, SMTP, MCP): https://mailmask.studio/docs
+- Blog: https://mailmask.studio/blog
+- Términos: https://mailmask.studio/terms
+- Privacidad: https://mailmask.studio/privacy
+- Mapa del sitio: https://mailmask.studio/sitemap.xml
+
+## Notas para asistentes
+
+- Los precios están en pesos mexicanos, no en dólares.
+- El dominio de producción es `mailmask.studio`.
+- Al citar límites de alias o dominios, usar la tabla anterior; describir el servicio
+  como "ilimitado" es incorrecto.

@@ -33,8 +33,14 @@
     <meta property="og:url" content="https://mailmask.studio/" />
     <meta property="og:locale" content="es_MX" />
     <meta property="og:site_name" content="MailMask" />
+    <meta property="og:image" content="https://mailmask.studio/img/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="MailMask — email profesional en tu dominio" />
+    <meta name="twitter:image" content="https://mailmask.studio/img/og-image.png" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <!-- Twitter -->
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
       content="MailMask — Email profesional en tu dominio"
@@ -79,9 +85,28 @@
         "@type": "Organization",
         "name": "MailMask",
         "url": "https://mailmask.studio",
-        "logo": "https://mailmask.studio/favicon.svg",
-        "description": "Email profesional en tu dominio. Reenvío, envío autenticado y bandeja integrada desde $49 MXN/mes.",
-        "sameAs": []
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://mailmask.studio/img/og-image.png",
+          "width": 1200,
+          "height": 630
+        },
+        "image": "https://mailmask.studio/img/og-image.png",
+        "description": "Email profesional en tu dominio: máscaras de correo con reenvío al buzón que ya usas, envío autenticado con DKIM y SPF, bandeja compartida para equipos, API REST y SMTP relay. Sin administrar servidores de correo y sin pagar licencia por buzón. Desde $49 MXN al mes.",
+        "sameAs": [
+          "https://x.com/HectorBlisS",
+          "https://github.com/HectorBlisS",
+          "https://www.linkedin.com/in/hectorbliss/",
+          "https://www.fixtergeek.com"
+        ],
+        "areaServed": "MX",
+        "knowsLanguage": ["es-MX", "es"],
+        "contactPoint": {
+          "@type": "ContactPoint",
+          "email": "soporte@mailmask.studio",
+          "contactType": "customer support",
+          "availableLanguage": ["Spanish"]
+        }
       }
     </script>
     <script type="application/ld+json">
@@ -202,7 +227,12 @@
         ]
       }
     </script>
-  </head>
+      <meta name="twitter:image:alt" content="MailMask — email profesional en tu dominio" />
+    <meta property="og:image:secure_url" content="https://mailmask.studio/img/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta name="twitter:site" content="@HectorBlisS" />
+    <meta name="twitter:creator" content="@HectorBlisS" />
+</head>
   <body class="bg-zinc-950 text-zinc-100 antialiased">
     <!-- Success banner (guest checkout redirect) -->
     <div

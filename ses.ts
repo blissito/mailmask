@@ -3,6 +3,13 @@ import { db } from "./pg.js";
 import { tokens } from "./schema.js";
 import { eq, and, gt } from "drizzle-orm";
 
+// MailMask is pinned to us-east-1. SES inbound only exists in us-east-1,
+// us-west-2 and eu-west-1, and all receipt rules, the inbound S3 bucket and
+// every verified customer domain live there. Sending from another region would
+// split sender reputation and separate inbound from outbound, so this is not
+// configurable via env — a stray AWS_REGION secret must not be able to move it.
+export const AWS_REGION = "us-east-1";
+
 // Lazy-loaded AWS SDK clients to reduce cold start on Deno Deploy
 let _sesOutbound: any;
 let _sesInbound: any;
@@ -11,7 +18,7 @@ let _s3: any;
 async function getSesOutbound() {
   if (!_sesOutbound) {
     const { SESClient } = await import("@aws-sdk/client-ses");
-    _sesOutbound = new SESClient({ region: process.env.AWS_REGION ?? "us-east-1" });
+    _sesOutbound = new SESClient({ region: AWS_REGION });
   }
   return _sesOutbound;
 }
@@ -19,7 +26,7 @@ async function getSesOutbound() {
 async function getSesInbound() {
   if (!_sesInbound) {
     const { SESClient } = await import("@aws-sdk/client-ses");
-    _sesInbound = new SESClient({ region: process.env.AWS_SES_INBOUND_REGION ?? "us-east-1" });
+    _sesInbound = new SESClient({ region: AWS_REGION });
   }
   return _sesInbound;
 }
@@ -27,7 +34,7 @@ async function getSesInbound() {
 async function getS3() {
   if (!_s3) {
     const { S3Client } = await import("@aws-sdk/client-s3");
-    _s3 = new S3Client({ region: process.env.AWS_SES_INBOUND_REGION ?? "us-east-1" });
+    _s3 = new S3Client({ region: AWS_REGION });
   }
   return _s3;
 }
@@ -293,9 +300,45 @@ export async function fetchEmailFromS3(bucketName: string, objectKey: string): P
 
 // --- Email forwarding ---
 
+// Remove headers (and their folded continuation lines) from the header block only,
+// never from the body. Used to drop signatures that no longer apply after we rewrite From.
+function stripHeaders(raw: string, names: string[]): string {
+  const sepMatch = raw.match(/\r?\n\r?\n/);
+  const sepIdx = sepMatch?.index ?? -1;
+  const headerBlock = sepIdx >= 0 ? raw.slice(0, sepIdx) : raw;
+  const rest = sepIdx >= 0 ? raw.slice(sepIdx) : "";
+  const prefixes = names.map((n) => n.toLowerCase() + ":");
+
+  const kept: string[] = [];
+  let skipping = false;
+  for (const line of headerBlock.split(/\r?\n/)) {
+    if (/^[ \t]/.test(line)) {
+      // Folded continuation: belongs to whatever header we last decided on
+      if (!skipping) kept.push(line);
+      continue;
+    }
+    skipping = prefixes.some((p) => line.toLowerCase().startsWith(p));
+    if (!skipping) kept.push(line);
+  }
+  return kept.join("\r\n") + rest;
+}
+
 export async function forwardEmail(originalRaw: string, from: string, to: string, aliasDomain: string): Promise<void> {
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
+
+  // The sender's DKIM signature covers the original From, which we rewrite below, so it
+  // is already invalid. Worse, SES signs outbound mail itself and rejects the message
+  // with "Duplicate header 'DKIM-Signature'" if the original signature is still present.
+  // ARC/DomainKey signatures and Sender are dropped for the same reason.
+  originalRaw = stripHeaders(originalRaw, [
+    "DKIM-Signature",
+    "DomainKey-Signature",
+    "ARC-Seal",
+    "ARC-Message-Signature",
+    "ARC-Authentication-Results",
+    "Sender",
+  ]);
 
   // Use the alias domain for From so emails show the user's domain, not mailmask.studio
   const forwardingAddress = `reenvio@${aliasDomain}`;
@@ -308,7 +351,6 @@ export async function forwardEmail(originalRaw: string, from: string, to: string
 
   // Remove/rewrite headers that SES validates against verified identities
   rewrittenRaw = rewrittenRaw.replace(/^Return-Path:\s*.+$/mi, `Return-Path: <${forwardingAddress}>`);
-  rewrittenRaw = rewrittenRaw.replace(/^Sender:\s*.+$/mi, "");
 
   const extraHeaders = [
     `X-MailMask-Forwarded: true`,
@@ -417,6 +459,35 @@ export async function putBackupToS3(key: string, data: string): Promise<void> {
   }));
 }
 
+// Full-database backups are gzipped SQLite files, so they must be uploaded as bytes.
+// putBackupToS3 above encodes a string and hardcodes application/json, which would
+// corrupt a binary body.
+export async function putBackupBinaryToS3(
+  key: string,
+  body: Uint8Array,
+  contentType = "application/gzip",
+): Promise<void> {
+  const s3 = await getS3();
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new PutObjectCommand({
+    Bucket: BACKUP_BUCKET,
+    Key: `${BACKUP_PREFIX}${key}`,
+    Body: body,
+    ContentType: contentType,
+  }));
+}
+
+// Binary-safe counterpart of getBackupFromS3, which decodes as UTF-8 and mangles bytes.
+export async function getBackupBytesFromS3(key: string): Promise<Uint8Array> {
+  const s3 = await getS3();
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  const res = await s3.send(new GetObjectCommand({
+    Bucket: BACKUP_BUCKET,
+    Key: `${BACKUP_PREFIX}${key}`,
+  }));
+  return await res.Body!.transformToByteArray();
+}
+
 export async function deleteOldBackups(): Promise<void> {
   const s3 = await getS3();
   const { ListObjectsV2Command, DeleteObjectCommand } = await import("@aws-sdk/client-s3");
@@ -425,12 +496,40 @@ export async function deleteOldBackups(): Promise<void> {
     Prefix: BACKUP_PREFIX,
   }));
   const objects = res.Contents ?? [];
-  // Sort by key (date-based), oldest first
-  objects.sort((a: any, b: any) => (a.Key ?? "").localeCompare(b.Key ?? ""));
-  const toDelete = objects.slice(0, Math.max(0, objects.length - BACKUP_RETENTION));
-  for (const obj of toDelete) {
-    if (obj.Key) {
-      await s3.send(new DeleteObjectCommand({ Bucket: BACKUP_BUCKET, Key: obj.Key }));
+
+  // Retention is per backup family. A single pool would let the legacy
+  // mailmask-backup-*.json files count against the retention window and evict real
+  // mailmask-db-*.sqlite.gz snapshots — losing the only restorable copies.
+  const families = new Map<string, typeof objects>();
+  for (const obj of objects) {
+    const key = obj.Key ?? "";
+    const family = key.includes(".sqlite.gz") ? "db" : "legacy-json";
+    const list = families.get(family) ?? [];
+    list.push(obj);
+    families.set(family, list);
+  }
+
+  for (const [, list] of families) {
+    // Sort by key (timestamp-based), oldest first
+    list.sort((a: any, b: any) => (a.Key ?? "").localeCompare(b.Key ?? ""));
+
+    // Retention counts *days*, not files. Keys carry a full timestamp, so pressing
+    // "Crear backup ahora" a few times would otherwise fill the whole window with
+    // near-identical snapshots taken seconds apart and evict last week's history.
+    // Keep only the newest backup per calendar day, then the newest N days.
+    const newestPerDay = new Map<string, any>();
+    for (const obj of list) {
+      const day = (obj.Key ?? "").match(/(\d{4}-\d{2}-\d{2})/)?.[1];
+      if (!day) continue;
+      newestPerDay.set(day, obj); // list is oldest-first, so the last write wins
+    }
+    const keepDays = [...newestPerDay.keys()].sort().slice(-BACKUP_RETENTION);
+    const keep = new Set(keepDays.map((d) => newestPerDay.get(d)?.Key));
+
+    for (const obj of list) {
+      if (obj.Key && !keep.has(obj.Key)) {
+        await s3.send(new DeleteObjectCommand({ Bucket: BACKUP_BUCKET, Key: obj.Key }));
+      }
     }
   }
 }
@@ -479,12 +578,12 @@ let _iam: any;
 async function getIam() {
   if (!_iam) {
     const { IAMClient } = await import("@aws-sdk/client-iam");
-    _iam = new IAMClient({ region: process.env.AWS_REGION ?? "us-east-1" });
+    _iam = new IAMClient({ region: AWS_REGION });
   }
   return _iam;
 }
 
-const SES_SMTP_REGION = process.env.AWS_REGION ?? "us-east-1";
+const SES_SMTP_REGION = AWS_REGION;
 
 export async function deriveSesSmtpPassword(secretAccessKey: string, region: string): Promise<string> {
   const enc = new TextEncoder();
@@ -594,7 +693,7 @@ let _sns: any;
 async function getSns() {
   if (!_sns) {
     const { SNSClient } = await import("@aws-sdk/client-sns");
-    _sns = new SNSClient({ region: process.env.AWS_SES_INBOUND_REGION ?? "us-east-1" });
+    _sns = new SNSClient({ region: AWS_REGION });
   }
   return _sns;
 }

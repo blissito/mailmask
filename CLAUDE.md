@@ -100,7 +100,9 @@ Objetivo: solidificar el tronco del servicio. Blindar seguridad, rendimiento y r
 - [x] ~~**Input validation audit**~~: Blog slug path traversal fix, parseInt radix explícito. Drizzle ORM previene SQLi, SSRF protection en webhooks, filenames sanitizados.
 - [x] ~~**Rate limiting audit**~~: Agregado rate limit a send (20/min), send-bulk (5/min), bandeja reply (20/min), alias create (20/min), agents invite (10/min), api-keys create (5/min), billing cancel (3/min), smtp-credentials create (5/min). Login, register, forgot-password, checkout ya tenían.
 - [x] ~~**Error handling audit**~~: `onError` global no filtra stack traces, devuelve "Error interno" genérico. `String(error)` solo va a logs internos.
-- [ ] **Backup & recovery drill**: Probar restauración completa desde backup de S3
+- [x] ~~**Respaldos reales**~~: Resuelto 29-jul-2026. `backup.ts` hace `runDbBackup()`: `VACUUM INTO` (snapshot consistente que sí incluye el WAL), verificación con `integrity_check` + conteo de tablas antes de subir, gzip nivel 9 y upload a `s3://mailmask-backups/backups/mailmask-db-<ISO>.sqlite.gz`. Retención de 7 por familia de respaldo. Los JSON de 3.2 KB anteriores solo cubrían 4 de 22 tablas y omitían los DKIM tokens; fueron borrados de S3 (copia en `~/mailmask-backups-legacy/`). **Drill de restauración ejecutado y verificado**: 23 tablas, `integrity_check` ok, alias con destinos, suscripciones y DKIM tokens presentes.
+- [ ] **Chat de docs roto**: El widget "Asistente MailMask" (`public/js/docs-chat.tsx`) devuelve `Error: Failed to fetch` en cualquier pregunta. El CSP en `main.ts` ya permite `connect-src https://formmy.app`, así que no es CSP. Revisar: publishable key rotada, agente de Formmy borrado/sin créditos, CORS, o bundle desactualizado (`npm run build:chat`).
+- [ ] **Deploy sin downtime**: SQLite en un volumen único obliga a parar la máquina vieja antes de arrancar la nueva. Evaluar LiteFS o migrar a Postgres para tener 2+ máquinas.
 - [ ] **Load testing**: Benchmarks de rendimiento bajo carga (forwarding, API, bandeja)
 - [ ] **Logging & observability**: Structured logging para debugging en producción sin exponer datos sensibles
 

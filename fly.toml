@@ -1,12 +1,41 @@
 app = "mailmask"
 primary_region = "dfw"
 
+# Declared explicitly so deploys update the existing machine in place. Without this
+# Fly reported "Process groups have changed" on every deploy and *replaced* the
+# machine — and a replaced machine gets a freshly provisioned volume (forked from an
+# old snapshot), which silently rolled production data back.
+[processes]
+  app = "node_modules/.bin/tsx main.ts"
+
 [http_service]
   internal_port = 8000
   force_https = true
+  processes = ["app"]
   auto_stop_machines = "suspend"
   auto_start_machines = true
+  # Keep one machine up: with a single volume-backed machine there is no second
+  # instance to serve traffic, so a suspended machine means a cold start on every
+  # request and an outage window during deploys.
+  min_machines_running = 1
+
+  # Without checks Fly never knows the app is ready, so the proxy answered
+  # "[PR01] no known healthy instances found" while the machine sat unstarted.
+  # Tight timings on purpose: `fly deploy` blocks until a check passes, so a long
+  # grace_period is dead time added to every deploy. The app binds the port in a
+  # couple of seconds (AWS/SNS startup work runs detached, after listen).
+  [[http_service.checks]]
+    interval = "5s"
+    timeout = "2s"
+    grace_period = "3s"
+    method = "GET"
+    path = "/healthz"
 
 [mounts]
   source = "mailmask_data"
   destination = "/app/data"
+  initial_size = "1gb"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

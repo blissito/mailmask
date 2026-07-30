@@ -136,7 +136,6 @@ import {
   sendFromDomain,
   sendAlert,
   checkSesHealth,
-  putBackupToS3,
   deleteOldBackups,
   getConfigSetName,
   listBackups,
@@ -146,7 +145,9 @@ import {
   deleteDomainIdentity,
 } from "./ses.js";
 import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, extractAttachmentByIndex, rebuildConversationsFromS3 } from "./forwarding.js";
-import { fetchEmailFromS3, repairReceiptRules, ensureSnsSubscription } from "./ses.js";
+import { fetchEmailFromS3, repairReceiptRules, ensureSnsSubscription, AWS_REGION, getBackupBytesFromS3 } from "./ses.js";
+import { runDbBackup, DB_BACKUP_SUFFIX } from "./backup.js";
+import { sqlite } from "./pg.js";
 import { log } from "./logger.js";
 import { createSmtpIamCredential, revokeSmtpIamCredential } from "./ses.js";
 import "./cron.js";
@@ -205,7 +206,9 @@ async function serveStatic(filePath: string): Promise<Response> {
     });
   } catch {
     try {
-      const notFoundPage = Bun.file("public/404.html");
+      // Node runtime — Bun.file() is unavailable here, so the custom 404 page was
+      // never actually served and every miss fell through to bare "Not found".
+      const notFoundPage = fs.readFileSync(path.join(PUBLIC_DIR, "404.html"));
       return new Response(notFoundPage, { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
     } catch {
       return new Response("Not found", { status: 404 });
@@ -245,36 +248,6 @@ async function rateLimitGuard(
 function isAdmin(email: string): boolean {
   const admins = (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim().toLowerCase());
   return admins.includes(email.toLowerCase());
-}
-
-// --- Backup logic (shared by cron + admin endpoint) ---
-
-async function runBackup(): Promise<{ key: string; users: number }> {
-  const backupData: Record<string, unknown>[] = [];
-  const allUsers = await listAllUsers();
-
-  for (const user of allUsers) {
-    const domains = await listUserDomains(user.email);
-    const domainsData = [];
-    for (const d of domains) {
-      const aliases = await listAliases(d.id);
-      const rules = await listRules(d.id);
-      domainsData.push({ domain: d.domain, domainId: d.id, verified: d.verified, aliases, rules });
-    }
-    backupData.push({
-      email: user.email,
-      subscription: user.subscription,
-      emailVerified: user.emailVerified,
-      createdAt: user.createdAt,
-      domains: domainsData,
-    });
-  }
-
-  const dateStr = new Date().toISOString().split("T")[0];
-  const key = `mailmask-backup-${dateStr}.json`;
-  await putBackupToS3(key, JSON.stringify(backupData, null, 2));
-  await deleteOldBackups();
-  return { key, users: backupData.length };
 }
 
 // --- SNS signature verification ---
@@ -448,7 +421,7 @@ const app = new Elysia({ adapter: node() })
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
-        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/health", "/docs",
+        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/health", "/healthz", "/docs",
       ],
       staticFile: true,
     },
@@ -554,6 +527,14 @@ const app = new Elysia({ adapter: node() })
   })
 
   // --- Health ---
+  // Liveness probe for fly-proxy: proves only that this process serves HTTP.
+  // Deliberately does no I/O — /health below returns 503 on a mail backlog or an SES
+  // hiccup, and wiring that to the proxy would pull a perfectly serving machine out of
+  // rotation (and fail deploys) because forwards piled up. Keep them separate.
+  .get("/healthz", () => new Response("ok", {
+    headers: { "content-type": "text/plain", "cache-control": "no-store" },
+  }))
+
   .get("/health", async () => {
     const [queueDepth, deadLetterCount, sesOk] = await Promise.all([
       getQueueDepth(),
@@ -614,6 +595,9 @@ const app = new Elysia({ adapter: node() })
   })
   .get("/robots.txt", () => serveStatic("/robots.txt"))
   .get("/sitemap.xml", () => serveStatic("/sitemap.xml"))
+  // Convention for generative engines: a plain-text summary of what the product is,
+  // so assistants cite it accurately instead of inferring from marketing copy.
+  .get("/llms.txt", () => serveStatic("/llms.txt"))
 
   // --- Auth ---
 
@@ -1234,7 +1218,7 @@ const app = new Elysia({ adapter: node() })
     } else {
       try {
         const { SESClient, GetIdentityDkimAttributesCommand } = await import("@aws-sdk/client-ses");
-        const sesClient = new SESClient({ region: process.env.AWS_SES_INBOUND_REGION ?? "us-east-1" });
+        const sesClient = new SESClient({ region: AWS_REGION });
         const dkimRes = await sesClient.send(new GetIdentityDkimAttributesCommand({ Identities: [d] }));
         const dkimAttrs = dkimRes.DkimAttributes?.[d];
         if (dkimAttrs?.DkimVerificationStatus === "Success") {
@@ -2287,6 +2271,98 @@ const app = new Elysia({ adapter: node() })
       }
     }
 
+    // Handle recurring charges. MP sends these as subscription_authorized_payment,
+    // NOT as subscription_preapproval — without this the period end never advances
+    // and the dashboard shows an active subscription as expired.
+    if (body.type === "subscription_authorized_payment" && body.data?.id) {
+      try {
+        if (await isWebhookProcessed(body.data.id)) {
+          return new Response("OK", { status: 200 });
+        }
+
+        const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+        if (!mpAccessToken) {
+          log("error", "webhook", "MP_ACCESS_TOKEN not configured");
+          return new Response("Server misconfigured", { status: 500 });
+        }
+
+        const apRes = await fetch(
+          `https://api.mercadopago.com/authorized_payments/${body.data.id}`,
+          {
+            headers: { Authorization: `Bearer ${mpAccessToken}` },
+            signal: AbortSignal.timeout(10_000),
+          },
+        );
+        const ap = await apRes.json();
+        log("info", "webhook", "MP authorized payment fetched", {
+          preapproval_id: ap.preapproval_id,
+          status: ap.status,
+          paymentStatus: ap.payment?.status,
+        });
+
+        // Only processed charges with an approved payment extend the period
+        const approved = ap.status === "processed" &&
+          (!ap.payment?.status || ap.payment.status === "approved");
+        if (!approved || !ap.preapproval_id) {
+          await markWebhookProcessed(body.data.id);
+          return new Response("OK", { status: 200 });
+        }
+
+        // Resolve the user: by stored preapproval id first, then via the preapproval payload
+        let user = getUserBySubscriptionId(ap.preapproval_id);
+        let email = user?.email;
+
+        if (!email) {
+          const subRes = await fetch(
+            `https://api.mercadopago.com/preapproval/${ap.preapproval_id}`,
+            {
+              headers: { Authorization: `Bearer ${mpAccessToken}` },
+              signal: AbortSignal.timeout(10_000),
+            },
+          );
+          const sub = await subRes.json();
+          const externalRef = sub.external_reference ?? "";
+          const UUID_RE =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          const candidate = UUID_RE.test(externalRef)
+            ? sub.payer_email
+            : externalRef || sub.payer_email;
+          email = candidate ? String(candidate).toLowerCase().trim() : undefined;
+          if (email) user = await getUser(email);
+        }
+
+        if (!email || !user?.subscription) {
+          log("warn", "webhook", "Recurring charge for unknown user", {
+            preapproval_id: ap.preapproval_id,
+            email,
+          });
+          await markWebhookProcessed(body.data.id);
+          return new Response("OK", { status: 200 });
+        }
+
+        const bufferDays = ap.type === "yearly" ? 370 : 35;
+        await extendSubscriptionPeriod(email, bufferDays);
+
+        // Self-heal accounts activated manually (no preapproval id stored),
+        // so future renewals resolve by id without hitting the MP API.
+        if (!user.subscription.mpSubscriptionId) {
+          const refreshed = await getUser(email);
+          if (refreshed?.subscription) {
+            await updateUserSubscription(email, {
+              ...refreshed.subscription,
+              mpSubscriptionId: ap.preapproval_id,
+            });
+          }
+        }
+
+        log("info", "webhook", "Subscription renewed via authorized payment", { email, bufferDays });
+        await markWebhookProcessed(body.data.id);
+      } catch (err) {
+        log("error", "webhook", "MP authorized payment processing error", { error: String(err) });
+        return new Response("Internal error", { status: 500 });
+      }
+    }
+
     return new Response("OK", { status: 200 });
   }, {
     detail: { tags: ["Webhooks"], summary: "MercadoPago subscription webhook", hide: true },
@@ -3206,7 +3282,7 @@ const app = new Elysia({ adapter: node() })
 
     const credential = createSmtpCredential(params.id, label, iamResult.iamUsername, iamResult.accessKeyId);
 
-    const smtpServer = `email-smtp.${process.env.AWS_REGION ?? "us-east-2"}.amazonaws.com`;
+    const smtpServer = `email-smtp.${AWS_REGION}.amazonaws.com`;
 
     return new Response(JSON.stringify({
       id: credential.id,
@@ -3395,6 +3471,17 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
 
     try {
+      // Database backups are gzipped binaries; decoding them as UTF-8 (as the legacy
+      // JSON path does) silently corrupts the file and yields an unrestorable download.
+      if (params.key.endsWith(DB_BACKUP_SUFFIX)) {
+        const bytes = await getBackupBytesFromS3(params.key);
+        return new Response(bytes, {
+          headers: {
+            "content-type": "application/gzip",
+            "content-disposition": `attachment; filename="${params.key}"`,
+          },
+        });
+      }
       const content = await getBackupFromS3(params.key);
       return new Response(content, {
         headers: {
@@ -3430,10 +3517,17 @@ const app = new Elysia({ adapter: node() })
     if (!user || !isAdmin(user.email))
       return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
 
+    // A backup does a full VACUUM INTO plus a gzip of the whole database; letting the
+    // button be pressed repeatedly burns I/O and churns S3 for no added safety.
+    const limited = await rateLimitGuard(`backup:${user.email}`, 3, 300_000);
+    if (limited) return limited;
+
     try {
-      const result = await runBackup();
+      const result = await runDbBackup();
       log("info", "backup", "Manual backup triggered by admin", { email: user.email, key: result.key });
-      return new Response(JSON.stringify({ ok: true, key: result.key, users: result.users }), { headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({
+        ok: true, key: result.key, users: result.users, tables: result.tables, gzipBytes: result.gzipBytes,
+      }), { headers: { "content-type": "application/json" } });
     } catch (err) {
       log("error", "backup", "Manual backup failed", { error: String(err) });
       return new Response(JSON.stringify({ error: "Backup falló" }), { status: 500, headers: { "content-type": "application/json" } });
@@ -3986,8 +4080,10 @@ cron.schedule("*/5 * * * *", async () => {
 
 cron.schedule("0 4 * * *", async () => {
   try {
-    const result = await runBackup();
-    log("info", "backup", "Daily backup completed", { users: result.users, key: result.key });
+    const result = await runDbBackup();
+    log("info", "backup", "Daily backup completed", {
+      key: result.key, users: result.users, tables: result.tables, gzipBytes: result.gzipBytes,
+    });
   } catch (err) {
     log("error", "backup", "Daily backup failed", { error: String(err) });
     await sendAlert("backup-failure", `Daily backup failed: ${String(err)}`);
@@ -3998,6 +4094,32 @@ const port = parseInt(process.env.PORT ?? "8000", 10);
 app.listen({ port, hostname: "0.0.0.0" }, () => {
   console.log(`MailMask running on port ${port}`);
 });
+
+// Graceful shutdown. Without these handlers the process ignored SIGINT/SIGTERM and Fly
+// waited out its kill timeout — roughly 6 seconds of the deploy downtime window was the
+// old machine refusing to die ("Virtual machine exited abruptly" in the logs).
+let shuttingDown = false;
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.on(signal, () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    log("info", "process", `Received ${signal}, shutting down`);
+    try {
+      // Elysia exposes stop() on the Node adapter, but guard in case the runtime differs.
+      (app as unknown as { stop?: () => void }).stop?.();
+    } catch (err) {
+      log("warn", "process", "Error stopping server", { error: String(err) });
+    }
+    try {
+      // Checkpoint the WAL so the next boot does not have to recover the journal.
+      sqlite.pragma("wal_checkpoint(TRUNCATE)");
+      sqlite.close();
+    } catch (err) {
+      log("warn", "process", "Error closing database", { error: String(err) });
+    }
+    process.exit(0);
+  });
+}
 
 process.on("uncaughtException", (err) => {
   log("error", "process", "Uncaught exception", { error: String(err) });

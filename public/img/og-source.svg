@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0a0b"/>
+      <stop offset="100%" stop-color="#18181b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <ellipse cx="250" cy="150" rx="520" ry="420" fill="url(#glow)"/>
+
+  <!-- Logo: same mask mark as favicon.svg, scaled 2.6x and centred at (150, 168) -->
+  <g transform="translate(150,168) scale(2.6) translate(-40,-38)">
+    <ellipse cx="40" cy="42" rx="28" ry="24" fill="#059669"/>
+    <ellipse cx="40" cy="38" rx="28" ry="22" fill="#10b981"/>
+    <ellipse cx="28" cy="36" rx="8" ry="6" fill="#18181b"/>
+    <ellipse cx="52" cy="36" rx="8" ry="6" fill="#18181b"/>
+    <ellipse cx="30" cy="34" rx="2" ry="1.5" fill="#fafafa" opacity="0.6"/>
+    <ellipse cx="50" cy="34" rx="2" ry="1.5" fill="#fafafa" opacity="0.6"/>
+    <path d="M40 18 L40 26" stroke="#facc15" stroke-width="2" stroke-linecap="round"/>
+    <path d="M36 19 L40 26 L44 19" stroke="#facc15" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M30 48 Q40 54 50 48" stroke="#065f46" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <text x="300" y="190" font-family="Helvetica, Arial, sans-serif" font-size="86" font-weight="bold" fill="#fafafa">MailMask</text>
+
+  <text x="100" y="330" font-family="Helvetica, Arial, sans-serif" font-size="50" font-weight="bold" fill="#fafafa">Email profesional en tu dominio</text>
+  <text x="100" y="400" font-family="Helvetica, Arial, sans-serif" font-size="34" fill="#a1a1aa">Máscaras de correo, reenvío, envío autenticado DKIM+SPF</text>
+  <text x="100" y="450" font-family="Helvetica, Arial, sans-serif" font-size="34" fill="#a1a1aa">y bandeja compartida. Sin servidores de correo.</text>
+
+  <rect x="100" y="510" width="330" height="62" rx="31" fill="#10b981"/>
+  <text x="265" y="551" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#0a0a0b" text-anchor="middle">Desde $49 MXN/mes</text>
+
+  <text x="1100" y="551" font-family="Helvetica, Arial, sans-serif" font-size="28" fill="#71717a" text-anchor="end">mailmask.studio</text>
+</svg>

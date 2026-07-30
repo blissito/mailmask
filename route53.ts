@@ -1,4 +1,5 @@
 import { log } from "./logger.js";
+import { AWS_REGION } from "./ses.js";
 
 // Lazy-loaded AWS SDK clients (same pattern as ses.ts)
 let _route53Domains: any;
@@ -133,7 +134,7 @@ export async function configureDnsRecords(
         Type: "MX",
         TTL: 300,
         ResourceRecords: [
-          { Value: `10 inbound-smtp.${process.env.AWS_SES_INBOUND_REGION ?? "us-east-1"}.amazonaws.com` },
+          { Value: `10 inbound-smtp.${AWS_REGION}.amazonaws.com` },
         ],
       },
     },
