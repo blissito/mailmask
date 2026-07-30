@@ -56,6 +56,7 @@ Override with env vars `S3_BUCKET` and `S3_BACKUP_BUCKET` respectively.
 - **Error responses**: Always JSON `{ error: "message" }` with appropriate status code
 - **Auth**: JWT in HttpOnly cookie named `token`, verified via `verifyJwt()` from `auth.ts`
 - **Plans**: Defined in `db.ts` as `PLANS` constant (basico, freelancer, developer; legacy: pro, agencia)
+- **Límites**: se cuentan **por dominio**, no por cuenta (`getSendCount()` y el rate limit de forwarding se llavean con `domainId`). Son dos distintos: `sends` (saliente que origina el usuario, por día) y `forwardPerHour` (reenvío de entrada, el caso de uso principal, un orden de magnitud mayor). Falta un tope mensual — ver `monthlyForwards` en el backlog, pendiente de revisitar.
 
 ## Billing
 - MercadoPago PreApproval API for subscriptions
@@ -133,7 +134,24 @@ Objetivo: solidificar el tronco del servicio. Blindar seguridad, rendimiento y r
 - [ ] **Guías de automatización con IA + aliases**: Blog posts y/o sección educativa enseñando a usuarios a automatizar workflows usando aliases específicos de MailMask + herramientas de IA. Ejemplos: alias dedicado para recibir notificaciones de n8n/Make/Zapier, alias como trigger de workflows AI, alias para clasificación automática de leads, alias temporal para campañas con análisis automático. Doble propósito: educar usuarios existentes y atraer audiencia técnica vía SEO. Investigar y documentar patrones concretos antes de escribir.
 
 ### Backlog (priorizado)
-1. [ ] **SES Tenants + aislamiento de reputación**: Implementar SES Tenants (feature de agosto 2025) para aislar reputación por dominio de cliente. 1 tenant por dominio, política Standard para Básico/Freelancer, Strict para Developer. Managed Dedicated IPs para tiers de pago (auto-scaling, sin warmup manual). EventBridge para recibir eventos de cambio de estado/reputación y pausar forwarding automáticamente. Evaluar VDM (Virtual Deliverability Manager) para dashboard de entregabilidad por config set. También agregar `monthlyForwards` a PLANS para limitar emails procesados por mes y proteger margen (hoy solo existe `forwardPerHour`).
+0. [ ] **`monthlyForwards` — tope mensual para proteger margen. ⚠️ REVISITAR PARA ENTENDERLO MEJOR ANTES DE IMPLEMENTAR.**
+
+   No implementar todavía. Primero hay que sentarse a entender el modelo de costo con números reales; lo de abajo es el planteamiento, no una decisión.
+
+   **El problema.** A AWS se le paga por correo procesado; al cliente se le cobra una cuota fija al mes. Hoy el único freno es `forwardPerHour` (100/500/2000 por dominio en `PLANS`, aplicado en `forwarding.ts:462` con `checkRateLimit`). Un límite por hora frena un pico pero no acota un total: 2,000/hora sostenidas son ~1.4M de correos al mes de un cliente que paga $999 MXN. El de por hora protege el sistema; falta el que protege el margen.
+
+   **La idea.** Agregar `monthlyForwards` a `PLANS` y contar por mes además de por hora. Ojo: los límites son **por dominio** (`getSendCount()` y el rate limit de forwarding se llavean con `domainId`), así que hay que decidir si el tope mensual es por dominio o por cuenta — no es lo mismo con 20 dominios.
+
+   **Lo que falta entender antes de tocar código:**
+   - Costo real por correo (SES inbound + S3 PUT + almacenamiento + SES outbound del reenvío). Hoy nadie lo tiene medido.
+   - Margen objetivo por plan, y con eso derivar el tope en vez de inventar un número redondo.
+   - Qué pasa al toparse: ¿se descarta el correo (se pierde correo del cliente, grave), se encola, se degrada, o se cobra excedente? Hoy `forwarding.ts` descarta y manda alerta.
+   - Cómo se avisa antes de llegar: sin aviso previo, un tope mensual es una sorpresa desagradable a mitad de mes.
+   - Interacción con el add-on de almacenamiento y con la retención por plan, que también están sin definir.
+
+   **No es urgente**: con el volumen actual nadie se acerca. Importa antes de tener volumen, porque el consumo que abusa llega antes de lo esperado. Relacionado: SES Tenants (abajo) y la estrategia de historial/almacenamiento.
+
+1. [ ] **SES Tenants + aislamiento de reputación**: Implementar SES Tenants (feature de agosto 2025) para aislar reputación por dominio de cliente. 1 tenant por dominio, política Standard para Básico/Freelancer, Strict para Developer. Managed Dedicated IPs para tiers de pago (auto-scaling, sin warmup manual). EventBridge para recibir eventos de cambio de estado/reputación y pausar forwarding automáticamente. Evaluar VDM (Virtual Deliverability Manager) para dashboard de entregabilidad por config set. Relacionado: **`monthlyForwards`** (ver abajo).
 - [x] ~~**SMTP relay**~~: Implementado. Credenciales SMTP para enviar desde código/SaaS (no clientes de correo). Solo plan Developer. IAM user por credencial con policy scoped al dominio.
 - [ ] **IMAP/POP (Dovecot)**: Integrar Dovecot open source (basado en ForwardEmail) para ofrecer servidor de entrada completo. Permitiría configurar clientes de correo (Apple Mail, Outlook, Thunderbird) con recepción + envío. Proyecto separado a futuro, no incluir en marketing actual.
 - [ ] Probar checkout autenticado con email diferente al collector de MP
