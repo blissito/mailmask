@@ -29,13 +29,23 @@ MailMask te permite recibir y gestionar emails con tu dominio propio. Configura 
 
 ## Planes
 
-Los límites son por plan. Precios en MXN.
+Precios en MXN. Máscaras, reglas, envíos y reenvío se cuentan **por dominio**, no por cuenta.
 
-| Plan | Mensual | Anual | Dominios | Máscaras | Reglas | Historial | Envíos/día | API | SMTP | Webhooks |
-|------|---------|-------|----------|----------|--------|-----------|------------|-----|------|----------|
-| Básico | $49 | $490 | 1 | 5 | — | 15 días | 10 | ✓ | — | — |
-| Freelancer | $449 | $4,490 | 15 | 50 | 10 | 30 días | 50 | ✓ | — | — |
-| Developer | $999 | $9,990 | 20 | 100 | 50 | 90 días | 200 | ✓ | ✓ | ✓ |
+|  | Básico | Freelancer | Developer |
+|---|---|---|---|
+| Mensual | $49 | $449 | $999 |
+| Anual | $490 | $4,490 | $9,990 |
+| Dominios | 1 | 15 | 20 |
+| Máscaras | 5 | 50 | 100 |
+| Reglas | — | 10 | 50 |
+| Historial | 15 días | 30 días | 90 días |
+| Envíos/día | 25 | 100 | 1,000 |
+| **Reenvío de entrada** | **100/hora** | **500/hora** | **2,000/hora** |
+| API + SDK | ✓ | ✓ | ✓ |
+| SMTP relay | — | — | ✓ |
+| Webhooks | — | — | ✓ |
+
+Son dos límites distintos. **Envíos** es el correo saliente que originas tú (panel, API, SMTP relay). **Reenvío de entrada** es el correo que llega a una máscara y sale al buzón destino — el caso de uso principal, medido por hora y un orden de magnitud mayor: ~2,400, ~12,000 y ~48,000 al día. Quien solo reenvía nunca toca el límite de envíos.
 
 Fuente de verdad: `PLANS` en [`db.ts`](db.ts).
 

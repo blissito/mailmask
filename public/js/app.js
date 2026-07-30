@@ -197,10 +197,17 @@ function renderStats() {
 
   const totalAliases = u.aliasesPerDomain.reduce((s, a) => s + a.current, 0);
   const totalForwards = domains.reduce((s, d) => s + (d.monthlyForwards ?? 0), 0);
+  const sendsToday = (u.sendsPerDomain ?? []).reduce((s, d) => s + d.current, 0);
+  const sendsLimit = currentUser?.limits?.sends ?? 0;
+  const fwdPerHour = currentUser?.limits?.forwardPerHour ?? 0;
 
+  // Los envíos son el límite chico y el que se agota; el reenvío de entrada es un orden
+  // de magnitud mayor y es lo que de verdad usa quien solo redirige correo. Se muestran
+  // juntos para que nadie confunda uno con el otro.
+  // 2 columnas en móvil y 4 desde sm: cuatro cifras de 3xl no caben en un teléfono.
   container.innerHTML = `
     <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5">
-      <div class="grid grid-cols-3 gap-6">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
         <div>
           <span class="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Dominios</span>
           <div class="text-3xl font-light text-zinc-100 mt-1">${u.domains.current}<span class="text-lg text-zinc-600">/${u.domains.limit}</span></div>
@@ -210,8 +217,14 @@ function renderStats() {
           <div class="text-3xl font-light text-zinc-100 mt-1">${totalAliases}</div>
         </div>
         <div>
-          <span class="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Forwards</span>
+          <span class="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Envíos hoy</span>
+          <div class="text-3xl font-light text-zinc-100 mt-1">${sendsToday.toLocaleString("es-MX")}<span class="text-lg text-zinc-600">/${sendsLimit.toLocaleString("es-MX")}</span></div>
+          <div class="text-[11px] text-zinc-600 mt-0.5">por dominio, al día</div>
+        </div>
+        <div>
+          <span class="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Reenvíos</span>
           <div class="text-3xl font-light text-zinc-100 mt-1">${totalForwards.toLocaleString("es-MX")}</div>
+          <div class="text-[11px] text-zinc-600 mt-0.5">límite ${fwdPerHour.toLocaleString("es-MX")}/hora por dominio</div>
         </div>
       </div>
     </div>`;

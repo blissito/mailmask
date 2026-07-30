@@ -67,16 +67,36 @@ function extractSections(html: string): { title: string; content: string }[] {
 const EXTRA_DOCS = [
   {
     title: "Planes y Precios de MailMask",
-    content: `MailMask ofrece 3 planes:
+    content: `MailMask ofrece 3 planes. Todos los precios están en pesos mexicanos (MXN),
+no en dólares. Ningún plan es gratuito y ningún límite es ilimitado.
 
-- Básico (gratis): 1 dominio, 5 aliases, forwarding básico, bandeja de entrada
-- Freelancer ($5 USD/mes): 3 dominios, 25 aliases, envío de emails, reglas avanzadas
-- Developer ($15 USD/mes): 10 dominios, aliases ilimitados, SMTP relay, API keys, SDK access, soporte prioritario
+- Básico — $49 MXN/mes o $490 MXN/año: 1 dominio, 5 máscaras (alias), sin reglas,
+  historial de 15 días, 25 envíos/día, reenvío de entrada 100/hora.
+- Freelancer — $449 MXN/mes o $4,490 MXN/año: 15 dominios, 50 máscaras por dominio,
+  10 reglas por dominio, historial de 30 días, 100 envíos/día por dominio,
+  reenvío de entrada 500/hora por dominio, 3 miembros de equipo por dominio.
+- Developer — $999 MXN/mes o $9,990 MXN/año: 20 dominios, 100 máscaras por dominio,
+  50 reglas por dominio, historial de 90 días, 1,000 envíos/día por dominio,
+  reenvío de entrada 2,000/hora por dominio, 10 miembros por dominio, SMTP relay,
+  webhooks y soporte prioritario.
+
+Importante sobre los límites: se cuentan **por dominio**, no por cuenta. Un plan
+Freelancer con 15 dominios dispone de 15 x 100 = 1,500 envíos al día en total.
+
+Hay dos límites distintos y conviene no confundirlos:
+- Envíos ("sends"): correo saliente que el usuario origina desde el panel, la API o el
+  SMTP relay. Es el límite diario por dominio.
+- Reenvío de entrada ("forwarding"): el correo que llega a una máscara y se reenvía al
+  buzón destino. Es el caso de uso principal, se mide por hora y es un orden de magnitud
+  mayor (100/500/2,000 por hora, o sea unos 2,400/12,000/48,000 al día). Quien solo usa
+  MailMask para reenviar nunca toca el límite de envíos.
+
+Todos los planes incluyen API, bandeja compartida y DKIM + SPF automáticos.
 
 Los planes legacy (Pro y Agencia) ya no están disponibles para nuevos usuarios.
 
-SMTP relay solo está disponible en plan Developer.
-API keys y acceso al SDK requieren plan Developer o superior.
+SMTP relay y webhooks solo están disponibles en plan Developer.
+Las API keys y el SDK están habilitados en todos los planes, incluido Básico.
 El paquete npm del SDK es @easybits.cloud/mailmask.
 El dominio del servicio es mailmask.studio.`,
   },

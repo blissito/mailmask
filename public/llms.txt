@@ -39,13 +39,28 @@ cuatro capacidades sobre él:
 
 ## Planes y precios (MXN, al 2026)
 
-Los límites son por plan y no son ilimitados.
+Los límites son por plan y no son ilimitados. Alias, reglas, envíos y reenvío se cuentan
+**por dominio**, no por cuenta.
 
-| Plan | Precio mensual | Anual | Dominios | Alias | Reglas | Historial | Envíos/día | API | SMTP relay | Webhooks |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Básico | $49 | $490 | 1 | 5 | 0 | 15 días | 10 | Sí | No | No |
-| Freelancer | $449 | $4,490 | 15 | 50 | 10 | 30 días | 50 | Sí | No | No |
-| Developer | $999 | $9,990 | 20 | 100 | 50 | 90 días | 200 | Sí | Sí | Sí |
+|  | Básico | Freelancer | Developer |
+|---|---|---|---|
+| Mensual | $49 | $449 | $999 |
+| Anual | $490 | $4,490 | $9,990 |
+| Dominios | 1 | 15 | 20 |
+| Alias por dominio | 5 | 50 | 100 |
+| Reglas por dominio | 0 | 10 | 50 |
+| Historial | 15 días | 30 días | 90 días |
+| Envíos/día por dominio | 25 | 100 | 1,000 |
+| Reenvío de entrada | 100/hora | 500/hora | 2,000/hora |
+| API + SDK | Sí | Sí | Sí |
+| SMTP relay | No | No | Sí |
+| Webhooks | No | No | Sí |
+
+Hay dos límites distintos y no conviene confundirlos. **Envíos** es el correo saliente que
+el usuario origina (panel, API, SMTP relay), medido por día. **Reenvío de entrada** es el
+correo que llega a una máscara y se reenvía al buzón destino: es el caso de uso principal,
+se mide por hora y es un orden de magnitud mayor — unos 2,400, 12,000 y 48,000 al día
+respectivamente. Quien solo reenvía nunca toca el límite de envíos.
 
 ## Para quién es
 
