@@ -267,6 +267,15 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
       status: "open", // Re-open on new inbound message
       threadReferences: newRefs,
     });
+    // Visibilidad del threading: sin esto no hay forma de saber, viendo los logs, si un
+    // correo entrante enganchó en su hilo o abrió uno nuevo por error.
+    log("info", "mesa", "Inbound threaded into existing conversation", {
+      conversationId: conv.id,
+      domainId,
+      from,
+      refsInEmail: references.length,
+      matchedRef: references.find((r) => conv!.threadReferences.includes(r)) ?? null,
+    });
     return { conversationId: conv.id, isNew: false };
   } else {
     // Create new conversation — include messageIdHeader so replies can thread
@@ -293,6 +302,16 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
       direction: "inbound",
       createdAt: new Date().toISOString(),
       messageId: messageIdHeader,
+    });
+    log("info", "mesa", "Inbound created new conversation", {
+      conversationId: conv.id,
+      domainId,
+      from,
+      subject,
+      // Si esto trae refs pero igual se creó una conversación nueva, el threading falló:
+      // el correo citaba un Message-ID que no está en ningún thread_refs guardado.
+      refsInEmail: references.length,
+      unmatchedRefs: references.length > 0 ? references : undefined,
     });
     return { conversationId: conv.id, isNew: true };
   }

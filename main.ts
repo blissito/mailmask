@@ -3162,6 +3162,19 @@ const app = new Elysia({ adapter: node() })
         messageId,
       });
 
+      // El messageId queda en el log a propósito: es la referencia que debe aparecer en
+      // el In-Reply-To de la respuesta del contacto. Sirve para comprobar el threading
+      // cruzando este log con el de "Inbound threaded into existing conversation".
+      log("info", "mesa", "Compose sent", {
+        conversationId: conv.id,
+        domainId: domain.id,
+        from: fromAddress,
+        to: recipient,
+        messageId,
+        sendsUsed: reserved,
+        sendsLimit: limits.sends,
+      });
+
       return new Response(JSON.stringify({ ok: true, conversationId: conv.id, messageId }), {
         status: 201,
         headers: { "content-type": "application/json" },
@@ -3932,11 +3945,23 @@ const app = new Elysia({ adapter: node() })
     const domainsWithAliases = [];
     for (const d of domains) {
       const aliasCount = await countAliases(d.id);
-      domainsWithAliases.push({ id: d.id, domain: d.domain, verified: d.verified, aliasCount });
+      // Envíos de hoy por dominio: es lo que permite confirmar que un envío real se contó.
+      domainsWithAliases.push({
+        id: d.id,
+        domain: d.domain,
+        verified: d.verified,
+        aliasCount,
+        sendsToday: await getSendCount(d.id),
+      });
     }
 
     const { passwordHash: _, ...safe } = target;
-    return new Response(JSON.stringify({ ...safe, domains: domainsWithAliases }), { headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({
+      ...safe,
+      domains: domainsWithAliases,
+      limits: getUserPlanLimits(target),
+      addons: listAddons(target.email),
+    }), { headers: { "content-type": "application/json" } });
   }, {
     detail: { tags: ["Admin"], summary: "Get user details by email", security: [{ cookieAuth: [] }] },
   })
