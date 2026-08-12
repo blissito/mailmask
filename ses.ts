@@ -384,10 +384,29 @@ function stripHeaderInjection(value: string): string {
 export function encodeHeader(value: string): string {
   const clean = stripHeaderInjection(value);
   if (!clean) return "";
-  if (/^=\?[^?]+\?[BQbq]\?/.test(clean)) return clean;
+  // Solo se deja pasar si TODO el valor son encoded-words. Con un prefijo bastaba para
+  // colar bytes crudos en la cola ("=?UTF-8?Q?Pedido?= confirmado señor").
+  if (/^(=\?[^?]+\?[BQbq]\?[^?]*\?=)(\s+=\?[^?]+\?[BQbq]\?[^?]*\?=)*$/.test(clean)) return clean;
   // deno-lint-ignore no-control-regex
   if (!/[^\x00-\x7F]/.test(clean)) return clean;
-  return `=?UTF-8?B?${Buffer.from(clean, "utf8").toString("base64")}?=`;
+
+  // RFC 2047 topa cada encoded-word en 75 caracteres, así que se parte en varios
+  // plegados con CRLF+espacio. Un solo encoded-word largo podía superar el límite de
+  // 998 caracteres por línea y hacer que SES rechazara el mensaje entero.
+  const words: string[] = [];
+  let chunk = "";
+  for (const ch of clean) {
+    const candidate = chunk + ch;
+    // 45 bytes → 60 chars de base64, más el envoltorio =?UTF-8?B?...?= cabe en 75.
+    if (Buffer.byteLength(candidate, "utf8") > 45) {
+      words.push(`=?UTF-8?B?${Buffer.from(chunk, "utf8").toString("base64")}?=`);
+      chunk = ch;
+    } else {
+      chunk = candidate;
+    }
+  }
+  if (chunk) words.push(`=?UTF-8?B?${Buffer.from(chunk, "utf8").toString("base64")}?=`);
+  return words.join("\r\n ");
 }
 
 // "Nombre <a@b.com>" → "a@b.com". Las conversaciones reconstruidas desde S3 guardan el
@@ -402,12 +421,15 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
 
+  // El header From conserva el display name si viene ("MailMask <alertas@...>"); el
+  // sobre de SES necesita la dirección pelada.
   const fromAddr = normalizeAddress(from);
   const toAddr = normalizeAddress(to);
+  const fromHeader = /<[^>]+>/.test(from) ? stripHeaderInjection(from) : fromAddr;
   const messageId = `<${crypto.randomUUID()}@${fromAddr.split("@")[1] ?? "mailmask.studio"}>`;
   const boundary = `----=_Part_${Date.now()}`;
   const headers = [
-    `From: ${fromAddr}`,
+    `From: ${fromHeader}`,
     `To: ${toAddr}`,
     `Subject: ${encodeHeader(subject)}`,
     `Message-ID: ${messageId}`,

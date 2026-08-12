@@ -159,3 +159,20 @@ describe("Add-ons: aislamiento del webhook", () => {
     assert.equal(ADDONS.sends25.price, PLANS.basico.price);
   });
 });
+
+// La lista de supresión se llavea en minúsculas al escribir y al leer: SES entrega los
+// bounces con las mayúsculas originales y SQLite compara sensible a mayúsculas.
+describe("Supresión: matching insensible a mayúsculas", () => {
+  it("un email guardado con mayúsculas se detecta en minúsculas", async () => {
+    const { addSuppression, isSuppressed, createDomain, createUser } = await import("./db.ts");
+    const email = `supp-${crypto.randomUUID()}@test.com`;
+    createUser(email, "x");
+    const dom = createDomain(email, `supp-${Date.now()}.com`, ["dk"], "vf");
+
+    addSuppression(dom.id, "Cliente.VIP@Empresa.com", "bounce:Permanent");
+    assert.equal(isSuppressed(dom.id, "cliente.vip@empresa.com"), true);
+    assert.equal(isSuppressed(dom.id, "Cliente.VIP@Empresa.com"), true);
+    assert.equal(isSuppressed(dom.id, "  CLIENTE.VIP@EMPRESA.COM  "), true);
+    assert.equal(isSuppressed(dom.id, "otro@empresa.com"), false);
+  });
+});

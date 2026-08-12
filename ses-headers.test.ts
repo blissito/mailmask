@@ -72,3 +72,35 @@ describe("normalizeAddress", () => {
     assert.equal(normalizeAddress("  brenda@example.com  "), "brenda@example.com");
   });
 });
+
+describe("encodeHeader — asuntos largos y passthrough", () => {
+  it("parte un asunto largo en varios encoded-words plegados", () => {
+    const long = "Cotización " + "á".repeat(300);
+    const out = encodeHeader(long);
+    for (const line of out.split("\r\n")) {
+      // RFC 5322 topa la línea en 998; cada encoded-word en 75.
+      assert.ok(line.trim().length <= 78, `línea de ${line.trim().length} chars: ${line.slice(0, 40)}`);
+    }
+    // El plegado usa CRLF + espacio, que es continuación válida, no inyección.
+    for (const cont of out.split("\r\n").slice(1)) {
+      assert.ok(cont.startsWith(" "), "cada continuación debe empezar con espacio");
+    }
+    const decoded = out.split(/\r\n\s+/)
+      .map((w) => Buffer.from(w.slice("=?UTF-8?B?".length, -2), "base64").toString("utf8"))
+      .join("");
+    assert.equal(decoded, long, "debe poder reconstruirse igual");
+  });
+
+  it("no deja pasar bytes crudos pegados a un encoded-word", () => {
+    // Antes bastaba con que el valor EMPEZARA con =? para devolverlo tal cual.
+    const mixed = "=?UTF-8?Q?Pedido?= confirmado señor";
+    const out = encodeHeader(mixed);
+    // deno-lint-ignore no-control-regex
+    assert.ok(!/[^\x00-\x7F]/.test(out), "no deben quedar bytes no-ASCII en el header");
+  });
+
+  it("sí deja pasar una cadena que es toda encoded-words", () => {
+    const already = "=?UTF-8?B?Q290aXphY2nDs24=?= =?UTF-8?B?Q290aXphY2nDs24=?=";
+    assert.equal(encodeHeader(already), already);
+  });
+});

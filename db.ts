@@ -1114,23 +1114,38 @@ export function countAgents(domainId: string): number {
 
 // --- Suppression list ---
 
+// La lista de supresión se llavea en minúsculas de forma consistente al escribir y al
+// leer. SES entrega los bounces con las mayúsculas originales y la comparación de SQLite
+// es sensible a mayúsculas, así que sin esto un "Cliente.VIP@Empresa.com" que rebotó
+// duro nunca volvería a matchear y le seguiríamos escribiendo.
 export function addSuppression(domainId: string, email: string, reason: string): void {
-  db.insert(suppressions).values({ domainId, email, reason })
+  const key = email.trim().toLowerCase();
+  db.insert(suppressions).values({ domainId, email: key, reason })
     .onConflictDoUpdate({ target: [suppressions.domainId, suppressions.email], set: { reason } })
     .run();
 }
 
 export function isSuppressed(domainId: string, email: string): boolean {
+  const key = email.trim().toLowerCase();
   const rows = db.select().from(suppressions)
-    .where(and(eq(suppressions.domainId, domainId), eq(suppressions.email, email)))
+    .where(and(eq(suppressions.domainId, domainId), eq(suppressions.email, key)))
     .all();
   return rows.length > 0;
 }
 
 export function removeSuppression(domainId: string, email: string): void {
   db.delete(suppressions)
-    .where(and(eq(suppressions.domainId, domainId), eq(suppressions.email, email)))
+    .where(and(eq(suppressions.domainId, domainId), eq(suppressions.email, email.trim().toLowerCase())))
     .run();
+}
+
+// Normaliza a minúsculas las filas escritas antes de que la clave fuera consistente.
+export function normalizeSuppressionKeys(): number {
+  const res = db.update(suppressions)
+    .set({ email: rawSql`LOWER(TRIM(${suppressions.email}))` })
+    .where(rawSql`${suppressions.email} <> LOWER(TRIM(${suppressions.email}))`)
+    .run();
+  return res.changes ?? 0;
 }
 
 // --- Send counter (monthly) ---

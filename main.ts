@@ -76,6 +76,7 @@ import {
   deleteAgentInvite,
   addSuppression,
   isSuppressed,
+  normalizeSuppressionKeys,
   incrementSendCount,
   decrementSendCount,
   getSendCount,
@@ -2570,6 +2571,15 @@ const app = new Elysia({ adapter: node() })
       if (existing) {
         return new Response(JSON.stringify({ error: "Ya tienes un add-on de envíos activo. Cancélalo antes de cambiarlo." }), { status: 409 });
       }
+      // Los `pending` también bloquean: sin esto, dos pestañas o un F5 en el paso de
+      // MercadoPago crean dos suscripciones y se le cobra dos veces por un beneficio
+      // que de todos modos no se acumula.
+      const pending = listAddons(auth.email).find((a) =>
+        a.kind.startsWith("sends") && a.status === "pending" &&
+        Date.now() - new Date(a.createdAt).getTime() < 30 * 60_000);
+      if (pending) {
+        return new Response(JSON.stringify({ error: "Ya tienes una compra de envíos en curso. Termínala o espera unos minutos." }), { status: 409 });
+      }
     }
 
     const mpAccessToken = process.env.MP_ACCESS_TOKEN;
@@ -2731,12 +2741,23 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Destinatario en lista de supresión (bounce/complaint previo)" }), { status: 422 });
     }
 
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(recipient)) {
+      return new Response(JSON.stringify({ error: "Destinatario inválido" }), { status: 400 });
+    }
+
     // El remitente debe ser un alias real del dominio: sin esto se puede enviar como
-    // cualquier dirección del dominio propio.
-    const sendAliases = await listAliases(domain.id);
-    const fromLocalPart = String(fromLocal ?? "noreply").split("@")[0].toLowerCase();
-    if (fromLocal && !sendAliases.some((a) => a.alias.toLowerCase() === fromLocalPart && a.enabled && a.alias !== "*")) {
-      return new Response(JSON.stringify({ error: "El remitente debe ser un alias activo de tu dominio" }), { status: 400 });
+    // cualquier dirección del dominio propio. Se compara y se usa el local-part ya
+    // saneado, no el valor crudo — "ventas@evil.com" produciría un From inválido.
+    let fromLocalPart = "noreply";
+    if (fromLocal !== undefined && fromLocal !== null) {
+      const candidate = String(fromLocal).split("@")[0].trim().toLowerCase();
+      const sendAliases = await listAliases(domain.id);
+      const hit = sendAliases.find((a) => a.alias.toLowerCase() === candidate && a.enabled && a.alias !== "*");
+      if (!hit) {
+        return new Response(JSON.stringify({ error: "El remitente debe ser un alias activo de tu dominio" }), { status: 400 });
+      }
+      fromLocalPart = hit.alias;
     }
 
     // Reservar antes de enviar: chequear y luego incrementar deja pasar dos peticiones
@@ -2747,7 +2768,7 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: `Límite diario de envíos alcanzado (${limits.sends})` }), { status: 429 });
     }
 
-    const fromAddress = `${fromLocal ?? "noreply"}@${domain.domain}`;
+    const fromAddress = `${fromLocalPart}@${domain.domain}`;
     try {
       const messageId = await sendFromDomain(fromAddress, recipient, subject, (textBody ?? html)!, {
         html,
@@ -2819,7 +2840,20 @@ const app = new Elysia({ adapter: node() })
       }), { status: 429, headers: { "content-type": "application/json" } });
     }
 
-    const fromAddress = `${fromLocal ?? "noreply"}@${domain.domain}`;
+    // Mismo saneamiento que en el envío unitario: el local-part sale del alias
+    // encontrado, no del valor crudo del body.
+    let bulkFromLocal = "noreply";
+    if (fromLocal !== undefined && fromLocal !== null) {
+      const candidate = String(fromLocal).split("@")[0].trim().toLowerCase();
+      const bulkAliases = await listAliases(domain.id);
+      const hit = bulkAliases.find((a) => a.alias.toLowerCase() === candidate && a.enabled && a.alias !== "*");
+      if (!hit) {
+        return new Response(JSON.stringify({ error: "El remitente debe ser un alias activo de tu dominio" }), { status: 400 });
+      }
+      bulkFromLocal = hit.alias;
+    }
+
+    const fromAddress = `${bulkFromLocal}@${domain.domain}`;
     const job = await createBulkJob({
       domainId: domain.id,
       recipients,
@@ -3122,9 +3156,11 @@ const app = new Elysia({ adapter: node() })
     const fromAddress = `${match.alias}@${domain.domain}`;
     let messageId: string;
     try {
-      // Sin inReplyTo/references: es el primer mensaje del hilo. El Message-ID que
-      // devuelve SES es lo que guardamos en threadReferences para que la respuesta
-      // del contacto reenganche en esta misma conversación.
+      // Sin inReplyTo/references: es el primer mensaje del hilo. El Message-ID lo genera
+      // sendFromDomain y se guarda en threadReferences para que la respuesta del contacto
+      // reenganche aquí. Ojo: SES puede reescribir ese header en SendRawEmail — si lo
+      // hace, el hilo no reengancha. El log "Inbound created new conversation" con
+      // unmatchedRefs lo delata en producción.
       messageId = await sendFromDomain(fromAddress, recipient, String(subject), (textBody ?? html)!, {
         html,
         configSet: getConfigSetName(domain.domain),
@@ -3162,9 +3198,9 @@ const app = new Elysia({ adapter: node() })
         messageId,
       });
 
-      // El messageId queda en el log a propósito: es la referencia que debe aparecer en
-      // el In-Reply-To de la respuesta del contacto. Sirve para comprobar el threading
-      // cruzando este log con el de "Inbound threaded into existing conversation".
+      // El messageId queda en el log a propósito: es la referencia que debería aparecer
+      // en el In-Reply-To de la respuesta. Cruzar este log con el de
+      // "Inbound threaded into existing conversation" confirma (o desmiente) el threading.
       log("info", "mesa", "Compose sent", {
         conversationId: conv.id,
         domainId: domain.id,
@@ -4420,6 +4456,19 @@ cron.schedule("* * * * *", async () => {
     const jobOwner = jobDomain ? await getUser(jobDomain.ownerEmail) : null;
     const jobLimit = jobOwner ? getUserPlanLimits(jobOwner).sends : 0;
 
+    // Sin cuota el job no puede avanzar nunca: hay que fallarlo, no dejarlo latiendo.
+    // Pasa si el dominio se borró, si el dueño ya no existe, o si la suscripción venció
+    // o se canceló mientras el job estaba a medias. Con `break` a secas quedaba en
+    // processing y listPendingBulkJobs lo recogía cada minuto durante 7 días.
+    if (jobLimit === 0) {
+      job.status = "failed";
+      job.lastError = "El plan del dominio ya no permite envíos";
+      job.completedAt = new Date().toISOString();
+      await updateBulkJob(job);
+      log("warn", "ses", "Bulk job failed: no send quota available", { jobId: job.id, domainId: job.domainId });
+      continue;
+    }
+
     for (const recipient of batch) {
       // Check suppression
       if (await isSuppressed(job.domainId, recipient)) {
@@ -4532,6 +4581,11 @@ process.on("unhandledRejection", (err) => {
   try {
     const repaired = await repairReceiptRules();
     if (repaired > 0) log("info", "startup", `Repaired ${repaired} receipt rule(s) with missing TopicArn`);
+
+    // Las filas escritas antes de que la clave de supresión fuera consistente quedaron
+    // con las mayúsculas de SES y ya no matcheaban. Idempotente.
+    const normalized = normalizeSuppressionKeys();
+    if (normalized > 0) log("info", "startup", `Normalized ${normalized} suppression key(s) to lowercase`);
 
     const appUrl = process.env.APP_URL ?? "https://mailmask.studio";
     const subStatus = await ensureSnsSubscription(appUrl);

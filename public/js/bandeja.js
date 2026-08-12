@@ -676,6 +676,13 @@ function setupKeyboard() {
 
     if (isTyping) return;
 
+    // Con el modal abierto, el foco puede estar en el body (por ejemplo tras hacer click
+    // en el título). Sin esto, teclear una "c" mientras se escribe reabriría el modal y
+    // borraría el borrador.
+    const composeOpen = !document.getElementById("modal-compose")?.classList.contains("hidden");
+    const assignOpen = !document.getElementById("modal-assign")?.classList.contains("hidden");
+    if (composeOpen || assignOpen) return;
+
     if (e.key === "j") {
       e.preventDefault();
       const filtered = getFilteredConversations();
