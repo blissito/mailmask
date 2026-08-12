@@ -2,8 +2,8 @@ import cron from "node-cron";
 import { sendFromDomain, deleteEmailFromS3 } from "./ses.js";
 import { log } from "./logger.js";
 import { db } from "./pg.js";
-import { tokens, emailLogs, forwardQueue, rateLimits, sendCounts, bulkJobs, users } from "./schema.js";
-import { lte, and, inArray, isNotNull, gt, sql as rawSql } from "drizzle-orm";
+import { tokens, emailLogs, forwardQueue, rateLimits, sendCounts, bulkJobs, users, addons } from "./schema.js";
+import { lte, and, eq, inArray, isNotNull, gt, sql as rawSql } from "drizzle-orm";
 import { purgeDeletedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, createDomain } from "./db.js";
 
 // Daily at 14:00 UTC — warn users whose subscription expires within 3 days
@@ -81,6 +81,14 @@ cron.schedule("*/15 * * * *", async () => {
     ]);
     const total = results.reduce((sum, r) => sum + (r.changes ?? 0), 0);
     if (total > 0) log("info", "cron", "Cleaned expired rows", { count: total });
+
+    // Add-ons abandonados en el checkout de MP. No se borran (queda el rastro de intento),
+    // solo se marcan para que no bloqueen una compra nueva del mismo tipo.
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const stale = await db.update(addons)
+      .set({ status: "expired" })
+      .where(and(eq(addons.status, "pending"), lte(addons.createdAt, dayAgo)));
+    if ((stale.changes ?? 0) > 0) log("info", "cron", "Expired abandoned add-ons", { count: stale.changes });
   } catch (err) {
     log("error", "cron", "Cleanup failed", { error: String(err) });
   }

@@ -22,6 +22,7 @@ import {
   referralClicks,
   domainRegistrations,
   apiKeys,
+  addons,
 } from "./schema.js";
 
 export { db };
@@ -104,12 +105,37 @@ export interface EmailLog {
 // El reenvío entrante — el caso de uso principal — va por `forwardPerHour` y es un orden
 // de magnitud mayor, así que el límite de envíos no lo toca quien solo reenvía.
 export const PLANS = {
-  basico:     { price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 15, sends: 25,    api: true,  webhooks: false, forwardPerHour: 100,  smtpRelay: false },
-  freelancer: { price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 100,   api: true,  webhooks: false, forwardPerHour: 500,  smtpRelay: false },
+  basico:     { price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 15, sends: 0,     api: true,  webhooks: false, forwardPerHour: 100,  smtpRelay: false },
+  freelancer: { price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 200,   api: true,  webhooks: false, forwardPerHour: 500,  smtpRelay: false },
   developer:  { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 1000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
   pro:     { price: 299_00, yearlyPrice: 2990_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500,  smtpRelay: true },
   agencia: { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
 } as const;
+
+// --- Add-ons ---
+
+// Se compran encima del plan base. El de envíos se compra una vez y desbloquea el envío
+// en todos los dominios del usuario; el tope sigue aplicando por dominio y por día,
+// que es como ya se llavea sendCounts. El de dominio es cupo acumulable y no incluye envíos.
+export const ADDONS = {
+  sends25:  { price: 49_00, sends: 25,  label: "Envíos 25/día" },
+  sends100: { price: 99_00, sends: 100, label: "Envíos 100/día" },
+  domain:   { price: 99_00, domains: 1, label: "Dominio extra" },
+} as const;
+
+export type AddonKind = keyof typeof ADDONS;
+
+export interface Addon {
+  id: string;
+  userEmail: string;
+  kind: AddonKind;
+  status: "pending" | "active" | "cancelled" | "expired";
+  mpPreapprovalId?: string;
+  priceCents: number;
+  currentPeriodEnd?: string;
+  createdAt: string;
+  cancelledAt?: string;
+}
 
 // --- Row → interface mappers ---
 
@@ -544,16 +570,86 @@ export function updateUserSubscription(email: string, sub: Subscription): User |
   return rows.length ? rowToUser(rows[0]) : null;
 }
 
-export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; api: boolean; webhooks: boolean; forwardPerHour: number; smtpRelay: boolean } {
+function rowToAddon(r: typeof addons.$inferSelect): Addon {
+  return {
+    id: r.id,
+    userEmail: r.userEmail,
+    kind: r.kind as AddonKind,
+    status: r.status as Addon["status"],
+    mpPreapprovalId: r.mpPreapprovalId ?? undefined,
+    priceCents: r.priceCents,
+    currentPeriodEnd: r.currentPeriodEnd ?? undefined,
+    createdAt: r.createdAt,
+    cancelledAt: r.cancelledAt ?? undefined,
+  };
+}
+
+export function listAddons(email: string): Addon[] {
+  return db.select().from(addons).where(eq(addons.userEmail, email)).all().map(rowToAddon);
+}
+
+// Add-ons que otorgan cupo ahora mismo: los activos, más los cancelados que aún no
+// terminan su periodo pagado (mismo trato de gracia que la suscripción base).
+export function listEffectiveAddons(email: string): Addon[] {
+  const now = new Date();
+  return listAddons(email).filter((a) => {
+    if (a.status === "active") return true;
+    if (a.status === "cancelled" && a.currentPeriodEnd) return new Date(a.currentPeriodEnd) >= now;
+    return false;
+  });
+}
+
+export function getAddonById(id: string): Addon | null {
+  const r = db.select().from(addons).where(eq(addons.id, id)).get();
+  return r ? rowToAddon(r) : null;
+}
+
+export function getAddonByMpId(mpPreapprovalId: string): Addon | null {
+  const r = db.select().from(addons).where(eq(addons.mpPreapprovalId, mpPreapprovalId)).get();
+  return r ? rowToAddon(r) : null;
+}
+
+export function createAddon(userEmail: string, kind: AddonKind): Addon {
+  const r = db.insert(addons).values({
+    userEmail,
+    kind,
+    status: "pending",
+    priceCents: ADDONS[kind].price,
+  }).returning().get();
+  return rowToAddon(r);
+}
+
+export function updateAddon(id: string, patch: Partial<Pick<Addon, "status" | "mpPreapprovalId" | "currentPeriodEnd" | "cancelledAt">>): void {
+  db.update(addons).set(patch).where(eq(addons.id, id)).run();
+}
+
+export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; sendsUnlocked: boolean; api: boolean; webhooks: boolean; forwardPerHour: number; smtpRelay: boolean } {
   const sub = user.subscription;
   if (sub && (sub.status === "active" || sub.status === "cancelled")) {
     if (sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) < new Date()) {
-      return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false };
+      return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, sendsUnlocked: false, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false };
     }
     const plan = PLANS[sub.plan];
-    return { domains: plan.domains, aliases: plan.aliases, rules: plan.rules, logDays: plan.logDays, sends: plan.sends, api: plan.api, webhooks: plan.webhooks, forwardPerHour: plan.forwardPerHour, smtpRelay: plan.smtpRelay };
+    const active = listEffectiveAddons(user.email);
+    // sends100 gana sobre sends25 si por alguna razón hay ambos.
+    const sendsAddon = active.find((a) => a.kind === "sends100") ?? active.find((a) => a.kind === "sends25");
+    const extraDomains = active.filter((a) => a.kind === "domain").length;
+    // Math.max para que un add-on viejo de 25 no *reduzca* los envíos de un plan mayor.
+    const sends = sendsAddon ? Math.max(plan.sends, (ADDONS[sendsAddon.kind] as { sends: number }).sends) : plan.sends;
+    return {
+      domains: plan.domains + extraDomains,
+      aliases: plan.aliases,
+      rules: plan.rules,
+      logDays: plan.logDays,
+      sends,
+      sendsUnlocked: sub.plan !== "basico" || !!sendsAddon,
+      api: plan.api,
+      webhooks: plan.webhooks,
+      forwardPerHour: plan.forwardPerHour,
+      smtpRelay: plan.smtpRelay,
+    };
   }
-  return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false };
+  return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, sendsUnlocked: false, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false };
 }
 
 // --- Pending checkout (guest flow) ---

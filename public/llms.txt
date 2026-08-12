@@ -50,11 +50,23 @@ Los límites son por plan y no son ilimitados. Alias, reglas, envíos y reenvío
 | Alias por dominio | 5 | 50 | 100 |
 | Reglas por dominio | 0 | 10 | 50 |
 | Historial | 15 días | 30 días | 90 días |
-| Envíos/día por dominio | 25 | 100 | 1,000 |
+| Envíos/día por dominio | — (add-on) | 200 | 1,000 |
 | Reenvío de entrada | 100/hora | 500/hora | 2,000/hora |
 | API + SDK | Sí | Sí | Sí |
 | SMTP relay | No | No | Sí |
 | Webhooks | No | No | Sí |
+
+Add-ons, comprables encima de cualquier plan activo y cobrados aparte mes a mes:
+
+| Add-on | Precio | Qué hace |
+|---|---|---|
+| Envíos 25/día | +$49 | Desbloquea el envío desde tu dominio, tope 25/día por dominio |
+| Envíos 100/día | +$99 | Igual, tope 100/día por dominio |
+| Dominio extra | +$99 c/u | Un dominio más de cupo, acumulable. No incluye envío |
+
+Los dos de envíos son mutuamente excluyentes; se compran una vez y aplican a todos los
+dominios de la cuenta. El plan Básico no envía correo nuevo si no tiene uno de estos
+add-ons: sí puede responder conversaciones desde la Bandeja, que viene incluida.
 
 Hay dos límites distintos y no conviene confundirlos. **Envíos** es el correo saliente que
 el usuario origina (panel, API, SMTP relay), medido por día. **Reenvío de entrada** es el

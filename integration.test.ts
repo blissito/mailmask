@@ -5,9 +5,10 @@ import { app } from "./main.ts";
 import {
   createUser, getUser, createDomain, createAlias, createRule,
   listUserDomains, listAliases, listRules, updateUserSubscription,
-  createPendingCheckout,
+  createPendingCheckout, createAddon, getAddonById,
 } from "./db.ts";
 import { hashPassword, signJwt, generateCsrfToken } from "./auth.ts";
+import { sqlite } from "./pg.ts";
 
 // Unique fake IP per test run to avoid rate limiter collisions
 let ipCounter = 0;
@@ -63,6 +64,13 @@ const suffix = Date.now();
 // --- Auth flow ---
 
 describe("Auth", () => {
+  // Los rate limits viven en la DB y sobreviven entre corridas. Se limpian aquí para que
+  // la suite no dependa del historial acumulado en data/test.db, que hacía fallar estos
+  // tests de forma intermitente con corridas seguidas.
+  before(() => {
+    sqlite.prepare("DELETE FROM rate_limits").run();
+  });
+
   it("POST /api/auth/register — 201 + sets cookie", async () => {
     const res = await jsonPost("/api/auth/register", {
       email: `test-reg-${suffix}@example.com`,
@@ -187,6 +195,78 @@ describe("Domains", () => {
 
     const res = await jsonPost("/api/domains", { domain: "test.com" }, cookie!, csrfToken);
     assert.equal(res.status, 402);
+    await res.body?.cancel();
+  });
+});
+
+// --- Add-ons: gate de envío y endpoints ---
+
+describe("Add-ons API", () => {
+  const email = `addon-api-${suffix}@example.com`;
+  let cookie: string | undefined;
+  let csrfToken: string | undefined;
+  let domainId = "";
+
+  before(async () => {
+    sqlite.prepare("DELETE FROM rate_limits").run();
+    createUser(email, await hashPassword("password123"));
+    await updateUserSubscription(email, {
+      plan: "basico",
+      status: "active",
+      mpSubscriptionId: `sub-addon-api-${suffix}`,
+      currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString(),
+    });
+    const loginRes = await jsonPost("/api/auth/login", { email, password: "password123" });
+    ({ cookie, csrfToken } = extractCookies(loginRes));
+    await loginRes.body?.cancel();
+
+    const dom = createDomain(email, `addon-api-${suffix}.com`, ["dkim1"], "verify1");
+    domainId = dom.id;
+    sqlite.prepare("UPDATE domains SET verified = 1 WHERE id = ?").run(domainId);
+  });
+
+  it("básico sin add-on no puede enviar", async () => {
+    const res = await jsonPost(`/api/domains/${domainId}/send`,
+      { to: "alguien@example.com", subject: "hola", body: "texto" }, cookie!, csrfToken);
+    assert.equal(res.status, 403);
+    const data = await res.json();
+    assert.match(data.error, /add-on de envíos/i);
+  });
+
+  it("GET /api/addons devuelve catálogo", async () => {
+    const res = await req("/api/addons", { headers: { cookie: cookie! } });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.deepEqual(Object.keys(data.catalog).sort(), ["domain", "sends100", "sends25"]);
+    assert.ok(Array.isArray(data.mine));
+  });
+
+  it("rechaza un kind inválido", async () => {
+    const res = await jsonPost("/api/addons/checkout", { kind: "gratis" }, cookie!, csrfToken);
+    assert.equal(res.status, 400);
+    await res.body?.cancel();
+  });
+
+  it("no permite un segundo add-on de envíos", async () => {
+    const a = createAddon(email, "sends100");
+    const { updateAddon } = await import("./db.ts");
+    updateAddon(a.id, { status: "active", currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString() });
+
+    const res = await jsonPost("/api/addons/checkout", { kind: "sends25" }, cookie!, csrfToken);
+    assert.equal(res.status, 409);
+    await res.body?.cancel();
+
+    // …y con el add-on activo el gate de envío ya deja pasar
+    const me = await req("/api/auth/me", { headers: { cookie: cookie! } });
+    const data = await me.json();
+    assert.equal(data.limits.sendsUnlocked, true);
+    assert.equal(data.limits.sends, 100);
+    assert.equal(data.addons.length, 1);
+  });
+
+  it("cancelar un add-on inexistente da 404", async () => {
+    const res = await jsonPost(`/api/addons/${crypto.randomUUID()}/cancel`, {}, cookie!, csrfToken);
+    assert.equal(res.status, 404);
     await res.body?.cancel();
   });
 });
@@ -589,6 +669,142 @@ describe("Webhook", () => {
 
       const user = getUser(email);
       assert.equal(user?.subscription?.plan, "freelancer");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  // Regresión crítica: el add-on de envíos cuesta $49, exactamente lo mismo que el plan
+  // básico. Si el webhook no sale por la rama de add-on, el fallback por monto lo activaría
+  // como plan y le sobrescribiría subPlan/subMpId al usuario.
+  it("add-on de $49 no toca la suscripción base", async () => {
+    const email = `webhook-addon-${suffix}@example.com`;
+    const hash = await hashPassword("testpass123");
+    createUser(email, hash);
+    await updateUserSubscription(email, {
+      plan: "developer",
+      status: "active",
+      mpSubscriptionId: "sub-base-original",
+      currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString(),
+    });
+
+    const addon = createAddon(email, "sends25");
+    const subId = `sub-addon-${crypto.randomUUID()}`;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, _init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("api.mercadopago.com/preapproval/")) {
+        return new Response(JSON.stringify({
+          payer_email: email,
+          external_reference: `addon:${addon.id}`,
+          status: "authorized",
+          auto_recurring: { transaction_amount: 49, frequency: 1 },
+        }));
+      }
+      return originalFetch(input, _init);
+    };
+
+    try {
+      const res = await postWebhook({ type: "subscription_preapproval", data: { id: subId } }, subId);
+      assert.equal(res.status, 200);
+      await res.body?.cancel();
+
+      const user = getUser(email);
+      assert.equal(user?.subscription?.plan, "developer", "el plan base no debe cambiar");
+      assert.equal(user?.subscription?.mpSubscriptionId, "sub-base-original", "el preapproval base no debe cambiar");
+
+      const stored = getAddonById(addon.id);
+      assert.equal(stored?.status, "active");
+      assert.equal(stored?.mpPreapprovalId, subId);
+      assert.ok(stored?.currentPeriodEnd, "debe quedar con periodo vigente");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("cancelación de add-on en MP lo desactiva sin tocar el plan", async () => {
+    const email = `webhook-addon-cancel-${suffix}@example.com`;
+    const hash = await hashPassword("testpass123");
+    createUser(email, hash);
+    await updateUserSubscription(email, {
+      plan: "basico",
+      status: "active",
+      mpSubscriptionId: "sub-base-basico",
+      currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString(),
+    });
+
+    const addon = createAddon(email, "domain");
+    const subId = `sub-addon-cancel-${crypto.randomUUID()}`;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, _init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("api.mercadopago.com/preapproval/")) {
+        return new Response(JSON.stringify({
+          payer_email: email,
+          external_reference: `addon:${addon.id}`,
+          status: "cancelled",
+          auto_recurring: { transaction_amount: 99, frequency: 1 },
+        }));
+      }
+      return originalFetch(input, _init);
+    };
+
+    try {
+      const res = await postWebhook({ type: "subscription_preapproval", data: { id: subId } }, subId);
+      assert.equal(res.status, 200);
+      await res.body?.cancel();
+
+      assert.equal(getAddonById(addon.id)?.status, "cancelled");
+      assert.equal(getUser(email)?.subscription?.status, "active", "el plan base sigue vivo");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("el pago recurrente de un add-on extiende su periodo, no el del plan", async () => {
+    const email = `webhook-addon-renew-${suffix}@example.com`;
+    const hash = await hashPassword("testpass123");
+    createUser(email, hash);
+    const basePeriodEnd = new Date(Date.now() + 30 * 864e5).toISOString();
+    await updateUserSubscription(email, {
+      plan: "basico",
+      status: "active",
+      mpSubscriptionId: "sub-base-renew",
+      currentPeriodEnd: basePeriodEnd,
+    });
+
+    const addon = createAddon(email, "sends100");
+    const mpId = `mp-addon-renew-${crypto.randomUUID()}`;
+    const { updateAddon } = await import("./db.ts");
+    updateAddon(addon.id, { status: "active", mpPreapprovalId: mpId, currentPeriodEnd: new Date(Date.now() + 2 * 864e5).toISOString() });
+
+    const payId = `pay-addon-${crypto.randomUUID()}`;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, _init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("authorized_payments/")) {
+        return new Response(JSON.stringify({
+          preapproval_id: mpId,
+          status: "processed",
+          payment: { status: "approved" },
+        }));
+      }
+      return originalFetch(input, _init);
+    };
+
+    try {
+      const res = await postWebhook({ type: "subscription_authorized_payment", data: { id: payId } }, payId);
+      assert.equal(res.status, 200);
+      await res.body?.cancel();
+
+      const stored = getAddonById(addon.id);
+      assert.ok(
+        new Date(stored!.currentPeriodEnd!) > new Date(Date.now() + 30 * 864e5),
+        "el periodo del add-on debe haberse extendido ~35 días",
+      );
+      assert.equal(getUser(email)?.subscription?.currentPeriodEnd, basePeriodEnd, "el periodo del plan no se toca");
     } finally {
       globalThis.fetch = originalFetch;
     }

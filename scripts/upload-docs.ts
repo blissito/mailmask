@@ -71,17 +71,28 @@ const EXTRA_DOCS = [
 no en dólares. Ningún plan es gratuito y ningún límite es ilimitado.
 
 - Básico — $49 MXN/mes o $490 MXN/año: 1 dominio, 5 máscaras (alias), sin reglas,
-  historial de 15 días, 25 envíos/día, reenvío de entrada 100/hora.
+  historial de 15 días, reenvío de entrada 100/hora. **No incluye envío de correo nuevo**:
+  requiere el add-on de envíos (ver abajo). Sí puede responder conversaciones desde la
+  Bandeja, que viene incluida.
 - Freelancer — $449 MXN/mes o $4,490 MXN/año: 15 dominios, 50 máscaras por dominio,
-  10 reglas por dominio, historial de 30 días, 100 envíos/día por dominio,
+  10 reglas por dominio, historial de 30 días, 200 envíos/día por dominio,
   reenvío de entrada 500/hora por dominio, 3 miembros de equipo por dominio.
 - Developer — $999 MXN/mes o $9,990 MXN/año: 20 dominios, 100 máscaras por dominio,
   50 reglas por dominio, historial de 90 días, 1,000 envíos/día por dominio,
   reenvío de entrada 2,000/hora por dominio, 10 miembros por dominio, SMTP relay,
   webhooks y soporte prioritario.
 
+Add-ons: se compran encima de cualquier plan activo y se cobran aparte, mes a mes.
+- Envíos 25/día — +$49 MXN/mes: desbloquea el envío desde tu dominio, tope 25 al día por dominio.
+- Envíos 100/día — +$99 MXN/mes: igual, tope 100 al día por dominio.
+- Dominio extra — +$99 MXN/mes cada uno: un dominio más de cupo, acumulable. No incluye envío.
+
+Los dos add-ons de envíos son mutuamente excluyentes. Se compran una vez y aplican a todos
+los dominios de la cuenta; el tope sigue contando por dominio y por día. A partir del quinto
+dominio conviene pasar a Freelancer: cuesta casi lo mismo y trae 15 dominios, envíos y equipo.
+
 Importante sobre los límites: se cuentan **por dominio**, no por cuenta. Un plan
-Freelancer con 15 dominios dispone de 15 x 100 = 1,500 envíos al día en total.
+Freelancer con 15 dominios dispone de 15 x 200 = 3,000 envíos al día en total.
 
 Hay dos límites distintos y conviene no confundirlos:
 - Envíos ("sends"): correo saliente que el usuario origina desde el panel, la API o el
@@ -168,7 +179,7 @@ Estado: próximamente. El paquete aún no está publicado en npm. Se requiere pl
   },
   {
     title: "Bandeja de Entrada (Inbox)",
-    content: `La Bandeja de Entrada es una interfaz de inbox colaborativa para gestionar emails recibidos en tus dominios. Disponible desde el plan Freelancer.
+    content: `La Bandeja de Entrada es una interfaz de inbox colaborativa para gestionar emails recibidos en tus dominios. Incluida en todos los planes, también en Básico: responder conversaciones desde la Bandeja no requiere el add-on de envíos. Lo que varía por plan es cuántos miembros de equipo puedes invitar (Básico 0, Freelancer 3, Developer 10).
 
 Endpoints de la API:
 

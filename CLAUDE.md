@@ -56,7 +56,9 @@ Override with env vars `S3_BUCKET` and `S3_BACKUP_BUCKET` respectively.
 - **Error responses**: Always JSON `{ error: "message" }` with appropriate status code
 - **Auth**: JWT in HttpOnly cookie named `token`, verified via `verifyJwt()` from `auth.ts`
 - **Plans**: Defined in `db.ts` as `PLANS` constant (basico, freelancer, developer; legacy: pro, agencia)
+- **Add-ons**: `ADDONS` en `db.ts` (`sends25` $49, `sends100` $99, `domain` $99 c/u). Tabla `addons`, preapproval propio de MP con `external_reference: "addon:{id}"`. `getUserPlanLimits()` los suma; `sendsUnlocked` es el flag que decide si se puede enviar. **Básico tiene `sends: 0`**: no envía correo nuevo sin add-on, pero sí responde desde la Bandeja (`mesaActions: true` para todos los planes).
 - **Límites**: se cuentan **por dominio**, no por cuenta (`getSendCount()` y el rate limit de forwarding se llavean con `domainId`). Son dos distintos: `sends` (saliente que origina el usuario, por día) y `forwardPerHour` (reenvío de entrada, el caso de uso principal, un orden de magnitud mayor). Falta un tope mensual — ver `monthlyForwards` en el backlog, pendiente de revisitar.
+- **Migraciones**: el snapshot de drizzle está desincronizado respecto a `api_keys` (el hash se aplicó con `scripts/migrate-api-keys-hash.ts`, fuera de drizzle). `drizzle-kit generate` pedirá input interactivo y quiere emitir un `ALTER TABLE api_keys` que **rompería producción**. Hasta que se reconcilie, escribe las migraciones a mano en `drizzle/` y agrégalas a `meta/_journal.json`.
 
 ## Billing
 - MercadoPago PreApproval API for subscriptions

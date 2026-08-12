@@ -32,6 +32,13 @@ import {
   listLogs,
   getForwardCounts,
   PLANS,
+  ADDONS,
+  listAddons,
+  listEffectiveAddons,
+  getAddonById,
+  getAddonByMpId,
+  createAddon,
+  updateAddon,
   updateUserSubscription,
   getUserBySubscriptionId,
   extendSubscriptionPeriod,
@@ -116,6 +123,7 @@ import {
   updateDomainRegistration,
   getDomainRegistrationByPaymentId,
 } from "./db.js";
+import type { AddonKind } from "./db.js";
 import {
   hashPassword,
   verifyPassword,
@@ -374,6 +382,21 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
 interface AccessResult {
   domain: NonNullable<Awaited<ReturnType<typeof getDomain>>>;
   role: string;
+}
+
+// Cancela un preapproval en MercadoPago. Lanza si MP responde error, para que el caller
+// decida si aborta o solo lo registra.
+async function cancelMpPreapproval(preapprovalId: string, accessToken: string): Promise<void> {
+  const res = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status: "cancelled" }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`MP cancel ${preapprovalId}: ${await res.text()}`);
 }
 
 async function checkDomainAccess(
@@ -787,6 +810,7 @@ const app = new Elysia({ adapter: node() })
           currentPeriodEnd: user.subscription?.currentPeriodEnd ?? null,
         },
         limits,
+        addons: listAddons(user.email),
         emailVerified: user.emailVerified ?? false,
         usage: {
           domains: { current: domains.length, limit: limits.domains },
@@ -1038,7 +1062,7 @@ const app = new Elysia({ adapter: node() })
     if (currentCount >= limits.domains) {
       return new Response(
         JSON.stringify({
-          error: `Tu plan permite máximo ${limits.domains} dominio(s)`,
+          error: `Tu plan permite máximo ${limits.domains} dominio(s). Puedes agregar el add-on de dominio extra o subir de plan.`,
         }),
         { status: 400 },
       );
@@ -2100,6 +2124,31 @@ const app = new Elysia({ adapter: node() })
         log("info", "webhook", "MP subscription fetched", { payer_email: sub.payer_email, external_reference: sub.external_reference, status: sub.status });
 
         const externalRef = sub.external_reference ?? "";
+
+        // Add-ons: preapproval propio, aparte de la suscripción base. Se atiende aquí y se
+        // sale, para no tocar nunca subPlan/subMpId — la detección de plan por monto de
+        // más abajo mapearía $49 a "basico" y le rompería la suscripción al usuario.
+        if (externalRef.startsWith("addon:")) {
+          const addon = getAddonById(externalRef.slice("addon:".length));
+          if (!addon) {
+            log("warn", "webhook", "Add-on preapproval sin fila", { externalRef });
+          } else if (sub.status === "authorized") {
+            const end = new Date();
+            end.setDate(end.getDate() + 35);
+            updateAddon(addon.id, {
+              status: "active",
+              mpPreapprovalId: body.data.id,
+              currentPeriodEnd: end.toISOString(),
+            });
+            log("info", "billing", "Add-on activado", { addonId: addon.id, kind: addon.kind, email: addon.userEmail });
+          } else if (sub.status === "cancelled" || sub.status === "paused") {
+            updateAddon(addon.id, { status: "cancelled", cancelledAt: new Date().toISOString() });
+            log("info", "billing", "Add-on cancelado", { addonId: addon.id, kind: addon.kind, mpStatus: sub.status });
+          }
+          await markWebhookProcessed(body.data.id);
+          return new Response("OK", { status: 200 });
+        }
+
         const UUID_RE =
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         const isGuestCheckout = UUID_RE.test(externalRef);
@@ -2308,6 +2357,20 @@ const app = new Elysia({ adapter: node() })
           return new Response("OK", { status: 200 });
         }
 
+        // Renovación mensual de un add-on. Va antes de resolver el usuario porque los
+        // add-ons no viven en users.sub_mp_id; sin esta rama el add-on expiraría aunque
+        // el cliente siguiera pagando.
+        const renewingAddon = getAddonByMpId(ap.preapproval_id);
+        if (renewingAddon) {
+          const prev = renewingAddon.currentPeriodEnd ? new Date(renewingAddon.currentPeriodEnd) : new Date();
+          const base = prev > new Date() ? prev : new Date();
+          base.setDate(base.getDate() + 35);
+          updateAddon(renewingAddon.id, { status: "active", currentPeriodEnd: base.toISOString() });
+          log("info", "billing", "Add-on renovado", { addonId: renewingAddon.id, kind: renewingAddon.kind, until: base.toISOString() });
+          await markWebhookProcessed(body.data.id);
+          return new Response("OK", { status: 200 });
+        }
+
         // Resolve the user: by stored preapproval id first, then via the preapproval payload
         let user = getUserBySubscriptionId(ap.preapproval_id);
         let email = user?.email;
@@ -2425,6 +2488,18 @@ const app = new Elysia({ adapter: node() })
       ...user.subscription!,
       status: "cancelled",
     });
+
+    // Cascada: sin plan base los add-ons no otorgan nada (getUserPlanLimits devuelve
+    // ceros), así que hay que apagar el cobro o le seguiríamos cargando $99/mes.
+    for (const addon of listEffectiveAddons(auth.email)) {
+      try {
+        if (addon.mpPreapprovalId) await cancelMpPreapproval(addon.mpPreapprovalId, mpAccessToken);
+        updateAddon(addon.id, { status: "cancelled", cancelledAt: new Date().toISOString() });
+      } catch (err) {
+        log("error", "billing", "No se pudo cancelar add-on en cascada", { addonId: addon.id, error: String(err) });
+      }
+    }
+
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
     });
@@ -2449,6 +2524,127 @@ const app = new Elysia({ adapter: node() })
     );
   }, {
     detail: { tags: ["Billing"], summary: "Get current subscription status", security: [{ cookieAuth: [] }] },
+  })
+
+  // --- Add-ons ---
+
+  .get("/api/addons", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    return new Response(JSON.stringify({ catalog: ADDONS, mine: listAddons(auth.email) }), {
+      headers: { "content-type": "application/json" },
+    });
+  }, {
+    detail: { tags: ["Billing"], summary: "List add-on catalog and user's add-ons", security: [{ cookieAuth: [] }] },
+  })
+
+  .post("/api/addons/checkout", async ({ request, body: addonBody }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 5, 60_000);
+    if (limited) return limited;
+
+    const { kind } = addonBody;
+    if (!(kind in ADDONS)) {
+      return new Response(JSON.stringify({ error: "Add-on inválido" }), { status: 400 });
+    }
+    const addonKind = kind as AddonKind;
+
+    const user = await getUser(auth.email);
+    if (!user) return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404 });
+
+    const limits = getUserPlanLimits(user);
+    if (limits.domains === 0) {
+      return new Response(JSON.stringify({ error: "Necesitas un plan activo para comprar add-ons" }), { status: 402 });
+    }
+
+    if (addonKind.startsWith("sends")) {
+      if (user.subscription?.plan !== "basico") {
+        return new Response(JSON.stringify({ error: "Tu plan ya incluye envío de emails" }), { status: 400 });
+      }
+      const existing = listEffectiveAddons(auth.email).find((a) => a.kind.startsWith("sends"));
+      if (existing) {
+        return new Response(JSON.stringify({ error: "Ya tienes un add-on de envíos activo. Cancélalo antes de cambiarlo." }), { status: 409 });
+      }
+    }
+
+    const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+    if (!mpAccessToken) {
+      return new Response(JSON.stringify({ error: "Billing no configurado" }), { status: 500 });
+    }
+
+    const addon = createAddon(auth.email, addonKind);
+    try {
+      const { default: MercadoPagoConfig, PreApproval } = await import("mercadopago").then((m) => ({
+        default: m.MercadoPagoConfig,
+        PreApproval: m.PreApproval,
+      }));
+      const preApproval = new PreApproval(new MercadoPagoConfig({ accessToken: mpAccessToken }));
+      const result = await preApproval.create({
+        body: {
+          // Sin la palabra "Plan": el webhook tiene un regex /Plan (\w+)/i que activaría
+          // un plan por accidente. Salimos antes por el prefijo addon:, pero no hay razón
+          // para dejar la mina puesta.
+          reason: `MailMask — Add-on ${ADDONS[addonKind].label}`,
+          auto_recurring: {
+            frequency: 1,
+            frequency_type: "months",
+            transaction_amount: ADDONS[addonKind].price / 100,
+            currency_id: "MXN",
+          },
+          payer_email: auth.email,
+          back_url: `${getMainDomainUrl()}/app?addon=success`,
+          external_reference: `addon:${addon.id}`,
+        },
+      });
+      updateAddon(addon.id, { mpPreapprovalId: result.id });
+      return new Response(JSON.stringify({ init_point: result.init_point, addonId: addon.id }), {
+        headers: { "content-type": "application/json" },
+      });
+    } catch (err) {
+      updateAddon(addon.id, { status: "expired" });
+      log("error", "billing", "Add-on checkout failed", { error: String(err), kind: addonKind });
+      return new Response(JSON.stringify({ error: "Error creando la suscripción del add-on" }), { status: 500 });
+    }
+  }, {
+    body: t.Object({ kind: t.String() }),
+    detail: { tags: ["Billing"], summary: "Start add-on subscription checkout", security: [{ cookieAuth: [] }] },
+  })
+
+  .post("/api/addons/:id/cancel", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 5, 60_000);
+    if (limited) return limited;
+
+    const addon = getAddonById(params.id);
+    if (!addon || addon.userEmail !== auth.email) {
+      return new Response(JSON.stringify({ error: "Add-on no encontrado" }), { status: 404 });
+    }
+    if (addon.status === "cancelled" || addon.status === "expired") {
+      return new Response(JSON.stringify({ error: "El add-on ya está cancelado" }), { status: 400 });
+    }
+
+    const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+    if (addon.mpPreapprovalId && mpAccessToken) {
+      try {
+        await cancelMpPreapproval(addon.mpPreapprovalId, mpAccessToken);
+      } catch (err) {
+        log("error", "billing", "MP add-on cancel error", { error: String(err), addonId: addon.id });
+        return new Response(JSON.stringify({ error: "Error al cancelar en MercadoPago" }), { status: 500 });
+      }
+    }
+
+    // Se conserva currentPeriodEnd: el usuario mantiene el cupo hasta que termine
+    // el periodo que ya pagó (listEffectiveAddons lo sigue contando).
+    updateAddon(addon.id, { status: "cancelled", cancelledAt: new Date().toISOString() });
+    return new Response(JSON.stringify({ ok: true, activeUntil: addon.currentPeriodEnd ?? null }), {
+      headers: { "content-type": "application/json" },
+    });
+  }, {
+    detail: { tags: ["Billing"], summary: "Cancel an add-on subscription", security: [{ cookieAuth: [] }] },
   })
 
   // --- Export ---
@@ -2509,13 +2705,8 @@ const app = new Elysia({ adapter: node() })
     const user = (await getUser(auth.email))!;
     const limits = getUserPlanLimits(user);
 
-    if (limits.sends === 0) {
-      return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails" }), { status: 403 });
-    }
-
-    const plan = user.subscription?.plan ?? "basico";
-    if (plan === "basico") {
-      return new Response(JSON.stringify({ error: "Envío directo no disponible en plan Básico. Usa Mesa para responder." }), { status: 403 });
+    if (limits.sends === 0 || !limits.sendsUnlocked) {
+      return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails. Agrega el add-on de envíos." }), { status: 403 });
     }
 
     const access = await checkDomainAccess(auth.email, params.id, "write");
@@ -2579,13 +2770,8 @@ const app = new Elysia({ adapter: node() })
     const user = (await getUser(auth.email))!;
     const limits = getUserPlanLimits(user);
 
-    if (limits.sends === 0) {
-      return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails" }), { status: 403 });
-    }
-
-    const plan = user.subscription?.plan ?? "basico";
-    if (plan === "basico") {
-      return new Response(JSON.stringify({ error: "Envío directo no disponible en plan Básico. Usa Mesa para responder." }), { status: 403 });
+    if (limits.sends === 0 || !limits.sendsUnlocked) {
+      return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails. Agrega el add-on de envíos." }), { status: 403 });
     }
 
     const access = await checkDomainAccess(auth.email, params.id, "write");

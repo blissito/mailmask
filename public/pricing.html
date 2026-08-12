@@ -65,6 +65,33 @@
             "priceValidUntil": "2026-12-31",
             "availability": "https://schema.org/InStock",
             "url": "https://mailmask.studio/pricing"
+          },
+          {
+            "@type": "Offer",
+            "name": "Add-on: Envíos 25/día",
+            "price": "49",
+            "priceCurrency": "MXN",
+            "priceValidUntil": "2026-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": "https://mailmask.studio/pricing#addons"
+          },
+          {
+            "@type": "Offer",
+            "name": "Add-on: Envíos 100/día",
+            "price": "99",
+            "priceCurrency": "MXN",
+            "priceValidUntil": "2026-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": "https://mailmask.studio/pricing#addons"
+          },
+          {
+            "@type": "Offer",
+            "name": "Add-on: Dominio extra",
+            "price": "99",
+            "priceCurrency": "MXN",
+            "priceValidUntil": "2026-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": "https://mailmask.studio/pricing#addons"
           }
         ]
       }
@@ -151,7 +178,7 @@
         <div class="grid grid-cols-3 px-4 py-3 border-t border-zinc-800">
           <div class="text-zinc-400">Envío desde tu dominio</div>
           <div class="text-center text-zinc-500">Solo con licencia</div>
-          <div class="text-center text-mask-400 font-semibold">Incluido</div>
+          <div class="text-center text-mask-400 font-semibold">Desde Freelancer o add-on</div>
         </div>
         <div class="grid grid-cols-3 px-4 py-3 border-t border-zinc-800">
           <div class="text-zinc-400">DKIM + SPF</div>
@@ -193,7 +220,7 @@
           <p class="plan-savings text-xs text-green-400 mt-1 hidden"></p>
           <ul class="mt-6 space-y-3 text-sm text-zinc-300">
             <li>✓ 5 máscaras (alias)</li>
-            <li>✓ Enviar como tu@dominio (25/día)</li>
+            <li class="text-zinc-500">✗ Envío desde tu dominio — <a href="#addons" class="text-mask-400 hover:underline">add-on desde $49</a></li>
             <li>✓ Reenvío de entrada — 100/hora (~2,400/día)</li>
             <li class="text-zinc-500">✗ Sin reglas</li>
             <li>✓ Historial 15 días</li>
@@ -227,7 +254,7 @@
           <p class="plan-per-domain text-xs text-mask-400 mt-1">15 dominios — $30/dominio</p>
           <ul class="mt-6 space-y-3 text-sm text-zinc-300">
             <li>✓ 50 máscaras por dominio</li>
-            <li>✓ Enviar como tu@dominio (100/día por dominio)</li>
+            <li>✓ Enviar como tu@dominio (200/día por dominio)</li>
             <li>✓ Reenvío de entrada — 500/hora por dominio (~12,000/día)</li>
             <li>✓ 10 reglas por dominio</li>
             <li>✓ Historial 30 días</li>
@@ -287,6 +314,51 @@
       <p class="text-center text-sm text-zinc-500 mt-8">
         Todos los precios en MXN. Pago con MercadoPago.<br/>
         Anual: Básico $490/año (ahorras $98) · Freelancer $4,490/año (ahorras $898) · Developer $9,990/año (ahorras $1,998)
+      </p>
+    </section>
+
+    <!-- Add-ons -->
+    <section id="addons" class="max-w-4xl mx-auto px-4 py-16 border-t border-zinc-800">
+      <h2 class="text-3xl font-extrabold text-center">Add-ons</h2>
+      <p class="text-center text-zinc-400 mt-3 max-w-2xl mx-auto">
+        ¿Solo te falta una cosa? Agrégala a tu plan sin cambiarlo. Se cobran aparte, mes a mes,
+        y los cancelas cuando quieras.
+      </p>
+
+      <div class="grid md:grid-cols-3 gap-6 mt-10">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col">
+          <h3 class="font-bold text-lg">Envíos 25/día</h3>
+          <div class="mt-2"><span class="text-3xl font-extrabold">+$49</span><span class="text-zinc-500 text-sm"> MXN/mes</span></div>
+          <p class="text-sm text-zinc-400 mt-4 flex-1">
+            Desbloquea el envío desde tu dominio, con tope de 25 correos al día por dominio.
+            Para quien manda poco y de vez en cuando.
+          </p>
+        </div>
+
+        <div class="bg-zinc-900 border-2 border-mask-600 rounded-xl p-6 flex flex-col relative">
+          <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-mask-600 text-white text-xs font-semibold px-3 py-1 rounded-full">Más elegido</span>
+          <h3 class="font-bold text-lg">Envíos 100/día</h3>
+          <div class="mt-2"><span class="text-3xl font-extrabold">+$99</span><span class="text-zinc-500 text-sm"> MXN/mes</span></div>
+          <p class="text-sm text-zinc-400 mt-4 flex-1">
+            Lo mismo, con tope de 100 al día por dominio. Se compra una vez y aplica a todos
+            tus dominios.
+          </p>
+        </div>
+
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col">
+          <h3 class="font-bold text-lg">Dominio extra</h3>
+          <div class="mt-2"><span class="text-3xl font-extrabold">+$99</span><span class="text-zinc-500 text-sm"> MXN/mes c/u</span></div>
+          <p class="text-sm text-zinc-400 mt-4 flex-1">
+            Un dominio más en tu cuenta, con sus máscaras y su bandeja. Puedes agregar varios.
+            No incluye envío.
+          </p>
+        </div>
+      </div>
+
+      <p class="text-center text-sm text-zinc-500 mt-8 max-w-2xl mx-auto">
+        Los add-ons se compran desde tu panel, con un plan activo.
+        A partir del quinto dominio te conviene <a href="#pricing" class="text-mask-400 hover:underline">Freelancer</a>:
+        cuesta casi lo mismo y trae 15 dominios, envíos y equipo.
       </p>
     </section>
 

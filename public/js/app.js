@@ -140,11 +140,13 @@ function renderBillingBanner() {
           <span class="text-xs text-zinc-500">hasta ${periodEnd ? periodEnd.toLocaleDateString("es-MX") : "—"}</span>
         </div>
         <div class="flex items-center gap-4">
+          <button id="btn-addons" class="text-xs text-mask-400 hover:text-mask-300 transition-colors">Add-ons</button>
           <a href="/pricing" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Cambiar plan</a>
           <button id="btn-cancel-sub" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Cancelar</button>
         </div>
       </div>`;
     document.getElementById("btn-cancel-sub")?.addEventListener("click", cancelSubscription);
+    document.getElementById("btn-addons")?.addEventListener("click", showAddonsModal);
   } else if (isCancelledWithAccess) {
     container.innerHTML = `
       <div class="bg-yellow-900/20 border border-yellow-800/50 rounded-xl px-4 py-3 flex items-center justify-between">
@@ -199,6 +201,7 @@ function renderStats() {
   const totalForwards = domains.reduce((s, d) => s + (d.monthlyForwards ?? 0), 0);
   const sendsToday = (u.sendsPerDomain ?? []).reduce((s, d) => s + d.current, 0);
   const sendsLimit = currentUser?.limits?.sends ?? 0;
+  const sendsUnlocked = currentUser?.limits?.sendsUnlocked ?? false;
   const fwdPerHour = currentUser?.limits?.forwardPerHour ?? 0;
 
   // Los envíos son el límite chico y el que se agota; el reenvío de entrada es un orden
@@ -218,8 +221,11 @@ function renderStats() {
         </div>
         <div>
           <span class="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Envíos hoy</span>
-          <div class="text-3xl font-light text-zinc-100 mt-1">${sendsToday.toLocaleString("es-MX")}<span class="text-lg text-zinc-600">/${sendsLimit.toLocaleString("es-MX")}</span></div>
-          <div class="text-[11px] text-zinc-600 mt-0.5">por dominio, al día</div>
+          ${sendsUnlocked
+            ? `<div class="text-3xl font-light text-zinc-100 mt-1">${sendsToday.toLocaleString("es-MX")}<span class="text-lg text-zinc-600">/${sendsLimit.toLocaleString("es-MX")}</span></div>
+               <div class="text-[11px] text-zinc-600 mt-0.5">por dominio, al día</div>`
+            : `<div class="text-3xl font-light text-zinc-600 mt-1">—</div>
+               <button id="usage-addon-cta" class="text-[11px] text-mask-400 hover:underline mt-0.5">Activar envíos →</button>`}
         </div>
         <div>
           <span class="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Reenvíos</span>
@@ -228,6 +234,113 @@ function renderStats() {
         </div>
       </div>
     </div>`;
+
+  document.getElementById("usage-addon-cta")?.addEventListener("click", showAddonsModal);
+}
+
+// --- Add-ons ---
+
+const ADDON_COPY = {
+  sends25:  { desc: "Desbloquea el envío desde tu dominio, con tope de 25 correos al día por dominio." },
+  sends100: { desc: "Desbloquea el envío desde tu dominio, con tope de 100 correos al día por dominio." },
+  domain:   { desc: "Un dominio más en tu cuenta, con sus máscaras y su bandeja. Puedes agregar varios. No incluye envío." },
+};
+
+async function showAddonsModal() {
+  const list = document.getElementById("addons-list");
+  const err = document.getElementById("addons-error");
+  err.classList.add("hidden");
+  list.innerHTML = `<div class="text-zinc-500 text-sm">Cargando…</div>`;
+  showModal("modal-addons");
+
+  const res = await fetch("/api/addons");
+  if (!res.ok) {
+    list.innerHTML = "";
+    err.textContent = "No se pudieron cargar los add-ons.";
+    err.classList.remove("hidden");
+    return;
+  }
+  const { catalog, mine } = await res.json();
+
+  // Un add-on cancelado sigue valiendo hasta que termina el periodo pagado, así que
+  // cuenta como activo para no ofrecer una compra duplicada.
+  const now = new Date();
+  const effective = (mine ?? []).filter(a =>
+    a.status === "active" ||
+    (a.status === "cancelled" && a.currentPeriodEnd && new Date(a.currentPeriodEnd) >= now));
+  const hasSends = effective.some(a => a.kind.startsWith("sends"));
+  const planIncludesSends = currentUser?.subscription?.plan !== "basico";
+
+  list.innerHTML = Object.entries(catalog).map(([kind, info]) => {
+    const owned = effective.filter(a => a.kind === kind);
+    const isSends = kind.startsWith("sends");
+    const blocked = isSends && (hasSends || planIncludesSends);
+    const blockedWhy = planIncludesSends
+      ? "Tu plan ya incluye envíos"
+      : "Ya tienes un add-on de envíos";
+
+    const ownedLabel = owned.length
+      ? `<div class="text-xs text-mask-400 mt-2">${owned.length > 1 ? `${owned.length} activos` : "Activo"}${
+          owned[0].status === "cancelled" ? ` · termina el ${new Date(owned[0].currentPeriodEnd).toLocaleDateString("es-MX")}` : ""}</div>`
+      : "";
+
+    const actions = owned.length
+      ? owned.filter(a => a.status === "active").map(a =>
+          `<button data-action="cancel-addon" data-addon-id="${esc(a.id)}" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Cancelar</button>`).join(" · ")
+      : "";
+
+    return `
+      <div class="border border-zinc-800 rounded-lg p-4 flex items-start justify-between gap-4">
+        <div class="flex-1">
+          <div class="font-semibold text-zinc-100">${esc(info.label)}</div>
+          <div class="text-sm text-zinc-400 mt-1">${esc(ADDON_COPY[kind]?.desc ?? "")}</div>
+          ${ownedLabel}
+        </div>
+        <div class="text-right shrink-0">
+          <div class="text-xl font-bold">+$${(info.price / 100).toLocaleString("es-MX")}</div>
+          <div class="text-[11px] text-zinc-500 mb-2">MXN/mes${kind === "domain" ? " c/u" : ""}</div>
+          ${blocked && !owned.length
+            ? `<div class="text-[11px] text-zinc-600 max-w-[8rem]">${blockedWhy}</div>`
+            : `<button data-action="buy-addon" data-kind="${esc(kind)}"
+                 class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                 ${owned.length ? "Agregar otro" : "Agregar"}
+               </button>`}
+          ${actions ? `<div class="mt-2">${actions}</div>` : ""}
+        </div>
+      </div>`;
+  }).join("");
+}
+
+async function buyAddon(kind) {
+  const err = document.getElementById("addons-error");
+  err.classList.add("hidden");
+  const res = await fetch("/api/addons/checkout", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ kind }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.init_point) {
+    err.textContent = data.error ?? "No se pudo iniciar la compra.";
+    err.classList.remove("hidden");
+    return;
+  }
+  window.location.href = data.init_point;
+}
+
+async function cancelAddon(id) {
+  if (!confirm("¿Cancelar este add-on? Lo conservas hasta que termine el periodo que ya pagaste.")) return;
+  const err = document.getElementById("addons-error");
+  err.classList.add("hidden");
+  const res = await fetch(`/api/addons/${id}/cancel`, { method: "POST" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    err.textContent = data.error ?? "No se pudo cancelar.";
+    err.classList.remove("hidden");
+    return;
+  }
+  await refreshUsage();
+  await showAddonsModal();
 }
 
 // --- Referral credit banner ---
@@ -1870,6 +1983,15 @@ function setupEventListeners() {
   // Cancel modal buttons
   document.querySelectorAll(".btn-cancel-modal").forEach(btn => {
     btn.addEventListener("click", () => hideModal(btn.dataset.modal));
+  });
+
+  // Event delegation: add-ons (el contenido se re-renderiza, así que no se puede
+  // enganchar a los botones directamente)
+  document.getElementById("addons-list")?.addEventListener("click", (e) => {
+    const buy = e.target.closest("[data-action='buy-addon']");
+    if (buy) { buyAddon(buy.dataset.kind); return; }
+    const cancel = e.target.closest("[data-action='cancel-addon']");
+    if (cancel) cancelAddon(cancel.dataset.addonId);
   });
 
   // Event delegation: domains list

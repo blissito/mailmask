@@ -238,6 +238,25 @@ export const domainRegistrations = sqliteTable("domain_registrations", {
   index("idx_domain_reg_status").on(table.status),
 ]);
 
+// Add-ons comprables encima del plan base. Cada fila es una unidad: el add-on de
+// dominio es acumulable (N filas), los de envíos son mutuamente excluyentes (validado
+// en el endpoint, no por constraint, porque quedan filas históricas en `cancelled`).
+// Sin `expiresAt` a propósito: es tabla de negocio, no kv efímera — el cron de purga
+// no debe tocarla.
+export const addons = sqliteTable("addons", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  userEmail: text("user_email").notNull().references(() => users.email, { onDelete: "cascade" }),
+  kind: text("kind").notNull(), // sends25 | sends100 | domain
+  status: text("status").notNull().default("pending"), // pending | active | cancelled | expired
+  mpPreapprovalId: text("mp_preapproval_id").unique(),
+  priceCents: integer("price_cents").notNull(),
+  currentPeriodEnd: text("current_period_end"),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
+  cancelledAt: text("cancelled_at"),
+}, (table) => [
+  index("idx_addons_user_status").on(table.userEmail, table.status),
+]);
+
 export const apiKeys = sqliteTable("api_keys", {
   id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
   userEmail: text("user_email").notNull().references(() => users.email, { onDelete: "cascade" }),

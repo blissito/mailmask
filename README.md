@@ -39,7 +39,7 @@ Precios en MXN. Máscaras, reglas, envíos y reenvío se cuentan **por dominio**
 | Máscaras | 5 | 50 | 100 |
 | Reglas | — | 10 | 50 |
 | Historial | 15 días | 30 días | 90 días |
-| Envíos/día | 25 | 100 | 1,000 |
+| Envíos/día | — (add-on) | 200 | 1,000 |
 | **Reenvío de entrada** | **100/hora** | **500/hora** | **2,000/hora** |
 | API + SDK | ✓ | ✓ | ✓ |
 | SMTP relay | — | — | ✓ |
@@ -47,7 +47,20 @@ Precios en MXN. Máscaras, reglas, envíos y reenvío se cuentan **por dominio**
 
 Son dos límites distintos. **Envíos** es el correo saliente que originas tú (panel, API, SMTP relay). **Reenvío de entrada** es el correo que llega a una máscara y sale al buzón destino — el caso de uso principal, medido por hora y un orden de magnitud mayor: ~2,400, ~12,000 y ~48,000 al día. Quien solo reenvía nunca toca el límite de envíos.
 
-Fuente de verdad: `PLANS` en [`db.ts`](db.ts).
+### Add-ons
+
+Se compran encima de cualquier plan activo y se cobran aparte, mes a mes.
+
+| Add-on | Precio | Qué hace |
+|---|---|---|
+| Envíos 25/día | +$49 | Desbloquea el envío desde tu dominio, tope 25/día por dominio |
+| Envíos 100/día | +$99 | Igual, tope 100/día por dominio |
+| Dominio extra | +$99 c/u | Un dominio más de cupo. Acumulable. No incluye envío |
+
+Los dos de envíos son mutuamente excluyentes; se compran una vez y aplican a todos los
+dominios de la cuenta, con el tope contando por dominio y por día.
+
+Fuente de verdad: `PLANS` y `ADDONS` en [`db.ts`](db.ts).
 
 ## Stack
 
