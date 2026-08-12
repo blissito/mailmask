@@ -371,39 +371,71 @@ export async function forwardEmail(originalRaw: string, from: string, to: string
 
 // --- Send from domain (SMTP outbound) ---
 
+// Un CR o LF en un valor de header permite inyectar headers arbitrarios (un Bcc:, por
+// ejemplo). Los valores vienen de input del usuario — asunto, destinatario, reply-to —
+// así que se limpian antes de armar el mensaje.
+function stripHeaderInjection(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").trim();
+}
+
+// RFC 2047. Un header solo admite ASCII: un asunto como "Cotización" metería bytes UTF-8
+// crudos. Se deja pasar lo que ya viene encoded (típico del correo entrante, que se
+// reenvía tal cual en las respuestas).
+export function encodeHeader(value: string): string {
+  const clean = stripHeaderInjection(value);
+  if (!clean) return "";
+  if (/^=\?[^?]+\?[BQbq]\?/.test(clean)) return clean;
+  // deno-lint-ignore no-control-regex
+  if (!/[^\x00-\x7F]/.test(clean)) return clean;
+  return `=?UTF-8?B?${Buffer.from(clean, "utf8").toString("base64")}?=`;
+}
+
+// "Nombre <a@b.com>" → "a@b.com". Las conversaciones reconstruidas desde S3 guardan el
+// From con display name, y eso no sirve ni como destinatario de SES ni para buscar en la
+// lista de supresión.
+export function normalizeAddress(value: string): string {
+  const m = value.match(/<([^>]+)>/);
+  return stripHeaderInjection(m ? m[1] : value).toLowerCase();
+}
+
 export async function sendFromDomain(from: string, to: string, subject: string, body: string, opts?: { html?: string; replyTo?: string; configSet?: string; inReplyTo?: string; references?: string }): Promise<string> {
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
 
-  const messageId = `<${crypto.randomUUID()}@${from.split("@")[1] ?? "mailmask.studio"}>`;
+  const fromAddr = normalizeAddress(from);
+  const toAddr = normalizeAddress(to);
+  const messageId = `<${crypto.randomUUID()}@${fromAddr.split("@")[1] ?? "mailmask.studio"}>`;
   const boundary = `----=_Part_${Date.now()}`;
   const headers = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
+    `From: ${fromAddr}`,
+    `To: ${toAddr}`,
+    `Subject: ${encodeHeader(subject)}`,
     `Message-ID: ${messageId}`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
   ];
-  if (opts?.replyTo) headers.push(`Reply-To: ${opts.replyTo}`);
-  if (opts?.inReplyTo) headers.push(`In-Reply-To: ${opts.inReplyTo}`);
-  if (opts?.references) headers.push(`References: ${opts.references}`);
+  if (opts?.replyTo) headers.push(`Reply-To: ${normalizeAddress(opts.replyTo)}`);
+  if (opts?.inReplyTo) headers.push(`In-Reply-To: ${stripHeaderInjection(opts.inReplyTo)}`);
+  if (opts?.references) headers.push(`References: ${stripHeaderInjection(opts.references)}`);
+
+  // base64: el cuerpo es UTF-8 y declararlo 7bit es mentira — se corrompe en tránsito.
+  const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64").replace(/(.{76})/g, "$1\r\n");
 
   const parts = [
     `--${boundary}`,
     `Content-Type: text/plain; charset=UTF-8`,
-    `Content-Transfer-Encoding: 7bit`,
+    `Content-Transfer-Encoding: base64`,
     ``,
-    body,
+    b64(body),
   ];
   if (opts?.html) {
     parts.push(
       ``,
       `--${boundary}`,
       `Content-Type: text/html; charset=UTF-8`,
-      `Content-Transfer-Encoding: 7bit`,
+      `Content-Transfer-Encoding: base64`,
       ``,
-      opts.html,
+      b64(opts.html),
     );
   }
   parts.push(``, `--${boundary}--`);
@@ -413,8 +445,8 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
   // deno-lint-ignore no-explicit-any
   const cmd: any = {
     RawMessage: { Data: new TextEncoder().encode(rawEmail) },
-    Source: from,
-    Destinations: [to],
+    Source: fromAddr,
+    Destinations: [toAddr],
   };
   if (opts?.configSet) cmd.ConfigurationSetName = opts.configSet;
 
