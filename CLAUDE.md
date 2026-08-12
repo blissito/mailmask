@@ -67,6 +67,29 @@ Override with env vars `S3_BUCKET` and `S3_BACKUP_BUCKET` respectively.
 - MP webhook (`/api/webhooks/mercadopago`) handles payment notifications with HMAC validation
 - Known: `payer_email` cannot match the MP collector account ("Payer and collector cannot be the same user")
 
+## Add-ons y envío de correo nuevo (agosto 2026)
+
+**Modelo comercial.** El plan Básico ($49) **no envía correo nuevo** (`sends: 0`); sí responde desde la Bandeja, que está incluida en todos los planes. Enviar se compra aparte:
+
+| Concepto | Precio |
+|---|---|
+| Envíos 25/día | +$49 |
+| Envíos 100/día | +$99 (excluyentes entre sí) |
+| Dominio extra | +$99 c/u, acumulable |
+| Freelancer | $449 · 15 dominios · 200 envíos/día |
+
+La escalera está calculada para que el 5º dominio ($445) empate con Freelancer ($449) y el upgrade se venda solo. El add-on de envíos se compra una vez y aplica a todos los dominios; el tope cuenta **por dominio y por día**.
+
+**Cómo se envía.** Tres caminos, todos con tope: `POST /api/domains/:id/send` (unitario), `/send-bulk` (job asíncrono) y `POST /api/bandeja/conversations` (redactar desde la UI, botón "Redactar" o tecla `c`). Responder en la Bandeja **no** consume cuota — tiene su propio tope de abuso de 200/hora por dominio.
+
+**Dos cosas no obvias del código:**
+- Las conversaciones guardan `from` = contacto externo y `to` = nuestro alias, **también al redactar**. La lista, el filtro de alias y el remitente del reply dependen de esa convención invertida.
+- El `Message-ID` lo genera `sendFromDomain` y se guarda en `threadReferences`; es lo que engancha la respuesta del contacto. **SES podría reescribirlo** — sin verificar. Ver `VIGILAR-BRENDI.md`.
+
+**Cobro.** PreApproval propio por add-on con `external_reference: "addon:{id}"`, atendido en una rama temprana del webhook que sale con `return` antes de la detección de plan. Es obligatorio: el add-on de $49 vale lo mismo que el plan básico y el fallback por monto lo activaría como plan.
+
+**Sin verificar en producción** (ver `VIGILAR-BRENDI.md`): la compra real en MercadoPago y el threading de punta a punta.
+
 ## TODO
 
 ### Crítico — bloquea lanzamiento público
