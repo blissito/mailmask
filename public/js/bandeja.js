@@ -34,6 +34,8 @@ let conversations = [];
 let selectedIdx = -1;
 let activeConv = null;
 let canDoActions = false; // false for basico plan
+let canCompose = false;   // redactar correo nuevo requiere el add-on de envíos
+let domainAliases = [];   // alias del dominio seleccionado, para el remitente
 let composerMode = "reply"; // "reply" | "note"
 let newConvIds = new Set();
 let unreadCount = 0;
@@ -54,8 +56,9 @@ async function checkAuth() {
   document.getElementById("user-email").textContent = currentUser.email;
   if (currentUser.isAdmin) { const al = document.getElementById("admin-link"); if (al) al.style.display = ""; }
 
-  const plan = currentUser.subscription?.plan ?? "basico";
   canDoActions = true;
+  // Responder está incluido en todos los planes; iniciar un correo nuevo no.
+  canCompose = currentUser.limits?.sendsUnlocked === true;
 }
 
 // --- Domains ---
@@ -75,8 +78,106 @@ async function loadDomains() {
   ).join("");
 
   selectedDomainId = domains[0].id;
+  await loadAliasesForCompose();
   await loadConversations();
   connectSSE(selectedDomainId);
+}
+
+// Alias reales del dominio, para el selector de remitente. Tienen que ser alias
+// existentes: si no, la respuesta del contacto no se reenvía a ningún buzón.
+async function loadAliasesForCompose() {
+  domainAliases = [];
+  if (!selectedDomainId) return;
+  try {
+    const res = await fetch(`/api/domains/${selectedDomainId}/alias`);
+    if (!res.ok) return;
+    const list = await res.json();
+    domainAliases = (list || []).filter(a => a.enabled && a.alias !== "*");
+  } catch { /* el botón se deshabilita solo si queda vacío */ }
+  updateComposeButton();
+}
+
+function updateComposeButton() {
+  const btn = document.getElementById("btn-compose");
+  if (!btn) return;
+  if (!canCompose) {
+    btn.disabled = true;
+    btn.title = "Necesitas el add-on de envíos para escribir correos nuevos";
+  } else if (domainAliases.length === 0) {
+    btn.disabled = true;
+    btn.title = "Crea un alias en este dominio para poder escribir";
+  } else {
+    btn.disabled = false;
+    btn.title = "Redactar (C)";
+  }
+}
+
+// --- Redactar ---
+function openComposeModal() {
+  if (!canCompose) {
+    toast("Tu plan no incluye enviar correos nuevos. Agrega el add-on desde el panel.");
+    return;
+  }
+  if (domainAliases.length === 0) {
+    toast("Necesitas un alias activo en este dominio.");
+    return;
+  }
+  const domain = domains.find(d => d.id === selectedDomainId);
+  document.getElementById("compose-from").innerHTML = domainAliases
+    .map(a => `<option value="${esc(a.alias)}">${esc(a.alias)}@${esc(domain?.domain ?? "")}</option>`)
+    .join("");
+  document.getElementById("compose-to").value = "";
+  document.getElementById("compose-subject").value = "";
+  document.getElementById("compose-body").value = "";
+  const err = document.getElementById("compose-error");
+  err.classList.add("hidden");
+  err.textContent = "";
+  document.getElementById("modal-compose").classList.remove("hidden");
+  document.getElementById("compose-to").focus();
+}
+
+function closeComposeModal() {
+  document.getElementById("modal-compose").classList.add("hidden");
+}
+
+async function sendNew() {
+  const btn = document.getElementById("compose-send");
+  const err = document.getElementById("compose-error");
+  const to = document.getElementById("compose-to").value.trim();
+  const subject = document.getElementById("compose-subject").value.trim();
+  const body = document.getElementById("compose-body").value.trim();
+  const fromAlias = document.getElementById("compose-from").value;
+
+  const fail = (msg) => { err.textContent = msg; err.classList.remove("hidden"); };
+  err.classList.add("hidden");
+  if (!to || !subject || !body) return fail("Completa destinatario, asunto y mensaje.");
+
+  btn.disabled = true;
+  btn.textContent = "Enviando...";
+  try {
+    const res = await fetch("/api/bandeja/conversations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ domainId: selectedDomainId, to, subject, body, fromAlias }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return fail(data.error || "No se pudo enviar el correo.");
+
+    closeComposeModal();
+    playSound("whoosh");
+    toast(data.warning || "Correo enviado");
+    await loadConversations();
+    // Abrir el hilo recién creado, si se guardó.
+    if (data.conversationId) {
+      const conv = conversations.find(c => c.id === data.conversationId);
+      if (conv) openConversation(conv);
+    }
+  } catch (e) {
+    fail("Error de red. Intenta de nuevo.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Enviar";
+  }
 }
 
 // --- Conversations ---
@@ -425,6 +526,7 @@ function setupListeners() {
     updateTitle();
     document.getElementById("detail-empty").classList.remove("mesa-hidden");
     document.getElementById("detail-loaded").classList.add("mesa-hidden");
+    loadAliasesForCompose();
     loadConversations();
     connectSSE(selectedDomainId);
   });
@@ -470,6 +572,14 @@ function setupListeners() {
       e.preventDefault();
       sendReply();
     }
+  });
+
+  // Compose modal
+  document.getElementById("btn-compose").addEventListener("click", openComposeModal);
+  document.getElementById("compose-cancel").addEventListener("click", closeComposeModal);
+  document.getElementById("compose-send").addEventListener("click", sendNew);
+  document.getElementById("compose-body").addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); sendNew(); }
   });
 
   // Assign modal
@@ -539,6 +649,11 @@ function setupKeyboard() {
 
     if (e.key === "Escape") {
       // Close modal if open
+      const composeModal = document.getElementById("modal-compose");
+      if (composeModal && !composeModal.classList.contains("hidden")) {
+        closeComposeModal();
+        return;
+      }
       const modal = document.getElementById("modal-assign");
       if (!modal.classList.contains("hidden")) {
         modal.classList.add("hidden");
@@ -590,6 +705,11 @@ function setupKeyboard() {
       composerMode = "reply";
       updateComposerMode();
       document.getElementById("composer-textarea").focus();
+    }
+    if (e.key === "c") {
+      e.preventDefault();
+      openComposeModal();
+      return;
     }
     if (e.key === "n" && canDoActions) {
       e.preventDefault();

@@ -5,7 +5,8 @@ import { app } from "./main.ts";
 import {
   createUser, getUser, createDomain, createAlias, createRule,
   listUserDomains, listAliases, listRules, updateUserSubscription,
-  createPendingCheckout, createAddon, getAddonById,
+  createPendingCheckout, createAddon, getAddonById, updateAddon,
+  addSuppression, getConversation, listMessages, getSendCount,
 } from "./db.ts";
 import { hashPassword, signJwt, generateCsrfToken } from "./auth.ts";
 import { sqlite } from "./pg.ts";
@@ -262,6 +263,30 @@ describe("Add-ons API", () => {
     assert.equal(data.limits.sendsUnlocked, true);
     assert.equal(data.limits.sends, 100);
     assert.equal(data.addons.length, 1);
+  });
+
+  it("redactar sin add-on da 403", async () => {
+    // Este usuario ya tiene sends100 activo del test anterior, así que se usa uno limpio.
+    const e2 = `compose-nolimit-${suffix}@example.com`;
+    sqlite.prepare("DELETE FROM rate_limits").run();
+    createUser(e2, await hashPassword("password123"));
+    await updateUserSubscription(e2, {
+      plan: "basico", status: "active", mpSubscriptionId: `sub-cnl-${suffix}`,
+      currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString(),
+    });
+    const lr = await jsonPost("/api/auth/login", { email: e2, password: "password123" });
+    const { cookie: c2, csrfToken: t2 } = extractCookies(lr);
+    await lr.body?.cancel();
+
+    const d2 = createDomain(e2, `compose-nl-${suffix}.com`, ["dk"], "vf");
+    sqlite.prepare("UPDATE domains SET verified = 1 WHERE id = ?").run(d2.id);
+    createAlias(d2.id, "hola", ["dest@example.com"]);
+
+    const res = await jsonPost("/api/bandeja/conversations", {
+      domainId: d2.id, to: "cliente@example.com", subject: "Hola", body: "texto", fromAlias: "hola",
+    }, c2!, t2);
+    assert.equal(res.status, 403);
+    assert.match((await res.json()).error, /add-on de envíos/i);
   });
 
   it("cancelar un add-on inexistente da 404", async () => {
@@ -932,5 +957,92 @@ describe("Webhook", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+});
+
+// --- Redactar correo nuevo desde la Bandeja ---
+
+describe("Bandeja: redactar", () => {
+  const email = `compose-${suffix}@example.com`;
+  let cookie: string | undefined;
+  let csrfToken: string | undefined;
+  let domainId = "";
+
+  before(async () => {
+    sqlite.prepare("DELETE FROM rate_limits").run();
+    createUser(email, await hashPassword("password123"));
+    await updateUserSubscription(email, {
+      plan: "basico",
+      status: "active",
+      mpSubscriptionId: `sub-compose-${suffix}`,
+      currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString(),
+    });
+    // Add-on de 25/día para poder probar el tope sin mandar 100 correos.
+    const a = createAddon(email, "sends25");
+    updateAddon(a.id, { status: "active", currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString() });
+
+    const loginRes = await jsonPost("/api/auth/login", { email, password: "password123" });
+    ({ cookie, csrfToken } = extractCookies(loginRes));
+    await loginRes.body?.cancel();
+
+    const dom = createDomain(email, `compose-${suffix}.com`, ["dkim1"], "verify1");
+    domainId = dom.id;
+    sqlite.prepare("UPDATE domains SET verified = 1 WHERE id = ?").run(domainId);
+    createAlias(domainId, "hola", ["destino@example.com"]);
+    createAlias(domainId, "off", ["destino@example.com"]);
+    sqlite.prepare("UPDATE alias SET enabled = 0 WHERE domain_id = ? AND alias = ?").run(domainId, "off");
+  });
+
+  const compose = (over: Record<string, unknown> = {}) =>
+    jsonPost("/api/bandeja/conversations", {
+      domainId, to: "cliente@example.com", subject: "Cotización", body: "Hola, va la propuesta.", fromAlias: "hola",
+      ...over,
+    }, cookie!, csrfToken);
+
+  it("rechaza un remitente que no es alias del dominio", async () => {
+    const res = await compose({ fromAlias: "inventado" });
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).error, /alias activo/i);
+  });
+
+  it("rechaza un alias deshabilitado", async () => {
+    const res = await compose({ fromAlias: "off" });
+    assert.equal(res.status, 400);
+  });
+
+  it("rechaza un destinatario inválido", async () => {
+    const res = await compose({ to: "no-es-un-email" });
+    assert.equal(res.status, 400);
+  });
+
+  it("rechaza un destinatario en la lista de supresión", async () => {
+    addSuppression(domainId, "rebotado@example.com", "bounce:Permanent");
+    const res = await compose({ to: "rebotado@example.com" });
+    assert.equal(res.status, 422);
+  });
+
+  it("respeta el tope diario del add-on", async () => {
+    // El add-on de este usuario es de 25/día. Se llena el contador a mano: ningún test
+    // de esta suite llega a enviar, así que la fila del día no existe todavía.
+    const day = new Date().toISOString().slice(0, 10);
+    const expires = new Date(Date.now() + 3 * 864e5).toISOString();
+    sqlite.prepare(
+      "INSERT OR REPLACE INTO send_counts (domain_id, month, count, expires_at) VALUES (?,?,?,?)",
+    ).run(domainId, day, 25, expires);
+
+    const res = await compose({ subject: "Uno de más" });
+    assert.equal(res.status, 429);
+    assert.match((await res.json()).error, /Límite diario/i);
+
+    // La cuota rechazada se devuelve: no queda consumida de más.
+    assert.equal(getSendCount(domainId), 25);
+  });
+
+  it("un dominio sin verificar no puede redactar", async () => {
+    sqlite.prepare("UPDATE domains SET verified = 0 WHERE id = ?").run(domainId);
+    const res = await compose();
+    assert.equal(res.status, 400);
+    await res.body?.cancel();
+    sqlite.prepare("UPDATE domains SET verified = 1 WHERE id = ?").run(domainId);
   });
 });

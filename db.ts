@@ -1148,6 +1148,17 @@ export function incrementSendCount(domainId: string): number {
   return rows[0].count;
 }
 
+// Se usa para devolver la cuota cuando el envío falla después de haberla reservado.
+// El patrón es reservar-primero (incrementar y verificar el valor devuelto) porque
+// getSendCount → enviar → incrementar deja pasar dos peticiones simultáneas.
+export function decrementSendCount(domainId: string): void {
+  const month = new Date().toISOString().slice(0, 10);
+  db.update(sendCounts)
+    .set({ count: rawSql`MAX(0, ${sendCounts.count} - 1)` })
+    .where(and(eq(sendCounts.domainId, domainId), eq(sendCounts.month, month)))
+    .run();
+}
+
 export function getSendCount(domainId: string): number {
   const month = new Date().toISOString().slice(0, 10); // daily key (YYYY-MM-DD)
   const rows = db.select().from(sendCounts)

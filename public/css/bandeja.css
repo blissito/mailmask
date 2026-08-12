@@ -632,6 +632,43 @@ body {
   font-weight: 600;
 }
 
+/* --- Compose modal --- */
+.mesa-modal-wide { width: 560px; }
+.mesa-field-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--mesa-text-3);
+  font-weight: 600;
+  margin: 12px 0 4px;
+}
+.mesa-field-label:first-of-type { margin-top: 4px; }
+.mesa-modal .mesa-field {
+  width: 100%;
+  background: var(--mesa-bg);
+  border: 1px solid var(--mesa-border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--mesa-text);
+  font-size: 13px;
+  font-family: inherit;
+}
+.mesa-modal .mesa-field:focus { outline: none; border-color: var(--mesa-accent); }
+.mesa-field-textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
+.mesa-modal-error {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.mesa-modal-error.hidden { display: none; }
+.mesa-modal-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+#btn-compose:disabled { opacity: 0.45; cursor: not-allowed; }
+
 /* --- Toast --- */
 .mesa-toast {
   position: fixed;

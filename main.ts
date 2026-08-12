@@ -77,7 +77,9 @@ import {
   addSuppression,
   isSuppressed,
   incrementSendCount,
+  decrementSendCount,
   getSendCount,
+  createConversation,
   createBulkJob,
   getBulkJob,
   updateBulkJob,
@@ -142,6 +144,7 @@ import {
   createReceiptRule,
   deleteReceiptRule,
   sendFromDomain,
+  normalizeAddress,
   sendAlert,
   checkSesHealth,
   deleteOldBackups,
@@ -2723,27 +2726,39 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "to, subject y body/html requeridos" }), { status: 400 });
     }
 
-    if (await isSuppressed(domain.id, to)) {
+    const recipient = normalizeAddress(to);
+    if (await isSuppressed(domain.id, recipient)) {
       return new Response(JSON.stringify({ error: "Destinatario en lista de supresión (bounce/complaint previo)" }), { status: 422 });
     }
 
-    const currentSends = await getSendCount(domain.id);
-    if (currentSends >= limits.sends) {
+    // El remitente debe ser un alias real del dominio: sin esto se puede enviar como
+    // cualquier dirección del dominio propio.
+    const sendAliases = await listAliases(domain.id);
+    const fromLocalPart = String(fromLocal ?? "noreply").split("@")[0].toLowerCase();
+    if (fromLocal && !sendAliases.some((a) => a.alias.toLowerCase() === fromLocalPart && a.enabled && a.alias !== "*")) {
+      return new Response(JSON.stringify({ error: "El remitente debe ser un alias activo de tu dominio" }), { status: 400 });
+    }
+
+    // Reservar antes de enviar: chequear y luego incrementar deja pasar dos peticiones
+    // simultáneas por el mismo hueco.
+    const reservedSend = await incrementSendCount(domain.id);
+    if (reservedSend > limits.sends) {
+      decrementSendCount(domain.id);
       return new Response(JSON.stringify({ error: `Límite diario de envíos alcanzado (${limits.sends})` }), { status: 429 });
     }
 
     const fromAddress = `${fromLocal ?? "noreply"}@${domain.domain}`;
     try {
-      const messageId = await sendFromDomain(fromAddress, to, subject, (textBody ?? html)!, {
+      const messageId = await sendFromDomain(fromAddress, recipient, subject, (textBody ?? html)!, {
         html,
         replyTo,
         configSet: getConfigSetName(domain.domain),
       });
-      await incrementSendCount(domain.id);
       return new Response(JSON.stringify({ ok: true, messageId }), {
         headers: { "content-type": "application/json" },
       });
     } catch (err) {
+      decrementSendCount(domain.id); // devolver la cuota reservada
       log("error", "ses", "Outbound send failed", { error: String(err), domainId: domain.id });
       return new Response(JSON.stringify({ error: "Error enviando email" }), { status: 500 });
     }
@@ -2794,6 +2809,14 @@ const app = new Elysia({ adapter: node() })
     const invalid = recipients.filter((r: string) => typeof r !== "string" || !emailRegex.test(r));
     if (invalid.length) {
       return new Response(JSON.stringify({ error: `Emails inválidos: ${invalid.slice(0, 5).join(", ")}` }), { status: 400, headers: { "content-type": "application/json" } });
+    }
+
+    // Sin esto un job de 10,000 sale completo aunque el plan tope en 25 al día.
+    const usedToday = await getSendCount(domain.id);
+    if (usedToday + recipients.length > limits.sends) {
+      return new Response(JSON.stringify({
+        error: `El lote excede tu límite diario: te quedan ${Math.max(0, limits.sends - usedToday)} envíos de ${limits.sends}`,
+      }), { status: 429, headers: { "content-type": "application/json" } });
     }
 
     const fromAddress = `${fromLocal ?? "noreply"}@${domain.domain}`;
@@ -3033,6 +3056,137 @@ const app = new Elysia({ adapter: node() })
     detail: { tags: ["Bandeja"], summary: "Download a message attachment", security: [{ cookieAuth: [] }] },
   })
 
+  // Redactar un correo nuevo: crea la conversación y manda el primer mensaje.
+  // A diferencia de responder, esto SÍ es correo que origina el usuario, así que pasa
+  // por el add-on de envíos y su tope diario.
+  .post("/api/bandeja/conversations", async ({ request, body: newBody }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 20, 60_000);
+    if (limited) return limited;
+
+    const { domainId, to, subject, body: textBody, html, fromAlias } = newBody;
+    if (!domainId || !to || !subject || (!textBody && !html) || !fromAlias) {
+      return new Response(JSON.stringify({ error: "domainId, to, subject, fromAlias y body/html requeridos" }), { status: 400 });
+    }
+
+    // Redactar crea identidad saliente nueva, así que pide permiso de escritura —
+    // no el owner||agent inline que usa el resto de la Bandeja.
+    const access = await checkDomainAccess(auth.email, domainId, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    const domain = access.domain;
+
+    const user = (await getUser(auth.email))!;
+    const plan = user.subscription?.plan ?? "basico";
+    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
+    if (!mesaLimits.mesaActions) {
+      return new Response(JSON.stringify({ error: "Tu plan no permite escribir desde Mesa" }), { status: 403 });
+    }
+
+    const limits = getUserPlanLimits(user);
+    if (limits.sends === 0 || !limits.sendsUnlocked) {
+      return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails. Agrega el add-on de envíos." }), { status: 403 });
+    }
+    if (!domain.verified) {
+      return new Response(JSON.stringify({ error: "Dominio no verificado" }), { status: 400 });
+    }
+
+    // El remitente tiene que ser un alias real y habilitado: si no, es spoofing dentro
+    // del propio dominio, y además la respuesta del contacto no se reenviaría a ningún
+    // buzón (caería en la Bandeja pero con "No matching alias").
+    const aliases = await listAliases(domain.id);
+    const local = String(fromAlias).split("@")[0].toLowerCase();
+    const match = aliases.find((a) => a.alias.toLowerCase() === local && a.enabled && a.alias !== "*");
+    if (!match) {
+      return new Response(JSON.stringify({ error: "El remitente debe ser un alias activo de tu dominio" }), { status: 400 });
+    }
+
+    const recipient = normalizeAddress(String(to));
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(recipient)) {
+      return new Response(JSON.stringify({ error: "Destinatario inválido" }), { status: 400 });
+    }
+    if (await isSuppressed(domain.id, recipient)) {
+      return new Response(JSON.stringify({ error: "Destinatario en lista de supresión (bounce/complaint previo)" }), { status: 422 });
+    }
+
+    // Reservar la cuota antes de enviar. Chequear y luego incrementar deja pasar dos
+    // peticiones simultáneas por el mismo hueco.
+    const reserved = await incrementSendCount(domain.id);
+    if (reserved > limits.sends) {
+      decrementSendCount(domain.id);
+      return new Response(JSON.stringify({ error: `Límite diario de envíos alcanzado (${limits.sends})` }), { status: 429 });
+    }
+
+    const fromAddress = `${match.alias}@${domain.domain}`;
+    let messageId: string;
+    try {
+      // Sin inReplyTo/references: es el primer mensaje del hilo. El Message-ID que
+      // devuelve SES es lo que guardamos en threadReferences para que la respuesta
+      // del contacto reenganche en esta misma conversación.
+      messageId = await sendFromDomain(fromAddress, recipient, String(subject), (textBody ?? html)!, {
+        html,
+        configSet: getConfigSetName(domain.domain),
+      });
+    } catch (err) {
+      decrementSendCount(domain.id);
+      log("error", "ses", "Compose send failed", { error: String(err), domainId: domain.id });
+      return new Response(JSON.stringify({ error: "Error enviando email" }), { status: 500 });
+    }
+
+    try {
+      // Convención invertida a propósito, igual que en las conversaciones entrantes:
+      // `from` es el contacto externo y `to` nuestro alias. La lista, el filtro y el
+      // reply posterior (que deriva el remitente de conv.to) dependen de esto.
+      const conv = await createConversation({
+        domainId: domain.id,
+        from: recipient,
+        to: fromAddress,
+        subject: String(subject),
+        status: "open",
+        priority: "normal",
+        lastMessageAt: new Date().toISOString(),
+        messageCount: 1,
+        tags: [],
+        threadReferences: [messageId],
+      });
+
+      await addMessage({
+        conversationId: conv.id,
+        from: fromAddress,
+        body: textBody ?? "",
+        html: html ?? "",
+        direction: "outbound",
+        createdAt: new Date().toISOString(),
+        messageId,
+      });
+
+      return new Response(JSON.stringify({ ok: true, conversationId: conv.id, messageId }), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      });
+    } catch (err) {
+      // El correo ya salió. Es mejor avisar que quedó sin registrar que fingir un
+      // fallo y que el usuario lo mande otra vez.
+      log("error", "mesa", "Compose sent but not persisted", { error: String(err), domainId: domain.id, messageId });
+      return new Response(JSON.stringify({ ok: true, warning: "El correo se envió pero no se pudo guardar en la Bandeja", messageId }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+  }, {
+    body: t.Object({
+      domainId: t.String(),
+      to: t.String(),
+      subject: t.String(),
+      fromAlias: t.String(),
+      body: t.Optional(t.String()),
+      html: t.Optional(t.String()),
+    }),
+    detail: { tags: ["Bandeja"], summary: "Compose a new conversation and send the first email", security: [{ cookieAuth: [] }] },
+  })
+
   .post("/api/bandeja/conversations/:id/reply", async ({ request, params, body: replyBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
@@ -3065,17 +3219,34 @@ const app = new Elysia({ adapter: node() })
     if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
     if (conv.deletedAt) return new Response(JSON.stringify({ error: "Conversación eliminada" }), { status: 400 });
 
+    if (!domain.verified) {
+      return new Response(JSON.stringify({ error: "Dominio no verificado" }), { status: 400 });
+    }
+
+    // conv.from puede venir con display name si la conversación se reconstruyó desde S3.
+    const recipient = normalizeAddress(conv.from);
+    if (await isSuppressed(domain.id, recipient)) {
+      return new Response(JSON.stringify({ error: "Destinatario en lista de supresión (bounce/complaint previo)" }), { status: 422 });
+    }
+
+    // Responder NO consume la cuota del add-on: la Bandeja se vende incluida en todos
+    // los planes. El tope de aquí es contra abuso (bucles, scripts), no de producto,
+    // y el volumen ya está acotado río arriba por forwardPerHour.
+    const replyLimit = checkRateLimit(`reply:${domain.id}`, 200, 3600_000);
+    if (!replyLimit.allowed) {
+      return new Response(JSON.stringify({ error: "Demasiadas respuestas por hora" }), { status: 429 });
+    }
+
     const fromAddress = `${conv.to.split("@")[0]}@${domain.domain}`;
     const lastRef = conv.threadReferences[conv.threadReferences.length - 1];
 
     try {
-      const messageId = await sendFromDomain(fromAddress, conv.from, `Re: ${conv.subject}`, (replyBodyText ?? html)!, {
+      const messageId = await sendFromDomain(fromAddress, recipient, `Re: ${conv.subject}`, (replyBodyText ?? html)!, {
         html,
         configSet: getConfigSetName(domain.domain),
         inReplyTo: lastRef,
         references: conv.threadReferences.join(" "),
       });
-      await incrementSendCount(domain.id);
 
       await addMessage({
         conversationId: conv.id,
@@ -4218,11 +4389,26 @@ cron.schedule("* * * * *", async () => {
       continue;
     }
 
+    // El tope diario se valida al encolar, pero un job puede cruzar la medianoche o
+    // convivir con envíos sueltos. Sin esto el bulk vacía la lista sin mirar la cuota.
+    const jobDomain = await getDomain(job.domainId);
+    const jobOwner = jobDomain ? await getUser(jobDomain.ownerEmail) : null;
+    const jobLimit = jobOwner ? getUserPlanLimits(jobOwner).sends : 0;
+
     for (const recipient of batch) {
       // Check suppression
       if (await isSuppressed(job.domainId, recipient)) {
         job.skippedSuppressed++;
         continue;
+      }
+
+      // Reservar la cuota. Al toparse se deja el job en processing y se reanuda
+      // mañana: bulk_jobs vive 7 días, así que no se pierde nada.
+      const used = await incrementSendCount(job.domainId);
+      if (used > jobLimit) {
+        decrementSendCount(job.domainId);
+        log("info", "ses", "Bulk job paused: daily send limit reached", { jobId: job.id, domainId: job.domainId, limit: jobLimit });
+        break;
       }
 
       try {
@@ -4231,8 +4417,8 @@ cron.schedule("* * * * *", async () => {
           configSet,
         });
         job.sent++;
-        await incrementSendCount(job.domainId);
       } catch (err) {
+        decrementSendCount(job.domainId); // devolver la cuota reservada
         job.failed++;
         job.lastError = String(err);
         log("warn", "ses", "Bulk send failed for recipient", { recipient, error: String(err) });
