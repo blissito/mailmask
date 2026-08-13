@@ -1,3 +1,23 @@
+// Con un modal abierto, el fondo no debe desplazarse.
+let openModals = 0;
+function lockBodyScroll() {
+  if (openModals === 0) {
+    const gap = window.innerWidth - document.documentElement.clientWidth;
+    document.body.dataset.prevOverflow = document.body.style.overflow || "";
+    document.body.style.overflow = "hidden";
+    if (gap > 0) document.body.style.paddingRight = `${gap}px`;
+  }
+  openModals++;
+}
+function unlockBodyScroll() {
+  openModals = Math.max(0, openModals - 1);
+  if (openModals === 0) {
+    document.body.style.overflow = document.body.dataset.prevOverflow ?? "";
+    document.body.style.paddingRight = "";
+    delete document.body.dataset.prevOverflow;
+  }
+}
+
 // --- CSRF: inject X-CSRF-Token header on mutating requests ---
 {
   const _fetch = window.fetch;
@@ -324,7 +344,8 @@ function renderCoupons() {
 
 function initCoupons() {
   document.getElementById("btn-create-coupon").addEventListener("click", () => {
-    document.getElementById("coupon-modal").classList.remove("hidden");
+    const cm = document.getElementById("coupon-modal");
+    if (cm.classList.contains("hidden")) { cm.classList.remove("hidden"); lockBodyScroll(); }
     document.getElementById("coupon-modal-error").classList.add("hidden");
     document.getElementById("coupon-code").value = "";
     document.getElementById("coupon-desc").value = "";
@@ -335,7 +356,8 @@ function initCoupons() {
   });
 
   document.getElementById("btn-cancel-coupon").addEventListener("click", () => {
-    document.getElementById("coupon-modal").classList.add("hidden");
+    const cmc = document.getElementById("coupon-modal");
+        if (!cmc.classList.contains("hidden")) { cmc.classList.add("hidden"); unlockBodyScroll(); }
   });
 
   document.getElementById("coupon-price").addEventListener("input", (e) => {
@@ -384,7 +406,8 @@ function initCoupons() {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
       });
       if (res.ok) {
-        document.getElementById("coupon-modal").classList.add("hidden");
+        const cmc = document.getElementById("coupon-modal");
+        if (!cmc.classList.contains("hidden")) { cmc.classList.add("hidden"); unlockBodyScroll(); }
         couponsLoaded = false; loadCoupons();
       } else {
         const d = await res.json();

@@ -1,3 +1,23 @@
+// Con un modal abierto, el fondo no debe desplazarse.
+let openModals = 0;
+function lockBodyScroll() {
+  if (openModals === 0) {
+    const gap = window.innerWidth - document.documentElement.clientWidth;
+    document.body.dataset.prevOverflow = document.body.style.overflow || "";
+    document.body.style.overflow = "hidden";
+    if (gap > 0) document.body.style.paddingRight = `${gap}px`;
+  }
+  openModals++;
+}
+function unlockBodyScroll() {
+  openModals = Math.max(0, openModals - 1);
+  if (openModals === 0) {
+    document.body.style.overflow = document.body.dataset.prevOverflow ?? "";
+    document.body.style.paddingRight = "";
+    delete document.body.dataset.prevOverflow;
+  }
+}
+
 // Session detection (non-blocking)
 let _loggedInUser = null;
 fetch("/api/auth/me").then(r => r.ok ? r.json() : null).then(u => {
@@ -107,12 +127,15 @@ function showEmailModal(plan, billing, btn) {
   modal.dataset.plan = plan;
   modal.dataset.billing = billing;
   modal._btn = btn;
-  modal.classList.remove("hidden");
+  if (modal.classList.contains("hidden")) { modal.classList.remove("hidden"); lockBodyScroll(); }
   setTimeout(() => input.focus(), 100);
 }
 
 function hideEmailModal() {
-  document.getElementById("email-modal").classList.add("hidden");
+  const el = document.getElementById("email-modal");
+  if (el.classList.contains("hidden")) return;
+  el.classList.add("hidden");
+  unlockBodyScroll();
 }
 
 document.addEventListener("DOMContentLoaded", () => {

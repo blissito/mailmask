@@ -26,6 +26,27 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+
+// Con un modal abierto, el fondo no debe desplazarse.
+let openModals = 0;
+function lockBodyScroll() {
+  if (openModals === 0) {
+    const gap = window.innerWidth - document.documentElement.clientWidth;
+    document.body.dataset.prevOverflow = document.body.style.overflow || "";
+    document.body.style.overflow = "hidden";
+    if (gap > 0) document.body.style.paddingRight = `${gap}px`;
+  }
+  openModals++;
+}
+function unlockBodyScroll() {
+  openModals = Math.max(0, openModals - 1);
+  if (openModals === 0) {
+    document.body.style.overflow = document.body.dataset.prevOverflow ?? "";
+    document.body.style.paddingRight = "";
+    delete document.body.dataset.prevOverflow;
+  }
+}
+
 // --- State ---
 let currentUser = null;
 let domains = [];
@@ -133,11 +154,15 @@ function openComposeModal() {
   err.classList.add("hidden");
   err.textContent = "";
   document.getElementById("modal-compose").classList.remove("hidden");
+  lockBodyScroll();
   document.getElementById("compose-to").focus();
 }
 
 function closeComposeModal() {
-  document.getElementById("modal-compose").classList.add("hidden");
+  const el = document.getElementById("modal-compose");
+  if (el.classList.contains("hidden")) return;
+  el.classList.add("hidden");
+  unlockBodyScroll();
 }
 
 async function sendNew() {
@@ -584,7 +609,10 @@ function setupListeners() {
 
   // Assign modal
   document.getElementById("assign-cancel").addEventListener("click", () => {
-    document.getElementById("modal-assign").classList.add("hidden");
+    const el = document.getElementById("modal-assign");
+    if (el.classList.contains("hidden")) return;
+    el.classList.add("hidden");
+    unlockBodyScroll();
   });
   document.getElementById("assign-confirm").addEventListener("click", async () => {
     const email = document.getElementById("assign-email").value.trim();

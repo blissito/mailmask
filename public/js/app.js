@@ -1684,12 +1684,45 @@ function switchTab(tab) {
 
 // --- Modals ---
 
+// Con un modal abierto, el fondo no debe desplazarse. Se lleva la cuenta de cuántos hay
+// abiertos para que cerrar uno no libere el scroll si todavía queda otro.
+let openModals = 0;
+
+function lockBodyScroll() {
+  if (openModals === 0) {
+    // Se compensa el ancho de la barra de desplazamiento para que la página no salte
+    // al ocultarla.
+    const gap = window.innerWidth - document.documentElement.clientWidth;
+    document.body.dataset.prevOverflow = document.body.style.overflow || "";
+    document.body.dataset.prevPadding = document.body.style.paddingRight || "";
+    document.body.style.overflow = "hidden";
+    if (gap > 0) document.body.style.paddingRight = `${gap}px`;
+  }
+  openModals++;
+}
+
+function unlockBodyScroll() {
+  openModals = Math.max(0, openModals - 1);
+  if (openModals === 0) {
+    document.body.style.overflow = document.body.dataset.prevOverflow ?? "";
+    document.body.style.paddingRight = document.body.dataset.prevPadding ?? "";
+    delete document.body.dataset.prevOverflow;
+    delete document.body.dataset.prevPadding;
+  }
+}
+
 function showModal(id) {
-  document.getElementById(id).classList.remove("hidden");
+  const el = document.getElementById(id);
+  if (!el || !el.classList.contains("hidden")) return; // ya estaba abierto: no contar doble
+  el.classList.remove("hidden");
+  lockBodyScroll();
 }
 
 function hideModal(id) {
-  document.getElementById(id).classList.add("hidden");
+  const el = document.getElementById(id);
+  if (!el || el.classList.contains("hidden")) return; // ya estaba cerrado
+  el.classList.add("hidden");
+  unlockBodyScroll();
 }
 
 const AVAILABLE_TLDS = [

@@ -173,7 +173,7 @@
             "name": "¿Puedo enviar emails desde mi dominio?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Sí. Todos los planes incluyen envío autenticado. Al agregar tu dominio, MailMask configura DKIM y SPF automáticamente — Gmail y Outlook muestran \"firmado por tudominio.com\" junto al remitente, lo que mejora la entregabilidad y evita que tus emails caigan en spam."
+              "text": "Sí, y sale firmado con tu dominio. Responder desde la Bandeja está incluido en todos los planes; para iniciar un correo nuevo, Básico necesita el add-on de envíos (+$49 o +$99 al mes) y Freelancer y Developer ya lo traen. Al agregar tu dominio, MailMask configura DKIM y SPF automáticamente — Gmail y Outlook muestran \"firmado por tudominio.com\" junto al remitente, lo que mejora la entregabilidad y evita que tus emails caigan en spam."
             }
           },
           {
@@ -503,7 +503,7 @@
           <div class="text-zinc-400">Máscaras (alias)</div>
           <div class="text-center text-zinc-500">1 por usuario</div>
           <div class="text-center text-mask-400 font-semibold">
-            5 — 100 por dominio
+            0 — 50 por dominio
           </div>
         </div>
         <div
@@ -519,7 +519,7 @@
           <div class="text-zinc-400">Reglas de routing</div>
           <div class="text-center text-zinc-500">Limitadas</div>
           <div class="text-center text-mask-400 font-semibold">
-            5 — 100 por dominio
+            0 — 50 por dominio
           </div>
         </div>
         <div
@@ -883,9 +883,7 @@
             <li>✓ Bandeja — helpdesk integrado</li>
             <li>✓ 3 miembros de equipo por dominio</li>
             <li>✓ Marca blanca <span class="text-xs text-zinc-500">(próximamente)</span></li>
-
-            <li>✓ API/SDK <span class="text-xs text-zinc-500">(próximamente)</span></li>
-            <li>✓ Webhooks <span class="text-xs text-zinc-500">(próximamente)</span></li>
+            <li>✓ API REST + SDK de JavaScript</li>
             <li>✓ Soporte por email</li>
           </ul>
           <button
@@ -916,13 +914,13 @@
             <li>✓ 50 reglas por dominio</li>
             <li>✓ Historial 90 días</li>
             <li>✓ Entrega fuera de spam (DKIM + SPF)</li>
-            <li>✓ API/SDK <span class="text-xs text-zinc-500">(próximamente)</span></li>
+            <li>✓ API REST + SDK de JavaScript</li>
             <li>✓ Webhooks <span class="text-xs text-zinc-500">(próximamente)</span></li>
             <li>✓ Marca blanca <span class="text-xs text-zinc-500">(próximamente)</span></li>
             <li>✓ IPs dedicadas <span class="text-xs text-zinc-500">(próximamente)</span></li>
             <li>✓ Bandeja — helpdesk integrado</li>
             <li>✓ 10 miembros de equipo por dominio</li>
-            <li>✓ SMTP — envía desde cualquier cliente <span class="text-xs text-zinc-500">(próximamente)</span></li>
+            <li>✓ SMTP relay — conecta tu SaaS o sistema existente</li>
             <li>✓ Soporte prioritario</li>
           </ul>
           <button
@@ -986,7 +984,7 @@
             >
           </summary>
           <p class="px-6 pb-4 text-zinc-400 text-sm">
-            Sí. Todos los planes incluyen envío autenticado.
+            Sí, y sale firmado con tu dominio. Responder desde la Bandeja está incluido en todos los planes; para iniciar un correo nuevo, Básico necesita el add-on de envíos (+$49 o +$99 al mes) y Freelancer y Developer ya lo traen.
             Al agregar tu dominio, MailMask configura DKIM y SPF automáticamente —
             Gmail y Outlook muestran "firmado por tudominio.com" junto al remitente,
             lo que mejora la entregabilidad y evita que tus emails caigan en spam.
@@ -1079,7 +1077,7 @@
             licencias. Con MailMask creas todas las direcciones que tu plan
             permita por una sola cuota — y cada una puede reenviar a uno o
             varios destinos a la vez (Gmail, Outlook, el correo de tu equipo,
-            donde quieras). Además, con los planes Freelancer y Developer
+            donde quieras). Además, con el plan Developer
             puedes enviar desde tu dominio usando credenciales SMTP en
             Outlook, Thunderbird o cualquier cliente de correo — recibes y
             envías como ventas@tudominio.com sin pagar por buzón. Pagas por
