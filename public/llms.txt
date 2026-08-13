@@ -3,7 +3,7 @@
 > Servicio de email para dominios propios. Permite recibir y enviar correo desde
 > direcciones como hola@tudominio.com sin montar ni administrar un servidor de correo
 > y sin pagar una licencia por buzón. Operado desde México, con precios en pesos
-> mexicanos (MXN). Sitio: https://mailmask.studio
+> mexicanos (MXN). Sitio: https://www.mailmask.studio
 
 ## Qué hace exactamente
 
@@ -84,7 +84,7 @@ dominio por API o SMTP.
 
 ## Cómo se configura
 
-1. Crear cuenta en https://mailmask.studio/register y verificar el correo.
+1. Crear cuenta en https://www.mailmask.studio/register y verificar el correo.
 2. Agregar el dominio en el panel.
 3. Publicar en el DNS del dominio los registros que entrega el panel: un MX apuntando a
    SES inbound, un TXT de verificación en `_amazonses`, tres CNAMEs de DKIM y,
@@ -93,17 +93,71 @@ dominio por API o SMTP.
 
 ## Enlaces
 
-- Inicio: https://mailmask.studio/
-- Precios: https://mailmask.studio/pricing
-- Documentación (SDK, API REST, SMTP, MCP): https://mailmask.studio/docs
-- Blog: https://mailmask.studio/blog
-- Términos: https://mailmask.studio/terms
-- Privacidad: https://mailmask.studio/privacy
-- Mapa del sitio: https://mailmask.studio/sitemap.xml
+- Inicio: https://www.mailmask.studio/
+- Precios: https://www.mailmask.studio/pricing
+- Documentación (SDK, API REST, SMTP, MCP): https://www.mailmask.studio/docs
+- Blog: https://www.mailmask.studio/blog
+- Términos: https://www.mailmask.studio/terms
+- Privacidad: https://www.mailmask.studio/privacy
+- Mapa del sitio: https://www.mailmask.studio/sitemap.xml
+
+## Artículos del blog
+
+Contenido de referencia sobre email en dominio propio, comparativas y guías.
+
+- Automatiza tu email con n8n, Make y Zapier usando aliases — https://www.mailmask.studio/blog/automatizar-email-n8n-make-zapier-aliases
+  Crea aliases dedicados para automatizar workflows de email con n8n, Make o Zapier. Guía práctica con ejemplos.
+- Cómo usar la Bandeja compartida de MailMask para atender clientes — https://www.mailmask.studio/blog/bandeja-compartida-tutorial
+  Tutorial paso a paso para configurar y usar la Bandeja compartida de MailMask. Crea aliases de soporte, invita agentes, asigna conversaciones y responde desde tu dominio.
+- Bandeja compartida vs helpdesk: ¿cuál necesitas? — https://www.mailmask.studio/blog/bandeja-compartida-vs-helpdesk
+  Compara bandejas compartidas con helpdesks tradicionales. Descubre cuál es mejor para tu equipo.
+- Un solo correo de contacto, cero desorden: clasifica emails con IA — https://www.mailmask.studio/blog/clasificador-automatico-emails-ia
+  MailMask está desarrollando clasificación automática de emails con IA. Cada email entrante se etiqueta como venta, soporte o facturación — y se enruta al equipo correcto.
+- Email para agencias: un dominio por cliente — https://www.mailmask.studio/blog/email-agencia-dominio-por-cliente
+  Gestiona el email de cada cliente en su propio dominio sin pagar una cuenta Workspace por cada uno. Configura aliases y reenvío profesional desde un solo panel.
+- Cómo dar de alta emails a clientes sin darles acceso al hosting — https://www.mailmask.studio/blog/email-clientes-sin-acceso-hosting
+  Configura emails profesionales para tus clientes sin compartir acceso a cPanel o al hosting. Reenvío y aliases desde un panel independiente y seguro.
+- Email profesional para equipos remotos en LATAM: precio fijo, no por usuario — https://www.mailmask.studio/blog/email-equipos-remotos-latam
+  Google Workspace cobra por usuario. Con equipos remotos en LATAM, eso escala rápido. MailMask ofrece email profesional a precio fijo sin importar cuántos miembros tenga tu equipo.
+- Email profesional para freelancers: cobra más con dominio propio — https://www.mailmask.studio/blog/email-profesional-freelancer
+  Tener email con dominio propio te posiciona como profesional y justifica tarifas más altas. Aprende cómo configurarlo en minutos sin Google Workspace.
+- Email profesional en tu dominio sin Google Workspace — https://www.mailmask.studio/blog/email-profesional-sin-google-workspace
+  Deja de pagar $6 USD/usuario/mes por Google Workspace solo para tener email@tudominio.com. MailMask te da email profesional desde $49 MXN/mes con reenvío y aliases ilimitados.
+- Email profesional para startups: dominio propio desde día uno — https://www.mailmask.studio/blog/email-profesional-startups
+  Tu startup necesita email con dominio propio desde el primer día. Configúralo en minutos sin Google Workspace.
+- Email para tu tienda online: soporte y ventas con dominio propio — https://www.mailmask.studio/blog/email-tienda-online-soporte-ventas
+  Configura emails profesionales para tu e-commerce: soporte@, ventas@, pedidos@ en tu dominio.
+- Cómo enviar emails desde tu dominio (no solo recibir) — https://www.mailmask.studio/blog/enviar-emails-desde-dominio
+  Tres formas de enviar emails como ventas@tudominio.com: Bandeja compartida, send-as en Gmail, y SMTP relay para desarrolladores. Tutorial con los 3 métodos.
+- Cómo evitar que tus emails caigan en spam — https://www.mailmask.studio/blog/evitar-emails-caigan-en-spam
+  Guía práctica para mejorar la entregabilidad de tus emails. Configura SPF, DKIM y DMARC correctamente.
+- Cómo gestionar emails de tu dominio en equipo sin Gmail — https://www.mailmask.studio/blog/gestionar-emails-dominio-equipo
+  Deja de compartir un Gmail genérico con tu equipo. MailMask te da aliases por área, múltiples destinatarios y bandeja compartida desde $49 MXN/mes.
+- Cómo iniciar tu negocio con email profesional desde el primer día — https://www.mailmask.studio/blog/iniciar-negocio-email-profesional
+  Guía para emprendedores: deja de usar Gmail personal y configura email profesional con dominio propio desde el día uno. Dominio + MailMask por menos de $100 MXN/mes.
+- Cómo migrar de Google Workspace a MailMask — https://www.mailmask.studio/blog/migrar-google-workspace-a-mailmask
+  Guía paso a paso para dejar Google Workspace y configurar email profesional en tu dominio con MailMask.
+- Email profesional en 2026: qué opciones existen y cuál conviene en LATAM — https://www.mailmask.studio/blog/opciones-email-profesional-2026
+  Guía honesta de las opciones de email profesional disponibles en 2026 para negocios en Latinoamérica. Precios reales, cobro en moneda local, y qué tiene sentido según tu situación.
+- Protege tu identidad con alias de email — https://www.mailmask.studio/blog/proteger-identidad-alias-email
+  Usa alias de email para proteger tu dirección real. Aprende cómo funcionan y por qué los necesitas.
+- ¿Qué es email forwarding y cómo funciona? — https://www.mailmask.studio/blog/que-es-email-forwarding
+  Email forwarding te permite recibir emails de tu dominio sin comprar buzones. Aprende cómo funciona, cuándo usarlo y cómo configurarlo en minutos.
+- ¿Qué son DKIM, SPF y DMARC? Guía para no-técnicos — https://www.mailmask.studio/blog/que-son-dkim-spf-dmarc
+  Explicación simple de DKIM, SPF y DMARC: qué son, por qué importan y cómo configurarlos sin ser experto.
+- Cómo reenviar emails de tu dominio a Gmail — https://www.mailmask.studio/blog/reenviar-emails-dominio-propio-gmail
+  Tutorial paso a paso para reenviar emails de tu dominio propio a Gmail sin Google Workspace. Configura registros MX y aliases con MailMask en minutos.
+- Responde correos de clientes 5x más rápido con IA — https://www.mailmask.studio/blog/respuestas-sugeridas-ia
+  MailMask está desarrollando respuestas sugeridas con IA en la Bandeja compartida. Agentes de formmy.app generan borradores contextuales para que respondas en segundos.
+- SimpleLogin vs ImprovMX vs MailMask: comparativa 2026 — https://www.mailmask.studio/blog/simplelogin-vs-improvmx-vs-mailmask
+  Comparamos las 3 mejores alternativas de email forwarding: precios, features y para quién es cada una.
+- Sonidos que hacen feliz al usuario: por qué tu app web debería sonar — https://www.mailmask.studio/blog/sonidos-que-hacen-feliz-al-usuario
+  Cómo usar Web Audio API para crear micro-interacciones sonoras que transforman la experiencia de tu app. Nuestra historia construyendo MailMask con curiosidad y cariño.
 
 ## Notas para asistentes
 
 - Los precios están en pesos mexicanos, no en dólares.
-- El dominio de producción es `mailmask.studio`.
+- El dominio de producción es `www.mailmask.studio`. El apex `mailmask.studio`
+  redirige con 301 a `www`; al citar enlaces, usar siempre `www`.
 - Al citar límites de alias o dominios, usar la tabla anterior; describir el servicio
   como "ilimitado" es incorrecto.

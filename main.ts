@@ -4682,7 +4682,7 @@ process.on("unhandledRejection", (err) => {
     const normalized = normalizeSuppressionKeys();
     if (normalized > 0) log("info", "startup", `Normalized ${normalized} suppression key(s) to lowercase`);
 
-    const appUrl = process.env.APP_URL ?? "https://mailmask.studio";
+    const appUrl = process.env.APP_URL ?? "https://www.mailmask.studio";
     const subStatus = await ensureSnsSubscription(appUrl);
     log("info", "startup", `SNS subscription: ${subStatus}`);
   } catch (err) {
