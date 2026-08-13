@@ -181,6 +181,7 @@ import {
   renewalReceipt,
   chargeFailed,
   guestWelcome,
+  SUPPORT_EMAIL,
 } from "./emails.js";
 import "./cron.js";
 
@@ -843,9 +844,18 @@ const app = new Elysia({ adapter: node() })
         subscription: {
           ...(user.subscription ?? { plan: "basico", status: "none" }),
           currentPeriodEnd: user.subscription?.currentPeriodEnd ?? null,
+          // Resuelto aquí y no en el navegador: app.js es un script plano que no puede
+          // importar TypeScript, y duplicar el mapa de nombres en JS garantizaba que se
+          // desincronizara. De paso muere el `charAt(0).toUpperCase()` que escribía
+          // "Basico" sin acento.
+          planLabel: planLabel(user.subscription?.plan),
         },
         limits,
         addons: listAddons(user.email),
+        // Para que el resumen pueda sumar el cobro real sin pedir otro endpoint.
+        planPriceCents: planPriceCents(user.subscription?.plan),
+        addonCatalog: ADDONS,
+        lastOrder: getLastOrder(user.email),
         emailVerified: user.emailVerified ?? false,
         usage: {
           domains: { current: domains.length, limit: limits.domains },
@@ -2852,6 +2862,43 @@ const app = new Elysia({ adapter: node() })
   })
 
   // --- Add-ons ---
+
+  // Endpoint aparte y no dentro de /api/auth/me: el historial crece sin techo y /me se
+  // llama en cada carga del dashboard.
+  .get("/api/billing/orders", async ({ request, query }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
+
+    const limit = Math.min(Number(query.limit) || 50, 200);
+    const rows = listOrders(auth.email, { limit, before: query.before });
+
+    return new Response(JSON.stringify({
+      // Se omiten `raw`, `grantedBy` y `eventKey`: son operativos, y `raw` trae datos
+      // del pagador que MercadoPago nos manda y que no tenemos por qué devolver.
+      orders: rows.map((o) => ({
+        id: o.id,
+        number: o.number,
+        date: o.occurredAt,
+        kind: o.kind,
+        concept: o.description,
+        subject: o.subject,
+        amountCents: o.amountCents,
+        listPriceCents: o.listPriceCents ?? null,
+        currency: o.currency,
+        periodStart: o.periodStart ?? null,
+        periodEnd: o.periodEnd ?? null,
+        failureReason: o.mpStatusDetail ?? null,
+        note: o.note ?? null,
+        reference: o.mpPaymentId ?? o.mpAuthorizedPaymentId ?? o.mpPreapprovalId ?? null,
+      })),
+      // Cursor por `createdAt` y no por `occurredAt`: los webhooks llegan tarde y
+      // desordenados, así que solo el orden de inserción es monotónico.
+      nextCursor: rows.length === limit ? rows[rows.length - 1].createdAt : null,
+      invoiceNote: `¿Necesitas factura (CFDI)? Escríbenos a ${SUPPORT_EMAIL} con tu RFC, razón social, uso de CFDI y el folio del cargo.`,
+    }), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Billing"], summary: "Payment, courtesy and cancellation history", security: [{ cookieAuth: [] }] },
+  })
 
   .get("/api/addons", async ({ request }) => {
     const auth = await getAuthUser(request);

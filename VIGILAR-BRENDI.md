@@ -1,5 +1,33 @@
 # Vigilar la compra y el threading de Brenda
 
+> **Actualizado en agosto 2026.** Ya existe libro mayor (`orders`), recibo por correo en
+> cada cobro y aviso cuando uno falla, así que buena parte de esto se puede verificar
+> desde el dashboard en vez de con `fly ssh`. Su add-on de dominio quedó marcado como
+> cortesía: ya no se le muestra como un cargo de $99 y no se puede cancelar por accidente.
+
+## 0. El cobro del 28 de agosto
+
+Es la primera renovación que pasa por el código nuevo. Lo que debe ocurrir:
+
+```
+MP authorized payment fetched   status=processed  paymentStatus=approved
+Subscription renewed via authorized payment   email=cliente@example.com
+Recibo de renovación enviado   orderNumber=MM-2609-XXXX
+```
+
+Y en su dashboard debe aparecer la tira "Cobramos $49 MXN el 28/8/2026" más la orden en
+el historial. Si el cobro falla, en vez de eso llega el correo de cargo rechazado y la
+tira sale en rojo.
+
+Comando:
+
+```bash
+fly logs | grep -iE "authorized payment|renewed|Recibo|Cobro rechazado"
+```
+
+Si no aparece nada el día 28, el webhook de renovación tiene el mismo problema que el de
+alta y hay que extender el periodo a mano.
+
 ## 1. Cuando pague el add-on
 
 Dejar corriendo en una terminal:
@@ -37,7 +65,7 @@ y `limits.sendsUnlocked: true` con `limits.sends: 100`.
 ```bash
 fly ssh console -C "/bin/sh -c 'cd /app && node -e \"
 const D=require(\\\"better-sqlite3\\\");
-const d=new D(\\\"/data/mailmask.db\\\");
+const d=new D(\\\"/app/data/mailmask.db\\\");
 const end=new Date(Date.now()+35*864e5).toISOString();
 d.prepare(\\\"UPDATE addons SET status=?, current_period_end=? WHERE user_email=? AND status=?\\\")
  .run(\\\"active\\\", end, \\\"brenda@sudominio.com\\\", \\\"pending\\\");

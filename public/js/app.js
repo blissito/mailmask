@@ -28,13 +28,23 @@ let currentUser = null;
 let domains = [];
 let selectedDomain = null;
 
+// Todo lo que depende de /api/auth/me se pinta desde aquí. Antes `refreshUsage` no
+// llamaba a `renderBillingBanner`, así que cancelar un add-on dejaba el estado de
+// facturación viejo en pantalla — con el resumen de cobro eso ya no es cosmético: el
+// total se quedaría en un número que no es.
+function renderAccountUI() {
+  renderBillingBanner();
+  renderBillingSummary();
+  renderStats();
+  renderReferralBanner();
+  renderReferrals();
+}
+
 async function refreshUsage() {
   const res = await fetch("/api/auth/me");
   if (!res.ok) return;
   currentUser = await res.json();
-  renderStats();
-  renderReferrals();
-  renderReferralBanner();
+  renderAccountUI();
 }
 
 // --- Init ---
@@ -59,7 +69,8 @@ async function checkAuth() {
   // Plan badge in nav
   const badge = document.getElementById("plan-badge");
   if (badge && currentUser.subscription?.plan) {
-    badge.textContent = currentUser.subscription.plan;
+    // Del servidor, ya acentuado. Salía "basico" en minúsculas y sin acento.
+    badge.textContent = currentUser.subscription.planLabel ?? currentUser.subscription.plan;
     badge.classList.remove("hidden");
   }
 
@@ -72,10 +83,7 @@ async function checkAuth() {
   }
 
   renderVerifyBanner();
-  renderBillingBanner();
-  renderStats();
-  renderReferralBanner();
-  renderReferrals();
+  renderAccountUI();
 
   // Handle query param redirects
   const params = new URLSearchParams(window.location.search);
@@ -125,7 +133,7 @@ function renderBillingBanner() {
   if (!container) return;
 
   const sub = currentUser.subscription;
-  const planName = sub?.plan ? sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1) : "Ninguno";
+  const planName = sub?.planLabel ?? PLAN_LABELS[sub?.plan] ?? "Ninguno";
   const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
   const isExpired = periodEnd && periodEnd < new Date();
   const isActive = sub && sub.status === "active" && !isExpired;
@@ -187,6 +195,175 @@ function renderBillingBanner() {
       addDomainBtn.title = "";
     }
   }
+}
+
+// --- Resumen de cobro ---
+
+// Sección siempre visible, no un modal. La queja de fondo es que la app nunca decía lo
+// que cobraba: esconder la respuesta detrás de un clic repetiría el error de los
+// add-ons. Y va aparte de renderBillingBanner, que ya tiene cuatro ramas.
+function renderBillingSummary() {
+  const el = document.getElementById("billing-summary");
+  if (!el) return;
+
+  const sub = currentUser?.subscription;
+  const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
+  const usable = sub && (sub.status === "active" || sub.status === "cancelled")
+    && periodEnd && periodEnd >= new Date();
+  if (!usable) { el.innerHTML = ""; return; }
+
+  const now = new Date();
+  const catalog = currentUser.addonCatalog ?? {};
+  const effective = (currentUser.addons ?? []).filter(a =>
+    a.status === "active" ||
+    (a.status === "cancelled" && a.currentPeriodEnd && new Date(a.currentPeriodEnd) >= now));
+
+  const lines = [{
+    label: `Plan ${sub.planLabel ?? sub.plan}`,
+    cents: currentUser.planPriceCents ?? 0,
+    gift: false,
+  }];
+  for (const a of effective) {
+    const label = catalog[a.kind]?.label ?? a.kind;
+    lines.push({
+      label: a.isCourtesy ? `${label} (cortesía)` : label,
+      // Una cortesía suma cero al total. Ése es el punto entero de la sección.
+      cents: a.isCourtesy ? 0 : (a.priceCents ?? 0),
+      gift: !!a.isCourtesy,
+    });
+  }
+  const total = lines.reduce((sum, l) => sum + l.cents, 0);
+  const money = (c) => `$${(c / 100).toLocaleString("es-MX")}`;
+
+  const aviso = renderLastOrderStrip();
+
+  el.innerHTML = `
+    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3">
+      ${aviso}
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[11px] uppercase tracking-widest text-zinc-400 font-semibold">Tu cobro mensual</span>
+        <button data-action="show-orders" class="text-xs text-mask-400 hover:text-mask-300 transition-colors">Historial de pagos</button>
+      </div>
+      <div class="space-y-1">
+        ${lines.map(l => `
+          <div class="flex items-center justify-between gap-3 text-sm">
+            <span class="${l.gift ? "text-mask-400" : "text-zinc-300"}">${esc(l.label)}</span>
+            <span class="${l.gift ? "text-mask-400" : "text-zinc-300"}">${money(l.cents)}</span>
+          </div>`).join("")}
+      </div>
+      <div class="flex items-center justify-between border-t border-zinc-800 mt-2 pt-2">
+        <span class="text-sm font-semibold text-zinc-100">Total</span>
+        <span class="text-sm font-semibold text-zinc-100">${money(total)} MXN/mes</span>
+      </div>
+      <div class="text-xs text-zinc-400 mt-2">
+        ${sub.status === "cancelled"
+          ? `Cancelada — el servicio termina el ${periodEnd.toLocaleDateString("es-MX")}`
+          : `Próximo cargo el ${periodEnd.toLocaleDateString("es-MX")}`}
+      </div>
+    </div>`;
+}
+
+// Aviso de que sí pasó algo con tu dinero. No hay tabla de notificaciones a propósito:
+// el libro mayor ya es el almacén, y el descarte es preferencia de vista, no dato —
+// por eso vive en localStorage. En el peor caso reaparece en otro dispositivo.
+function renderLastOrderStrip() {
+  const lo = currentUser?.lastOrder;
+  if (!lo) return "";
+
+  const dias = (Date.now() - new Date(lo.createdAt).getTime()) / 864e5;
+  if (dias > 14) return "";
+
+  const fallo = lo.kind === "failed_charge";
+  // El fallido no se puede descartar: es una tarea pendiente, no una noticia.
+  if (!fallo && localStorage.getItem("mm:seen-order") === lo.id) return "";
+
+  const fecha = new Date(lo.occurredAt).toLocaleDateString("es-MX");
+  const monto = `$${((fallo ? (lo.listPriceCents ?? 0) : lo.amountCents) / 100).toLocaleString("es-MX")}`;
+
+  if (fallo) {
+    return `
+      <div class="flex flex-wrap items-center justify-between gap-2 bg-red-900/20 border border-red-800/50 rounded-lg px-3 py-2 mb-3">
+        <span class="text-sm text-red-400">No pudimos cobrar ${monto} MXN el ${fecha}</span>
+        <button data-action="show-orders" class="text-xs text-red-300 hover:text-red-200">Ver detalle</button>
+      </div>`;
+  }
+  return `
+    <div class="flex flex-wrap items-center justify-between gap-2 bg-mask-900/30 border border-mask-700/50 rounded-lg px-3 py-2 mb-3">
+      <span class="text-sm text-mask-400">Cobramos ${monto} MXN el ${fecha}</span>
+      <div class="flex items-center gap-3">
+        <button data-action="show-orders" class="text-xs text-mask-400 hover:text-mask-300">Ver recibo</button>
+        <button data-action="dismiss-order" data-order-id="${esc(lo.id)}" class="text-zinc-400 hover:text-zinc-200 text-lg leading-none">&times;</button>
+      </div>
+    </div>`;
+}
+
+// --- Historial de pagos ---
+
+const ORDER_TONE = {
+  charge:       { dot: "bg-green-400", label: "Pagado" },
+  courtesy:     { dot: "bg-mask-400",  label: "Cortesía" },
+  cancellation: { dot: "bg-zinc-400",  label: "Cancelado" },
+  failed_charge:{ dot: "bg-red-400",   label: "Rechazado" },
+};
+
+async function showOrdersModal() {
+  const list = document.getElementById("orders-list");
+  const err = document.getElementById("orders-error");
+  if (!list) return;
+  err.classList.add("hidden");
+  list.innerHTML = `<div class="text-zinc-400 text-sm">Cargando…</div>`;
+  showModal("modal-orders");
+
+  const res = await fetch("/api/billing/orders");
+  if (!res.ok) {
+    list.innerHTML = "";
+    err.textContent = "No se pudo cargar el historial.";
+    err.classList.remove("hidden");
+    return;
+  }
+  const { orders } = await res.json();
+  if (!orders.length) {
+    list.innerHTML = `<div class="text-zinc-400 text-sm">Todavía no hay movimientos. Aquí van a aparecer tus cargos, cortesías y cancelaciones.</div>`;
+    return;
+  }
+
+  // Dos líneas por fila: cinco campos no caben en un teléfono en una sola.
+  list.innerHTML = orders.map(o => {
+    const tone = ORDER_TONE[o.kind] ?? ORDER_TONE.charge;
+    const gratis = o.kind === "courtesy" || o.amountCents === 0;
+    const monto = o.kind === "failed_charge" && o.listPriceCents
+      ? `$${(o.listPriceCents / 100).toLocaleString("es-MX")}`
+      : gratis ? "$0" : `$${(o.amountCents / 100).toLocaleString("es-MX")}`;
+    const periodo = o.periodStart && o.periodEnd
+      ? ` · ${new Date(o.periodStart).toLocaleDateString("es-MX")} – ${new Date(o.periodEnd).toLocaleDateString("es-MX")}`
+      : o.periodEnd ? ` · hasta ${new Date(o.periodEnd).toLocaleDateString("es-MX")}` : "";
+
+    return `
+      <div class="border border-zinc-800 rounded-lg px-4 py-3">
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <div class="text-sm text-zinc-100 truncate">${esc(o.concept)}</div>
+            <div class="text-xs text-zinc-400 mt-0.5">${new Date(o.date).toLocaleDateString("es-MX")}${periodo}</div>
+            ${o.failureReason ? `<div class="text-xs text-red-400 mt-0.5">${esc(o.failureReason)}</div>` : ""}
+            ${o.note ? `<div class="text-xs text-zinc-400 mt-0.5">${esc(o.note)}</div>` : ""}
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-sm font-semibold ${gratis ? "text-mask-400" : "text-zinc-100"}">
+              ${monto} <span class="text-xs font-normal text-zinc-400">${esc(o.currency)}</span>
+            </div>
+            <div class="flex items-center justify-end gap-1.5 mt-0.5">
+              <span class="w-1.5 h-1.5 rounded-full ${tone.dot}"></span>
+              <span class="text-xs text-zinc-400">${tone.label}</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 mt-2 pt-2 border-t border-zinc-800 text-[11px] text-zinc-400">
+          <span class="font-mono">${esc(o.number)}</span>
+          ${o.reference ? `<span class="font-mono">MP ${esc(o.reference)}</span>` : ""}
+          <button data-action="copy-order" data-order-number="${esc(o.number)}" class="text-mask-400 hover:text-mask-300 ml-auto">Copiar folio</button>
+        </div>
+      </div>`;
+  }).join("");
 }
 
 // --- Stats row (big numbers) ---
@@ -279,33 +456,49 @@ async function showAddonsModal() {
       ? "Tu plan ya incluye envíos"
       : "Ya tienes un add-on de envíos";
 
-    const ownedLabel = owned.length
-      ? `<div class="text-xs text-mask-400 mt-2">${owned.length > 1 ? `${owned.length} activos` : "Activo"}${
-          owned[0].status === "cancelled" ? ` · termina el ${new Date(owned[0].currentPeriodEnd).toLocaleDateString("es-MX")}` : ""}</div>`
-      : "";
-
-    const actions = owned.length
-      ? owned.filter(a => a.status === "active").map(a =>
-          `<button data-action="cancel-addon" data-addon-id="${esc(a.id)}" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Cancelar</button>`).join(" · ")
-      : "";
+    // Una línea por unidad, no una por tipo. Antes se miraba `owned[0]` y se imprimía
+    // un solo precio de catálogo para toda la tarjeta: con dos dominios, uno pagado y
+    // otro de cortesía, no había forma de que dijera la verdad.
+    const ownedRows = owned.map(a => {
+      if (a.isCourtesy) {
+        // Sin precio y sin Cancelar, por construcción. La tarjeta vieja decía
+        // "+$99 MXN/mes" sobre un regalo y ofrecía un botón para destruirlo.
+        return `
+          <div class="flex flex-wrap items-center gap-2 text-xs mt-2">
+            <span class="inline-flex items-center gap-1 bg-mask-900/40 border border-mask-700/50 text-mask-400 rounded-full px-2 py-0.5">Cortesía</span>
+            <span class="text-zinc-400">sin costo${a.currentPeriodEnd ? ` · hasta ${new Date(a.currentPeriodEnd).toLocaleDateString("es-MX")}` : ""}</span>
+          </div>`;
+      }
+      const cancelled = a.status === "cancelled";
+      // El precio de la fila, no el de catálogo: un precio heredado debe mostrar lo
+      // que el cliente de verdad paga.
+      const precio = `$${((a.priceCents ?? info.price) / 100).toLocaleString("es-MX")} MXN/mes`;
+      return `
+        <div class="flex flex-wrap items-center gap-2 text-xs mt-2">
+          <span class="${cancelled ? "text-yellow-400" : "text-mask-400"}">${cancelled
+            ? `Termina el ${new Date(a.currentPeriodEnd).toLocaleDateString("es-MX")}`
+            : "Activo"}</span>
+          <span class="text-zinc-400">· ${precio}</span>
+          ${cancelled ? "" : `<button data-action="cancel-addon" data-addon-id="${esc(a.id)}" class="text-zinc-400 hover:text-red-400 transition-colors">Cancelar</button>`}
+        </div>`;
+    }).join("");
 
     return `
       <div class="border border-zinc-800 rounded-lg p-4 flex items-start justify-between gap-4">
-        <div class="flex-1">
+        <div class="flex-1 min-w-0">
           <div class="font-semibold text-zinc-100">${esc(info.label)}</div>
           <div class="text-sm text-zinc-400 mt-1">${esc(ADDON_COPY[kind]?.desc ?? "")}</div>
-          ${ownedLabel}
+          ${ownedRows}
         </div>
         <div class="text-right shrink-0">
           <div class="text-xl font-bold">+$${(info.price / 100).toLocaleString("es-MX")}</div>
-          <div class="text-[11px] text-zinc-500 mb-2">MXN/mes${kind === "domain" ? " c/u" : ""}</div>
+          <div class="text-[11px] text-zinc-400 mb-2">MXN/mes${kind === "domain" ? " c/u" : ""}</div>
           ${blocked && !owned.length
-            ? `<div class="text-[11px] text-zinc-600 max-w-[8rem]">${blockedWhy}</div>`
+            ? `<div class="text-[11px] text-zinc-400 max-w-[8rem]">${blockedWhy}</div>`
             : `<button data-action="buy-addon" data-kind="${esc(kind)}"
                  class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors">
                  ${owned.length ? "Agregar otro" : "Agregar"}
                </button>`}
-          ${actions ? `<div class="mt-2">${actions}</div>` : ""}
         </div>
       </div>`;
   }).join("");
@@ -489,9 +682,16 @@ async function loadCoupon() {
   } catch { /* ignore */ }
 }
 
+// El único lugar que no puede tomar la etiqueta del servidor: el cupón se lee antes de
+// iniciar sesión, así que no hay /api/auth/me del cual sacarla.
+const PLAN_LABELS = {
+  basico: "Básico", freelancer: "Freelancer", developer: "Developer",
+  pro: "Pro", agencia: "Agencia",
+};
+
 function getCheckoutLabel() {
   if (activeCoupon) {
-    const name = activeCoupon.plan.charAt(0).toUpperCase() + activeCoupon.plan.slice(1);
+    const name = PLAN_LABELS[activeCoupon.plan] ?? activeCoupon.plan;
     const price = Math.round(activeCoupon.fixedPrice / 100);
     return `Activar Plan ${name} — $${price}/mes`;
   }
@@ -2025,6 +2225,28 @@ function setupEventListeners() {
     if (buy) { buyAddon(buy.dataset.kind); return; }
     const cancel = e.target.closest("[data-action='cancel-addon']");
     if (cancel) cancelAddon(cancel.dataset.addonId);
+  });
+
+  // Delegación a nivel documento: el resumen de cobro se re-renderiza completo en cada
+  // refresh, así que no hay a qué engancharse de forma permanente.
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-action='show-orders']")) { showOrdersModal(); return; }
+
+    const dismiss = e.target.closest("[data-action='dismiss-order']");
+    if (dismiss) {
+      localStorage.setItem("mm:seen-order", dismiss.dataset.orderId);
+      renderBillingSummary();
+      return;
+    }
+
+    const copy = e.target.closest("[data-action='copy-order']");
+    if (copy) {
+      // Copiar el folio *es* el trámite de la factura.
+      navigator.clipboard.writeText(copy.dataset.orderNumber).then(() => {
+        playSound("copy");
+        showToast("Folio copiado");
+      }).catch(() => showToast("No se pudo copiar", true));
+    }
   });
 
   // Event delegation: domains list
