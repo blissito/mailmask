@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg viewBox="0 0 800 340" width="800" height="340" role="img" aria-labelledby="hiloTitulo hiloDesc" style="display:block">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 340" width="800" height="340" role="img" aria-labelledby="hiloTitulo hiloDesc" style="display:block">
             <title id="hiloTitulo">El hilo de la conversación reventado a la mitad</title>
             <desc id="hiloDesc">Dos telas unidas por una costura verde de puntadas alternadas. A la mitad la costura se revienta: los hilos quedan sueltos, las telas se abren y un mensaje queda huérfano en el hueco.</desc>
 
