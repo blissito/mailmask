@@ -419,8 +419,8 @@ async function computeHmac(secret: string, dataId: string, requestId: string, ts
   return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function postWebhook(body: unknown, dataId: string): Promise<Response> {
-  const requestId = `req-${crypto.randomUUID()}`;
+async function postWebhook(body: unknown, dataId: string, fixedRequestId?: string): Promise<Response> {
+  const requestId = fixedRequestId ?? `req-${crypto.randomUUID()}`;
   const ts = Math.floor(Date.now() / 1000).toString();
   const v1 = await computeHmac(MP_SECRET, dataId, requestId, ts);
 
@@ -559,22 +559,159 @@ describe("Webhook", () => {
       return originalFetch(input, _init);
     };
 
+    // La idempotencia se llavea por EVENTO (x-request-id), no por suscripción: el mismo
+    // preapproval debe poder procesarse varias veces (pending -> authorized), pero el
+    // mismo evento reenviado por MP no.
+    const sameEvent = `req-idemp-${crypto.randomUUID()}`;
     try {
       const res1 = await postWebhook(
-        { type: "subscription_preapproval", data: { id: subId } },
-        subId,
+        { type: "subscription_preapproval", data: { id: subId } }, subId, sameEvent,
       );
       assert.equal(res1.status, 200);
       await res1.body?.cancel();
       assert.equal(fetchCount, 1);
 
       const res2 = await postWebhook(
-        { type: "subscription_preapproval", data: { id: subId } },
-        subId,
+        { type: "subscription_preapproval", data: { id: subId } }, subId, sameEvent,
       );
       assert.equal(res2.status, 200);
       await res2.body?.cancel();
-      assert.equal(fetchCount, 1, "Should not fetch MP API again for already-processed webhook");
+      assert.equal(fetchCount, 1, "el mismo evento reenviado no debe reprocesarse");
+
+      // Y la regresión que costó un pago: un evento DISTINTO del mismo preapproval
+      // (pending -> authorized) sí debe procesarse.
+      const res3 = await postWebhook(
+        { type: "subscription_preapproval", data: { id: subId } }, subId,
+      );
+      assert.equal(res3.status, 200);
+      await res3.body?.cancel();
+      assert.equal(fetchCount, 2, "un evento nuevo del mismo preapproval SÍ debe procesarse");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  // Espacio de fallo que costó el pago de una clienta: el webhook tenía seis formas de
+  // perder un cobro y tres devolvían 200 sin log.
+  it("acepta data.id con mayúsculas (MP firma en minúsculas)", async () => {
+    const email = `webhook-upper-${suffix}@example.com`;
+    createUser(email, await hashPassword("testpass123"));
+    const subId = `SUB-UPPER-${crypto.randomUUID().toUpperCase()}`;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, _init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("api.mercadopago.com/preapproval/")) {
+        return new Response(JSON.stringify({
+          payer_email: email, external_reference: email, status: "authorized",
+          auto_recurring: { transaction_amount: 49, frequency: 1 },
+        }));
+      }
+      return originalFetch(input, _init);
+    };
+    try {
+      // El manifest se firma con el id en minúsculas, pero la query lo trae en mayúsculas.
+      const requestId = `req-${crypto.randomUUID()}`;
+      const ts = Math.floor(Date.now() / 1000).toString();
+      const v1 = await computeHmac(MP_SECRET, subId.toLowerCase(), requestId, ts);
+      const res = await app.fetch(new Request(
+        `http://localhost/api/webhooks/mercadopago?data.id=${subId}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-signature": `ts=${ts},v1=${v1}`, "x-request-id": requestId },
+          body: JSON.stringify({ type: "subscription_preapproval", data: { id: subId } }),
+        },
+      ));
+      assert.equal(res.status, 200, "no debe rechazarse por mayúsculas");
+      await res.body?.cancel();
+      assert.equal(getUser(email)?.subscription?.status, "active");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("acepta data.id solo en el body, sin query", async () => {
+    const email = `webhook-bodyid-${suffix}@example.com`;
+    createUser(email, await hashPassword("testpass123"));
+    const subId = `sub-bodyid-${crypto.randomUUID()}`;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, _init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("api.mercadopago.com/preapproval/")) {
+        return new Response(JSON.stringify({
+          payer_email: email, external_reference: email, status: "authorized",
+          auto_recurring: { transaction_amount: 49, frequency: 1 },
+        }));
+      }
+      return originalFetch(input, _init);
+    };
+    try {
+      const requestId = `req-${crypto.randomUUID()}`;
+      const ts = Math.floor(Date.now() / 1000).toString();
+      const v1 = await computeHmac(MP_SECRET, subId, requestId, ts);
+      const res = await app.fetch(new Request(
+        `http://localhost/api/webhooks/mercadopago`, // sin ?data.id
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-signature": `ts=${ts},v1=${v1}`, "x-request-id": requestId },
+          body: JSON.stringify({ type: "subscription_preapproval", data: { id: subId } }),
+        },
+      ));
+      assert.equal(res.status, 200);
+      await res.body?.cancel();
+      assert.equal(getUser(email)?.subscription?.status, "active");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("un tipo desconocido responde 200 pero no se traga el evento en silencio", async () => {
+    const dataId = `unknown-${crypto.randomUUID()}`;
+    const res = await postWebhook({ type: "preapproval", data: { id: dataId } }, dataId);
+    // 200 para que MP no reintente algo que no nos toca, pero queda registrado en el log.
+    assert.equal(res.status, 200);
+    await res.body?.cancel();
+  });
+
+  it("si MP devuelve error al consultar el preapproval, responde 500 para forzar reintento", async () => {
+    const dataId = `sub-fetchfail-${crypto.randomUUID()}`;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, _init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("api.mercadopago.com/preapproval/")) {
+        return new Response(JSON.stringify({ message: "not found" }), { status: 404 });
+      }
+      return originalFetch(input, _init);
+    };
+    try {
+      const res = await postWebhook({ type: "subscription_preapproval", data: { id: dataId } }, dataId);
+      assert.equal(res.status, 500, "debe pedir reintento, no devolver 200 y perder el pago");
+      await res.body?.cancel();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("un email sin fila en users no se reporta como activado", async () => {
+    const ghost = `fantasma-${suffix}@example.com`;
+    const dataId = `sub-ghost-${crypto.randomUUID()}`;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, _init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("api.mercadopago.com/preapproval/")) {
+        return new Response(JSON.stringify({
+          payer_email: ghost, external_reference: ghost, status: "authorized",
+          auto_recurring: { transaction_amount: 49, frequency: 1 },
+        }));
+      }
+      return originalFetch(input, _init);
+    };
+    try {
+      const res = await postWebhook({ type: "subscription_preapproval", data: { id: dataId } }, dataId);
+      assert.equal(res.status, 500, "antes devolvía 200 y logueaba 'Subscription activated' sin escribir nada");
+      await res.body?.cancel();
+      assert.equal(getUser(ghost), null);
     } finally {
       globalThis.fetch = originalFetch;
     }

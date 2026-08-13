@@ -1929,6 +1929,7 @@ const app = new Elysia({ adapter: node() })
         payer_email: payerEmail,
         back_url: backUrl,
         external_reference: token,
+        notification_url: `${getMainDomainUrl()}/api/webhooks/mercadopago`,
       };
       const result = await preApproval.create({ body: mpBody });
 
@@ -2024,6 +2025,7 @@ const app = new Elysia({ adapter: node() })
         payer_email: user.email,
         back_url: backUrl,
         external_reference: user.email,
+        notification_url: `${getMainDomainUrl()}/api/webhooks/mercadopago`,
       };
       const result = await preApproval.create({ body: mpBody });
 
@@ -2065,7 +2067,23 @@ const app = new Elysia({ adapter: node() })
     const xSignature = request.headers.get("x-signature") ?? "";
     const xRequestId = request.headers.get("x-request-id") ?? "";
     const url = new URL(request.url);
-    const dataId = url.searchParams.get("data.id") ?? "";
+
+    // El cuerpo se lee ANTES de validar la firma porque `data.id` no siempre viene en la
+    // query (formato IPN antiguo, o notificaciones donde solo llega en el body).
+    let rawBody = "";
+    // deno-lint-ignore no-explicit-any
+    let body: any = {};
+    try {
+      rawBody = await request.text();
+      body = rawBody ? JSON.parse(rawBody) : {};
+    } catch (err) {
+      log("warn", "webhook", "MP webhook: cuerpo ilegible", { error: String(err), rawLength: rawBody.length });
+      return new Response("Bad Request", { status: 400 });
+    }
+
+    const queryDataId = url.searchParams.get("data.id") ?? url.searchParams.get("id") ?? "";
+    const bodyDataId = String(body?.data?.id ?? body?.id ?? "");
+    const dataId = queryDataId || bodyDataId;
 
     // Parse ts and v1 from x-signature
     const parts = Object.fromEntries(
@@ -2077,36 +2095,71 @@ const app = new Elysia({ adapter: node() })
     const ts = parts["ts"] ?? "";
     const v1 = parts["v1"] ?? "";
 
-    const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(secret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"],
-    );
-    const sig = await crypto.subtle.sign(
-      "HMAC",
-      key,
-      new TextEncoder().encode(manifest),
-    );
-    const computed = Array.from(new Uint8Array(sig))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
+    const hmacHex = async (msg: string) => {
+      const key = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(secret),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"],
+      );
+      const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(msg));
+      return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    };
 
-    if (computed !== v1) {
-      log("warn", "webhook", "MP webhook: invalid signature");
+    // MercadoPago especifica que los ids alfanuméricos van en minúsculas, y que el
+    // segmento se OMITE cuando el valor no viene. Antes se mandaba siempre "id:;" y
+    // "request-id:;", lo que producía un 401 en cuanto faltaba alguno — y tras una racha
+    // de 401 MP deshabilita la URL de notificación.
+    const buildManifest = (id: string, reqId: string) =>
+      (id ? `id:${id};` : "") + (reqId ? `request-id:${reqId};` : "") + (ts ? `ts:${ts};` : "");
+
+    // Se prueban las variantes plausibles del id; todas exigen firma válida, así que no
+    // se debilita nada. Es tolerancia al formato, no al secreto.
+    const candidates = [...new Set([
+      buildManifest(dataId.toLowerCase(), xRequestId),
+      buildManifest(dataId, xRequestId),
+      buildManifest(queryDataId.toLowerCase(), xRequestId),
+      buildManifest(bodyDataId.toLowerCase(), xRequestId),
+    ])];
+
+    let matched = false;
+    for (const candidate of candidates) {
+      const computed = await hmacHex(candidate);
+      // Comparación en tiempo constante.
+      if (computed.length === v1.length && computed.length > 0) {
+        let diff = 0;
+        for (let i = 0; i < computed.length; i++) diff |= computed.charCodeAt(i) ^ v1.charCodeAt(i);
+        if (diff === 0) { matched = true; break; }
+      }
+    }
+
+    if (!matched) {
+      // Un 401 sin datos era indistinguible de "nunca llegó". Esto es lo que permite
+      // diagnosticar el próximo incidente sin adivinar.
+      log("warn", "webhook", "MP webhook: invalid signature", {
+        dataId, queryDataId, bodyDataId, xRequestId, ts,
+        v1Received: v1.slice(0, 16),
+        type: body?.type ?? body?.topic ?? null,
+        manifestTried: candidates[0],
+        secretLen: secret.length,
+      });
       return new Response("Unauthorized", { status: 401 });
     }
 
-    const body = await request.json();
-    log("info", "webhook", "MP webhook received", { type: body.type, dataId: body.data?.id });
+    // La clave de idempotencia es el id del EVENTO, no el del preapproval. Antes se
+    // usaba data.id, así que el primer evento de una suscripción bloqueaba todos los
+    // siguientes durante 7 días: si MP mandaba "pending" y luego "authorized", el bueno
+    // se descartaba en silencio. Es el candidato principal del pago que se perdió.
+    const eventKey = xRequestId || `${body.type ?? body.topic ?? "unknown"}:${dataId}:${ts}`;
+    log("info", "webhook", "MP webhook received", { type: body.type ?? body.topic, dataId, eventKey });
 
     // Handle subscription_preapproval events
     if (body.type === "subscription_preapproval" && body.data?.id) {
       try {
         // Idempotency: skip if already successfully processed
-        if (await isWebhookProcessed(body.data.id)) {
+        if (await isWebhookProcessed(eventKey)) {
+          log("info", "webhook", "MP webhook duplicado, ignorado", { eventKey, dataId });
           return new Response("OK", { status: 200 });
         }
 
@@ -2123,6 +2176,13 @@ const app = new Elysia({ adapter: node() })
             signal: AbortSignal.timeout(10_000),
           },
         );
+        // Sin esto, un 4xx/5xx de MP producía un objeto de error que fallaba por todas
+        // las ramas y devolvía 200: pago perdido sin reintento y sin rastro.
+        if (!subRes.ok) {
+          const errText = await subRes.text().catch(() => "");
+          log("error", "webhook", "MP preapproval fetch failed", { status: subRes.status, dataId, body: errText.slice(0, 300) });
+          return new Response("Upstream error", { status: 500 }); // 500 para que MP reintente
+        }
         const sub = await subRes.json();
 
         log("info", "webhook", "MP subscription fetched", { payer_email: sub.payer_email, external_reference: sub.external_reference, status: sub.status });
@@ -2149,7 +2209,7 @@ const app = new Elysia({ adapter: node() })
             updateAddon(addon.id, { status: "cancelled", cancelledAt: new Date().toISOString() });
             log("info", "billing", "Add-on cancelado", { addonId: addon.id, kind: addon.kind, mpStatus: sub.status });
           }
-          await markWebhookProcessed(body.data.id);
+          await markWebhookProcessed(eventKey);
           return new Response("OK", { status: 200 });
         }
 
@@ -2252,13 +2312,18 @@ const app = new Elysia({ adapter: node() })
                 log("info", "webhook", "Referred user gets 2nd month free", { email, referrer: referredBy });
               }
 
-              await updateUserSubscription(email, {
+              const written = await updateUserSubscription(email, {
                 plan,
                 status: "active",
                 mpSubscriptionId: body.data.id,
                 currentPeriodEnd: periodEnd.toISOString(),
               });
-              log("info", "webhook", "Subscription activated", { email, plan });
+              if (!written) {
+                // La fila no existe: se estaba logueando "activated" sin haber escrito nada.
+                log("error", "webhook", "Subscription NOT activated: usuario inexistente", { email, plan, dataId: body.data.id });
+                return new Response("User not found", { status: 500 }); // 500 para que MP reintente
+              }
+              log("info", "webhook", "Subscription activated", { email, plan, mpId: body.data.id });
 
               const alertFrom = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
 
@@ -2316,7 +2381,7 @@ const app = new Elysia({ adapter: node() })
           }
 
           // Mark as processed only after successful handling
-          await markWebhookProcessed(body.data.id);
+          await markWebhookProcessed(eventKey);
         }
       } catch (err) {
         log("error", "webhook", "MP webhook processing error", { error: String(err) });
@@ -2329,7 +2394,7 @@ const app = new Elysia({ adapter: node() })
     // and the dashboard shows an active subscription as expired.
     if (body.type === "subscription_authorized_payment" && body.data?.id) {
       try {
-        if (await isWebhookProcessed(body.data.id)) {
+        if (await isWebhookProcessed(eventKey)) {
           return new Response("OK", { status: 200 });
         }
 
@@ -2357,7 +2422,7 @@ const app = new Elysia({ adapter: node() })
         const approved = ap.status === "processed" &&
           (!ap.payment?.status || ap.payment.status === "approved");
         if (!approved || !ap.preapproval_id) {
-          await markWebhookProcessed(body.data.id);
+          await markWebhookProcessed(eventKey);
           return new Response("OK", { status: 200 });
         }
 
@@ -2371,7 +2436,7 @@ const app = new Elysia({ adapter: node() })
           base.setDate(base.getDate() + 35);
           updateAddon(renewingAddon.id, { status: "active", currentPeriodEnd: base.toISOString() });
           log("info", "billing", "Add-on renovado", { addonId: renewingAddon.id, kind: renewingAddon.kind, until: base.toISOString() });
-          await markWebhookProcessed(body.data.id);
+          await markWebhookProcessed(eventKey);
           return new Response("OK", { status: 200 });
         }
 
@@ -2403,7 +2468,7 @@ const app = new Elysia({ adapter: node() })
             preapproval_id: ap.preapproval_id,
             email,
           });
-          await markWebhookProcessed(body.data.id);
+          await markWebhookProcessed(eventKey);
           return new Response("OK", { status: 200 });
         }
 
@@ -2423,13 +2488,22 @@ const app = new Elysia({ adapter: node() })
         }
 
         log("info", "webhook", "Subscription renewed via authorized payment", { email, bufferDays });
-        await markWebhookProcessed(body.data.id);
+        await markWebhookProcessed(eventKey);
       } catch (err) {
         log("error", "webhook", "MP authorized payment processing error", { error: String(err) });
         return new Response("Internal error", { status: 500 });
       }
     }
 
+    // Todo lo que no se maneja arriba llegaba hasta aquí y devolvía 200 sin un solo log.
+    // MercadoPago usa "preapproval" a secas en algunas configuraciones de IPN, así que un
+    // evento válido podía tirarse en silencio.
+    log("warn", "webhook", "MP webhook: tipo no manejado", {
+      type: body?.type ?? body?.topic ?? null,
+      dataId,
+      eventKey,
+      action: body?.action ?? null,
+    });
     return new Response("OK", { status: 200 });
   }, {
     detail: { tags: ["Webhooks"], summary: "MercadoPago subscription webhook", hide: true },
@@ -2609,7 +2683,10 @@ const app = new Elysia({ adapter: node() })
           payer_email: auth.email,
           back_url: `${getMainDomainUrl()}/app?addon=success`,
           external_reference: `addon:${addon.id}`,
-        },
+          // El tipo del SDK no declara notification_url, pero la API sí lo acepta.
+          notification_url: `${getMainDomainUrl()}/api/webhooks/mercadopago`,
+          // deno-lint-ignore no-explicit-any
+        } as any,
       });
       updateAddon(addon.id, { mpPreapprovalId: result.id });
       return new Response(JSON.stringify({ init_point: result.init_point, addonId: addon.id }), {
