@@ -110,7 +110,19 @@ La escalera está calculada para que el 5º dominio ($445) empate con Freelancer
   - **Precio**: cambia la estructura de costos, así que hay que decidir si es add-on, plan nuevo o incluido.
   - Carga de soporte: ofrecer IMAP implica atender configuraciones de clientes de correo.
 
-  Relacionado: el add-on de almacenamiento y la retención por plan, ambos sin definir. Y ojo con el soporte: ofrecer IMAP implica atender configuraciones de clientes de correo, que es otro tipo de carga.
+  **Por qué importa más de lo que parece.** Hoy MailMask **no puede reemplazar a Google Workspace**: reenvía *hacia* Gmail, así que el cliente sigue dependiendo de Google. La landing compara contra Workspace pero lo que se vende es una capa encima de una cuenta que ya tienen. IMAP es lo que lo convierte en reemplazo de verdad. El mercado no es solo "quien usa Outlook": es quien se quiere ir de Google, quien lee en la app nativa del teléfono, y quien necesita offline.
+
+  **La contra, para no sobrevalorarlo:** para agencias, freelancers y negocios chicos la Bandeja puede ser suficiente, y de hecho es mejor que un cliente de correo para trabajo en equipo (historial compartido, asignación, notas). Por eso el add-on debe ser **opcional y por dominio**, no incluido encareciendo a todos.
+
+  **Referencia de mercado** (agosto 2026): **Migadu** valida el modelo — dominios y buzones ilimitados, cobra **solo por almacenamiento**: $19 USD/año por 5 GB hasta $990/año por 500 GB. Purelymail: $10 USD/año plano + $0.56/GB extra. Fastmail: $60 USD/año **por persona**. Zoho: ~$1 USD/usuario/mes, y **su plan gratis no incluye IMAP** — el mercado ya lo trata como algo de pago.
+
+  **Nadie paga por "JMAP"**: es un protocolo, no una función que el cliente reconozca; ni Fastmail lo cobra aparte. Lo que se vende es buzón y almacenamiento. JMAP es la ventaja técnica que hace volar la Bandeja y regala búsqueda y sincronización.
+
+  Precio de referencia, a confirmar con el spike: **+$99 MXN/mes por dominio con ~10 GB** encaja en la escalera de add-ons actual. El almacenamiento no es el costo (10 GB en S3 son ~$4.40 MXN/mes); lo caro es operación y soporte.
+
+  **Antes de construir, medir**: la FAQ ahora dice "próximamente" en vez de prometerlo mal, así que por primera vez se puede medir cuánta gente pregunta por IMAP.
+
+  Relacionado: el add-on de almacenamiento y la retención por plan, ambos sin definir.
 
 ### ⏭️ Lo primero de la próxima sesión
 - [ ] **Evaluar el costo de sacar la app de Fly**. Análisis, no decisión: qué costaría migrar y a dónde. Lo que ata hoy a Fly es el **volumen único con SQLite** — es la misma restricción que impide el deploy multi-máquina y sin downtime, así que conviene evaluarlo junto con el punto de abajo y no por separado.
