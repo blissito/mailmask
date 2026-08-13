@@ -182,6 +182,9 @@ function renderUsers(users) {
       <div class="flex items-center gap-3 text-xs text-zinc-500 shrink-0 ml-2">
         <span>${u.plan || '—'}</span>
         <span class="${u.status === 'active' ? 'text-green-500' : u.status === 'cancelled' ? 'text-red-400' : ''}">${esc(u.status)}</span>
+        ${u.paying
+          ? '<span class="text-green-500" title="Suscripción real en MercadoPago">$ pagado</span>'
+          : '<span class="text-amber-500" title="Plan puesto a mano, sin suscripción en MercadoPago">cortesía</span>'}
         <span>${u.domainsCount}d</span>
       </div>
     </div>

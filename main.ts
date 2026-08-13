@@ -4038,6 +4038,10 @@ const app = new Elysia({ adapter: node() })
         emailVerified: u.emailVerified ?? false,
         createdAt: u.createdAt,
         domainsCount,
+        // Sin esto era imposible distinguir desde el admin a quien paga de quien tiene
+        // el plan puesto a mano.
+        mpSubscriptionId: u.subscription?.mpSubscriptionId ?? null,
+        paying: !!u.subscription?.mpSubscriptionId,
       });
     }
     return new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } });
@@ -4270,6 +4274,20 @@ const app = new Elysia({ adapter: node() })
     const sub = user.subscription;
     if (!sub || sub.status !== "active") {
       return new Response(JSON.stringify({ error: "Necesitas un plan activo para registrar dominios" }), { status: 402, headers: { "content-type": "application/json" } });
+    }
+
+    // Este endpoint COBRA antes de registrar, así que el tope se valida aquí: sin esto un
+    // Básico podía pagar por dominios que su plan no admite y habría que reembolsar.
+    // Se cuentan también los registros en curso para que dos compras simultáneas no se
+    // cuelen por el mismo hueco.
+    const regLimits = getUserPlanLimits(user);
+    const enCurso = getDomainRegistrationsByUser(auth.email)
+      .filter((r: { status: string }) => ["pending_payment", "paid", "registering"].includes(r.status)).length;
+    const yaTiene = await countUserDomains(auth.email);
+    if (yaTiene + enCurso >= regLimits.domains) {
+      return new Response(JSON.stringify({
+        error: `Tu plan permite máximo ${regLimits.domains} dominio(s). Agrega el add-on de dominio extra o sube de plan antes de registrar uno nuevo.`,
+      }), { status: 400, headers: { "content-type": "application/json" } });
     }
 
     const { domain } = regBody;

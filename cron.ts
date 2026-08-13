@@ -1,10 +1,10 @@
 import cron from "node-cron";
-import { sendFromDomain, deleteEmailFromS3 } from "./ses.js";
+import { sendFromDomain, deleteEmailFromS3, sendAlert } from "./ses.js";
 import { log } from "./logger.js";
 import { db } from "./pg.js";
 import { tokens, emailLogs, forwardQueue, rateLimits, sendCounts, bulkJobs, users, addons } from "./schema.js";
 import { lte, and, eq, inArray, isNotNull, gt, sql as rawSql } from "drizzle-orm";
-import { purgeDeletedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, createDomain } from "./db.js";
+import { purgeDeletedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, createDomain, listEffectiveAddons, updateAddon } from "./db.js";
 
 // Daily at 14:00 UTC — warn users whose subscription expires within 3 days
 cron.schedule("0 14 * * *", async () => {
@@ -28,7 +28,7 @@ cron.schedule("0 14 * * *", async () => {
   );
 
   // Step 2: get users expiring within 3 days with active/cancelled status
-  const expiringUsers = await db.select({ email: users.email, subPeriodEnd: users.subPeriodEnd })
+  const expiringUsers = await db.select({ email: users.email, subPeriodEnd: users.subPeriodEnd, subMpId: users.subMpId })
     .from(users)
     .where(
       and(
@@ -45,11 +45,17 @@ cron.schedule("0 14 * * *", async () => {
   for (const user of toWarn) {
     try {
       const endDate = new Date(user.subPeriodEnd!).toLocaleDateString("es-MX");
+      // Sin suscripción en MercadoPago no hay nada que renueve el plano: decirle "se
+      // renovará automáticamente" es mentirle y que se quede sin servicio sin avisar.
+      const seRenueva = !!user.subMpId;
+      const cuerpo = seRenueva
+        ? `Hola,\n\nTu suscripción de MailMask vence el ${endDate}.\n\nSi tu pago está al día, tu plan se renovará automáticamente. Si no, reactiva tu suscripción para no perder acceso:\n${baseUrl}/app\n\n— MailMask`
+        : `Hola,\n\nTu plan de MailMask vence el ${endDate} y no tiene una suscripción activa que lo renueve, así que ese día perderías el acceso.\n\nActiva tu suscripción aquí para no quedarte sin servicio:\n${baseUrl}/app\n\n— MailMask`;
       await sendFromDomain(
         alertFrom,
         user.email,
         "Tu plan de MailMask está por vencer",
-        `Hola,\n\nTu suscripción de MailMask vence el ${endDate}.\n\nSi tu pago está al día, tu plan se renovará automáticamente. Si no, reactiva tu suscripción para no perder acceso:\n${baseUrl}/app\n\n— MailMask`,
+        cuerpo,
       );
       const expiresAt = new Date(Date.now() + 4 * 24 * 3600_000).toISOString();
       await db.insert(tokens).values({
@@ -91,6 +97,73 @@ cron.schedule("*/15 * * * *", async () => {
     if ((stale.changes ?? 0) > 0) log("info", "cron", "Expired abandoned add-ons", { count: stale.changes });
   } catch (err) {
     log("error", "cron", "Cleanup failed", { error: String(err) });
+  }
+});
+
+// Diario 4:00 UTC — apagar add-ons cuyo plan base ya expiró.
+// Sin esto MercadoPago sigue cobrando el add-on mientras getUserPlanLimits devuelve cero:
+// se le cobra al cliente por algo que no recibe.
+cron.schedule("0 4 * * *", async () => {
+  const mpToken = process.env.MP_ACCESS_TOKEN;
+  try {
+    const now = new Date().toISOString();
+    const vencidos = await db.select({ email: users.email })
+      .from(users)
+      .where(and(isNotNull(users.subPeriodEnd), lte(users.subPeriodEnd, now)));
+
+    let apagados = 0;
+    for (const u of vencidos) {
+      for (const addon of listEffectiveAddons(u.email)) {
+        try {
+          if (addon.mpPreapprovalId && mpToken) {
+            const res = await fetch(`https://api.mercadopago.com/preapproval/${addon.mpPreapprovalId}`, {
+              method: "PUT",
+              headers: { Authorization: `Bearer ${mpToken}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ status: "cancelled" }),
+              signal: AbortSignal.timeout(10_000),
+            });
+            if (!res.ok) throw new Error(`MP ${res.status}: ${await res.text()}`);
+          }
+          updateAddon(addon.id, { status: "cancelled", cancelledAt: new Date().toISOString() });
+          apagados++;
+          log("info", "billing", "Add-on cancelado: el plan base expiró", { email: u.email, addonId: addon.id, kind: addon.kind });
+        } catch (err) {
+          log("error", "billing", "No se pudo cancelar add-on de plan expirado", { email: u.email, addonId: addon.id, error: String(err) });
+        }
+      }
+    }
+    if (apagados > 0) log("info", "cron", "Add-ons apagados por plan expirado", { count: apagados });
+  } catch (err) {
+    log("error", "cron", "Expired add-on cleanup failed", { error: String(err) });
+  }
+});
+
+// Diario 5:00 UTC — reconciliar MercadoPago contra la base.
+// Existe porque una clienta pagó y el webhook no la registró; nadie se enteró en semanas.
+cron.schedule("0 5 * * *", async () => {
+  const mpToken = process.env.MP_ACCESS_TOKEN;
+  if (!mpToken) return;
+  try {
+    const rows = await db.select({ email: users.email, subMpId: users.subMpId }).from(users);
+    const huerfanos: string[] = [];
+    for (const u of rows) {
+      if (u.subMpId) continue;
+      const res = await fetch(
+        `https://api.mercadopago.com/preapproval/search?payer_email=${encodeURIComponent(u.email)}`,
+        { headers: { Authorization: `Bearer ${mpToken}` }, signal: AbortSignal.timeout(15_000) },
+      );
+      if (!res.ok) continue;
+      const j = await res.json();
+      const dePlan = (j.results ?? []).filter((p: { status: string; external_reference?: string }) =>
+        p.status === "authorized" && !(p.external_reference ?? "").startsWith("addon:"));
+      if (dePlan.length > 0) huerfanos.push(`${u.email} → ${dePlan[0].id}`);
+    }
+    if (huerfanos.length > 0) {
+      log("error", "billing", "PAGOS SIN VINCULAR detectados", { count: huerfanos.length, huerfanos });
+      await sendAlert("mp-unlinked", `Hay ${huerfanos.length} pago(s) en MercadoPago sin vincular en la base:\n\n${huerfanos.join("\n")}\n\nCorre: npx tsx scripts/reconcile-mp.ts --fix`);
+    }
+  } catch (err) {
+    log("error", "cron", "MP reconciliation failed", { error: String(err) });
   }
 });
 
