@@ -1,60 +1,49 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 340" width="800" height="340" role="img" aria-labelledby="hiloTitulo hiloDesc" style="display:block">
-            <title id="hiloTitulo">El hilo de la conversación reventado a la mitad</title>
-            <desc id="hiloDesc">Dos telas unidas por una costura verde de puntadas alternadas. A la mitad la costura se revienta: los hilos quedan sueltos, las telas se abren y un mensaje queda huérfano en el hueco.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="800" height="400" role="img" aria-labelledby="hiloT hiloD" style="display:block">
+            <title id="hiloT">Comparación: la conversación partida en dos contra la conversación completa</title>
+            <desc id="hiloD">A la izquierda, escribes desde Gmail y la respuesta del cliente llega a tu buzón personal, fuera del dominio. A la derecha, escribes desde tu dominio y la respuesta cae en la misma conversación.</desc>
 
-            <defs>
-              <linearGradient id="telaSana" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stop-color="#2a2a30" /><stop offset="100%" stop-color="#232328" />
-              </linearGradient>
-              <linearGradient id="telaRota" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stop-color="#232328" /><stop offset="100%" stop-color="#1c1c20" />
-              </linearGradient>
-            </defs>
+            <!-- ===== IZQUIERDA: partida ===== -->
+            <text x="16" y="22" fill="#d97757" font-family="system-ui,sans-serif" font-size="13" font-weight="700">DESDE TU GMAIL</text>
 
-            <rect x="0" y="0" width="800" height="340" fill="transparent" />
+            <rect x="16" y="36" width="352" height="150" rx="8" fill="#141417" stroke="#3f3f46" />
+            <text x="32" y="60" fill="#71717a" font-family="system-ui,sans-serif" font-size="11" letter-spacing="1">TU GMAIL PERSONAL</text>
+            <rect x="32" y="72" width="240" height="34" rx="8" fill="#1f1f23" stroke="#52525b" />
+            <text x="44" y="94" fill="#d4d4d8" font-family="system-ui,sans-serif" font-size="12">tunombre87@gmail.com → cliente</text>
+            <rect x="112" y="118" width="240" height="34" rx="8" fill="#1f1f23" stroke="#d97757" />
+            <text x="124" y="140" fill="#d4d4d8" font-family="system-ui,sans-serif" font-size="12">cliente → tu Gmail  (la respuesta)</text>
+            <text x="32" y="172" fill="#d97757" font-family="system-ui,sans-serif" font-size="11">queda aquí, entre tus recibos y promociones</text>
 
-            <text x="24" y="28" fill="#a1a1aa" font-family="system-ui,sans-serif" font-size="13" font-weight="600" letter-spacing="1.6">TÚ</text>
-            <text x="24" y="330" fill="#a1a1aa" font-family="system-ui,sans-serif" font-size="13" font-weight="600" letter-spacing="1.6">TU CLIENTE</text>
+            <rect x="16" y="202" width="352" height="118" rx="8" fill="#141417" stroke="#3f3f46" />
+            <text x="32" y="226" fill="#71717a" font-family="system-ui,sans-serif" font-size="11" letter-spacing="1">TU DOMINIO</text>
+            <rect x="32" y="240" width="320" height="58" rx="8" fill="#18181b" stroke="#3f3f46" stroke-dasharray="5 4" />
+            <text x="192" y="266" fill="#52525b" font-family="system-ui,sans-serif" font-size="12" text-anchor="middle">sin registro de esta conversación</text>
+            <text x="192" y="286" fill="#52525b" font-family="system-ui,sans-serif" font-size="12" text-anchor="middle">tu equipo no la ve</text>
 
-            <!-- Izquierda: las telas se tocan, la costura las une -->
-            <rect x="24" y="44" width="380" height="98" rx="4" fill="url(#telaSana)" stroke="#3f3f46" stroke-width="1" />
-            <rect x="24" y="198" width="380" height="98" rx="4" fill="url(#telaSana)" stroke="#3f3f46" stroke-width="1" />
+            <text x="192" y="352" fill="#d97757" font-family="system-ui,sans-serif" font-size="14" font-weight="700" text-anchor="middle">2 lugares · 1 conversación rota</text>
 
-            <!-- Derecha: se abren, y el hueco crece -->
-            <path d="M436 44 H776 a4 4 0 0 1 4 4 V126 L436 108 Z" fill="url(#telaRota)" stroke="#3f3f46" stroke-width="1" />
-            <path d="M436 232 L780 214 V292 a4 4 0 0 1 -4 4 H436 Z" fill="url(#telaRota)" stroke="#3f3f46" stroke-width="1" />
+            <!-- separador -->
+            <line x1="400" y1="30" x2="400" y2="370" stroke="#27272a" stroke-width="1" />
 
-            <!-- Costura sana: cada puntada es un mensaje, alternando lados -->
-            <g stroke="#10b981" stroke-width="3" stroke-linecap="round" fill="none">
-              <path class="puntada" d="M56 138 L104 202 L152 138 L200 202 L248 138 L296 202 L344 138" />
-            </g>
-            <g fill="#10b981">
-              <circle cx="56" cy="138" r="4.5" /><circle cx="104" cy="202" r="4.5" />
-              <circle cx="152" cy="138" r="4.5" /><circle cx="200" cy="202" r="4.5" />
-              <circle cx="248" cy="138" r="4.5" /><circle cx="296" cy="202" r="4.5" />
-              <circle cx="344" cy="138" r="4.5" />
-            </g>
+            <!-- ===== DERECHA: completa ===== -->
+            <text x="432" y="22" fill="#10b981" font-family="system-ui,sans-serif" font-size="13" font-weight="700">DESDE TU DOMINIO</text>
 
-            <!-- El reventón -->
-            <g stroke="#d97757" stroke-width="3" stroke-linecap="round" fill="none">
-              <path class="hilo-suelto" d="M344 138 Q372 150 366 172 Q360 192 384 200" />
-              <path class="hilo-suelto" d="M392 214 Q368 224 374 244 Q380 262 356 268" />
-            </g>
-            <circle cx="384" cy="200" r="4" fill="#d97757" />
-            <circle cx="356" cy="268" r="4" fill="#d97757" />
+            <rect x="432" y="36" width="352" height="284" rx="8" fill="#141417" stroke="#10b981" stroke-opacity="0.5" />
+            <text x="448" y="60" fill="#71717a" font-family="system-ui,sans-serif" font-size="11" letter-spacing="1">BANDEJA DE TU DOMINIO</text>
 
-            <line x1="410" y1="70" x2="410" y2="272" stroke="#d97757" stroke-width="1.5" stroke-dasharray="5 6" opacity="0.55" />
-            <text x="418" y="66" fill="#d97757" font-family="system-ui,sans-serif" font-size="13" font-weight="600">le escribiste desde Gmail</text>
+            <rect x="448" y="72" width="248" height="34" rx="8" fill="#1f1f23" stroke="#52525b" />
+            <text x="460" y="94" fill="#d4d4d8" font-family="system-ui,sans-serif" font-size="12">hola@tunegocio.com → cliente</text>
 
-            <!-- El mensaje que se queda en el hueco -->
-            <g class="huerfano">
-              <rect x="556" y="150" width="176" height="42" rx="6" fill="#18181b" stroke="#d97757" stroke-width="1.5" />
-              <text x="644" y="176" fill="#d97757" font-family="system-ui,sans-serif" font-size="13" text-anchor="middle">su respuesta, sin hilo</text>
-            </g>
+            <rect x="520" y="118" width="248" height="34" rx="8" fill="#1f1f23" stroke="#10b981" />
+            <text x="532" y="140" fill="#d4d4d8" font-family="system-ui,sans-serif" font-size="12">cliente → hola@tunegocio.com</text>
 
-            <text x="214" y="316" fill="#71717a" font-family="system-ui,sans-serif" font-size="12" text-anchor="middle">una sola conversación</text>
-            <text x="776" y="316" fill="#71717a" font-family="system-ui,sans-serif" font-size="12" text-anchor="end">dos conversaciones que ya no se encuentran</text>
+            <rect x="448" y="164" width="248" height="34" rx="8" fill="#1f1f23" stroke="#52525b" />
+            <text x="460" y="186" fill="#d4d4d8" font-family="system-ui,sans-serif" font-size="12">hola@tunegocio.com → cliente</text>
 
-            
+            <line x1="448" y1="216" x2="768" y2="216" stroke="#27272a" />
+            <text x="448" y="240" fill="#10b981" font-family="system-ui,sans-serif" font-size="12">✓ un solo hilo, en orden</text>
+            <text x="448" y="262" fill="#10b981" font-family="system-ui,sans-serif" font-size="12">✓ queda en el historial del dominio</text>
+            <text x="448" y="284" fill="#10b981" font-family="system-ui,sans-serif" font-size="12">✓ tu equipo puede darle seguimiento</text>
+
+            <text x="608" y="352" fill="#10b981" font-family="system-ui,sans-serif" font-size="14" font-weight="700" text-anchor="middle">1 lugar · 1 conversación</text>
           </svg>
