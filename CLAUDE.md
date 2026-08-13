@@ -93,6 +93,10 @@ La escalera está calculada para que el 5º dominio ($445) empate con Freelancer
 ## TODO
 
 ### ⏭️ Lo primero de la próxima sesión
+- [ ] **Evaluar el costo de sacar la app de Fly**. Análisis, no decisión: qué costaría migrar y a dónde. Lo que ata hoy a Fly es el **volumen único con SQLite** — es la misma restricción que impide el deploy multi-máquina y sin downtime, así que conviene evaluarlo junto con el punto de abajo y no por separado.
+
+  A cuantificar: costo mensual actual en Fly vs alternativas (VPS simple, Railway, Render, EC2 con EBS); qué se rompe al mover el volumen y cómo se migra la base sin perder correo en tránsito; qué pasa con las reglas de recepción de SES y el `notification_url` de MercadoPago si cambia el host; y si la migración obliga de todos modos a pasar a Postgres, en cuyo caso el costo real es ese, no el del hosting. Ojo con el DNS y los certificados: el apex ya hace 301 a `www` y hay dominios de clientes apuntando a SES.
+
 - [ ] **Deploy sub-minuto**. Hoy cada `fly deploy` toma varios minutos y se sintió en una sesión con muchos despliegues seguidos. Ya se bajó de 25+ min a ~22s de build con 11s de downtime (ver `deploy-optimization-pending` en memoria), pero el ciclo completo sigue siendo lento. A revisar: caché de capas de Docker, tamaño de la imagen y qué se copia al contexto de build, `fly deploy --local-only` vs remoto, y si conviene separar el build de assets del de la app. El downtime en sí ya está acotado por SQLite en volumen único — eso es harina de otro costal (LiteFS o Postgres, ya anotado abajo).
 
 ### Crítico — bloquea lanzamiento público
