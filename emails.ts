@@ -185,7 +185,7 @@ export function layout(o: LayoutOpts): string {
     <tr><td style="padding:20px 28px 28px;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted};">
       ${o.footerNote ? `<p style="margin:0 0 10px;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted};">${escHtml(o.footerNote)}</p>` : ""}
       ${invoiceLine}
-      <p style="margin:0 0 10px;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted};">¿Dudas? Responde este correo o escribe a <a href="mailto:${SUPPORT_EMAIL}" style="color:${C.band};">${SUPPORT_EMAIL}</a>.</p>
+      <p style="margin:0 0 10px;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted};">¿Dudas? Responde este correo y te contestamos.</p>
       <p style="margin:0;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted};"><a href="${escHtml(url)}/app" target="_blank" rel="noopener noreferrer" style="color:${C.muted};">Administrar mi cuenta</a> &middot; MailMask &middot; mailmask.studio</p>
     </td></tr>
   </table>
@@ -199,7 +199,7 @@ function textFooter(billing: boolean): string {
   if (billing) {
     lines.push(`¿Necesitas factura (CFDI)? Escríbenos a ${SUPPORT_EMAIL} con tu RFC, razón social, uso de CFDI y el folio de este correo.`);
   }
-  lines.push(`¿Dudas? Responde este correo o escribe a ${SUPPORT_EMAIL}.`);
+  lines.push("¿Dudas? Responde este correo y te contestamos.");
   lines.push(`Administra tu cuenta en ${baseUrl()}/app`);
   lines.push("");
   lines.push("— MailMask");
