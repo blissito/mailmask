@@ -48,6 +48,9 @@
     <!-- Billing banner -->
     <div id="billing-banner"></div>
 
+    <!-- Desglose del cobro mensual: siempre visible, no detrás de un clic -->
+    <div id="billing-summary" class="mt-3"></div>
+
     <!-- Referral credit banner -->
     <div id="referral-credit-banner"></div>
 
@@ -478,6 +481,18 @@
           <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Guardar</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div id="modal-orders" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-start justify-between mb-1">
+        <h3 class="text-lg font-bold">Historial de pagos</h3>
+        <button type="button" class="btn-cancel-modal text-zinc-400 hover:text-zinc-200 text-2xl leading-none" data-modal="modal-orders">&times;</button>
+      </div>
+      <p class="text-sm text-zinc-400 mb-5">Tus cargos, cortesías y cancelaciones. ¿Necesitas factura? Escríbenos con el folio del cargo.</p>
+      <div id="orders-list" class="space-y-2"></div>
+      <div id="orders-error" class="text-red-400 text-sm mt-3 hidden"></div>
     </div>
   </div>
 

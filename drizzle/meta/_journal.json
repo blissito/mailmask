@@ -50,6 +50,13 @@
       "when": 1786000000000,
       "tag": "0006_addons",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1787000000000,
+      "tag": "0007_orders",
+      "breakpoints": true
     }
   ]
 }

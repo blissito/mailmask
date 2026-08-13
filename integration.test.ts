@@ -294,6 +294,101 @@ describe("Add-ons API", () => {
     assert.equal(res.status, 404);
     await res.body?.cancel();
   });
+
+  it("no deja cancelar una cortesía", async () => {
+    // La compuerta tiene que estar en el endpoint, no solo en la UI: esconder el botón
+    // no impide el POST, y una clienta con una cortesía llegó a tener ese botón enfrente.
+    const { createCourtesyAddon } = await import("./db.ts");
+    const { addon } = createCourtesyAddon({
+      userEmail: email, kind: "domain",
+      currentPeriodEnd: new Date(Date.now() + 400 * 864e5).toISOString(),
+      note: "regalo de prueba", grantedBy: "test",
+    });
+
+    const res = await jsonPost(`/api/addons/${addon.id}/cancel`, {}, cookie!, csrfToken);
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).error, /cortesía/i);
+
+    // Y sigue viva: el intento fallido no la marcó cancelada.
+    assert.equal(getAddonById(addon.id)?.status, "active");
+  });
+
+  it("la cortesía viaja al dashboard sin precio", async () => {
+    const res = await req("/api/addons", { headers: { cookie: cookie! } });
+    const data = await res.json();
+    const cortesia = data.mine.find((a: { isCourtesy: boolean }) => a.isCourtesy);
+    assert.ok(cortesia, "aparece en la lista");
+    // De aquí sale el "+$99 MXN/mes" que la pantalla vieja le mostraba a un regalo.
+    assert.equal(cortesia.priceCents, 0);
+    assert.equal(cortesia.source, "courtesy");
+  });
+});
+
+describe("Historial de pagos", () => {
+  const email = `orders-api-${suffix}@example.com`;
+  let cookie: string | undefined;
+
+  before(async () => {
+    sqlite.prepare("DELETE FROM rate_limits").run();
+    createUser(email, await hashPassword("password123"));
+    await updateUserSubscription(email, {
+      plan: "basico", status: "active", mpSubscriptionId: `sub-orders-${suffix}`,
+      currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString(),
+    });
+    const loginRes = await jsonPost("/api/auth/login", { email, password: "password123" });
+    ({ cookie } = extractCookies(loginRes));
+    await loginRes.body?.cancel();
+  });
+
+  it("sin sesión da 401", async () => {
+    const res = await req("/api/billing/orders");
+    assert.equal(res.status, 401);
+    await res.body?.cancel();
+  });
+
+  it("una cuenta sin movimientos devuelve lista vacía y la nota de factura", async () => {
+    const res = await req("/api/billing/orders", { headers: { cookie: cookie! } });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.deepEqual(data.orders, []);
+    assert.equal(data.nextCursor, null);
+    // Es la única vía para pedir CFDI, así que tiene que venir siempre.
+    assert.match(data.invoiceNote, /CFDI/);
+  });
+
+  it("devuelve los cargos con folio y referencia, sin filtrar lo interno", async () => {
+    const { recordOrder } = await import("./db.ts");
+    recordOrder({
+      userEmail: email, kind: "charge", subject: "plan", subjectKey: "basico",
+      description: "Plan Básico (mensual)", amountCents: 4900, listPriceCents: 4900,
+      mpPaymentId: "999888777", eventKey: `orders-api-${suffix}-1`,
+      raw: { payer_id: "no-debe-salir" },
+    });
+
+    const res = await req("/api/billing/orders", { headers: { cookie: cookie! } });
+    const [orden] = (await res.json()).orders;
+
+    assert.match(orden.number, /^MM-\d{4}-[0-9A-F]{4}$/);
+    assert.equal(orden.amountCents, 4900);
+    assert.equal(orden.reference, "999888777");
+    // `raw` trae datos del pagador que MercadoPago nos manda; no salen al cliente.
+    assert.equal(orden.raw, undefined);
+    assert.equal(orden.eventKey, undefined);
+  });
+
+  it("respeta el límite", async () => {
+    const { recordOrder } = await import("./db.ts");
+    for (let i = 0; i < 3; i++) {
+      recordOrder({
+        userEmail: email, kind: "charge", subject: "plan", description: `Cargo ${i}`,
+        amountCents: 100, eventKey: `orders-api-${suffix}-lim-${i}`,
+      });
+    }
+    const res = await req("/api/billing/orders?limit=2", { headers: { cookie: cookie! } });
+    const data = await res.json();
+    assert.equal(data.orders.length, 2);
+    assert.ok(data.nextCursor, "hay cursor cuando se llenó la página");
+  });
 });
 
 // --- Health check ---
