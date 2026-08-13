@@ -207,15 +207,33 @@ async function serveStatic(filePath: string): Promise<Response> {
       js: "application/javascript; charset=utf-8",
       css: "text/css; charset=utf-8",
       png: "image/png",
+      // Sin jpg/jpeg aquí, los JPG salían como application/octet-stream y WhatsApp
+      // descartaba el og:image sin decir nada — los navegadores no lo notan porque
+      // adivinan el tipo por el contenido, los scrapers no.
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      webp: "image/webp",
+      avif: "image/avif",
+      gif: "image/gif",
       svg: "image/svg+xml",
       ico: "image/x-icon",
+      woff: "font/woff",
+      woff2: "font/woff2",
       json: "application/json; charset=utf-8",
       xml: "application/xml; charset=utf-8",
       txt: "text/plain; charset=utf-8",
+      pdf: "application/pdf",
+      epub: "application/epub+zip",
+      webmanifest: "application/manifest+json",
     };
-    return new Response(file, {
-      headers: { "content-type": types[ext] ?? "application/octet-stream" },
-    });
+    const contentType = types[ext.toLowerCase()] ?? "application/octet-stream";
+    const headers: Record<string, string> = { "content-type": contentType };
+    // Caché larga para imágenes y fuentes: son inmutables en la práctica y los
+    // scrapers reintentan menos si la respuesta es estable.
+    if (/^(image|font)\//.test(contentType)) {
+      headers["cache-control"] = "public, max-age=604800";
+    }
+    return new Response(file, { headers });
   } catch {
     try {
       // Node runtime — Bun.file() is unavailable here, so the custom 404 page was
