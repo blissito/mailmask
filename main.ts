@@ -55,6 +55,15 @@ import {
   updateUserPassword,
   isWebhookProcessed,
   markWebhookProcessed,
+  isChargeFailureWarned,
+  markChargeFailureWarned,
+  recordOrder,
+  chargeEventKey,
+  listOrders,
+  getLastOrder,
+  planLabel,
+  planPriceCents,
+  addonLabel,
   createUserIfNotExists,
   getQueueDepth,
   getDeadLetterCount,
@@ -162,6 +171,17 @@ import { runDbBackup, DB_BACKUP_SUFFIX } from "./backup.js";
 import { sqlite } from "./pg.js";
 import { log } from "./logger.js";
 import { createSmtpIamCredential, revokeSmtpIamCredential } from "./ses.js";
+import {
+  sendTemplate,
+  verifyEmail as verifyEmailTemplate,
+  passwordReset,
+  mesaInvite,
+  paymentConfirmation,
+  addonPurchase,
+  renewalReceipt,
+  chargeFailed,
+  guestWelcome,
+} from "./emails.js";
 import "./cron.js";
 
 // --- Coupons (dynamic, from DB) ---
@@ -684,15 +704,8 @@ const app = new Elysia({ adapter: node() })
     const verifyToken = crypto.randomUUID();
     await setVerifyToken(email, verifyToken);
     const verifyUrl = `${getMainDomainUrl()}/api/auth/verify-email?token=${verifyToken}`;
-    const alertFrom =
-      process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
     try {
-      await sendFromDomain(
-        alertFrom,
-        email,
-        "Verifica tu email — MailMask",
-        `Hola,\n\nVerifica tu email haciendo clic en este enlace:\n${verifyUrl}\n\nTienes 7 días para verificar tu cuenta.\n\n— MailMask`,
-      );
+      await sendTemplate(email, verifyEmailTemplate({ verifyUrl }));
     } catch (err) {
       log("error", "auth", "Failed to send verification email", { error: String(err) });
     }
@@ -885,10 +898,10 @@ const app = new Elysia({ adapter: node() })
     const verifyToken = crypto.randomUUID();
     await setVerifyToken(auth.email, verifyToken);
     const verifyUrl = `${getMainDomainUrl()}/api/auth/verify-email?token=${verifyToken}`;
-    const alertFrom = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
     try {
-      await sendFromDomain(alertFrom, auth.email, "Verifica tu email — MailMask",
-        `Hola,\n\nVerifica tu email haciendo clic en este enlace:\n${verifyUrl}\n\nTienes 7 días para verificar tu cuenta.\n\n— MailMask`);
+      // Misma plantilla que el registro: antes eran dos copias del mismo cuerpo,
+      // destinadas a divergir.
+      await sendTemplate(auth.email, verifyEmailTemplate({ verifyUrl }));
     } catch (err) {
       log("error", "auth", "Failed to send verification email", { error: String(err) });
       return new Response(JSON.stringify({ error: "Error enviando email de verificación" }), { status: 500, headers: { "content-type": "application/json" } });
@@ -923,15 +936,8 @@ const app = new Elysia({ adapter: node() })
       const token = crypto.randomUUID();
       await setPasswordToken(email, token);
       const resetUrl = `${getMainDomainUrl()}/set-password?token=${token}`;
-      const alertFrom =
-        process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
       try {
-        const messageId = await sendFromDomain(
-          alertFrom,
-          email,
-          "Restablecer contraseña — MailMask",
-          `Hola,\n\nRecibimos una solicitud para restablecer tu contraseña.\n\nHaz clic en este enlace para crear una nueva contraseña:\n${resetUrl}\n\nEste enlace es válido por 7 días.\n\nSi no solicitaste esto, puedes ignorar este email.\n\n— https://mailmask.studio`,
-        );
+        const messageId = await sendTemplate(email, passwordReset({ resetUrl }));
         log("info", "auth", "Password reset email sent", { email, messageId });
       } catch (err) {
         log("error", "auth", "Failed to send password reset email", { email, error: String(err) });
@@ -2223,9 +2229,56 @@ const app = new Elysia({ adapter: node() })
               currentPeriodEnd: end.toISOString(),
             });
             log("info", "billing", "Add-on activado", { addonId: addon.id, kind: addon.kind, email: addon.userEmail });
+
+            // La clave es el id del add-on y no el del evento: MercadoPago puede
+            // reenviar `authorized` para el mismo preapproval indefinidamente, y solo
+            // el primero es un cobro.
+            const order = recordOrder({
+              userEmail: addon.userEmail,
+              kind: "charge",
+              subject: "addon",
+              subjectId: addon.id,
+              subjectKey: addon.kind,
+              description: addonLabel(addon.kind),
+              amountCents: Math.round((sub.auto_recurring?.transaction_amount ?? 0) * 100),
+              listPriceCents: addon.priceCents,
+              currency: sub.auto_recurring?.currency_id ?? "MXN",
+              periodEnd: end.toISOString(),
+              mpPreapprovalId: String(body.data.id),
+              mpStatus: sub.status,
+              eventKey: `addon-activate:${addon.id}`,
+              occurredAt: sub.date_created ?? undefined,
+              raw: sub,
+            });
+            if (order) {
+              try {
+                await sendTemplate(addon.userEmail, addonPurchase({
+                  addonLabel: addonLabel(addon.kind),
+                  order,
+                  nextChargeAt: end.toISOString(),
+                }));
+              } catch (err) {
+                log("error", "billing", "No se pudo mandar el recibo del add-on", { addonId: addon.id, error: String(err) });
+              }
+            }
           } else if (sub.status === "cancelled" || sub.status === "paused") {
             updateAddon(addon.id, { status: "cancelled", cancelledAt: new Date().toISOString() });
             log("info", "billing", "Add-on cancelado", { addonId: addon.id, kind: addon.kind, mpStatus: sub.status });
+            recordOrder({
+              userEmail: addon.userEmail,
+              kind: "cancellation",
+              subject: "addon",
+              subjectId: addon.id,
+              subjectKey: addon.kind,
+              description: addonLabel(addon.kind),
+              periodEnd: addon.currentPeriodEnd ?? null,
+              mpPreapprovalId: String(body.data.id),
+              mpStatus: sub.status,
+              // Misma clave que emite el endpoint de cancelar, para que la baja hecha
+              // por el usuario y su eco desde MercadoPago sean una sola fila.
+              eventKey: `addon-cancel:${addon.id}`,
+              raw: sub,
+            });
           }
           await markWebhookProcessed(eventKey);
           return new Response("OK", { status: 200 });
@@ -2328,8 +2381,10 @@ const app = new Elysia({ adapter: node() })
 
               // 2nd month free for referred users on first activation
               const referredBy = getUserReferredBy(email);
+              let referralBonusDays = 0;
               if (referredBy && (!existingSub || existingSub.status === "none")) {
                 periodEnd.setDate(periodEnd.getDate() + 30);
+                referralBonusDays = 30;
                 log("info", "webhook", "Referred user gets 2nd month free", { email, referrer: referredBy });
               }
 
@@ -2346,7 +2401,25 @@ const app = new Elysia({ adapter: node() })
               }
               log("info", "webhook", "Subscription activated", { email, plan, mpId: body.data.id });
 
-              const alertFrom = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
+              const order = recordOrder({
+                userEmail: email,
+                kind: "charge",
+                subject: "plan",
+                subjectKey: plan,
+                description: `Plan ${planLabel(plan)} (${sub.auto_recurring?.frequency === 12 ? "anual" : "mensual"})`,
+                // El monto real cobrado, no el de lista: la diferencia entre los dos es
+                // donde se ve un cupón aplicado, dato que hasta hoy se tiraba.
+                amountCents: Math.round((sub.auto_recurring?.transaction_amount ?? 0) * 100),
+                listPriceCents: PLANS[plan]?.price ?? null,
+                currency: sub.auto_recurring?.currency_id ?? "MXN",
+                periodStart: new Date().toISOString(),
+                periodEnd: periodEnd.toISOString(),
+                mpPreapprovalId: String(body.data.id),
+                mpStatus: sub.status,
+                eventKey: `plan-activate:${body.data.id}`,
+                occurredAt: sub.date_created ?? undefined,
+                raw: sub,
+              });
 
               if (isGuestCheckout) {
                 // Guest checkout: send welcome email with password-setup link
@@ -2354,26 +2427,21 @@ const app = new Elysia({ adapter: node() })
                 await setPasswordToken(email, pwToken);
                 const setPasswordUrl = `${getMainDomainUrl()}/set-password?token=${pwToken}`;
                 try {
-                  await sendFromDomain(
-                    alertFrom,
-                    email,
-                    "¡Bienvenido a MailMask! Configura tu contraseña",
-                    `¡Hola!\n\nTu suscripción al plan ${plan.charAt(0).toUpperCase() + plan.slice(1)} está activa.\n\nConfigura tu contraseña para acceder a tu cuenta:\n${setPasswordUrl}\n\nEste enlace es válido por 7 días.\n\n— MailMask`,
-                  );
+                  await sendTemplate(email, guestWelcome({ plan, setPasswordUrl, order }));
                   log("info", "webhook", "Welcome email sent", { email });
                 } catch (err) {
                   log("error", "webhook", "Failed to send welcome email", { email, error: String(err) });
                 }
-              } else {
-                // Authenticated checkout: send payment confirmation
+              } else if (order) {
+                // El `order` nulo significa evento duplicado: no se reenvía el recibo.
                 try {
-                  await sendFromDomain(
-                    alertFrom,
-                    email,
-                    "Confirmación de pago — MailMask",
-                    `¡Hola!\n\nTu pago fue procesado exitosamente. Tu plan ${plan.charAt(0).toUpperCase() + plan.slice(1)} está activo.\n\nPuedes administrar tu cuenta en:\n${getMainDomainUrl()}/app\n\nGracias por usar MailMask.\n\n— MailMask`,
-                  );
-                  log("info", "webhook", "Payment confirmation sent", { email });
+                  await sendTemplate(email, paymentConfirmation({
+                    plan,
+                    order,
+                    nextChargeAt: periodEnd.toISOString(),
+                    referralBonusDays: referralBonusDays || undefined,
+                  }));
+                  log("info", "webhook", "Payment confirmation sent", { email, orderNumber: order.number });
                 } catch (err) {
                   log("error", "webhook", "Failed to send payment confirmation", { email, error: String(err) });
                 }
@@ -2388,6 +2456,18 @@ const app = new Elysia({ adapter: node() })
                 status: "cancelled",
               });
               log("info", "webhook", "Subscription cancelled", { email });
+              recordOrder({
+                userEmail: email,
+                kind: "cancellation",
+                subject: "plan",
+                subjectKey: currentSub.plan,
+                description: `Plan ${planLabel(currentSub.plan)}`,
+                periodEnd: currentSub.currentPeriodEnd ?? null,
+                mpPreapprovalId: String(body.data.id),
+                mpStatus: sub.status,
+                eventKey: `plan-cancel:${body.data.id}`,
+                raw: sub,
+              });
             }
           } else if (sub.status === "paused") {
             const existingUser = await getUser(email);
@@ -2452,33 +2532,19 @@ const app = new Elysia({ adapter: node() })
           paymentStatus: ap.payment?.status,
         });
 
-        // Only processed charges with an approved payment extend the period
         const approved = ap.status === "processed" &&
           (!ap.payment?.status || ap.payment.status === "approved");
-        if (!approved || !ap.preapproval_id) {
-          await markWebhookProcessed(eventKey);
-          return new Response("OK", { status: 200 });
-        }
 
-        // Renovación mensual de un add-on. Va antes de resolver el usuario porque los
-        // add-ons no viven en users.sub_mp_id; sin esta rama el add-on expiraría aunque
-        // el cliente siguiera pagando.
-        const renewingAddon = getAddonByMpId(ap.preapproval_id);
-        if (renewingAddon) {
-          const prev = renewingAddon.currentPeriodEnd ? new Date(renewingAddon.currentPeriodEnd) : new Date();
-          const base = prev > new Date() ? prev : new Date();
-          base.setDate(base.getDate() + 35);
-          updateAddon(renewingAddon.id, { status: "active", currentPeriodEnd: base.toISOString() });
-          log("info", "billing", "Add-on renovado", { addonId: renewingAddon.id, kind: renewingAddon.kind, until: base.toISOString() });
-          await markWebhookProcessed(eventKey);
-          return new Response("OK", { status: 200 });
-        }
+        // El add-on se resuelve primero porque no vive en users.sub_mp_id.
+        const renewingAddon = ap.preapproval_id ? getAddonByMpId(ap.preapproval_id) : null;
 
-        // Resolve the user: by stored preapproval id first, then via the preapproval payload
-        let user = getUserBySubscriptionId(ap.preapproval_id);
+        // Resolver al dueño ANTES de mirar si el cobro se aprobó. Antes la rama de "no
+        // aprobado" se salía aquí mismo, así que no había a quién registrarle el fallo
+        // ni a quién avisarle: el plan simplemente se vencía en silencio.
+        let user = renewingAddon ? await getUser(renewingAddon.userEmail) : getUserBySubscriptionId(ap.preapproval_id);
         let email = user?.email;
 
-        if (!email) {
+        if (!email && ap.preapproval_id) {
           const subRes = await fetch(
             `https://api.mercadopago.com/preapproval/${ap.preapproval_id}`,
             {
@@ -2502,6 +2568,110 @@ const app = new Elysia({ adapter: node() })
             : externalRef || sub.payer_email;
           email = candidate ? String(candidate).toLowerCase().trim() : undefined;
           if (email) user = await getUser(email);
+        }
+
+        if (!approved || !ap.preapproval_id) {
+          if (email) {
+            const concepto = renewingAddon
+              ? addonLabel(renewingAddon.kind)
+              : `Plan ${planLabel(user?.subscription?.plan)}`;
+            const accessUntil = renewingAddon
+              ? renewingAddon.currentPeriodEnd
+              : user?.subscription?.currentPeriodEnd;
+
+            const failedOrder = recordOrder({
+              userEmail: email,
+              kind: "failed_charge",
+              subject: renewingAddon ? "addon" : "plan",
+              subjectId: renewingAddon?.id ?? null,
+              subjectKey: renewingAddon?.kind ?? user?.subscription?.plan ?? null,
+              description: concepto,
+              // Cero porque no se movió dinero; lo que se intentó cobrar va en el
+              // precio de lista.
+              amountCents: 0,
+              listPriceCents: Math.round((ap.transaction_amount ?? 0) * 100),
+              currency: ap.currency_id ?? "MXN",
+              periodEnd: accessUntil ?? null,
+              mpPreapprovalId: ap.preapproval_id ?? null,
+              mpAuthorizedPaymentId: String(ap.id),
+              mpPaymentId: ap.payment?.id ? String(ap.payment.id) : null,
+              mpStatus: ap.status,
+              mpStatusDetail: ap.payment?.status_detail ?? ap.payment?.status ?? null,
+              eventKey: chargeEventKey(ap),
+              occurredAt: ap.date_created ?? undefined,
+              raw: ap,
+            });
+
+            log("warn", "billing", "Cobro rechazado", {
+              email, concepto, mpStatus: ap.status,
+              paymentStatus: ap.payment?.status, duplicado: !failedOrder,
+            });
+
+            // Limitado a uno cada 3 días: MercadoPago dispara varios eventos de fallo
+            // por ciclo, y una tarjeta vencida se convertiría en una ristra de correos
+            // y en una queja de spam contra el dominio de envío.
+            if (failedOrder && !(await isChargeFailureWarned(email))) {
+              try {
+                await sendTemplate(email, chargeFailed({
+                  concept: concepto,
+                  attemptedCents: Math.round((ap.transaction_amount ?? 0) * 100),
+                  currency: ap.currency_id ?? "MXN",
+                  accessUntil: accessUntil ?? null,
+                  reason: ap.payment?.status_detail ?? null,
+                }));
+                await markChargeFailureWarned(email);
+              } catch (err) {
+                log("error", "billing", "No se pudo avisar del cobro fallido", { email, error: String(err) });
+              }
+            }
+          } else {
+            log("warn", "webhook", "Cobro rechazado sin dueño resoluble", { apId: ap.id, preapprovalId: ap.preapproval_id });
+          }
+          await markWebhookProcessed(eventKey);
+          return new Response("OK", { status: 200 });
+        }
+
+        // Renovación mensual de un add-on. Sin esta rama el add-on expiraría aunque el
+        // cliente siguiera pagando.
+        if (renewingAddon) {
+          const prev = renewingAddon.currentPeriodEnd ? new Date(renewingAddon.currentPeriodEnd) : new Date();
+          const base = prev > new Date() ? prev : new Date();
+          base.setDate(base.getDate() + 35);
+          updateAddon(renewingAddon.id, { status: "active", currentPeriodEnd: base.toISOString() });
+          log("info", "billing", "Add-on renovado", { addonId: renewingAddon.id, kind: renewingAddon.kind, until: base.toISOString() });
+
+          const order = recordOrder({
+            userEmail: renewingAddon.userEmail,
+            kind: "charge",
+            subject: "addon",
+            subjectId: renewingAddon.id,
+            subjectKey: renewingAddon.kind,
+            description: addonLabel(renewingAddon.kind),
+            amountCents: Math.round((ap.transaction_amount ?? 0) * 100),
+            listPriceCents: renewingAddon.priceCents,
+            currency: ap.currency_id ?? "MXN",
+            periodEnd: base.toISOString(),
+            mpPreapprovalId: ap.preapproval_id,
+            mpAuthorizedPaymentId: String(ap.id),
+            mpPaymentId: ap.payment?.id ? String(ap.payment.id) : null,
+            mpStatus: ap.status,
+            eventKey: chargeEventKey(ap),
+            occurredAt: ap.date_created ?? undefined,
+            raw: ap,
+          });
+          if (order) {
+            try {
+              await sendTemplate(renewingAddon.userEmail, renewalReceipt({
+                concept: addonLabel(renewingAddon.kind),
+                order,
+                nextChargeAt: base.toISOString(),
+              }));
+            } catch (err) {
+              log("error", "billing", "No se pudo mandar el recibo de renovación del add-on", { addonId: renewingAddon.id, error: String(err) });
+            }
+          }
+          await markWebhookProcessed(eventKey);
+          return new Response("OK", { status: 200 });
         }
 
         if (!email || !user?.subscription) {
@@ -2529,6 +2699,42 @@ const app = new Elysia({ adapter: node() })
         }
 
         log("info", "webhook", "Subscription renewed via authorized payment", { email, bufferDays });
+
+        const renewed = await getUser(email);
+        const order = recordOrder({
+          userEmail: email,
+          kind: "charge",
+          subject: "plan",
+          subjectKey: user.subscription.plan,
+          description: `Plan ${planLabel(user.subscription.plan)} (${ap.type === "yearly" ? "anual" : "mensual"})`,
+          amountCents: Math.round((ap.transaction_amount ?? 0) * 100),
+          listPriceCents: PLANS[user.subscription.plan]?.price ?? null,
+          currency: ap.currency_id ?? "MXN",
+          periodStart: user.subscription.currentPeriodEnd ?? null,
+          periodEnd: renewed?.subscription?.currentPeriodEnd ?? null,
+          mpPreapprovalId: ap.preapproval_id,
+          mpAuthorizedPaymentId: String(ap.id),
+          mpPaymentId: ap.payment?.id ? String(ap.payment.id) : null,
+          mpStatus: ap.status,
+          eventKey: chargeEventKey(ap),
+          occurredAt: ap.date_created ?? undefined,
+          raw: ap,
+        });
+        // Hasta hoy la renovación no mandaba nada: al cliente se le cobraba en absoluto
+        // silencio, mes tras mes.
+        if (order) {
+          try {
+            await sendTemplate(email, renewalReceipt({
+              concept: `Plan ${planLabel(user.subscription.plan)}`,
+              order,
+              nextChargeAt: renewed?.subscription?.currentPeriodEnd ?? null,
+            }));
+            log("info", "billing", "Recibo de renovación enviado", { email, orderNumber: order.number });
+          } catch (err) {
+            log("error", "billing", "No se pudo mandar el recibo de renovación", { email, error: String(err) });
+          }
+        }
+
         await markWebhookProcessed(eventKey);
       } catch (err) {
         log("error", "webhook", "MP authorized payment processing error", { error: String(err) });
@@ -3696,10 +3902,10 @@ const app = new Elysia({ adapter: node() })
     const token = await createAgentInvite(domain.id, email, name, role as "agent" | "admin");
     const inviteUrl = `${getMainDomainUrl()}/api/agents/accept?token=${token}`;
 
-    const alertFrom = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
     try {
-      await sendFromDomain(alertFrom, email, `Invitación a Mesa — ${domain.domain}`,
-        `Hola ${name},\n\n${auth.email} te invita como ${role} en Mesa para el dominio ${domain.domain}.\n\nAcepta la invitación aquí:\n${inviteUrl}\n\nEste enlace es válido por 7 días.\n\n— MailMask`);
+      await sendTemplate(email, mesaInvite({
+        inviterEmail: auth.email, domain: domain.domain, role, name, acceptUrl: inviteUrl,
+      }));
     } catch (err) {
       log("error", "ses", "Failed to send agent invite", { error: String(err) });
     }
@@ -4495,6 +4701,26 @@ const app = new Elysia({ adapter: node() })
 
           // Update to paid and start registration
           updateDomainRegistration(regId, { status: "paid", mpPaymentId: String(body.data.id) });
+
+          // Entra al libro mayor igual que los demás: es un cargo real a una tarjeta
+          // real, y dejarlo fuera haría que el historial mienta por omisión.
+          recordOrder({
+            userEmail: reg.ownerEmail,
+            kind: "charge",
+            subject: "domain_registration",
+            subjectId: reg.id,
+            subjectKey: reg.tld,
+            description: `Registro de dominio ${reg.domainName}`,
+            amountCents: reg.priceCents,
+            listPriceCents: reg.priceCents,
+            currency: payment.currency_id ?? "MXN",
+            periodEnd: reg.expiresAt ?? null,
+            mpPaymentId: String(body.data.id),
+            mpStatus: payment.status,
+            eventKey: `domreg:${regId}`,
+            occurredAt: payment.date_approved ?? payment.date_created ?? undefined,
+            raw: payment,
+          });
 
           try {
             const { registerDomain } = await import("./route53.js");

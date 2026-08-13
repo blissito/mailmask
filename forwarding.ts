@@ -1,5 +1,6 @@
 import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, type Rule, type ForwardQueueItem } from "./db.js";
 import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchEmailHeadersFromS3, sendFromDomain } from "./ses.js";
+import { sendTemplate, firstEmailReceived } from "./emails.js";
 import { checkRateLimit } from "./rate-limit.js";
 import { log } from "./logger.js";
 import cron from "node-cron";
@@ -565,13 +566,16 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
 
       // Notify owner on first email to this alias
       if (!matched.forwardCount && owner) {
-        const aliasAddr = `${matched.alias}@${domainName}`;
-        sendFromDomain(
-          `noreply@${domainName}`,
+        // Sale del dominio del propio cliente, no del remitente de alertas: es correo
+        // sobre su dominio y así conserva su reputación.
+        //
+        // La versión anterior metía `from` y `subject` crudos en el HTML. Los escribe
+        // quien manda el correo — o sea, cualquiera en internet — así que era inyección
+        // de HTML en la bandeja del dueño. La plantilla los escapa.
+        sendTemplate(
           owner.email,
-          `Primer email recibido en ${aliasAddr}`,
-          `¡Tu alias ${aliasAddr} acaba de recibir su primer email!\n\nDe: ${from}\nAsunto: ${subject}\n\nPuedes ver la actividad de tus alias en tu panel de control.`,
-          { html: `<p>¡Tu alias <strong>${aliasAddr}</strong> acaba de recibir su primer email!</p><p><strong>De:</strong> ${from}<br><strong>Asunto:</strong> ${subject}</p><p>Puedes ver la actividad de tus alias en tu <a href="https://mailmask.studio/app">panel de control</a>.</p>` },
+          firstEmailReceived({ alias: matched.alias, domain: domainName, from, subject }),
+          { from: `MailMask <noreply@${domainName}>` },
         ).catch(() => {}); // fire-and-forget
       }
     } else {

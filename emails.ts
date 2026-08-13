@@ -269,6 +269,32 @@ export function paymentConfirmation(d: {
   };
 }
 
+export function addonPurchase(d: {
+  addonLabel: string;
+  order: OrderLike;
+  nextChargeAt?: string | null;
+}): Email {
+  const rows = receiptRows(d.addonLabel, d.order, d.nextChargeAt);
+  return {
+    subject: cleanSubject(`Add-on activado: ${d.addonLabel} — MailMask`),
+    html: layout({
+      preheader: `${d.addonLabel} activo · ${money(d.order.amountCents, d.order.currency)} · folio ${d.order.number}`,
+      heading: `${d.addonLabel} ya está activo`,
+      body: p("Recibimos tu pago y el add-on ya aplica en tu cuenta. Aquí está el detalle para tus registros.")
+        + detailTable(rows),
+      cta: { label: "Ver mi cuenta", url: `${baseUrl()}/app` },
+      footerNote: "Este correo es tu comprobante de pago. No es un CFDI.",
+      billing: true,
+    }),
+    text: textBlock([
+      `${d.addonLabel} ya está activo en tu cuenta.`,
+      textRows(rows),
+      `Ver tu cuenta: ${baseUrl()}/app`,
+      "Este correo es tu comprobante de pago. No es un CFDI.",
+    ], true),
+  };
+}
+
 export function renewalReceipt(d: {
   concept: string;
   order: OrderLike;
@@ -580,6 +606,15 @@ export const TEMPLATE_FIXTURES: Record<string, () => Email> = {
     },
     nextChargeAt: "2026-09-12T00:00:00.000Z",
     referralBonusDays: 30,
+  }),
+  addonPurchase: () => addonPurchase({
+    addonLabel: ADDONS.sends100.label,
+    order: {
+      number: "MM-2608-3D5E", amountCents: 9900, currency: "MXN",
+      periodEnd: "2026-09-17T00:00:00.000Z", mpPaymentId: "555000111",
+      occurredAt: "2026-08-13T00:00:00.000Z",
+    },
+    nextChargeAt: "2026-09-13T00:00:00.000Z",
   }),
   renewalReceipt: () => renewalReceipt({
     concept: "Plan Básico (mensual)",

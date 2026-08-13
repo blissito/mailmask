@@ -1,17 +1,17 @@
 import cron from "node-cron";
-import { sendFromDomain, deleteEmailFromS3, sendAlert } from "./ses.js";
+import { deleteEmailFromS3, sendAlert } from "./ses.js";
 import { log } from "./logger.js";
 import { db } from "./pg.js";
 import { tokens, emailLogs, forwardQueue, rateLimits, sendCounts, bulkJobs, users, addons } from "./schema.js";
 import { lte, and, eq, inArray, isNotNull, gt, sql as rawSql } from "drizzle-orm";
-import { purgeDeletedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, createDomain, listEffectiveAddons, updateAddon } from "./db.js";
+import { purgeDeletedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, createDomain, listEffectiveAddons, updateAddon, recordOrder, addonLabel } from "./db.js";
+import { sendTemplate, expiryWarning, addonShutdown } from "./emails.js";
 
 // Daily at 14:00 UTC — warn users whose subscription expires within 3 days
 cron.schedule("0 14 * * *", async () => {
-  const alertFrom = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
-  const baseUrl = process.env.MAIN_DOMAIN
-    ? `https://${process.env.MAIN_DOMAIN.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`
-    : "https://mailmask.studio";
+  // El remitente y la URL base salían de aquí con un dominio por defecto distinto al
+  // de main.ts (`mailmask.studio` contra `www.mailmask.studio`). Ahora los dos vienen
+  // de emails.ts.
 
   // Find users expiring within 3 days who haven't been warned yet.
   // Step 1: get emails of already-warned users (stored as JSON value)
@@ -44,19 +44,12 @@ cron.schedule("0 14 * * *", async () => {
   let warned = 0;
   for (const user of toWarn) {
     try {
-      const endDate = new Date(user.subPeriodEnd!).toLocaleDateString("es-MX");
-      // Sin suscripción en MercadoPago no hay nada que renueve el plano: decirle "se
+      // Sin suscripción en MercadoPago no hay nada que renueve el plan: decirle "se
       // renovará automáticamente" es mentirle y que se quede sin servicio sin avisar.
-      const seRenueva = !!user.subMpId;
-      const cuerpo = seRenueva
-        ? `Hola,\n\nTu suscripción de MailMask vence el ${endDate}.\n\nSi tu pago está al día, tu plan se renovará automáticamente. Si no, reactiva tu suscripción para no perder acceso:\n${baseUrl}/app\n\n— MailMask`
-        : `Hola,\n\nTu plan de MailMask vence el ${endDate} y no tiene una suscripción activa que lo renueve, así que ese día perderías el acceso.\n\nActiva tu suscripción aquí para no quedarte sin servicio:\n${baseUrl}/app\n\n— MailMask`;
-      await sendFromDomain(
-        alertFrom,
-        user.email,
-        "Tu plan de MailMask está por vencer",
-        cuerpo,
-      );
+      await sendTemplate(user.email, expiryWarning({
+        endDate: user.subPeriodEnd!,
+        hasMpSubscription: !!user.subMpId,
+      }));
       const expiresAt = new Date(Date.now() + 4 * 24 * 3600_000).toISOString();
       await db.insert(tokens).values({
         token: crypto.randomUUID(),
@@ -113,7 +106,19 @@ cron.schedule("0 4 * * *", async () => {
 
     let apagados = 0;
     for (const u of vencidos) {
+      // Se acumulan por usuario para mandar un solo correo al final, no uno por add-on:
+      // quien tenga tres se llevaría tres avisos idénticos.
+      const cancelados: string[] = [];
+      let periodEnd: string | null = null;
+
       for (const addon of listEffectiveAddons(u.email)) {
+        // Las cortesías no se apagan. No hay nada que cancelar en MercadoPago —no
+        // tienen preapproval— y destruir un regalo porque el plan base venció es
+        // irreversible y además injusto: si el plan vuelve, el regalo debería seguir.
+        if (addon.isCourtesy) {
+          log("info", "billing", "Add-on de cortesía conservado pese al plan expirado", { email: u.email, addonId: addon.id, kind: addon.kind });
+          continue;
+        }
         try {
           if (addon.mpPreapprovalId && mpToken) {
             const res = await fetch(`https://api.mercadopago.com/preapproval/${addon.mpPreapprovalId}`, {
@@ -125,10 +130,34 @@ cron.schedule("0 4 * * *", async () => {
             if (!res.ok) throw new Error(`MP ${res.status}: ${await res.text()}`);
           }
           updateAddon(addon.id, { status: "cancelled", cancelledAt: new Date().toISOString() });
+          recordOrder({
+            userEmail: u.email,
+            kind: "cancellation",
+            subject: "addon",
+            subjectId: addon.id,
+            subjectKey: addon.kind,
+            description: addonLabel(addon.kind),
+            periodEnd: addon.currentPeriodEnd ?? null,
+            mpPreapprovalId: addon.mpPreapprovalId ?? null,
+            note: "El plan base expiró",
+            eventKey: `addon-cancel:${addon.id}`,
+          });
+          cancelados.push(addonLabel(addon.kind));
+          periodEnd = periodEnd ?? addon.currentPeriodEnd ?? null;
           apagados++;
           log("info", "billing", "Add-on cancelado: el plan base expiró", { email: u.email, addonId: addon.id, kind: addon.kind });
         } catch (err) {
           log("error", "billing", "No se pudo cancelar add-on de plan expirado", { email: u.email, addonId: addon.id, error: String(err) });
+        }
+      }
+
+      // Antes esto pasaba en silencio: al cliente se le acababa la capacidad de envío
+      // sin una sola explicación.
+      if (cancelados.length) {
+        try {
+          await sendTemplate(u.email, addonShutdown({ addonLabels: cancelados, planEndedAt: periodEnd }));
+        } catch (err) {
+          log("error", "billing", "No se pudo avisar del apagado de add-ons", { email: u.email, error: String(err) });
         }
       }
     }

@@ -954,6 +954,26 @@ export function markWebhookProcessed(id: string): void {
     .run();
 }
 
+// Limitador del aviso de cobro fallido: uno cada 3 días por usuario. MercadoPago
+// dispara varios eventos de rechazo por ciclo de cobro, así que una tarjeta vencida
+// se convertiría en una ristra de correos idénticos — y de ahí a una queja de spam
+// contra el dominio de envío hay un paso. Mismo patrón que `expiry-warned` en cron.ts.
+export function isChargeFailureWarned(email: string): boolean {
+  const now = new Date().toISOString();
+  const row = db.select().from(tokens)
+    .where(and(eq(tokens.token, `charge-failed:${email}`), gt(tokens.expiresAt, now)))
+    .get();
+  return !!row;
+}
+
+export function markChargeFailureWarned(email: string): void {
+  const expiresAt = new Date(Date.now() + 3 * 24 * 3600_000).toISOString();
+  db.insert(tokens)
+    .values({ token: `charge-failed:${email}`, kind: "charge-failed-warned", value: { email }, expiresAt })
+    .onConflictDoUpdate({ target: tokens.token, set: { expiresAt } })
+    .run();
+}
+
 // --- Atomic user creation (guest checkout) ---
 
 export function createUserIfNotExists(email: string, passwordHash: string): boolean {
