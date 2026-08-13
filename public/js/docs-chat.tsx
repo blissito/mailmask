@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { createRoot, createPortal } from "react-dom/client";
+import { createRoot } from "react-dom/client";
+import { createPortal } from "react-dom";
 import {
   FormmyProvider,
   useFormmyChat,
