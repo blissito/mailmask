@@ -223,7 +223,7 @@
             "name": "¿Puedo enviar emails desde mi dominio con un cliente de correo?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Para enviar, sí: el plan Developer incluye credenciales SMTP que configuras como servidor de salida en Outlook, Thunderbird o Apple Mail, y sales como ventas@tudominio.com con DKIM y SPF. Para recibir, todavía no: IMAP y POP están en camino. Por ahora el correo entrante llega al buzón al que lo reenvías, y para leer y escribir en un solo lugar está la Bandeja."
+              "text": "Para enviar, sí. Para recibir, todavía no. Con el plan Developer configuras las credenciales SMTP como servidor de salida en Outlook, Thunderbird o Apple Mail, y tus correos salen como ventas@tudominio.com firmados con DKIM y SPF. Recibir en el cliente necesita IMAP o POP, y esos están en camino: por ahora el correo entrante llega al buzón al que lo reenvías. Si buscas tener todo en un solo lugar, la Bandeja ya lo hace desde el navegador: recibes, respondes y escribes correos nuevos con el botón Redactar."
             }
           }
         ]
@@ -1152,15 +1152,23 @@
             >
           </summary>
           <p class="px-6 pb-4 text-zinc-400 text-sm">
-            Para <strong class="text-zinc-300">enviar</strong>, sí: el plan Developer
-            incluye credenciales SMTP que configuras como servidor de salida en Outlook,
-            Thunderbird o Apple Mail, y sales como ventas@tudominio.com con DKIM y SPF.
-            <strong class="text-zinc-300">Para recibir, todavía no:</strong> IMAP y POP
-            están en camino <span class="text-zinc-500">(próximamente)</span>, así que por
-            ahora el correo entrante sigue llegando al buzón al que lo reenvías. Mientras
-            tanto, para leer y escribir en un solo lugar está la
-            <a href="#bandeja" class="text-mask-400 hover:underline">Bandeja</a>: ahí
-            recibes, respondes y redactas sin configurar nada.
+            <strong class="text-zinc-300">Para enviar, sí. Para recibir, todavía no.</strong>
+          </p>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">
+            Con el plan Developer configuras las credenciales SMTP como servidor de salida
+            en Outlook, Thunderbird o Apple Mail. Tus correos salen como
+            <code class="text-zinc-300">ventas@tudominio.com</code>, firmados con DKIM y SPF.
+          </p>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">
+            Recibir en el cliente necesita IMAP o POP, y esos
+            <span class="text-zinc-500">están en camino</span>. Por ahora el correo entrante
+            llega al buzón al que lo reenvías.
+          </p>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">
+            Si lo que buscas es tener todo en un solo lugar, la
+            <a href="#bandeja" class="text-mask-400 hover:underline">Bandeja</a> ya lo hace
+            desde el navegador: recibes, respondes y <strong class="text-zinc-300">escribes
+            correos nuevos</strong> con el botón Redactar.
           </p>
         </details>
       </div>
