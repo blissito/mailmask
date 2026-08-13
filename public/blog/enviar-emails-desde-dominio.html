@@ -5,10 +5,10 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cómo enviar emails desde tu dominio (no solo recibir) — MailMask</title>
-    <meta name="description" content="Tres formas de enviar emails como ventas@tudominio.com: Bandeja compartida, send-as en Gmail, y SMTP relay para desarrolladores. Tutorial con los 3 métodos." />
+    <meta name="description" content="Tres formas de enviar como ventas@tudominio.com en MailMask: redactar desde la Bandeja, la API REST/SDK, y el SMTP relay. Planes, límites y cuándo usar cada una." />
     <link rel="canonical" href="https://www.mailmask.studio/blog/enviar-emails-desde-dominio" />
     <meta property="og:title" content="Cómo enviar emails desde tu dominio (no solo recibir)" />
-    <meta property="og:description" content="Tres formas de enviar desde tu dominio: Bandeja, Gmail send-as, y SMTP relay." />
+    <meta property="og:description" content="Tres formas de enviar desde tu dominio: Bandeja, API/SDK y SMTP relay." />
     <meta property="og:type" content="article" />
     <meta property="og:url" content="https://www.mailmask.studio/blog/enviar-emails-desde-dominio" />
     <meta property="og:locale" content="es_MX" />
@@ -19,11 +19,12 @@
     <meta property="og:image:alt" content="Cómo enviar emails desde tu dominio (no solo recibir)" />
     <meta property="og:image:secure_url" content="https://www.mailmask.studio/blog/img/enviar-dominio.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
-    <meta name="twitter:image" content="https://www.mailmask.studio/blog/img/enviar-dominio.jpg" />
-    <meta property="article:published_time" content="2026-02-24" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Cómo enviar emails desde tu dominio (no solo recibir)" />
-    <meta name="twitter:description" content="Tres formas de enviar desde tu dominio: Bandeja, Gmail send-as, y SMTP relay." />
+    <meta name="twitter:description" content="Tres formas de enviar desde tu dominio: Bandeja, API/SDK y SMTP relay." />
+    <meta name="twitter:image" content="https://www.mailmask.studio/blog/img/enviar-dominio.jpg" />
+    <meta property="article:published_time" content="2026-02-24" />
+    <meta property="article:modified_time" content="2026-08-12" />
     <script src="/js/analytics.js"></script>
     <link rel="stylesheet" href="/css/styles.css" />
     <link rel="stylesheet" href="/blog/blog.css" />
@@ -32,7 +33,7 @@
       "@context": "https://schema.org",
       "@type": "BlogPosting",
       "headline": "Cómo enviar emails desde tu dominio (no solo recibir)",
-      "description": "Tres formas de enviar emails como ventas@tudominio.com: Bandeja compartida, send-as en Gmail, y SMTP relay.",
+      "description": "Tres formas de enviar como ventas@tudominio.com en MailMask: redactar desde la Bandeja, la API REST/SDK y el SMTP relay.",
       "datePublished": "2026-02-24",
       "dateModified": "2026-08-12",
       "image": "https://www.mailmask.studio/blog/img/enviar-dominio.jpg",
@@ -62,31 +63,39 @@
           "name": "¿Puedo enviar emails desde mi dominio si uso forwarding?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Sí. Hay tres formas: responder desde la Bandeja compartida de MailMask, configurar send-as en Gmail para enviar como tu alias, o usar SMTP relay para enviar desde código o herramientas de automatización."
+            "text": "Sí. Hay tres formas en MailMask: redactar o responder desde la Bandeja, llamar la API REST (o el SDK @easybits.cloud/mailmask), y usar el SMTP relay. Las tres salen desde tu dominio autenticado con DKIM y SPF."
           }
         },
         {
           "@type": "Question",
-          "name": "¿Gmail send-as funciona con email forwarding?",
+          "name": "¿El plan Básico puede enviar desde su dominio?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Sí. Puedes agregar tu alias de MailMask como dirección de envío en Gmail usando las credenciales SMTP de MailMask. Los emails salen firmados con DKIM de tu dominio."
+            "text": "El plan Básico de $49 MXN al mes incluye la Bandeja y puede responder conversaciones sin costo extra. Para iniciar un correo nuevo necesita el add-on de envíos: 25 al día por +$49 MXN o 100 al día por +$99 MXN, excluyentes entre sí."
           }
         },
         {
           "@type": "Question",
-          "name": "¿Qué es SMTP relay y para qué sirve?",
+          "name": "¿Cuántos envíos al día incluye cada plan?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "SMTP relay son credenciales de servidor de correo que puedes usar para enviar emails desde código, aplicaciones SaaS o herramientas de automatización como n8n, Make o Zapier. Cada email sale con tu dominio autenticado."
+            "text": "Freelancer ($449 MXN) incluye 200 envíos al día por dominio y Developer ($999 MXN) incluye 1,000 al día por dominio. Básico responde sin límite de plan e inicia correos nuevos solo con el add-on de 25 o 100 al día. Los topes se cuentan por dominio y por día."
           }
         },
         {
           "@type": "Question",
-          "name": "¿Cuál método de envío debo usar?",
+          "name": "¿Puedo enviar desde una dirección que no existe en mi dominio?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Si atiendes clientes en equipo, usa la Bandeja compartida. Si trabajas solo y vives en Gmail, usa send-as. Si envías desde código o automatizaciones, usa SMTP relay. Puedes usar los tres simultáneamente."
+            "text": "No. El remitente debe ser un alias real y activo de un dominio verificado en tu cuenta. Si el alias no existe o está desactivado, el envío se rechaza."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué método de envío debo usar?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Usa la Bandeja para escribirle a una persona, la API REST o el SDK para enviar desde tu propio código, y el SMTP relay (solo plan Developer) para conectar un SaaS o un sistema que ya habla SMTP."
           }
         }
       ]
@@ -105,249 +114,166 @@
         <h1>Cómo enviar emails desde tu dominio (no solo recibir)</h1>
         <div class="meta">
           <span>📅 24 Feb 2026</span>
-          <span>⏱ 8 min de lectura</span>
+          <span>🔄 Actualizado 12 Ago 2026</span>
+          <span>⏱ 7 min de lectura</span>
         </div>
       </header>
 
       <div class="blog-content">
         <div class="tldr">
           <strong>En resumen</strong>
-          Recibir emails en tu dominio es solo la mitad. Aquí te mostramos 3 formas de <em>enviar</em> como <code>ventas@tudominio.com</code>: la Bandeja compartida (para equipos), send-as en Gmail (para uso personal), y SMTP relay (para código y automatizaciones).
+          MailMask tiene tres salidas para enviar como <code>ventas@tudominio.com</code>: redactar desde la Bandeja, la API REST con el SDK, y el SMTP relay. Las tres firman con DKIM y SPF de tu dominio. Aquí está cuál te toca y cómo se configura.
         </div>
 
-        <p>Configuraste tu dominio, creaste aliases, y ahora recibes emails en <code>hola@tunegocio.com</code>. Perfecto. Pero cuando respondes desde tu Gmail, el cliente ve <code>juanperez@gmail.com</code>. Eso rompe toda la magia del email profesional.</p>
+        <p>Recibir es la mitad del trabajo. Enviar desde tu dominio es lo que hace que el correo se vea profesional y llegue a la bandeja de entrada del otro lado.</p>
 
-        <p>La pregunta #1 después de configurar <a href="/blog/que-es-email-forwarding">email forwarding</a> es: ¿cómo respondo como mi alias? En MailMask hay tres formas, cada una para un caso de uso diferente.</p>
+        <p>MailMask ya no te pide credenciales SMTP ni plan Developer para escribir desde tu dominio. Hay tres caminos, y el más simple está en la interfaz.</p>
 
-        <h2>Elige tu método</h2>
+        <h2>¿Cuáles son las tres formas de enviar desde tu dominio?</h2>
 
-        <div class="comparison-row">
-          <div class="comparison-card accent">
-            <span class="tag">Equipos</span>
-            <h4>Bandeja compartida</h4>
-            <p>Responde desde MailMask directamente. Ideal cuando varios agentes coordinan soporte o ventas. El cliente ve el alias del equipo, nunca emails personales.</p>
-          </div>
-          <div class="comparison-card">
-            <span class="tag">Individual</span>
-            <h4>Send-as en Gmail</h4>
-            <p>Configura tu alias como dirección de envío en Gmail. Ideal si trabajas solo y no quieres salir de Gmail para responder.</p>
-          </div>
-        </div>
+        <p>Son la Bandeja, la API REST (con su SDK) y el SMTP relay. Las tres terminan en el mismo lugar: tu dominio verificado, firmado con DKIM y SPF.</p>
 
-        <div class="comparison-row">
-          <div class="comparison-card">
-            <span class="tag">Developers</span>
-            <h4>SMTP relay</h4>
-            <p>Credenciales SMTP para enviar desde código, apps SaaS o herramientas de automatización (n8n, Make, Zapier). Plan Developer.</p>
-          </div>
-          <div class="comparison-card">
-            <span class="tag">Combinado</span>
-            <h4>Los tres a la vez</h4>
-            <p>No son mutuamente excluyentes. Tu equipo puede usar la Bandeja, tú respondes desde Gmail, y tus automatizaciones usan SMTP. Todos envían desde el mismo dominio.</p>
-          </div>
-        </div>
+        <p>Cambian en el esfuerzo técnico y en quién aprieta el botón. La Bandeja la usa una persona; la API la usa tu código; el SMTP relay lo usa un sistema que ya existe y no vas a reescribir.</p>
 
-        <h2>Método 1: Bandeja compartida</h2>
+        <figure class="diagram">
+          <svg viewBox="0 0 720 340" width="100%" role="img" aria-labelledby="diagTitle" xmlns="http://www.w3.org/2000/svg">
+            <title id="diagTitle">Los tres caminos de salida de MailMask (Bandeja, API REST y SMTP relay) convergen en el dominio verificado, que firma cada correo con DKIM y SPF antes de entregarlo al destinatario.</title>
+            <defs>
+              <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" fill="rgb(var(--mask-500))" />
+              </marker>
+            </defs>
 
-        <div class="callout">
-          <p><strong>Para quién:</strong> equipos de 2+ personas que atienden soporte, ventas o cualquier buzón compartido.</p>
-        </div>
+            <text x="90" y="34" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="12" letter-spacing="1.5">ORIGEN</text>
+            <text x="360" y="34" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="12" letter-spacing="1.5">TU DOMINIO</text>
+            <text x="628" y="34" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="12" letter-spacing="1.5">DESTINO</text>
 
-        <p>La <a href="/blog/bandeja-compartida-tutorial">Bandeja compartida de MailMask</a> es la forma más directa de responder desde tu alias. No necesitas configurar nada extra — cuando recibes emails en tu dominio, aparecen en la Bandeja y puedes responder directamente.</p>
+            <g font-family="system-ui, sans-serif">
+              <rect x="16" y="62" width="150" height="56" rx="8" fill="#18181b" stroke="#3f3f46" />
+              <text x="32" y="86" fill="#fafafa" font-size="14" font-weight="600">Bandeja</text>
+              <text x="32" y="104" fill="#a1a1aa" font-size="11">Botón Redactar</text>
 
-        <h3>Cómo funciona</h3>
+              <rect x="16" y="142" width="150" height="56" rx="8" fill="#18181b" stroke="#3f3f46" />
+              <text x="32" y="166" fill="#fafafa" font-size="14" font-weight="600">API REST / SDK</text>
+              <text x="32" y="184" fill="#a1a1aa" font-size="11">Tu código</text>
 
-        <div class="step-card">
-          <div class="step-num">1</div>
-          <div>
-            <h4>Un email llega a tu alias</h4>
-            <p>Un cliente escribe a <code>soporte@tunegocio.com</code>. El email aparece en la Bandeja de tu dominio en tiempo real.</p>
-          </div>
-        </div>
+              <rect x="16" y="222" width="150" height="56" rx="8" fill="#18181b" stroke="#3f3f46" />
+              <text x="32" y="246" fill="#fafafa" font-size="14" font-weight="600">SMTP relay</text>
+              <text x="32" y="264" fill="#a1a1aa" font-size="11">SaaS o sistema externo</text>
+            </g>
 
-        <div class="step-card">
-          <div class="step-num">2</div>
-          <div>
-            <h4>Un agente toma la conversación</h4>
-            <p>Cualquier miembro del equipo puede asignarse la conversación para evitar respuestas duplicadas.</p>
-          </div>
-        </div>
+            <path d="M166 90 H236 Q256 90 256 120 V150" fill="none" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arw)" />
+            <path d="M166 170 H256" fill="none" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arw)" />
+            <path d="M166 250 H236 Q256 250 256 220 V190" fill="none" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arw)" />
 
-        <div class="step-card">
-          <div class="step-num">3</div>
-          <div>
-            <h4>Responde desde el alias</h4>
-            <p>Escribe tu respuesta y haz clic en responder. El email sale como <code>soporte@tunegocio.com</code>. El cliente nunca ve tu email personal.</p>
-          </div>
-        </div>
+            <rect x="272" y="118" width="176" height="104" rx="10" fill="#18181b" stroke="rgb(var(--mask-500))" stroke-width="2" />
+            <text x="360" y="146" text-anchor="middle" fill="#fafafa" font-family="system-ui, sans-serif" font-size="14" font-weight="600">Dominio verificado</text>
+            <text x="360" y="168" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">remitente = alias activo</text>
+            <line x1="292" y1="182" x2="428" y2="182" stroke="#3f3f46" />
+            <text x="360" y="202" text-anchor="middle" fill="rgb(var(--mask-500))" font-family="system-ui, sans-serif" font-size="12" font-weight="600">firma DKIM + SPF</text>
 
-        <h3>Ventajas</h3>
-        <ul>
-          <li>Cero configuración adicional — funciona de inmediato</li>
-          <li>Todo el equipo ve el historial de la conversación</li>
-          <li>Asignación y estados (abierto, en espera, resuelto) para coordinar</li>
-          <li>Emails en tiempo real via SSE</li>
-        </ul>
+            <path d="M448 170 H556" fill="none" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arw)" />
+            <text x="502" y="158" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">autenticado</text>
 
-        <h3>Limitaciones</h3>
-        <ul>
-          <li>Necesitas abrir MailMask para responder (no funciona desde Gmail directamente)</li>
-          <li>Pensada para atención al cliente/equipo, no para email personal del día a día</li>
-        </ul>
+            <rect x="566" y="142" width="138" height="56" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="635" y="166" text-anchor="middle" fill="#fafafa" font-family="system-ui, sans-serif" font-size="14" font-weight="600">Destinatario</text>
+            <text x="635" y="184" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">ve tu dominio</text>
 
-        <h2>Método 2: Send-as en Gmail</h2>
+            <rect x="272" y="252" width="432" height="46" rx="8" fill="#18181b" stroke="#3f3f46" stroke-dasharray="4 4" />
+            <text x="292" y="272" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11" font-weight="600">Lista de supresión</text>
+            <text x="292" y="289" fill="#71717a" font-family="system-ui, sans-serif" font-size="11">rebotes y quejas de spam quedan bloqueados antes de salir</text>
+          </svg>
+        </figure>
 
-        <div class="callout">
-          <p><strong>Para quién:</strong> personas que trabajan solas o quieren responder directamente desde Gmail/Outlook sin abrir otra app.</p>
-        </div>
+        <h2>¿Cómo envío un correo desde la Bandeja?</h2>
 
-        <p>Gmail tiene una función llamada "Enviar como" (send-as) que te permite agregar direcciones adicionales como remitente. Combinado con las credenciales SMTP de MailMask, puedes enviar emails como <code>hola@tunegocio.com</code> directamente desde tu interfaz de Gmail.</p>
+        <p>Abre la Bandeja del dominio y presiona el botón <strong>Redactar</strong> o la tecla <code>c</code>. Eliges el alias remitente, escribes y envías.</p>
 
-        <h3>Configuración paso a paso</h3>
+        <p>La respuesta del destinatario cae en la misma conversación, así que el hilo queda completo y visible para todo el equipo. No hay nada que configurar: si el dominio está verificado, ya funciona.</p>
 
-        <div class="step-card">
-          <div class="step-num">1</div>
-          <div>
-            <h4>Genera credenciales SMTP en MailMask</h4>
-            <p>En tu dashboard, ve a la sección SMTP de tu dominio y genera un par de credenciales (usuario + contraseña).</p>
-          </div>
-        </div>
+        <p>Responder un correo que ya recibiste es distinto de iniciar uno nuevo, y esa diferencia es la que define lo que pagas.</p>
 
-        <div class="step-card">
-          <div class="step-num">2</div>
-          <div>
-            <h4>Abre configuración de Gmail</h4>
-            <p>En Gmail, ve a <strong>Configuración → Cuentas e importación → Enviar como</strong>. Haz clic en "Agregar otra dirección de correo".</p>
-          </div>
-        </div>
+        <h2>¿Qué plan necesito para enviar?</h2>
 
-        <div class="step-card">
-          <div class="step-num">3</div>
-          <div>
-            <h4>Ingresa tu alias</h4>
-            <p>Escribe tu nombre y la dirección del alias (por ejemplo, <code>hola@tunegocio.com</code>). Desmarca "Tratar como alias".</p>
-          </div>
-        </div>
+        <p>Responder desde la Bandeja está incluido desde el plan Básico de $49 MXN al mes, sin costo extra. Iniciar un correo nuevo es lo que requiere cupo de envío.</p>
 
-        <div class="step-card">
-          <div class="step-num">4</div>
-          <div>
-            <h4>Configura el servidor SMTP</h4>
-            <p>Servidor: el host SMTP de MailMask. Puerto: 587. Usuario y contraseña: los que generaste en el paso 1. Seguridad: TLS.</p>
-          </div>
-        </div>
+        <p>Básico trae la Bandeja, 1 dominio, 5 máscaras y 15 días de historial. Para escribir primero necesitas un add-on de envíos: <strong>25 al día por +$49 MXN</strong> o <strong>100 al día por +$99 MXN</strong>. Son excluyentes: eliges uno.</p>
 
-        <div class="step-card">
-          <div class="step-num">5</div>
-          <div>
-            <h4>Verifica</h4>
-            <p>Gmail te enviará un código de verificación al alias. Como ya tienes forwarding configurado, el código llega a tu Gmail. Ingrésalo y listo.</p>
-          </div>
-        </div>
-
-        <p>Ahora, cuando redactes un email nuevo o respondas uno, puedes elegir desde qué dirección enviar: tu Gmail personal o tu alias de dominio.</p>
+        <p>Freelancer ($449 MXN) ya incluye <strong>200 envíos al día por dominio</strong>, 15 dominios y 3 miembros. Developer ($999 MXN) incluye <strong>1,000 al día por dominio</strong>, 20 dominios, 10 miembros, SMTP relay y webhooks. Los add-ons se compran desde el panel con un plan activo; también hay dominio extra por +$99 MXN cada uno. Todo el detalle está en <a href="/pricing">precios</a>.</p>
 
         <div class="highlight-box">
-          <h4>Tip pro</h4>
-          <p>En la misma sección de "Enviar como" en Gmail, puedes marcar tu alias como la dirección predeterminada. Así, todos tus emails salen como <code>hola@tunegocio.com</code> sin tener que seleccionarlo cada vez.</p>
+          <h4>Ojo con el conteo</h4>
+          <p>Los topes de envío se cuentan <strong>por dominio y por día</strong>, no por cuenta. Con Freelancer y 15 dominios tienes 200 envíos diarios en cada uno, no 200 repartidos entre todos.</p>
         </div>
 
-        <h3>Ventajas</h3>
-        <ul>
-          <li>Respondes directamente desde Gmail — flujo cero fricción</li>
-          <li>Funciona en Gmail web y en la app móvil</li>
-          <li>Puedes tener múltiples aliases como send-as simultáneamente</li>
-        </ul>
+        <h2>¿Cómo envío desde mi código con la API o el SDK?</h2>
 
-        <h3>Limitaciones</h3>
-        <ul>
-          <li>Requiere credenciales SMTP (plan Developer)</li>
-          <li>La configuración es manual, una vez por alias</li>
-          <li>Solo tú ves el historial — no hay visibilidad compartida con el equipo</li>
-        </ul>
+        <p>Haces un <code>POST /api/domains/:id/send</code> con tu API key, o usas el SDK oficial <code>@easybits.cloud/mailmask</code> si trabajas en JS/TS.</p>
 
-        <h2>Método 3: SMTP relay</h2>
+        <p>Es el camino para correos que dispara tu aplicación: confirmaciones de compra, avisos de una tarea terminada, respuestas automáticas de un formulario. El cuerpo lleva el alias remitente, el destinatario, el asunto y el contenido.</p>
 
-        <div class="callout">
-          <p><strong>Para quién:</strong> desarrolladores que necesitan enviar emails desde código, plataformas SaaS, o herramientas de automatización.</p>
+        <p>Cada envío cuenta contra el tope diario del dominio, igual que si lo hubieras mandado a mano desde la Bandeja. Si tu app supera el tope, la API responde con error en lugar de cobrarte de más: te toca subir de plan o agregar el add-on de envíos.</p>
+
+        <p>La referencia completa de parámetros y ejemplos está en la <a href="/docs">documentación</a>.</p>
+
+        <h2>¿Cuándo conviene el SMTP relay?</h2>
+
+        <p>Cuando el sistema que va a enviar ya habla SMTP y no lo vas a modificar. Está disponible solo en el plan Developer, con credenciales generadas por dominio.</p>
+
+        <p>No lo uses para escribirle a una persona ni para algo que tu código ya podría resolver con la API: el SMTP relay existe para el software que no te deja elegir cómo enviar.</p>
+
+        <p>Sirve para conectar un CRM, una plataforma de facturación, un WordPress o una herramienta de automatización que solo te pide host, puerto, usuario y contraseña. Cada credencial queda restringida a su dominio, así que si se filtra una, la revocas sin tocar las demás.</p>
+
+        <h2>Comparación de los tres métodos</h2>
+
+        <p>Esta tabla resume la decisión: mira para qué sirve cada uno y qué plan lo habilita.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Método</th>
+                <th>Para qué sirve</th>
+                <th>Qué plan lo permite</th>
+                <th>Esfuerzo técnico</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Bandeja</strong></td>
+                <td>Escribirle a una persona: soporte, ventas, seguimiento de un hilo.</td>
+                <td>Responder desde Básico. Iniciar correos con add-on de envíos, o incluido en Freelancer y Developer.</td>
+                <td>Ninguno. Botón Redactar o tecla <code>c</code>.</td>
+              </tr>
+              <tr>
+                <td><strong>API REST / SDK</strong></td>
+                <td>Enviar desde tu propio código o app: transaccionales y notificaciones.</td>
+                <td>Cualquier plan con cupo de envío disponible.</td>
+                <td>Medio. Una llamada HTTP con tu API key.</td>
+              </tr>
+              <tr>
+                <td><strong>SMTP relay</strong></td>
+                <td>Conectar un SaaS o sistema existente que solo habla SMTP.</td>
+                <td>Solo Developer.</td>
+                <td>Bajo, pero fuera de MailMask: configuras host, puerto y credenciales.</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
-        <p>El <a href="/blog/automatizar-email-n8n-make-zapier-aliases">SMTP relay</a> de MailMask te da credenciales de servidor de correo que puedes usar en cualquier lugar que acepte SMTP. Cada email sale autenticado con DKIM de tu dominio.</p>
+        <h2>¿Cómo se garantiza que el correo salga autenticado?</h2>
 
-        <h3>Casos de uso</h3>
+        <p>DKIM y SPF se configuran automáticamente al verificar el dominio, y el remitente siempre tiene que ser un alias real y activo de ese dominio.</p>
 
-        <ul>
-          <li><strong>Desde código</strong>: tu app Node/Python/PHP envía emails transaccionales (confirmaciones, notificaciones) como <code>noreply@tuapp.com</code></li>
-          <li><strong>n8n / Make / Zapier</strong>: workflows de automatización que envían emails como parte de un proceso</li>
-          <li><strong>CRM / herramientas SaaS</strong>: configura el SMTP de tu dominio en cualquier herramienta que lo soporte</li>
-          <li><strong>Formularios de contacto</strong>: tu sitio web envía la respuesta automática desde <code>hola@tunegocio.com</code></li>
-        </ul>
+        <p>No puedes inventar una dirección al vuelo: si el alias no existe o está desactivado, MailMask rechaza el envío. Es a propósito — solo firma con tu dominio lo que tú diste de alta, y eso evita que una credencial filtrada suplante direcciones que nunca creaste.</p>
 
-        <h3>Cómo configurarlo</h3>
+        <p>Eso significa que cada correo sale firmado y el servidor del destinatario puede comprobar que de verdad viene de ti. Si quieres entender qué está pasando debajo, lee <a href="/blog/que-son-dkim-spf-dmarc">qué son DKIM, SPF y DMARC</a>.</p>
 
-        <div class="step-card">
-          <div class="step-num">1</div>
-          <div>
-            <h4>Genera credenciales SMTP</h4>
-            <p>En el dashboard de MailMask, sección SMTP de tu dominio. Cada credencial tiene permisos limitados al dominio — seguridad por diseño.</p>
-          </div>
-        </div>
+        <p>Además hay una <strong>lista de supresión</strong>: a quien rebotó o te marcó como spam, MailMask deja de escribirle. Duele perder un contacto, pero protege la reputación del dominio para todos los demás. Complementa esto con las prácticas de <a href="/blog/evitar-emails-caigan-en-spam">cómo evitar que tus emails caigan en spam</a>: asunto honesto, sin listas compradas y con volumen que crece poco a poco.</p>
 
-        <div class="step-card">
-          <div class="step-num">2</div>
-          <div>
-            <h4>Configura en tu herramienta</h4>
-            <p>Usa el host, puerto (587/TLS), usuario y contraseña en cualquier herramienta o librería que soporte SMTP.</p>
-          </div>
-        </div>
+        <p>Empieza por la Bandeja. Es gratis dentro de tu plan para responder, no requiere configuración y cubre el 90% de los casos reales.</p>
 
-        <div class="step-card">
-          <div class="step-num">3</div>
-          <div>
-            <h4>Envía</h4>
-            <p>Los emails salen firmados con DKIM de tu dominio. Los destinatarios ven <code>tunombre@tudominio.com</code> como remitente.</p>
-          </div>
-        </div>
-
-        <div class="highlight-box">
-          <h4>Sobre la autenticación</h4>
-          <p>Cada credencial SMTP está scoped al dominio con un IAM user dedicado. No pueden enviar desde otros dominios de tu cuenta. Si una credencial se compromete, la revocas sin afectar las demás.</p>
-        </div>
-
-        <h2>¿Cuál método uso?</h2>
-
-        <p>No tienes que elegir uno solo. Esta es la combinación más común:</p>
-
-        <ul>
-          <li><strong>Para atender clientes en equipo</strong> → Bandeja compartida (disponible en todos los planes)</li>
-          <li><strong>Para tu email personal del día a día</strong> → Send-as en Gmail (requiere SMTP, plan Developer)</li>
-          <li><strong>Para automatizaciones y código</strong> → SMTP relay (plan Developer)</li>
-        </ul>
-
-        <div class="callout">
-          <p>Si estás empezando solo y no quieres complicarte, la Bandeja compartida es suficiente. Cuando necesites responder desde Gmail o enviar desde código, ahí están las otras opciones.</p>
-        </div>
-
-        <h2>Preguntas frecuentes</h2>
-
-        <h3>¿El cliente sabe qué método usé para responder?</h3>
-        <p>No. Sin importar si respondes desde la Bandeja, Gmail o SMTP, el email sale como <code>tunombre@tudominio.com</code>. El destinatario ve lo mismo.</p>
-
-        <h3>¿Send-as funciona con Outlook?</h3>
-        <p>Sí. Outlook también permite agregar cuentas SMTP externas como direcciones de envío. El proceso es similar al de Gmail.</p>
-
-        <h3>¿Cuántas credenciales SMTP puedo crear?</h3>
-        <p>Las que necesites por dominio. Recomendamos una por uso: una para Gmail send-as, otra para tu app, otra para n8n, etc. Así puedes revocar una sin afectar las demás.</p>
-
-        <h3>¿SMTP relay tiene límite de envíos?</h3>
-        <p>Sí, según tu plan y las políticas de AWS SES. El SMTP relay está diseñado para email transaccional y comunicación — no para campañas de email marketing masivo.</p>
-
-        <h3>¿Puedo usar la Bandeja sin configurar SMTP?</h3>
-        <p>Sí. La Bandeja compartida funciona en todos los planes sin configuración SMTP. Es la forma más simple de responder desde tu alias.</p>
-
-        <h2>Conclusión</h2>
-
-        <p>Recibir emails en tu dominio es el primer paso. Enviar desde tu dominio es lo que completa la experiencia profesional. Con MailMask tienes tres caminos para lograrlo — elige el que mejor se adapte a cómo trabajas hoy, y cambia o combina cuando necesites más.</p>
+        <p>Cuando tu producto necesite mandar correos solo, pasa a la API. Y si ya tienes un sistema que envía y no lo quieres tocar, el SMTP relay del plan Developer lo conecta sin cambiar una línea.</p>
 
         <p><a href="/register">Crea tu cuenta en MailMask</a> y empieza a enviar y recibir como <code>hola@tudominio.com</code> hoy.</p>
       </div>
@@ -355,7 +281,7 @@
 
     <section class="blog-cta">
       <h2>Envía y recibe con tu dominio</h2>
-      <p>Bandeja + SMTP relay + send-as. Desde $49 MXN/mes.</p>
+      <p>Bandeja, API y SMTP relay. Desde $49 MXN/mes.</p>
       <a href="/register" class="cta-btn">Crear cuenta gratis</a>
     </section>
 

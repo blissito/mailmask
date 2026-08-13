@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 800 340" width="800" height="340" role="img" aria-labelledby="hiloTitulo hiloDesc" style="display:block">
+            <title id="hiloTitulo">El hilo de la conversación reventado a la mitad</title>
+            <desc id="hiloDesc">Dos telas unidas por una costura verde de puntadas alternadas. A la mitad la costura se revienta: los hilos quedan sueltos, las telas se abren y un mensaje queda huérfano en el hueco.</desc>
+
+            <defs>
+              <linearGradient id="telaSana" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#2a2a30" /><stop offset="100%" stop-color="#232328" />
+              </linearGradient>
+              <linearGradient id="telaRota" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#232328" /><stop offset="100%" stop-color="#1c1c20" />
+              </linearGradient>
+            </defs>
+
+            <rect x="0" y="0" width="800" height="340" fill="transparent" />
+
+            <text x="24" y="28" fill="#a1a1aa" font-family="system-ui,sans-serif" font-size="13" font-weight="600" letter-spacing="1.6">TÚ</text>
+            <text x="24" y="330" fill="#a1a1aa" font-family="system-ui,sans-serif" font-size="13" font-weight="600" letter-spacing="1.6">TU CLIENTE</text>
+
+            <!-- Izquierda: las telas se tocan, la costura las une -->
+            <rect x="24" y="44" width="380" height="98" rx="4" fill="url(#telaSana)" stroke="#3f3f46" stroke-width="1" />
+            <rect x="24" y="198" width="380" height="98" rx="4" fill="url(#telaSana)" stroke="#3f3f46" stroke-width="1" />
+
+            <!-- Derecha: se abren, y el hueco crece -->
+            <path d="M436 44 H776 a4 4 0 0 1 4 4 V126 L436 108 Z" fill="url(#telaRota)" stroke="#3f3f46" stroke-width="1" />
+            <path d="M436 232 L780 214 V292 a4 4 0 0 1 -4 4 H436 Z" fill="url(#telaRota)" stroke="#3f3f46" stroke-width="1" />
+
+            <!-- Costura sana: cada puntada es un mensaje, alternando lados -->
+            <g stroke="#10b981" stroke-width="3" stroke-linecap="round" fill="none">
+              <path class="puntada" d="M56 138 L104 202 L152 138 L200 202 L248 138 L296 202 L344 138" />
+            </g>
+            <g fill="#10b981">
+              <circle cx="56" cy="138" r="4.5" /><circle cx="104" cy="202" r="4.5" />
+              <circle cx="152" cy="138" r="4.5" /><circle cx="200" cy="202" r="4.5" />
+              <circle cx="248" cy="138" r="4.5" /><circle cx="296" cy="202" r="4.5" />
+              <circle cx="344" cy="138" r="4.5" />
+            </g>
+
+            <!-- El reventón -->
+            <g stroke="#d97757" stroke-width="3" stroke-linecap="round" fill="none">
+              <path class="hilo-suelto" d="M344 138 Q372 150 366 172 Q360 192 384 200" />
+              <path class="hilo-suelto" d="M392 214 Q368 224 374 244 Q380 262 356 268" />
+            </g>
+            <circle cx="384" cy="200" r="4" fill="#d97757" />
+            <circle cx="356" cy="268" r="4" fill="#d97757" />
+
+            <line x1="410" y1="70" x2="410" y2="272" stroke="#d97757" stroke-width="1.5" stroke-dasharray="5 6" opacity="0.55" />
+            <text x="418" y="66" fill="#d97757" font-family="system-ui,sans-serif" font-size="13" font-weight="600">le escribiste desde Gmail</text>
+
+            <!-- El mensaje que se queda en el hueco -->
+            <g class="huerfano">
+              <rect x="556" y="150" width="176" height="42" rx="6" fill="#18181b" stroke="#d97757" stroke-width="1.5" />
+              <text x="644" y="176" fill="#d97757" font-family="system-ui,sans-serif" font-size="13" text-anchor="middle">su respuesta, sin hilo</text>
+            </g>
+
+            <text x="214" y="316" fill="#71717a" font-family="system-ui,sans-serif" font-size="12" text-anchor="middle">una sola conversación</text>
+            <text x="776" y="316" fill="#71717a" font-family="system-ui,sans-serif" font-size="12" text-anchor="end">dos conversaciones que ya no se encuentran</text>
+
+            
+          </svg>

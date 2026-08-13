@@ -113,6 +113,8 @@ Contenido de referencia sobre email en dominio propio, comparativas y guías.
   Compara bandejas compartidas con helpdesks tradicionales. Descubre cuál es mejor para tu equipo.
 - Un solo correo de contacto, cero desorden: clasifica emails con IA — https://www.mailmask.studio/blog/clasificador-automatico-emails-ia
   MailMask está desarrollando clasificación automática de emails con IA. Cada email entrante se etiqueta como venta, soporte o facturación — y se enruta al equipo correcto.
+- Cómo dejar de escribirle a tus clientes desde tu Gmail personal — https://www.mailmask.studio/blog/dejar-de-escribir-desde-gmail-personal
+  Recibes en tu dominio pero escribes desde tu Gmail. Así se rompe el hilo de la conversación y así se arregla, sin cambiar de correo.
 - Email para agencias: un dominio por cliente — https://www.mailmask.studio/blog/email-agencia-dominio-por-cliente
   Gestiona el email de cada cliente en su propio dominio sin pagar una cuenta Workspace por cada uno. Configura aliases y reenvío profesional desde un solo panel.
 - Cómo dar de alta emails a clientes sin darles acceso al hosting — https://www.mailmask.studio/blog/email-clientes-sin-acceso-hosting
@@ -128,7 +130,7 @@ Contenido de referencia sobre email en dominio propio, comparativas y guías.
 - Email para tu tienda online: soporte y ventas con dominio propio — https://www.mailmask.studio/blog/email-tienda-online-soporte-ventas
   Configura emails profesionales para tu e-commerce: soporte@, ventas@, pedidos@ en tu dominio.
 - Cómo enviar emails desde tu dominio (no solo recibir) — https://www.mailmask.studio/blog/enviar-emails-desde-dominio
-  Tres formas de enviar emails como ventas@tudominio.com: Bandeja compartida, send-as en Gmail, y SMTP relay para desarrolladores. Tutorial con los 3 métodos.
+  Tres formas de enviar como ventas@tudominio.com en MailMask: redactar desde la Bandeja, la API REST/SDK, y el SMTP relay. Planes, límites y cuándo usar cada una.
 - Cómo evitar que tus emails caigan en spam — https://www.mailmask.studio/blog/evitar-emails-caigan-en-spam
   Guía práctica para mejorar la entregabilidad de tus emails. Configura SPF, DKIM y DMARC correctamente.
 - Cómo gestionar emails de tu dominio en equipo sin Gmail — https://www.mailmask.studio/blog/gestionar-emails-dominio-equipo

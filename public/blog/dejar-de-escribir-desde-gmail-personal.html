@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cómo dejar de escribirle a tus clientes desde tu Gmail personal — MailMask</title>
+    <meta name="description" content="Recibes en tu dominio pero escribes desde tu Gmail. Así se rompe el hilo de la conversación y así se arregla, sin cambiar de correo." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/dejar-de-escribir-desde-gmail-personal" />
+    <meta property="og:title" content="Cómo dejar de escribirle a tus clientes desde tu Gmail personal" />
+    <meta property="og:description" content="Recibes en tu dominio pero escribes desde tu Gmail. Así se rompe el hilo de la conversación y así se arregla, sin cambiar de correo." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/dejar-de-escribir-desde-gmail-personal" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="og:image" content="https://www.mailmask.studio/img/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Cómo dejar de escribirle a tus clientes desde tu Gmail personal" />
+    <meta property="og:image:secure_url" content="https://www.mailmask.studio/img/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta name="twitter:image" content="https://www.mailmask.studio/img/og-image.png" />
+    <meta property="article:published_time" content="2026-08-12" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Cómo dejar de escribirle a tus clientes desde tu Gmail personal" />
+    <meta name="twitter:description" content="Recibes en tu dominio pero escribes desde tu Gmail. Así se rompe el hilo de la conversación y así se arregla, sin cambiar de correo." />
+    <script src="/js/analytics.js"></script>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Cómo dejar de escribirle a tus clientes desde tu Gmail personal",
+      "description": "Recibes en tu dominio pero escribes desde tu Gmail. Así se rompe el hilo de la conversación y así se arregla, sin cambiar de correo.",
+      "datePublished": "2026-08-12",
+      "dateModified": "2026-08-12",
+      "image": "https://www.mailmask.studio/img/og-image.png",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/dejar-de-escribir-desde-gmail-personal"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Dejar de escribir desde tu Gmail personal", "item": "https://www.mailmask.studio/blog/dejar-de-escribir-desde-gmail-personal" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Por qué es un problema escribirle a un cliente desde mi Gmail personal si recibo en mi dominio?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Porque la conversación se parte en dos. El cliente responde a tu Gmail y ese mensaje ya no pasa por tu dominio: no queda en el historial, no lo ve tu equipo y no lo puedes retomar desde la misma conversación. Además el cliente aprende tu dirección personal y la usará de ahí en adelante."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿El plan Básico de MailMask puede responder correos?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí. El plan Básico de $49 MXN al mes incluye la Bandeja y puede responder conversaciones existentes sin costo extra. Lo que no incluye es iniciar un correo nuevo hacia alguien que no te ha escrito: para eso se agrega el add-on de envíos."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cuánto cuesta poder iniciar conversaciones desde mi dominio?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Con el plan Básico se agrega el add-on de envíos: 25 envíos al día por 49 pesos extra al mes, o 100 envíos al día por 99 pesos extra. Son excluyentes entre sí. Los planes Freelancer (449 MXN) y Developer (999 MXN) ya incluyen 200 y 1,000 envíos diarios por dominio."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Tengo que configurar SPF y DKIM a mano?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Al verificar tu dominio en MailMask, DKIM y SPF quedan configurados automáticamente. Eso es lo que hace que tus correos salgan firmados y no caigan en spam por escribir desde tu propio dominio."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Los servicios de reenvío como SimpleLogin o ImprovMX sirven para esto?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No del todo. SimpleLogin, ImprovMX, ForwardEmail y addy.io son reenvío puro: entregan el correo a tu buzón pero no guardan el contenido ni te dan un lugar donde iniciar una conversación con historial. Sirven para recibir, no para llevar la conversación."
+          }
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
+      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Cómo dejar de escribirle a tus clientes desde tu Gmail personal</h1>
+        <div class="meta">
+          <span>📅 12 Ago 2026</span>
+          <span>⏱ 6 min de lectura</span>
+        </div>
+      </header>
+
+      <div class="blog-content">
+        <p>Ya tienes tu dominio. Pusiste <code>hola@tunegocio.com</code> en la tarjeta, en la firma y en el sitio. Los correos entran bien.</p>
+
+        <p>Pero cuando <strong>tú</strong> empiezas la conversación —la cotización, el seguimiento, el "¿cómo vas con lo que te mandé?"— abres Gmail y la mandas desde <code>tunombre87@gmail.com</code>. Y ahí se rompe algo.</p>
+
+        <figure style="margin: 2.5rem 0;">
+          <svg viewBox="0 0 800 340" width="100%" role="img" aria-labelledby="hiloTitulo hiloDesc" style="display:block">
+            <title id="hiloTitulo">El hilo de la conversación reventado a la mitad</title>
+            <desc id="hiloDesc">Dos telas unidas por una costura verde de puntadas alternadas. A la mitad la costura se revienta: los hilos quedan sueltos, las telas se abren y un mensaje queda huérfano en el hueco.</desc>
+
+            <defs>
+              <linearGradient id="telaSana" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#2a2a30" /><stop offset="100%" stop-color="#232328" />
+              </linearGradient>
+              <linearGradient id="telaRota" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#232328" /><stop offset="100%" stop-color="#1c1c20" />
+              </linearGradient>
+            </defs>
+
+            <rect x="0" y="0" width="800" height="340" fill="transparent" />
+
+            <text x="24" y="28" fill="#a1a1aa" font-family="system-ui,sans-serif" font-size="13" font-weight="600" letter-spacing="1.6">TÚ</text>
+            <text x="24" y="330" fill="#a1a1aa" font-family="system-ui,sans-serif" font-size="13" font-weight="600" letter-spacing="1.6">TU CLIENTE</text>
+
+            <!-- Izquierda: las telas se tocan, la costura las une -->
+            <rect x="24" y="44" width="380" height="98" rx="4" fill="url(#telaSana)" stroke="#3f3f46" stroke-width="1" />
+            <rect x="24" y="198" width="380" height="98" rx="4" fill="url(#telaSana)" stroke="#3f3f46" stroke-width="1" />
+
+            <!-- Derecha: se abren, y el hueco crece -->
+            <path d="M436 44 H776 a4 4 0 0 1 4 4 V126 L436 108 Z" fill="url(#telaRota)" stroke="#3f3f46" stroke-width="1" />
+            <path d="M436 232 L780 214 V292 a4 4 0 0 1 -4 4 H436 Z" fill="url(#telaRota)" stroke="#3f3f46" stroke-width="1" />
+
+            <!-- Costura sana: cada puntada es un mensaje, alternando lados -->
+            <g stroke="rgb(var(--mask-500))" stroke-width="3" stroke-linecap="round" fill="none">
+              <path class="puntada" d="M56 138 L104 202 L152 138 L200 202 L248 138 L296 202 L344 138" />
+            </g>
+            <g fill="rgb(var(--mask-500))">
+              <circle cx="56" cy="138" r="4.5" /><circle cx="104" cy="202" r="4.5" />
+              <circle cx="152" cy="138" r="4.5" /><circle cx="200" cy="202" r="4.5" />
+              <circle cx="248" cy="138" r="4.5" /><circle cx="296" cy="202" r="4.5" />
+              <circle cx="344" cy="138" r="4.5" />
+            </g>
+
+            <!-- El reventón -->
+            <g stroke="#d97757" stroke-width="3" stroke-linecap="round" fill="none">
+              <path class="hilo-suelto" d="M344 138 Q372 150 366 172 Q360 192 384 200" />
+              <path class="hilo-suelto" d="M392 214 Q368 224 374 244 Q380 262 356 268" />
+            </g>
+            <circle cx="384" cy="200" r="4" fill="#d97757" />
+            <circle cx="356" cy="268" r="4" fill="#d97757" />
+
+            <line x1="410" y1="70" x2="410" y2="272" stroke="#d97757" stroke-width="1.5" stroke-dasharray="5 6" opacity="0.55" />
+            <text x="418" y="66" fill="#d97757" font-family="system-ui,sans-serif" font-size="13" font-weight="600">le escribiste desde Gmail</text>
+
+            <!-- El mensaje que se queda en el hueco -->
+            <g class="huerfano">
+              <rect x="556" y="150" width="176" height="42" rx="6" fill="#18181b" stroke="#d97757" stroke-width="1.5" />
+              <text x="644" y="176" fill="#d97757" font-family="system-ui,sans-serif" font-size="13" text-anchor="middle">su respuesta, sin hilo</text>
+            </g>
+
+            <text x="214" y="316" fill="#71717a" font-family="system-ui,sans-serif" font-size="12" text-anchor="middle">una sola conversación</text>
+            <text x="776" y="316" fill="#71717a" font-family="system-ui,sans-serif" font-size="12" text-anchor="end">dos conversaciones que ya no se encuentran</text>
+
+            <style>
+              .puntada { stroke-dasharray: 620; stroke-dashoffset: 620; animation: coser 2.2s ease-out forwards; }
+              .hilo-suelto { stroke-dasharray: 120; stroke-dashoffset: 120; animation: soltar 1s ease-out 2s forwards; }
+              .huerfano { opacity: 0; animation: aparecer .6s ease-out 2.7s forwards; }
+              @keyframes coser { to { stroke-dashoffset: 0; } }
+              @keyframes soltar { to { stroke-dashoffset: 0; } }
+              @keyframes aparecer { to { opacity: 1; } }
+              @media (prefers-reduced-motion: reduce) {
+                .puntada, .hilo-suelto { animation: none; stroke-dashoffset: 0; }
+                .huerfano { animation: none; opacity: 1; }
+              }
+            </style>
+          </svg>
+          <figcaption style="text-align:center;color:#71717a;font-size:0.85rem;margin-top:0.75rem">
+            En español, el hilo es la conversación y también el hilo de coser. Cuando sales desde otra dirección, la costura se revienta.
+          </figcaption>
+        </figure>
+
+        <h2>¿Qué se rompe exactamente cuando escribes desde tu Gmail?</h2>
+
+        <p>Se parte el hilo en dos. El cliente le da Responder a tu Gmail, ese mensaje ya no pasa por tu dominio y por lo tanto no queda en tu historial ni lo ve nadie más de tu equipo.</p>
+
+        <p>Tú te enteras, claro: llega a tu buzón personal. Pero llega fuera de lugar, revuelto con los recibos de la luz y las promociones. Y a partir de ahí, la mitad más importante de la relación vive en un lugar que no controlas.</p>
+
+        <h2>¿No basta con poner mi dominio en el campo "De" de Gmail?</h2>
+
+        <p>Ayuda con las apariencias, no con el problema de fondo. Gmail te deja configurar un "enviar como", pero el correo sigue viviendo en tu cuenta personal: si un día la pierdes, cambias de proveedor o entra alguien más al negocio, el historial se va contigo.</p>
+
+        <p>Y la parte técnica no es trivial. Si sales con tu dominio sin que la firma coincida, tu correo tiene todas las papeletas para caer en spam justo cuando más te importa llegar.</p>
+
+        <h2>¿Cuál es la diferencia entre responder e iniciar?</h2>
+
+        <p>Responder es continuar un hilo que el cliente abrió; iniciar es abrir tú uno nuevo hacia alguien que no te ha escrito. Suenan parecido, pero para un servicio de correo son cosas distintas.</p>
+
+        <p>Responder es barato y de bajo riesgo: ya hay un hilo, alguien te contactó. Iniciar es envío saliente puro, que es lo que se cobra y lo que se limita, porque es lo que se puede usar para mandar cosas que nadie pidió.</p>
+
+        <p>En MailMask esa línea está donde debe estar: el plan Básico responde sin costo extra, e iniciar se agrega aparte.</p>
+
+        <h2>¿Qué necesito para poder iniciar desde mi dominio?</h2>
+
+        <p>Un plan activo y, si estás en Básico, el add-on de envíos. Nada más: los add-ons se compran desde el panel cuando ya tienes plan.</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Plan</th>
+              <th>Precio</th>
+              <th>Responder</th>
+              <th>Iniciar (envíos/día)</th>
+              <th>Dominios</th>
+              <th>Historial</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Básico</td>
+              <td>$49 MXN</td>
+              <td>Sí, incluido</td>
+              <td>Requiere add-on: +$49 → 25/día · +$99 → 100/día</td>
+              <td>1</td>
+              <td>15 días</td>
+            </tr>
+            <tr>
+              <td>Freelancer</td>
+              <td>$449 MXN</td>
+              <td>Sí</td>
+              <td>200 por dominio</td>
+              <td>15</td>
+              <td>30 días</td>
+            </tr>
+            <tr>
+              <td>Developer</td>
+              <td>$999 MXN</td>
+              <td>Sí</td>
+              <td>1,000 por dominio</td>
+              <td>20</td>
+              <td>90 días</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p>Los dos add-ons de envíos son excluyentes: contratas uno o el otro, no los dos. Si necesitas más dominios sin subir de plan, hay add-on de dominio extra a +$99 cada uno.</p>
+
+        <p>El Básico incluye 1 dominio, 5 máscaras en ese dominio, reenvío de hasta 100 correos por hora y la Bandeja. No incluye reglas de automatización; para eso está <a href="/pricing">Freelancer</a> con 10 y Developer con 50.</p>
+
+        <h2>¿Cómo se ve en la práctica?</h2>
+
+        <p>Abres la Bandeja y le picas a <strong>Redactar</strong> —o tecleas <code>c</code>, sin abrir nada—. Eliges desde qué alias sales, escribes y mandas.</p>
+
+        <p>Lo importante viene después: <strong>la respuesta del cliente cae en la misma conversación</strong>. No en otro buzón, no en otra pestaña. El hilo queda cosido de los dos lados.</p>
+
+        <p>Y la parte técnica ya está hecha. Al verificar tu dominio, DKIM y SPF se configuran solos, así que tus correos salen firmados desde el primer envío. Si quieres el detalle, lo desarrollamos en <a href="/blog/enviar-emails-desde-dominio">enviar emails desde tu dominio</a>.</p>
+
+        <h2>¿Por qué no me sirve un servicio de reenvío de correo?</h2>
+
+        <p>Porque el reenvío solo resuelve la mitad que ya tenías resuelta. SimpleLogin, ImprovMX, ForwardEmail y addy.io entregan el correo a tu buzón y ahí termina su trabajo: no guardan el contenido, no hay historial y no hay dónde iniciar una conversación.</p>
+
+        <p>Es reenvío puro y está bien hecho, pero te deja exactamente donde empezaste: recibiendo en tu dominio y escribiendo desde Gmail. Ese hueco —guardar la conversación y poder abrirla tú— es lo que ninguno cubre hoy.</p>
+
+        <h2>¿Vale la pena el cambio si trabajo solo?</h2>
+
+        <p>Sí, y de hecho es cuando más se nota. Cuando eres una sola persona, el historial <em>eres tú</em>: si no está escrito en algún lado, lo estás cargando en la cabeza.</p>
+
+        <p>Con todo en un mismo lugar, retomar un cliente de hace tres meses es abrir su conversación y leerla completa, con lo que tú mandaste y lo que él contestó. Y el día que entre alguien a ayudarte, no le heredas tu bandeja personal: le das acceso al dominio. El paso a paso está en el <a href="/blog/bandeja-compartida-tutorial">tutorial de la Bandeja</a>.</p>
+
+        <h2>¿Por dónde empiezo hoy?</h2>
+
+        <p>Empieza por el alias que más usas para salir, no por migrarlo todo. Elige uno —<code>hola@</code>, <code>ventas@</code>, tu nombre— y comprométete a que durante dos semanas todo lo que salga hacia clientes salga de ahí.</p>
+
+        <p>Con el Básico y el add-on de 25 envíos al día tienes de sobra para probarlo: son $98 MXN al mes, menos de lo que cuesta una comida. Si a las dos semanas ya no quieres volver a Gmail, subes el add-on o el plan.</p>
+
+        <p>Un detalle chico que rinde: pon el alias nuevo en tu firma y deja de dar tu Gmail por WhatsApp. La mitad de los hilos rotos empiezan ahí.</p>
+
+        <h2>En corto</h2>
+
+        <p>Recibir en tu dominio y escribir desde Gmail deja la conversación cosida de un solo lado. Responder ya lo tienes desde $49 MXN al mes; iniciar cuesta un add-on, y a cambio todo el hilo —tuyo y del cliente— queda en un solo lugar.</p>
+
+        <p><a href="https://www.mailmask.studio/register">Crea tu cuenta en MailMask</a> y manda tu primer correo desde tu dominio hoy mismo.</p>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Que el hilo completo viva en tu dominio</h2>
+      <p>Bandeja incluida desde $49 MXN/mes. Add-on de envíos desde +$49 para iniciar conversaciones.</p>
+      <a href="https://www.mailmask.studio/register" class="cta-btn">Crear cuenta</a>
+    </section>
+
+    <footer class="border-t border-zinc-800 py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">© 2026 by fixter.org</p>
+    </footer>
+
+    <style>
+      @media (prefers-reduced-motion: reduce) {
+        .blog-content svg animate,
+        .blog-content svg animateTransform { display: none; }
+        .blog-content svg path[stroke-dashoffset] { stroke-dashoffset: 0 !important; }
+      }
+    </style>
+  </body>
+</html>
