@@ -23,6 +23,7 @@ import {
   domainRegistrations,
   apiKeys,
   addons,
+  orders,
 } from "./schema.js";
 
 export { db };
@@ -95,35 +96,23 @@ export interface EmailLog {
   error?: string;
 }
 
-// --- Plans ---
+// --- Plans & add-ons ---
 
-// `sends` y `forwardPerHour` se cuentan **por dominio**, no por cuenta: getSendCount()
-// y el rate limit de forwarding se llavean con domainId. Un Freelancer con 15 dominios
-// tiene 15 x 100 envíos al día disponibles.
-//
-// `sends` es solo correo saliente que el usuario origina (panel, API, SMTP relay).
-// El reenvío entrante — el caso de uso principal — va por `forwardPerHour` y es un orden
-// de magnitud mayor, así que el límite de envíos no lo toca quien solo reenvía.
-export const PLANS = {
-  basico:     { price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 15, sends: 0,     api: true,  webhooks: false, forwardPerHour: 100,  smtpRelay: false },
-  freelancer: { price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 200,   api: true,  webhooks: false, forwardPerHour: 500,  smtpRelay: false },
-  developer:  { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 1000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
-  pro:     { price: 299_00, yearlyPrice: 2990_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500,  smtpRelay: true },
-  agencia: { price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
-} as const;
+// El catálogo vive en `plans.ts`: son constantes puras, y tenerlas aquí obligaba a
+// cualquiera que solo quisiera un precio a importar `pg.ts` y abrir SQLite. Se
+// re-exportan para no romper a quien ya las importaba desde `db.ts`.
+import {
+  PLANS,
+  ADDONS,
+  planLabel,
+  planPriceCents,
+  addonLabel,
+  addonPriceCents,
+} from "./plans.js";
+import type { AddonKind, PlanKey } from "./plans.js";
 
-// --- Add-ons ---
-
-// Se compran encima del plan base. El de envíos se compra una vez y desbloquea el envío
-// en todos los dominios del usuario; el tope sigue aplicando por dominio y por día,
-// que es como ya se llavea sendCounts. El de dominio es cupo acumulable y no incluye envíos.
-export const ADDONS = {
-  sends25:  { price: 49_00, sends: 25,  label: "Envíos 25/día" },
-  sends100: { price: 99_00, sends: 100, label: "Envíos 100/día" },
-  domain:   { price: 99_00, domains: 1, label: "Dominio extra" },
-} as const;
-
-export type AddonKind = keyof typeof ADDONS;
+export { PLANS, ADDONS, planLabel, planPriceCents, addonLabel, addonPriceCents };
+export type { AddonKind, PlanKey };
 
 export interface Addon {
   id: string;
@@ -135,6 +124,66 @@ export interface Addon {
   currentPeriodEnd?: string;
   createdAt: string;
   cancelledAt?: string;
+  source: "purchase" | "courtesy" | "migration";
+  // Derivado, para que el frontend nunca tenga que conocer el enum.
+  isCourtesy: boolean;
+  courtesyNote?: string;
+}
+
+// --- Órdenes (libro mayor de facturación) ---
+
+export type OrderKind = "charge" | "failed_charge" | "courtesy" | "cancellation";
+export type OrderSubject = "plan" | "addon" | "domain_registration";
+
+export interface Order {
+  id: string;
+  number: string;
+  userEmail: string;
+  kind: OrderKind;
+  subject: OrderSubject;
+  subjectId?: string;
+  subjectKey?: string;
+  description: string;
+  amountCents: number;
+  listPriceCents?: number;
+  currency: string;
+  periodStart?: string;
+  periodEnd?: string;
+  mpPreapprovalId?: string;
+  mpAuthorizedPaymentId?: string;
+  mpPaymentId?: string;
+  mpStatus?: string;
+  mpStatusDetail?: string;
+  eventKey: string;
+  note?: string;
+  grantedBy?: string;
+  occurredAt: string;
+  createdAt: string;
+}
+
+export interface NewOrder {
+  userEmail: string;
+  kind: OrderKind;
+  subject: OrderSubject;
+  subjectId?: string | null;
+  subjectKey?: string | null;
+  description: string;
+  amountCents?: number;
+  listPriceCents?: number | null;
+  currency?: string;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  mpPreapprovalId?: string | null;
+  mpAuthorizedPaymentId?: string | null;
+  mpPaymentId?: string | null;
+  mpStatus?: string | null;
+  mpStatusDetail?: string | null;
+  // Requerido: sin esto no hay idempotencia.
+  eventKey: string;
+  note?: string | null;
+  grantedBy?: string | null;
+  occurredAt?: string;
+  raw?: Record<string, unknown> | null;
 }
 
 // --- Row → interface mappers ---
@@ -581,6 +630,9 @@ function rowToAddon(r: typeof addons.$inferSelect): Addon {
     currentPeriodEnd: r.currentPeriodEnd ?? undefined,
     createdAt: r.createdAt,
     cancelledAt: r.cancelledAt ?? undefined,
+    source: (r.source ?? "purchase") as Addon["source"],
+    isCourtesy: r.source === "courtesy",
+    courtesyNote: r.courtesyNote ?? undefined,
   };
 }
 
@@ -619,8 +671,191 @@ export function createAddon(userEmail: string, kind: AddonKind): Addon {
   return rowToAddon(r);
 }
 
-export function updateAddon(id: string, patch: Partial<Pick<Addon, "status" | "mpPreapprovalId" | "currentPeriodEnd" | "cancelledAt">>): void {
+export function updateAddon(id: string, patch: Partial<Pick<Addon, "status" | "mpPreapprovalId" | "currentPeriodEnd" | "cancelledAt" | "source" | "courtesyNote">>): void {
   db.update(addons).set(patch).where(eq(addons.id, id)).run();
+}
+
+// --- Libro mayor ---
+
+function rowToOrder(r: typeof orders.$inferSelect): Order {
+  return {
+    id: r.id,
+    number: r.number,
+    userEmail: r.userEmail,
+    kind: r.kind as OrderKind,
+    subject: r.subject as OrderSubject,
+    subjectId: r.subjectId ?? undefined,
+    subjectKey: r.subjectKey ?? undefined,
+    description: r.description,
+    amountCents: r.amountCents,
+    listPriceCents: r.listPriceCents ?? undefined,
+    currency: r.currency,
+    periodStart: r.periodStart ?? undefined,
+    periodEnd: r.periodEnd ?? undefined,
+    mpPreapprovalId: r.mpPreapprovalId ?? undefined,
+    mpAuthorizedPaymentId: r.mpAuthorizedPaymentId ?? undefined,
+    mpPaymentId: r.mpPaymentId ?? undefined,
+    mpStatus: r.mpStatus ?? undefined,
+    mpStatusDetail: r.mpStatusDetail ?? undefined,
+    eventKey: r.eventKey ?? "",
+    note: r.note ?? undefined,
+    grantedBy: r.grantedBy ?? undefined,
+    occurredAt: r.occurredAt,
+    createdAt: r.createdAt,
+  };
+}
+
+// Folio dictable por teléfono: MM-2608-7F3A. El flujo de factura entero es que el
+// cliente nos pase esto por correo, así que un UUID no sirve.
+export function generateOrderNumber(now = new Date()): string {
+  const yy = String(now.getUTCFullYear()).slice(2);
+  const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const suffix = Array.from(crypto.getRandomValues(new Uint8Array(2)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
+  return `MM-${yy}${mm}-${suffix}`;
+}
+
+// Clave natural de un cargo de MercadoPago. Se le pega el resultado para que un fallo
+// y su reintento exitoso sean DOS filas del libro mayor, no una sobrescrita.
+//
+// Deliberadamente NO se usa x-request-id: cambia en cada reintento del mismo evento
+// lógico, que es justo lo que hay que deduplicar.
+export function chargeEventKey(ap: {
+  id: string | number;
+  status?: string;
+  payment?: { id?: string | number; status?: string };
+  retry_attempt?: number;
+}): string {
+  const outcome = ap.payment?.status ?? ap.status ?? "unknown";
+  const ref = ap.payment?.id ?? ap.retry_attempt ?? 0;
+  return `ap:${ap.id}:${outcome}:${ref}`;
+}
+
+// Devuelve la fila insertada, o null si `eventKey` ya existía (reintento de webhook).
+//
+// Ese null es la compuerta del correo: sin él, un reintento de MercadoPago le manda al
+// cliente tres avisos de "tu pago falló". La idempotencia vive en el UNIQUE de la
+// tabla y no en el handler, porque markWebhookProcessed se llama *después* de escribir.
+export function recordOrder(input: NewOrder): Order | null {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const r = db.insert(orders).values({
+        number: generateOrderNumber(),
+        userEmail: input.userEmail,
+        kind: input.kind,
+        subject: input.subject,
+        subjectId: input.subjectId ?? null,
+        subjectKey: input.subjectKey ?? null,
+        description: input.description,
+        amountCents: input.amountCents ?? 0,
+        listPriceCents: input.listPriceCents ?? null,
+        currency: input.currency ?? "MXN",
+        periodStart: input.periodStart ?? null,
+        periodEnd: input.periodEnd ?? null,
+        mpPreapprovalId: input.mpPreapprovalId ?? null,
+        mpAuthorizedPaymentId: input.mpAuthorizedPaymentId ?? null,
+        mpPaymentId: input.mpPaymentId ?? null,
+        mpStatus: input.mpStatus ?? null,
+        mpStatusDetail: input.mpStatusDetail ?? null,
+        eventKey: input.eventKey,
+        note: input.note ?? null,
+        grantedBy: input.grantedBy ?? null,
+        raw: input.raw ?? null,
+        occurredAt: input.occurredAt ?? new Date().toISOString(),
+      }).onConflictDoNothing().returning().get();
+      // `returning().get()` devuelve undefined cuando el conflicto ganó: la fila ya
+      // existía y este evento es un duplicado.
+      return r ? rowToOrder(r) : null;
+    } catch (err) {
+      // Choque de folio: 4 hex son 65k combinaciones por mes, así que pasa poco, pero
+      // pasa. Solo se reintenta si el conflicto fue del número, no del eventKey.
+      const msg = String(err);
+      if (msg.includes("orders_number_unique") || msg.includes("orders.number")) continue;
+      throw err;
+    }
+  }
+  throw new Error("No se pudo generar un folio único para la orden");
+}
+
+export function listOrders(email: string, opts?: { limit?: number; before?: string }): Order[] {
+  const limit = Math.min(opts?.limit ?? 50, 200);
+  const where = opts?.before
+    ? and(eq(orders.userEmail, email), lt(orders.createdAt, opts.before))
+    : eq(orders.userEmail, email);
+  return db.select().from(orders).where(where)
+    .orderBy(desc(orders.createdAt)).limit(limit).all().map(rowToOrder);
+}
+
+export function getLastOrder(email: string): Order | null {
+  const r = db.select().from(orders).where(eq(orders.userEmail, email))
+    .orderBy(desc(orders.createdAt)).limit(1).get();
+  return r ? rowToOrder(r) : null;
+}
+
+export function getOrderByNumber(number: string): Order | null {
+  const r = db.select().from(orders).where(eq(orders.number, number)).get();
+  return r ? rowToOrder(r) : null;
+}
+
+export function getOrderByEventKey(eventKey: string): Order | null {
+  const r = db.select().from(orders).where(eq(orders.eventKey, eventKey)).get();
+  return r ? rowToOrder(r) : null;
+}
+
+export function listOrdersForSubject(subject: OrderSubject, subjectId: string): Order[] {
+  return db.select().from(orders)
+    .where(and(eq(orders.subject, subject), eq(orders.subjectId, subjectId)))
+    .orderBy(desc(orders.createdAt)).all().map(rowToOrder);
+}
+
+// Otorga un add-on de cortesía: la fila del add-on y su asiento en el libro mayor, o
+// ninguna de las dos. `kind` acepta cualquier cadena — un add-on que se invente el año
+// que entra se puede regalar hoy, pasando `label` y `listPriceCents` a mano.
+export function createCourtesyAddon(input: {
+  userEmail: string;
+  kind: string;
+  currentPeriodEnd: string;
+  label?: string;
+  listPriceCents?: number;
+  note?: string;
+  grantedBy?: string;
+}): { addon: Addon; order: Order | null } {
+  const label = input.label ?? addonLabel(input.kind);
+  const listPrice = input.listPriceCents
+    ?? (ADDONS as Record<string, { price?: number }>)[input.kind]?.price
+    ?? null;
+
+  const run = sqlite.transaction(() => {
+    const row = db.insert(addons).values({
+      userEmail: input.userEmail,
+      kind: input.kind,
+      status: "active",
+      priceCents: 0,
+      currentPeriodEnd: input.currentPeriodEnd,
+      source: "courtesy",
+      courtesyNote: input.note ?? null,
+    }).returning().get();
+    const addon = rowToAddon(row);
+    const order = recordOrder({
+      userEmail: input.userEmail,
+      kind: "courtesy",
+      subject: "addon",
+      subjectId: addon.id,
+      subjectKey: input.kind,
+      description: label,
+      amountCents: 0,
+      listPriceCents: listPrice,
+      periodEnd: input.currentPeriodEnd,
+      eventKey: `courtesy:${addon.id}`,
+      note: input.note ?? null,
+      grantedBy: input.grantedBy ?? null,
+    });
+    return { addon, order };
+  });
+
+  return run();
 }
 
 export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; sendsUnlocked: boolean; api: boolean; webhooks: boolean; forwardPerHour: number; smtpRelay: boolean } {

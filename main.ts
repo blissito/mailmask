@@ -2311,6 +2311,9 @@ const app = new Elysia({ adapter: node() })
 
               if (!plan) {
                 log("warn", "webhook", "Could not determine plan, not activating", { email, amount: sub.auto_recurring?.transaction_amount });
+                // Se marca procesado: sin esto MP reintenta el mismo evento irresoluble
+                // durante días y el log se llena de ruido que tapa incidentes reales.
+                await markWebhookProcessed(eventKey);
                 return new Response("OK", { status: 200 });
               }
 
@@ -2397,10 +2400,13 @@ const app = new Elysia({ adapter: node() })
               log("info", "webhook", "Subscription paused (past_due)", { email });
             }
           }
-
-          // Mark as processed only after successful handling
-          await markWebhookProcessed(eventKey);
+        } else {
+          log("warn", "webhook", "Preapproval sin email resoluble", { dataId, externalRef });
         }
+
+        // Fuera del `if (email)` a propósito: estaba dentro, así que un evento sin
+        // email nunca se marcaba y MercadoPago lo reintentaba para siempre.
+        await markWebhookProcessed(eventKey);
       } catch (err) {
         log("error", "webhook", "MP webhook processing error", { error: String(err) });
         return new Response("Internal error", { status: 500 });
@@ -2429,6 +2435,16 @@ const app = new Elysia({ adapter: node() })
             signal: AbortSignal.timeout(10_000),
           },
         );
+        // Sin este guard, un 5xx de MercadoPago devolvía un objeto de error que caía
+        // por la rama de "no aprobado": registraríamos un cobro fallido que nunca
+        // falló y le mandaríamos al cliente un "tu pago falló". Una caída pasajera de
+        // MP se convertía en una renovación perdida para siempre, porque además se
+        // marcaba el evento como procesado. Simétrico con el guard del preapproval.
+        if (!apRes.ok) {
+          const errText = await apRes.text().catch(() => "");
+          log("error", "webhook", "MP authorized payment fetch failed", { status: apRes.status, dataId, body: errText.slice(0, 300) });
+          return new Response("Upstream error", { status: 500 }); // 500 para que MP reintente
+        }
         const ap = await apRes.json();
         log("info", "webhook", "MP authorized payment fetched", {
           preapproval_id: ap.preapproval_id,
@@ -2470,6 +2486,13 @@ const app = new Elysia({ adapter: node() })
               signal: AbortSignal.timeout(10_000),
             },
           );
+          // Mismo motivo que arriba: sin el guard, un 5xx de MP hace que el usuario
+          // parezca irresoluble y el cobro se descarte con un 200.
+          if (!subRes.ok) {
+            const errText = await subRes.text().catch(() => "");
+            log("error", "webhook", "MP preapproval fetch failed (renovación)", { status: subRes.status, preapprovalId: ap.preapproval_id, body: errText.slice(0, 300) });
+            return new Response("Upstream error", { status: 500 });
+          }
           const sub = await subRes.json();
           const externalRef = sub.external_reference ?? "";
           const UUID_RE =
@@ -2733,6 +2756,14 @@ const app = new Elysia({ adapter: node() })
     }
     if (addon.status === "cancelled" || addon.status === "expired") {
       return new Response(JSON.stringify({ error: "El add-on ya está cancelado" }), { status: 400 });
+    }
+    // Esconder el botón en la UI no basta: la compuerta real es ésta. Una cortesía no
+    // se cobra, así que "cancelar" solo destruiría el regalo sin ahorrarle un peso a
+    // nadie — y es exactamente lo que la pantalla vieja invitaba a hacer.
+    if (addon.source === "courtesy") {
+      return new Response(JSON.stringify({
+        error: "Este add-on es una cortesía de MailMask. No tiene costo y no se puede cancelar desde aquí — escríbenos si quieres liberarlo.",
+      }), { status: 400 });
     }
 
     const mpAccessToken = process.env.MP_ACCESS_TOKEN;

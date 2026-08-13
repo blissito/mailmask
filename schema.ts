@@ -253,8 +253,81 @@ export const addons = sqliteTable("addons", {
   currentPeriodEnd: text("current_period_end"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
   cancelledAt: text("cancelled_at"),
+  // purchase | courtesy | migration. Texto y no boolean: "no se cobra" tiene más de
+  // una razón, y un `is_courtesy` obligaría a otra migración la próxima vez. Una
+  // cortesía no tiene preapproval en MP: no se cobra, no se renueva, no se le ofrece
+  // cancelar al cliente y el cron de apagado no la toca.
+  source: text("source").notNull().default("purchase"),
+  courtesyNote: text("courtesy_note"),
 }, (table) => [
   index("idx_addons_user_status").on(table.userEmail, table.status),
+]);
+
+// Libro mayor de facturación. Append-only: nunca se hace UPDATE ni DELETE sobre una
+// fila. Cada cargo, cortesía, cancelación e intento fallido es una fila nueva; eso es
+// lo que la hace libro mayor y no tabla de estatus.
+//
+// Sin `expiresAt` a propósito, y con más fuerza que en `addons`: es el único registro
+// de qué se le cobró a quién y cuándo. Si el cron de purga la tocara, una disputa de
+// cargo quedaría sin evidencia. `tokens` es kv efímera; esto es contabilidad.
+export const orders = sqliteTable("orders", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  // Folio corto y dictable por teléfono: MM-2608-7F3A. Un UUID en un correo es un
+  // fracaso de usabilidad — el flujo de factura entero es "el cliente nos pasa el folio".
+  number: text("number").notNull().unique(),
+  userEmail: text("user_email").notNull().references(() => users.email, { onDelete: "cascade" }),
+
+  // charge = cobró; failed_charge = se intentó y lo rechazaron; courtesy = regalo del
+  // equipo; cancellation = se dio de baja. `paused` no es evento de libro mayor, es
+  // estatus: el failed_charge que lo acompaña es el registro real.
+  kind: text("kind").notNull(),
+
+  // Sobre qué, sin polimorfismo sucio: `subject` dice la familia, `subjectId` apunta a
+  // la fila concreta cuando existe, y `subjectKey` es la llave legible. `subjectKey`
+  // NO se valida contra ADDONS a propósito: una cortesía de un kind que se invente
+  // mañana tiene que poder insertarse hoy.
+  subject: text("subject").notNull(),      // plan | addon | domain_registration
+  subjectId: text("subject_id"),
+  subjectKey: text("subject_key"),
+  // Etiqueta congelada al momento del cobro. Literal, para que un cambio de precios
+  // no reescriba la historia.
+  description: text("description").notNull(),
+
+  amountCents: integer("amount_cents").notNull().default(0),
+  // Lo que habría costado: valor del regalo en cortesías, precio de lista cuando hubo
+  // cupón o crédito de referido, y monto intentado en un cargo fallido.
+  listPriceCents: integer("list_price_cents"),
+  currency: text("currency").notNull().default("MXN"),
+
+  periodStart: text("period_start"),
+  periodEnd: text("period_end"),
+
+  mpPreapprovalId: text("mp_preapproval_id"),
+  mpAuthorizedPaymentId: text("mp_authorized_payment_id"),
+  mpPaymentId: text("mp_payment_id"),
+  mpStatus: text("mp_status"),
+  mpStatusDetail: text("mp_status_detail"),   // por qué falló, en palabras de MP
+
+  // Idempotencia a nivel de tabla: UNIQUE + onConflictDoNothing. Un reintento de
+  // webhook no puede duplicar una fila aunque el handler corra dos veces.
+  // Deliberadamente NO es x-request-id: ése cambia en cada reintento del mismo evento
+  // lógico, que es justo lo que hay que deduplicar.
+  eventKey: text("event_key").unique(),
+
+  note: text("note"),                        // motivo de la cortesía, visible al cliente
+  grantedBy: text("granted_by"),             // quién corrió el script
+
+  raw: text("raw", { mode: "json" }).$type<Record<string, unknown>>(),
+
+  // `occurredAt` es la marca de MercadoPago; `createdAt` es cuándo nos enteramos. Los
+  // webhooks llegan tarde: el recibo debe cuadrar con el estado de cuenta del cliente,
+  // no con nuestra hora de proceso.
+  occurredAt: text("occurred_at").$defaultFn(() => new Date().toISOString()).notNull(),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
+}, (table) => [
+  index("idx_orders_user_created").on(table.userEmail, table.createdAt),
+  index("idx_orders_subject").on(table.subject, table.subjectId),
+  index("idx_orders_mp_preapproval").on(table.mpPreapprovalId),
 ]);
 
 export const apiKeys = sqliteTable("api_keys", {
