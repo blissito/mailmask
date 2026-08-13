@@ -207,7 +207,7 @@
             "name": "¿MailMask reemplaza a Gmail o Outlook?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "No. MailMask no es un cliente de correo — no almacena tu bandeja completa ni reemplaza donde lees y escribes emails. Es una capa de enrutamiento inteligente: recibe emails en tu dominio y los reenvía a tu inbox actual. Piensa en MailMask como el intermediario entre tu dominio y tu correo favorito."
+              "text": "Sí, si tú quieres. La Bandeja es un lugar completo de trabajo: ahí llega el correo de tu dominio, guarda el historial de cada conversación, respondes y escribes correos nuevos, sin que nada pase por Gmail. Y si prefieres no cambiar tu rutina, tampoco tienes que hacerlo: MailMask reenvía a donde ya lees tu correo. Muchos usan las dos cosas. Lo único que todavía no reemplaza es tu app de escritorio para recibir: eso necesita IMAP, que está en camino."
             }
           },
           {
@@ -659,7 +659,7 @@
     </section>
 
     <!-- Bandeja -->
-    <section class="max-w-4xl mx-auto px-4 py-16">
+    <section id="bandeja" class="max-w-4xl mx-auto px-4 py-16">
       <p class="text-mask-500 font-semibold text-sm tracking-widest uppercase text-center mb-4">Bandeja integrada</p>
       <h2 class="text-2xl font-bold text-center mb-4">
         Tu helpdesk, sin otro SaaS
@@ -1110,14 +1110,21 @@
             >
           </summary>
           <p class="px-6 pb-4 text-zinc-400 text-sm">
-            No. MailMask no es un cliente de correo — no almacena tu bandeja
-            completa ni reemplaza donde lees y escribes emails. Es una capa de
-            enrutamiento inteligente: recibe emails en tu dominio y los reenvía
-            a tu inbox actual (Gmail, Outlook, lo que uses). Piensa en MailMask
-            como el intermediario entre tu dominio y tu correo favorito. La
-            Bandeja es un panel de gestión para ver y responder desde el
-            navegador, pero tu flujo principal sigue siendo tu cliente de
-            siempre.
+            <strong class="text-zinc-300">Sí, si tú quieres.</strong> La
+            <a href="#bandeja" class="text-mask-400 hover:underline">Bandeja</a> es un lugar
+            completo de trabajo: ahí llega el correo de tu dominio, guarda el historial de
+            cada conversación, respondes y escribes correos nuevos. Nada de eso pasa por
+            Gmail.
+          </p>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">
+            Y si prefieres no cambiar tu rutina, tampoco tienes que hacerlo: MailMask reenvía
+            a donde ya lees tu correo y sigues igual que siempre. Muchos usan las dos cosas
+            —el equipo atiende clientes en la Bandeja y lo personal se reenvía a Gmail.
+          </p>
+          <p class="px-6 pb-4 text-zinc-400 text-sm">
+            Lo único que todavía no reemplaza es tu app de escritorio para
+            <strong class="text-zinc-300">recibir</strong>: eso necesita IMAP, que está en
+            camino.
           </p>
         </details>
         <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
