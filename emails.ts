@@ -13,10 +13,10 @@
  *    hecho lodo, y no hay forma confiable de optarse fuera. Uno claro con `color` y
  *    `background-color` explícitos en cada elemento sobrevive legible a los tres
  *    algoritmos (Apple no invierte, Gmail invierte parcial, Outlook invierte todo).
- *  - **Sin imágenes, ni el logo.** `sendFromDomain` no arma multipart/mixed, así que no
- *    hay adjuntos ni CID; Outlook bloquea las remotas por defecto y Gmail no renderiza
- *    SVG. La marca es un wordmark de texto sobre una banda esmeralda: cero bytes, cero
- *    bloqueo, se ve en todos lados.
+ *  - **Una sola imagen, y que nada dependa de ella.** `sendFromDomain` no arma
+ *    multipart/mixed, así que no hay adjuntos ni CID: la mascarita va como imagen remota,
+ *    y Outlook las bloquea por defecto. Por eso el wordmark de texto se queda junto al
+ *    logo en vez de reemplazarse: si la bloquean, la marca sigue ahí.
  *  - Tablas con `role="presentation"`, estilos inline, sin flex ni grid, 600px máximo.
  *  - `line-height` en el `<td>` *y* en el `<p>`: Outlook ignora uno de los dos.
  *  - Botones como tabla de una celda con `bgcolor`; un `<a>` con padding pierde el
@@ -33,7 +33,7 @@ import { PLANS, ADDONS, planLabel, addonLabel } from "./plans.js";
 
 export const ALERT_FROM = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
 export const FROM_HEADER = `MailMask <${ALERT_FROM}>`;
-export const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL ?? "hola@mailmask.studio";
+export const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL ?? "brenda@fixter.org";
 
 // La mascarita, servida desde el sitio. Va como imagen remota porque no hay otra vía:
 // `sendFromDomain` no arma multipart/mixed, así que no se puede adjuntar por CID, y el
