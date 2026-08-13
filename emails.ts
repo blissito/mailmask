@@ -35,6 +35,13 @@ export const ALERT_FROM = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.stud
 export const FROM_HEADER = `MailMask <${ALERT_FROM}>`;
 export const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL ?? "hola@mailmask.studio";
 
+// La mascarita, servida desde el sitio. Va como imagen remota porque no hay otra vía:
+// `sendFromDomain` no arma multipart/mixed, así que no se puede adjuntar por CID, y el
+// SVG del sitio no lo renderiza Gmail. Outlook bloquea las remotas por defecto — por eso
+// el wordmark de texto se queda al lado en vez de reemplazarse por la imagen: si la
+// bloquean, la marca sigue ahí y la mascarita degrada a su texto alternativo.
+export const LOGO_URL = "https://www.mailmask.studio/img/logo.png";
+
 export function baseUrl(): string {
   const raw = process.env.MAIN_DOMAIN ?? "www.mailmask.studio";
   const bare = raw.replace(/^https?:\/\//, "").replace(/\/+$/, "");
@@ -128,7 +135,7 @@ export function calloutBox(text: string, tone: "info" | "warn" | "danger" = "inf
 function ctaButton(label: string, url: string): string {
   return `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin:4px 0 8px;">
       <tr><td bgcolor="${C.band}" style="border-radius:8px;">
-        <a href="${escHtml(url)}" style="display:block;padding:13px 28px;font-family:${FONT};font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;">${escHtml(label)}</a>
+        <a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" style="display:block;padding:13px 28px;font-family:${FONT};font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;">${escHtml(label)}</a>
       </td></tr>
     </table>`;
 }
@@ -161,7 +168,14 @@ export function layout(o: LayoutOpts): string {
 <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="width:100%;background-color:${C.pageBg};">
 <tr><td align="center" style="padding:24px 12px;">
   <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" style="width:100%;max-width:600px;background-color:${C.cardBg};border:1px solid ${C.line};border-radius:12px;">
-    <tr><td style="background-color:${C.band};border-radius:12px 12px 0 0;padding:20px 28px;font-family:${FONT};font-size:20px;font-weight:700;color:${C.bandText};line-height:24px;">Mail<span style="color:${C.accent};">Mask</span></td></tr>
+    <tr><td style="background-color:${C.band};border-radius:12px 12px 0 0;padding:18px 28px;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr>
+        <td style="padding-right:10px;line-height:0;">
+          <img src="${LOGO_URL}" width="36" height="36" alt="MailMask" style="display:block;width:36px;height:36px;border:0;outline:none;text-decoration:none;">
+        </td>
+        <td style="font-family:${FONT};font-size:20px;font-weight:700;color:${C.bandText};line-height:24px;">Mail<span style="color:${C.accent};">Mask</span></td>
+      </tr></table>
+    </td></tr>
     <tr><td style="padding:28px;font-family:${FONT};font-size:16px;line-height:24px;color:${C.text};">
       <h1 style="margin:0 0 18px;font-family:${FONT};font-size:22px;line-height:28px;font-weight:700;color:${C.text};">${escHtml(o.heading)}</h1>
       ${o.body}
@@ -172,7 +186,7 @@ export function layout(o: LayoutOpts): string {
       ${o.footerNote ? `<p style="margin:0 0 10px;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted};">${escHtml(o.footerNote)}</p>` : ""}
       ${invoiceLine}
       <p style="margin:0 0 10px;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted};">¿Dudas? Responde este correo o escribe a <a href="mailto:${SUPPORT_EMAIL}" style="color:${C.band};">${SUPPORT_EMAIL}</a>.</p>
-      <p style="margin:0;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted};"><a href="${escHtml(url)}/app" style="color:${C.muted};">Administrar mi cuenta</a> &middot; MailMask &middot; mailmask.studio</p>
+      <p style="margin:0;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted};"><a href="${escHtml(url)}/app" target="_blank" rel="noopener noreferrer" style="color:${C.muted};">Administrar mi cuenta</a> &middot; MailMask &middot; mailmask.studio</p>
     </td></tr>
   </table>
 </td></tr></table>

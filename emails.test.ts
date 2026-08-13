@@ -36,9 +36,24 @@ describe("Correos: contrato de toda plantilla", () => {
       assert.doesNotMatch(html, /\sclass=/i);
     });
 
-    it(`${name} no depende de imágenes remotas`, () => {
-      // Outlook las bloquea por defecto y no hay soporte de adjuntos para inlinearlas.
-      assert.doesNotMatch(TEMPLATE_FIXTURES[name]().html, /<img[\s>]/i);
+    it(`${name} sobrevive a que bloqueen las imágenes`, () => {
+      // Outlook bloquea las remotas por defecto y no hay adjuntos para inlinearlas, así
+      // que toda imagen necesita texto alternativo y la marca no puede depender de ella:
+      // el wordmark tiene que seguir en el HTML.
+      const html = TEMPLATE_FIXTURES[name]().html;
+      for (const img of html.match(/<img[^>]*>/gi) ?? []) {
+        assert.match(img, /alt="[^"]+"/, `sin alt: ${img}`);
+      }
+      assert.ok(html.includes(">Mask<"), "el wordmark de texto sigue presente");
+    });
+
+    it(`${name} abre sus enlaces en pestaña nueva`, () => {
+      // Un recibo abierto en Gmail web no debe sacar al lector de su bandeja.
+      const html = TEMPLATE_FIXTURES[name]().html;
+      for (const a of html.match(/<a [^>]*href="https?:[^"]*"[^>]*>/gi) ?? []) {
+        assert.match(a, /target="_blank"/, `sin target: ${a}`);
+        assert.match(a, /rel="noopener noreferrer"/, `sin rel: ${a}`);
+      }
     });
 
     it(`${name} declara esquema claro`, () => {
@@ -74,7 +89,10 @@ describe("Correos: escapado", () => {
       inviterEmail: "x@y.com", domain: malicioso, role: "agente",
       name: null, acceptUrl: "https://www.mailmask.studio/x",
     });
-    assert.ok(!e.html.includes("<img"), "no inyecta una etiqueta");
+    // El único <img> del correo es el logo de la banda; la carga no puede agregar otro.
+    const imgs = e.html.match(/<img[^>]*>/gi) ?? [];
+    assert.equal(imgs.length, 1, "solo la mascarita");
+    assert.ok(imgs[0].includes("logo.png"), "y es el logo, no la inyección");
     // La carga sigue apareciendo como texto plano, y eso está bien: lo que importa es
     // que no se escape del atributo ni abra una etiqueta.
     assert.ok(!e.html.includes(`"><img`), "no rompe el atributo");
