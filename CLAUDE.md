@@ -92,6 +92,26 @@ La escalera está calculada para que el 5º dominio ($445) empate con Freelancer
 
 ## TODO
 
+### 🔥 Urgente — evaluar IMAP/POP
+- [ ] **Cerrar el hueco de recepción: cuánto cuesta y si AWS lo resuelve.** Hoy MailMask envía por SMTP pero **no ofrece IMAP ni POP**, así que nadie puede usar Outlook o Apple Mail como cliente completo: el correo entrante sigue cayendo en el buzón al que se reenvía. La landing lo prometía mal y ya se corrigió, pero el hueco de producto sigue ahí y es lo que separa "capa de reenvío" de "email profesional de verdad".
+
+  **WorkMail ya está descartado, con números** (agosto 2026): cuesta **$4 USD por usuario al mes** (≈$76 MXN, con 50 GB e IMAP incluidos). Un solo buzón cuesta más que todo el plan Básico ($49). Pero el problema de fondo no es el margen: **cobra por usuario**, que es justo el modelo contra el que se posiciona el producto entero ("Google cobra por persona, MailMask por dominio"). Adoptarlo obligaría a cobrar por persona y borraría el diferenciador.
+
+  Y hay un choque técnico que lo vuelve casi imposible: **el MX de un dominio apunta a un solo lugar**. Hoy apunta a SES inbound, de donde salen el reenvío, las reglas y la Bandeja. Si WorkMail toma el MX, se cae todo el pipeline — habría que elegir por dominio: o Bandeja, o WorkMail.
+
+  **Ruta recomendada: Stalwart** (no Dovecot). Servidor de correo en Rust, binario único, habla IMAP, JMAP, POP3 y SMTP. Lo decisivo para nosotros: **soporta S3 nativo como almacén de mensajes** — los cuerpos van a S3 y los metadatos a Postgres o SQLite —, así que el correo no vive en el disco de la caja de sandboxes, que es la objeción principal. Usa menos memoria que Dovecot y trae JMAP.
+
+  **Primer paso: un spike de un día, no lanzarlo.** Levantar Stalwart contra el S3 que ya existe, mandar un correo y leerlo desde Apple Mail. Eso dice si la ruta sirve y cuánto cuesta de verdad. **Nada de marketing antes del spike.**
+
+  Lo que el spike tiene que resolver antes de prometer nada:
+  - **El MX: la recomendación es NO moverlo.** Si Stalwart recibe directo, tendría que hacer todo lo que hoy hace el pipeline —reglas, reenvío, Bandeja, spam y virus— y se pierden los veredictos que SES ya da gratis. La ruta incremental es que **SES siga recibiendo y Stalwart sea un destino más**: `forwarding.ts` ya tiene el mensaje crudo en S3, así que solo hay que agregar un paso que lo deposite en el buzón por LMTP o `IMAP APPEND`. Ventajas: no se toca nada de lo que funciona, es reversible (si Stalwart cae, el reenvío sigue), y se puede activar por dominio o por alias en vez de migrar de golpe. El costo es guardar el mensaje dos veces, que es lo barato aquí. Mover el MX solo tendría sentido para jubilar el reenvío por completo — otro producto, no el siguiente paso.
+  - **Provisión de buzones**: hoy un alias es una fila que reenvía; con IMAP necesita cuenta, contraseña y almacenamiento. Es producto nuevo (altas, recuperación, qué pasa al borrar un alias).
+  - TLS para el host de IMAP, protección contra fuerza bruta en un puerto expuesto, respaldo del almacén de metadatos.
+  - **Precio**: cambia la estructura de costos, así que hay que decidir si es add-on, plan nuevo o incluido.
+  - Carga de soporte: ofrecer IMAP implica atender configuraciones de clientes de correo.
+
+  Relacionado: el add-on de almacenamiento y la retención por plan, ambos sin definir. Y ojo con el soporte: ofrecer IMAP implica atender configuraciones de clientes de correo, que es otro tipo de carga.
+
 ### ⏭️ Lo primero de la próxima sesión
 - [ ] **Evaluar el costo de sacar la app de Fly**. Análisis, no decisión: qué costaría migrar y a dónde. Lo que ata hoy a Fly es el **volumen único con SQLite** — es la misma restricción que impide el deploy multi-máquina y sin downtime, así que conviene evaluarlo junto con el punto de abajo y no por separado.
 
@@ -161,6 +181,13 @@ Objetivo: solidificar el tronco del servicio. Blindar seguridad, rendimiento y r
 - [ ] **Configurar SES multi-tenancy y estrategia de reputación**: Sesión de investigación para definir arquitectura de tenants SES, configuration sets por dominio, políticas de envío (Standard vs Strict), métricas de reputación a monitorear, y plan de acción para aislar dominios de clientes. Estudiar docs de SES Tenants, VDM, y EventBridge antes de implementar.
 - [ ] Evaluar pattern de almacenamiento de mensajes en Bandeja: ¿leer body de S3 on demand vs duplicar en SQLite? Investigar otros patterns (cache intermedio, pre-procesado a formato ligero, CDN/signed URLs). Concluir cuál es el mejor approach antes de implementar.
 - [ ] **Radar de Actividad por Alias**: Dashboard analítico por alias — volumen de emails por día/semana, horas pico, ratio legítimo vs marketing/spam, aliases "muertos" (30+ días sin actividad) con sugerencia de desactivarlos. Layer de IA (via formmy.app) que genera resumen semanal en lenguaje natural ("Tu alias newsletter@ recibió 47 emails esta semana, 82% son marketing — considera desactivarlo"). El 90% son queries SQL sobre datos existentes (logs/mensajes), la IA solo genera el resumen. Email semanal via SES con cron. Implementación: 3-4 días. Disponible en todos los planes como feature de retención.
+
+### Diseño
+- [ ] **Tema claro con toggle**. Hoy todo el sitio es oscuro fijo. La evidencia de 2026 dice que no hay ganador universal: oscuro rinde en herramientas de desarrollo, claro en público no técnico que necesita confiar rápido —que es el público de la home— y **lo que mejor funciona es híbrido**, claro donde se lee y oscuro donde se enfatiza. Hay casos documentados donde la versión clara ganó 16% más clics pero 42% menos conversiones, así que no se cambia a ciegas: **toggle y medir**, no reemplazar.
+
+  Implementación: tokens de color en `public/css/input.css` (hoy solo define `--mask-*`; los grises salen de clases `zinc-*` de Tailwind hardcodeadas en el HTML). Hay que pasar los fondos y textos a variables para poder invertirlos, respetar `prefers-color-scheme` en la primera visita y recordar la elección. Ojo: son 4 archivos HTML grandes más los 25 del blog.
+
+  **Ya hecho (agosto 2026)**: se corrigió el contraste de la home. `text-zinc-500` era el color de texto más usado (56 veces) y daba 4.12:1 sobre el fondo —por debajo del mínimo AA de 4.5:1— y 3.67:1 dentro de las tarjetas; `text-zinc-600` estaba en 2.29:1. Se subieron a zinc-400 y zinc-500. **El resto del sitio (pricing, docs, blog, app) sigue sin auditar de contraste.**
 
 ### Contenido / Educación
 

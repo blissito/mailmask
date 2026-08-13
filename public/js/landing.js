@@ -219,48 +219,113 @@ async function doCheckout(plan, billing, btn, email) {
   }
 }
 
-// --- Calculator ---
+// --- Calculadora: la asimetría de precio ---
+// Workspace escala con personas; MailMask con dominios. Antes cada slider alimentaba
+// solo un lado, así que parecía una comparación y eran dos cálculos sueltos.
 (function initCalc() {
   const usersSlider = document.getElementById("calc-users");
   const domainsSlider = document.getElementById("calc-domains");
-  if (!usersSlider || !domainsSlider) return;
+  const chart = document.getElementById("calc-chart");
+  if (!usersSlider || !domainsSlider || !chart) return;
 
-  const usersVal = document.getElementById("calc-users-val");
-  const domainsVal = document.getElementById("calc-domains-val");
-  const gwPrice = document.getElementById("calc-gw-price");
-  const gwUsers = document.getElementById("calc-gw-users");
-  const mmPrice = document.getElementById("calc-mm-price");
-  const mmPlan = document.getElementById("calc-mm-plan");
-  const badge = document.getElementById("calc-badge");
+  const $ = (id) => document.getElementById(id);
+  const GW_POR_PERSONA = 108;
+  const ENVIOS = 49;      // add-on de envíos, para comparar equivalente con Workspace
+  const MAX_U = 20;
 
-  let prevGw = 324, prevMm = 49;
+  // Geometría del SVG
+  const W = 720, H = 300, L = 56, R = 24, T = 24, B = 44;
+  const px = (u) => L + ((u - 1) / (MAX_U - 1)) * (W - L - R);
+  const money = (n) => "$" + n.toLocaleString("es-MX");
+
+  // `base` es lo que cuesta recibir y responder — el "desde $49" del encabezado.
+  // `conEnvio` suma el add-on solo donde hace falta: Freelancer y Developer ya incluyen
+  // iniciar correos, así que ahí las dos cifras coinciden.
+  function precioMailMask(d) {
+    if (d === 1) return { base: 49, conEnvio: 49 + ENVIOS, plan: "Básico · 1 dominio" };
+    if (d <= 4) {
+      const b = 49 + (d - 1) * 99;
+      return { base: b, conEnvio: b + ENVIOS, plan: `Básico + ${d - 1} dominio${d - 1 > 1 ? "s" : ""} extra` };
+    }
+    if (d <= 15) return { base: 449, conEnvio: 449, plan: "Freelancer · hasta 15 dominios" };
+    return { base: 999, conEnvio: 999, plan: "Developer · hasta 20 dominios" };
+  }
+
+  function dibujarGrid(maxY) {
+    const g = $("chart-grid");
+    let out = "";
+    for (let i = 0; i <= 4; i++) {
+      const val = (maxY / 4) * i;
+      const y = H - B - (val / maxY) * (H - T - B);
+      out += `<line x1="${L}" y1="${y}" x2="${W - R}" y2="${y}" stroke="#27272a" stroke-width="1" />`;
+      out += `<text x="${L - 8}" y="${y + 4}" fill="#71717a" font-family="system-ui,sans-serif" font-size="11" text-anchor="end">${money(Math.round(val))}</text>`;
+    }
+    g.innerHTML = out;
+  }
 
   function update() {
     const u = +usersSlider.value;
     const d = +domainsSlider.value;
-    usersVal.textContent = u;
-    domainsVal.textContent = d;
+    $("calc-users-val").textContent = u;
+    $("calc-domains-val").textContent = d;
 
-    const gw = u * 108;
-    let mm, planName;
-    if (d <= 1) { mm = 49; planName = "Plan Básico · 1 dominio"; }
-    else if (d <= 3) { mm = 449; planName = "Plan Freelancer · hasta 15 dominios"; }
-    else { mm = 999; planName = "Plan Developer · hasta 20 dominios"; }
+    const gw = u * GW_POR_PERSONA;
+    const mm = precioMailMask(d);
 
-    animatePrice(gwPrice, prevGw, gw, 400);
-    animatePrice(mmPrice, prevMm, mm, 400);
-    prevGw = gw;
-    prevMm = mm;
+    // La escala se fija al máximo del rango para que la línea de Workspace se vea
+    // trepar de verdad en vez de reescalarse a cada movimiento.
+    const maxY = Math.max(MAX_U * GW_POR_PERSONA, mm.conEnvio * 1.2);
+    const py = (v) => H - B - (v / maxY) * (H - T - B);
+    dibujarGrid(maxY);
 
-    gwUsers.textContent = u;
-    mmPlan.textContent = planName;
+    let gwPath = "", mmPath = "", envPath = "";
+    for (let i = 1; i <= MAX_U; i++) {
+      const cmd = i === 1 ? "M" : "L";
+      gwPath += `${cmd} ${px(i)} ${py(i * GW_POR_PERSONA)} `;
+      mmPath += `${cmd} ${px(i)} ${py(mm.base)} `;
+      envPath += `${cmd} ${px(i)} ${py(mm.conEnvio)} `;
+    }
+    $("line-gw").setAttribute("d", gwPath);
+    $("line-mm").setAttribute("d", mmPath);
+    // La punteada solo se dibuja cuando el add-on cambia algo.
+    const lineEnv = $("line-env");
+    if (mm.conEnvio > mm.base) { lineEnv.setAttribute("d", envPath); lineEnv.style.display = ""; }
+    else { lineEnv.style.display = "none"; }
+    $("area-mm").setAttribute("d", `${mmPath} L ${px(MAX_U)} ${H - B} L ${px(1)} ${H - B} Z`);
 
-    const pct = Math.round((1 - mm / gw) * 100);
-    badge.textContent = pct > 0 ? `Ahorras ${pct}%` : "Mismo precio";
+    const xu = px(u);
+    $("dot-gw").setAttribute("cx", xu); $("dot-gw").setAttribute("cy", py(gw));
+    $("dot-mm").setAttribute("cx", xu); $("dot-mm").setAttribute("cy", py(mm.base));
+
+    const lg = $("lbl-gw"), lm = $("lbl-mm");
+    lg.textContent = money(gw); lm.textContent = money(mm.base);
+    // Las etiquetas se apartan del borde para que no se corten.
+    const clamp = (x) => Math.max(L + 34, Math.min(W - R - 34, x));
+    lg.setAttribute("x", clamp(xu)); lg.setAttribute("y", Math.max(T + 12, py(gw) - 14));
+    lm.setAttribute("x", clamp(xu)); lm.setAttribute("y", py(mm.base) + 24);
+    const le = $("lbl-env");
+    if (mm.conEnvio > mm.base) {
+      le.style.display = ""; le.textContent = money(mm.conEnvio) + " con envío";
+      le.setAttribute("x", clamp(xu)); le.setAttribute("y", py(mm.conEnvio) - 10);
+    } else { le.style.display = "none"; }
+
+    $("calc-gw-price").textContent = money(gw);
+    $("calc-gw-users").textContent = u;
+    $("calc-mm-price").textContent = money(mm.base);
+    $("calc-mm-plan").textContent = mm.plan;
+    $("calc-mm-envio").textContent = mm.conEnvio > mm.base
+      ? `+$${ENVIOS} si además quieres iniciar correos`
+      : "Incluye iniciar correos";
+
+    const ahorro = Math.max(0, (gw - mm.base) * 12);
+    $("calc-savings").textContent = money(ahorro);
+    const pct = gw > 0 ? Math.round((1 - mm.base / gw) * 100) : 0;
+    $("calc-badge").textContent = pct > 0 ? `${pct}% menos` : "Mismo precio";
   }
 
   usersSlider.addEventListener("input", update);
   domainsSlider.addEventListener("input", update);
+  update(); // sin esto la página muestra los valores estáticos del HTML
 })();
 
 // Scroll-triggered animations using IntersectionObserver
