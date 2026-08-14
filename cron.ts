@@ -6,6 +6,16 @@ import { tokens, emailLogs, forwardQueue, rateLimits, sendCounts, bulkJobs, user
 import { lte, and, eq, inArray, isNotNull, gt, sql as rawSql } from "drizzle-orm";
 import { purgeDeletedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, createDomain, listEffectiveAddons, updateAddon, recordOrder, addonLabel } from "./db.js";
 import { sendTemplate, expiryWarning, addonShutdown } from "./emails.js";
+import { reconcilePendingAddons } from "./addon-sync.js";
+
+// Cada 5 minutos — activar add-ons ya pagados cuyo webhook nunca llegó.
+cron.schedule("*/5 * * * *", async () => {
+  try {
+    await reconcilePendingAddons();
+  } catch (err) {
+    log("error", "cron", "Reconcile add-ons failed", { error: String(err) });
+  }
+});
 
 // Daily at 14:00 UTC — warn users whose subscription expires within 3 days
 cron.schedule("0 14 * * *", async () => {
