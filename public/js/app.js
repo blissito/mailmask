@@ -448,8 +448,14 @@ async function showAddonsModal() {
   const hasSends = effective.some(a => a.kind.startsWith("sends"));
   const planIncludesSends = currentUser?.subscription?.plan !== "basico";
 
+  // Un pago recién hecho vive en `pending` hasta que MercadoPago avisa (o hasta que el
+  // cron de reconciliación lo alcanza). Sin esto el usuario volvía del checkout y veía
+  // el botón "Agregar" intacto, como si su pago no hubiera existido.
+  const pendingByKind = (mine ?? []).filter(a => a.status === "pending");
+
   list.innerHTML = Object.entries(catalog).map(([kind, info]) => {
     const owned = effective.filter(a => a.kind === kind);
+    const pending = pendingByKind.filter(a => a.kind === kind);
     const isSends = kind.startsWith("sends");
     const blocked = isSends && (hasSends || planIncludesSends);
     const blockedWhy = planIncludesSends
@@ -483,17 +489,25 @@ async function showAddonsModal() {
         </div>`;
     }).join("");
 
+    const pendingRows = pending.map(() => `
+      <div class="flex flex-wrap items-center gap-2 text-xs mt-2">
+        <span class="inline-flex items-center gap-1 bg-yellow-900/30 border border-yellow-700/40 text-yellow-400 rounded-full px-2 py-0.5">Procesando tu pago…</span>
+        <span class="text-zinc-400">se activa en unos minutos</span>
+      </div>`).join("");
+
     return `
       <div class="border border-zinc-800 rounded-lg p-4 flex items-start justify-between gap-4">
         <div class="flex-1 min-w-0">
           <div class="font-semibold text-zinc-100">${esc(info.label)}</div>
           <div class="text-sm text-zinc-400 mt-1">${esc(ADDON_COPY[kind]?.desc ?? "")}</div>
-          ${ownedRows}
+          ${ownedRows}${pendingRows}
         </div>
         <div class="text-right shrink-0">
           <div class="text-xl font-bold">+$${(info.price / 100).toLocaleString("es-MX")}</div>
           <div class="text-[11px] text-zinc-400 mb-2">MXN/mes${kind === "domain" ? " c/u" : ""}</div>
-          ${blocked && !owned.length
+          ${pending.length
+            ? `<div class="text-[11px] text-zinc-400 max-w-[8rem]">Pago en proceso</div>`
+            : blocked && !owned.length
             ? `<div class="text-[11px] text-zinc-400 max-w-[8rem]">${blockedWhy}</div>`
             : `<button data-action="buy-addon" data-kind="${esc(kind)}"
                  class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors">
