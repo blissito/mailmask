@@ -17,6 +17,16 @@ export interface Domain {
   createdAt: string;
 }
 
+/** Respuesta de `domains.verify`. */
+export interface DomainVerification {
+  domain: string;
+  verified: boolean;
+  dkimVerified: boolean;
+  /** true cuando no se pudo consultar a SES: los campos son el último estado conocido. */
+  stale?: boolean;
+  error?: string;
+}
+
 export interface Alias {
   alias: string;
   domainId: string;

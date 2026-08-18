@@ -16,6 +16,10 @@ import { MailMask, MailMaskError } from "./sdk/src/index.js";
 const suffix = Date.now();
 const enviados: { from: string; to: string; subject: string }[] = [];
 
+// Estado que "SES" reporta. Los tests lo mueven para simular que la identidad
+// desapareció de la cuenta, que es lo que le pasó a brendago.design.
+const ses = { verified: true, dkimVerified: true, respondio: true };
+
 describe("SDK ↔ servidor: contrato", () => {
   // deno-lint-ignore no-explicit-any
   let app: any;
@@ -39,6 +43,7 @@ describe("SDK ↔ servidor: contrato", () => {
           enviados.push({ from, to, subject });
           return `<stub-${crypto.randomUUID()}@test>`;
         },
+        checkDomainStatus: async () => ({ ...ses }),
       },
     });
 
@@ -171,6 +176,36 @@ describe("SDK ↔ servidor: contrato", () => {
     assert.equal(estado.id, job.jobId);
     assert.equal(estado.totalRecipients, 2);
     assert.equal(typeof estado.skippedSuppressed, "number");
+  });
+
+  it("verify vuelve a preguntarle a SES aunque la base diga que sí", async () => {
+    // El bug: con `verified` en la base, la ruta devolvía true sin consultar.
+    // Así, un dominio borrado de SES seguía reportándose sano y nadie se
+    // enteraba de que llevaba meses sin poder enviar.
+    ses.verified = false;
+    try {
+      const res = await mm.domains.verify(domainId);
+      assert.equal(res.verified, false, "verify siguió afirmando que está verificado");
+      const guardado = await mm.domains.get(domainId);
+      assert.equal(guardado.verified, false, "la bandera de la base no se corrigió");
+    } finally {
+      ses.verified = true;
+      await mm.domains.verify(domainId);
+    }
+  });
+
+  it("si no se puede consultar a SES, no se desverifica nada", async () => {
+    ses.respondio = false;
+    ses.verified = false;
+    try {
+      const res = await mm.domains.verify(domainId);
+      assert.equal(res.stale, true, "no marcó la respuesta como último estado conocido");
+      assert.equal(res.verified, true, "bajó la bandera por una consulta fallida");
+      assert.equal((await mm.domains.get(domainId)).verified, true);
+    } finally {
+      ses.respondio = true;
+      ses.verified = true;
+    }
   });
 
   it("logs y api-keys responden por el camino del SDK", async () => {

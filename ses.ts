@@ -127,20 +127,47 @@ export function getConfigSetName(domain: string): string {
   return configSetName(domain);
 }
 
-export async function checkDomainStatus(domain: string): Promise<{ verified: boolean; dkimVerified: boolean }> {
+/**
+ * Estado real del dominio en SES.
+ *
+ * `respondio` separa "SES dice que no está verificado" de "no pudimos
+ * preguntarle". Antes todo error caía en `verified: false`, así que un parpadeo
+ * de red se veía igual que un dominio caído; por miedo a eso, la ruta de verify
+ * dejó de preguntar del todo y empezó a responder `true` de memoria. Resultado:
+ * un dominio podía desaparecer de SES —como pasó con brendago.design— y MailMask
+ * seguía jurando que estaba verificado, sin poder enviar ni recibir.
+ */
+export async function checkDomainStatus(
+  domain: string
+): Promise<{ verified: boolean; dkimVerified: boolean; respondio: boolean }> {
   try {
     const ses = await getSesInbound();
-    const { GetIdentityVerificationAttributesCommand } = await import("@aws-sdk/client-ses");
+    const { GetIdentityVerificationAttributesCommand, GetIdentityDkimAttributesCommand } =
+      await import("@aws-sdk/client-ses");
     const res = await ses.send(new GetIdentityVerificationAttributesCommand({ Identities: [domain] }));
     const attrs = res.VerificationAttributes?.[domain];
-    if (!attrs) return { verified: false, dkimVerified: false };
+
+    // Sin atributos, SES respondió y no conoce el dominio: eso es un "no"
+    // legítimo, no una falla de consulta.
+    if (!attrs) return { verified: false, dkimVerified: false, respondio: true };
+
+    // El DKIM se consultaba nunca y se reportaba siempre como false.
+    let dkimVerified = false;
+    try {
+      const dkim = await ses.send(new GetIdentityDkimAttributesCommand({ Identities: [domain] }));
+      dkimVerified = dkim.DkimAttributes?.[domain]?.DkimVerificationStatus === "Success";
+    } catch {
+      // El DKIM es accesorio para decidir si el dominio existe.
+    }
 
     return {
       verified: attrs.VerificationStatus === "Success",
-      dkimVerified: false,
+      dkimVerified,
+      respondio: true,
     };
-  } catch {
-    return { verified: false, dkimVerified: false };
+  } catch (err) {
+    log("warn", "ses", "No se pudo consultar el estado del dominio", { domain, error: String(err) });
+    return { verified: false, dkimVerified: false, respondio: false };
   }
 }
 

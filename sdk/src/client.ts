@@ -1,5 +1,5 @@
 import type {
-  MailMaskConfig, Domain, Alias, CreateAliasInput, UpdateAliasInput,
+  MailMaskConfig, Domain, DomainVerification, Alias, CreateAliasInput, UpdateAliasInput,
   Rule, CreateRuleInput, UpdateRuleInput, EmailLog, SendEmailInput,
   BulkSendInput, BulkJob, BulkJobCreated, SmtpCredential, SmtpCredentialCreated,
   ApiKey,
@@ -67,7 +67,7 @@ class DomainsResource {
   create(domain: string) { return this.req<{ domain: Domain }>("/api/domains", { method: "POST", body: JSON.stringify({ domain }) }); }
   delete(id: string) { return this.req<{ ok: boolean }>(`/api/domains/${id}`, { method: "DELETE" }); }
   health(id: string) { return this.req<Record<string, unknown>>(`/api/domains/${id}/health`); }
-  verify(id: string) { return this.req<Record<string, unknown>>(`/api/domains/${id}/verify`, { method: "POST" }); }
+  verify(id: string) { return this.req<DomainVerification>(`/api/domains/${id}/verify`, { method: "POST" }); }
 }
 
 class AliasesResource {

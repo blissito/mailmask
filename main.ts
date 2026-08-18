@@ -1239,10 +1239,27 @@ const app = new Elysia({ adapter: node() })
     const d = domain.domain;
     const checks: Record<string, { ok: boolean; detail: string }> = {};
 
-    // 1. Verified in DB
-    checks.verified = domain.verified
-      ? { ok: true, detail: "Dominio verificado en SES" }
-      : { ok: false, detail: "Dominio no verificado — configura los registros DNS" };
+    // 1. Verificado — se le pregunta a SES, no a la base. La bandera local
+    // decía "verificado en SES" sin haber consultado a SES nunca, que fue
+    // exactamente cómo un dominio borrado de la cuenta pasó meses reportándose
+    // sano mientras no podía enviar ni recibir.
+    const estadoSes = await checkDomainStatus(d);
+    if (!estadoSes.respondio) {
+      checks.verified = {
+        ok: domain.verified,
+        detail: "No se pudo consultar SES; este es el último estado conocido.",
+      };
+    } else if (estadoSes.verified) {
+      checks.verified = { ok: true, detail: "Dominio verificado en SES" };
+    } else {
+      checks.verified = {
+        ok: false,
+        detail: "SES no reconoce este dominio — vuelve a verificarlo y revisa los registros DNS",
+      };
+    }
+    if (estadoSes.respondio && estadoSes.verified !== domain.verified) {
+      await updateDomain(domain.id, { verified: estadoSes.verified });
+    }
 
     // 2. MX records
     try {
@@ -1353,17 +1370,41 @@ const app = new Elysia({ adapter: node() })
     }
     const domain = access.domain;
 
-    // If already verified in DB, don't re-check SES (avoids accidentally unverifying)
-    if (domain.verified) {
-      return new Response(
-        JSON.stringify({ domain: domain.domain, verified: true, dkimVerified: true }),
-        { headers: { "content-type": "application/json" } },
-      );
+    // Antes, un dominio marcado como verificado en la base salía por aquí
+    // devolviendo `true` sin preguntarle a SES. La intención era no
+    // desverificar por un error pasajero, pero el efecto fue peor: cuando la
+    // identidad de brendago.design desapareció de SES, MailMask siguió
+    // afirmando que estaba verificada y el dominio pasó meses sin poder enviar
+    // ni recibir, sin una sola señal.
+    //
+    // Ahora siempre se pregunta, y el resguardo vive donde corresponde: la
+    // bandera sólo baja si SES respondió de verdad (`respondio`), no si la
+    // consulta falló.
+    const status = await checkDomainStatus(domain.domain);
+
+    if (status.respondio && status.verified !== domain.verified) {
+      await updateDomain(domain.id, { verified: status.verified });
+      if (!status.verified) {
+        log("warn", "ses", "El dominio dejó de estar verificado en SES", {
+          domain: domain.domain,
+          domainId: domain.id,
+        });
+      }
     }
 
-    const status = await checkDomainStatus(domain.domain);
-    if (status.verified) {
-      await updateDomain(domain.id, { verified: true });
+    // Si no se pudo consultar, se reporta lo último que se sabía en vez de
+    // inventar un "no verificado" que alarme sin motivo.
+    if (!status.respondio) {
+      return new Response(
+        JSON.stringify({
+          domain: domain.domain,
+          verified: domain.verified,
+          dkimVerified: false,
+          stale: true,
+          error: "No se pudo consultar SES; este es el último estado conocido.",
+        }),
+        { headers: { "content-type": "application/json" } },
+      );
     }
 
     return new Response(
