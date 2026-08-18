@@ -58,6 +58,66 @@ let canDoActions = false; // false for basico plan
 let canCompose = false;   // redactar correo nuevo requiere el add-on de envíos
 let domainAliases = [];   // alias del dominio seleccionado, para el remitente
 let composerMode = "reply"; // "reply" | "note"
+
+// Editores con formato (composer.js). Sustituyen a los textareas pero los dejan en
+// el DOM como espejo, así que el resto de este archivo puede seguir leyendo .value.
+let replyEditor = null;
+let composeEditor = null;
+
+// Sube una imagen y devuelve su URL pública. El bucket es privado: la URL apunta a
+// /api/img/:key, que es lo que el cliente de correo del destinatario podrá abrir.
+// Sube un adjunto. A diferencia de las imágenes no se sirve por HTTP: viaja dentro
+// del correo y el servidor lo borra de S3 al enviarlo.
+async function uploadComposerFile(file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`/api/domains/${selectedDomainId}/attachments`, { method: "POST", body: fd });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "No se pudo subir el archivo");
+  return { key: data.key, filename: data.filename, size: data.size };
+}
+
+async function loadCannedResponses() {
+  const res = await fetch(`/api/domains/${selectedDomainId}/canned`);
+  if (!res.ok) throw new Error("No se pudieron cargar");
+  return res.json();
+}
+
+async function uploadComposerImage(file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`/api/domains/${selectedDomainId}/images`, { method: "POST", body: fd });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "No se pudo subir la imagen");
+  return data.url;
+}
+
+function mountComposers() {
+  if (!window.MailMaskComposer) return; // sin el bundle, se sigue usando el textarea
+  const replyArea = document.getElementById("composer-textarea");
+  if (replyArea && !replyEditor) {
+    replyEditor = window.MailMaskComposer.create({
+      textarea: replyArea,
+      onSubmit: () => sendReply(),
+      uploadImage: uploadComposerImage,
+      uploadFile: uploadComposerFile,
+      loadCanned: loadCannedResponses,
+    });
+  }
+  const composeArea = document.getElementById("compose-body");
+  if (composeArea && !composeEditor) {
+    composeEditor = window.MailMaskComposer.create({
+      textarea: composeArea,
+      onSubmit: () => sendNew(),
+      uploadImage: uploadComposerImage,
+      uploadFile: uploadComposerFile,
+      loadCanned: loadCannedResponses,
+    });
+  }
+}
+
+// Los toast del compositor viajan por evento para no acoplarlo a este archivo.
+window.addEventListener("mm:toast", (e) => toast(e.detail));
 let newConvIds = new Set();
 let unreadCount = 0;
 
@@ -67,6 +127,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadDomains();
   setupListeners();
   setupKeyboard();
+  mountComposers();
 });
 
 // --- Auth ---
@@ -150,6 +211,10 @@ function openComposeModal() {
   document.getElementById("compose-to").value = "";
   document.getElementById("compose-subject").value = "";
   document.getElementById("compose-body").value = "";
+  document.getElementById("compose-cc").value = "";
+  document.getElementById("compose-bcc").value = "";
+  document.getElementById("compose-copy-row").hidden = true;
+  composeEditor?.clear();
   const err = document.getElementById("compose-error");
   err.classList.add("hidden");
   err.textContent = "";
@@ -170,7 +235,7 @@ async function sendNew() {
   const err = document.getElementById("compose-error");
   const to = document.getElementById("compose-to").value.trim();
   const subject = document.getElementById("compose-subject").value.trim();
-  const body = document.getElementById("compose-body").value.trim();
+  const body = (composeEditor ? composeEditor.getMarkdown() : document.getElementById("compose-body").value).trim();
   const fromAlias = document.getElementById("compose-from").value;
 
   const fail = (msg) => { err.textContent = msg; err.classList.remove("hidden"); };
@@ -183,7 +248,12 @@ async function sendNew() {
     const res = await fetch("/api/bandeja/conversations", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ domainId: selectedDomainId, to, subject, body, fromAlias }),
+      body: JSON.stringify({
+        domainId: selectedDomainId, to, subject, markdown: body, fromAlias,
+        cc: splitAddresses(document.getElementById("compose-cc").value),
+        bcc: splitAddresses(document.getElementById("compose-bcc").value),
+        attachments: composeEditor ? composeEditor.getAttachments() : [],
+      }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return fail(data.error || "No se pudo enviar el correo.");
@@ -410,11 +480,151 @@ function renderMessages(messages, notes) {
   container.scrollTop = container.scrollHeight;
 }
 
+// Separa "a@x.com, b@y.com" en lista. El servidor vuelve a validar cada dirección;
+// esto es sólo para no mandar basura evidente.
+function splitAddresses(value) {
+  return String(value || "")
+    .split(/[,;\s]+/)
+    .map(v => v.trim())
+    .filter(Boolean);
+}
+
+// --- Firma del dominio ---
+
+async function openSignatureModal() {
+  if (!selectedDomainId) return toast("Selecciona un dominio primero");
+  const err = document.getElementById("signature-error");
+  err.classList.add("hidden");
+  const area = document.getElementById("signature-body");
+  area.value = "";
+  try {
+    const res = await fetch(`/api/domains/${selectedDomainId}`);
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) area.value = data.signature || "";
+  } catch { /* se abre vacía */ }
+  document.getElementById("modal-signature").classList.remove("hidden");
+  lockBodyScroll();
+  area.focus();
+}
+
+async function saveSignature() {
+  const err = document.getElementById("signature-error");
+  const btn = document.getElementById("signature-save");
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/domains/${selectedDomainId}/signature`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ signature: document.getElementById("signature-body").value }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      err.textContent = data.error || "No se pudo guardar";
+      err.classList.remove("hidden");
+      return;
+    }
+    closeModal("modal-signature");
+    toast("Firma guardada");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// --- Respuestas guardadas ---
+
+async function openCannedModal() {
+  if (!selectedDomainId) return toast("Selecciona un dominio primero");
+  document.getElementById("canned-error").classList.add("hidden");
+  document.getElementById("canned-title").value = "";
+  document.getElementById("canned-body").value = "";
+  await renderCannedList();
+  document.getElementById("modal-canned").classList.remove("hidden");
+  lockBodyScroll();
+}
+
+async function renderCannedList() {
+  const list = document.getElementById("canned-list");
+  list.textContent = "";
+  let items = [];
+  try {
+    items = await loadCannedResponses();
+  } catch {
+    list.textContent = "No se pudieron cargar.";
+    return;
+  }
+  if (!items.length) {
+    const p = document.createElement("p");
+    p.className = "mesa-field-label";
+    p.textContent = "Todavía no hay ninguna. Agrega la primera abajo.";
+    list.appendChild(p);
+    return;
+  }
+  for (const item of items) {
+    const fila = document.createElement("div");
+    fila.className = "mm-file-chip";
+    fila.style.maxWidth = "100%";
+    fila.style.marginBottom = "6px";
+
+    const nombre = document.createElement("span");
+    nombre.className = "mm-file-name";
+    nombre.textContent = item.title;
+
+    const quitar = document.createElement("button");
+    quitar.type = "button";
+    quitar.className = "mm-file-remove";
+    quitar.textContent = "×";
+    quitar.title = `Eliminar ${item.title}`;
+    quitar.addEventListener("click", async () => {
+      await fetch(`/api/domains/${selectedDomainId}/canned/${item.id}`, { method: "DELETE" });
+      await renderCannedList();
+    });
+
+    fila.append(nombre, quitar);
+    list.appendChild(fila);
+  }
+}
+
+async function saveCanned() {
+  const err = document.getElementById("canned-error");
+  const title = document.getElementById("canned-title").value.trim();
+  const body = document.getElementById("canned-body").value.trim();
+  if (!title || !body) {
+    err.textContent = "Escribe un título y el contenido.";
+    err.classList.remove("hidden");
+    return;
+  }
+  const res = await fetch(`/api/domains/${selectedDomainId}/canned`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ title, body }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    err.textContent = data.error || "No se pudo guardar";
+    err.classList.remove("hidden");
+    return;
+  }
+  err.classList.add("hidden");
+  document.getElementById("canned-title").value = "";
+  document.getElementById("canned-body").value = "";
+  await renderCannedList();
+  toast("Respuesta guardada");
+}
+
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (!el || el.classList.contains("hidden")) return;
+  el.classList.add("hidden");
+  unlockBodyScroll();
+}
+
 // --- Actions ---
 async function sendReply() {
   if (!activeConv || !canDoActions) return;
   const textarea = document.getElementById("composer-textarea");
-  const text = textarea.value.trim();
+  // El editor manda markdown; el servidor lo convierte a HTML de correo. Sin el
+  // bundle cargado se cae al textarea y sigue funcionando como texto plano.
+  const text = (replyEditor ? replyEditor.getMarkdown() : textarea.value).trim();
   if (!text) return;
 
   const btn = document.getElementById("btn-send");
@@ -428,7 +638,8 @@ async function sendReply() {
     });
     btn.disabled = false;
     if (res.ok) {
-      textarea.value = "";
+      // La nota interna no sale por correo: se guarda el markdown tal cual.
+      replyEditor ? replyEditor.clear() : (textarea.value = "");
       toast("Nota agregada");
       openConversation(activeConv);
     } else {
@@ -439,11 +650,15 @@ async function sendReply() {
     const res = await fetch(`/api/bandeja/conversations/${activeConv.id}/reply`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ domainId: selectedDomainId, body: text }),
+      body: JSON.stringify({
+        domainId: selectedDomainId,
+        markdown: text,
+        attachments: replyEditor ? replyEditor.getAttachments() : [],
+      }),
     });
     btn.disabled = false;
     if (res.ok) {
-      textarea.value = "";
+      replyEditor ? replyEditor.clear() : (textarea.value = "");
       playSound("whoosh");
       toast("Respuesta enviada");
       openConversation(activeConv);
@@ -571,7 +786,7 @@ function setupListeners() {
   document.getElementById("btn-reply").addEventListener("click", () => {
     composerMode = "reply";
     updateComposerMode();
-    document.getElementById("composer-textarea").focus();
+    replyEditor ? replyEditor.focus() : document.getElementById("composer-textarea").focus();
   });
 
   document.getElementById("btn-assign").addEventListener("click", assignConversation);
@@ -580,6 +795,21 @@ function setupListeners() {
   document.getElementById("btn-delete-conv").addEventListener("click", deleteConversation);
   document.getElementById("btn-restore-conv").addEventListener("click", restoreConversationAction);
   document.getElementById("btn-send").addEventListener("click", sendReply);
+
+  // Firma, respuestas guardadas y el desplegable de Cc/Cco.
+  document.getElementById("btn-signature").addEventListener("click", openSignatureModal);
+  document.getElementById("signature-cancel").addEventListener("click", () => closeModal("modal-signature"));
+  document.getElementById("signature-save").addEventListener("click", saveSignature);
+
+  document.getElementById("btn-canned").addEventListener("click", openCannedModal);
+  document.getElementById("canned-close").addEventListener("click", () => closeModal("modal-canned"));
+  document.getElementById("canned-save").addEventListener("click", saveCanned);
+
+  document.getElementById("compose-copy-toggle").addEventListener("click", () => {
+    const row = document.getElementById("compose-copy-row");
+    row.hidden = !row.hidden;
+    if (!row.hidden) document.getElementById("compose-cc").focus();
+  });
 
   // Composer mode toggle
   document.getElementById("mode-reply").addEventListener("click", () => {
@@ -739,7 +969,7 @@ function setupKeyboard() {
       e.preventDefault();
       composerMode = "reply";
       updateComposerMode();
-      document.getElementById("composer-textarea").focus();
+      replyEditor ? replyEditor.focus() : document.getElementById("composer-textarea").focus();
     }
     if (e.key === "c") {
       e.preventDefault();
@@ -750,7 +980,7 @@ function setupKeyboard() {
       e.preventDefault();
       composerMode = "note";
       updateComposerMode();
-      document.getElementById("composer-textarea").focus();
+      replyEditor ? replyEditor.focus() : document.getElementById("composer-textarea").focus();
     }
     if (e.key === "a" && canDoActions) {
       e.preventDefault();

@@ -444,7 +444,28 @@ export function normalizeAddress(value: string): string {
   return stripHeaderInjection(m ? m[1] : value).toLowerCase();
 }
 
-export async function sendFromDomain(from: string, to: string, subject: string, body: string, opts?: { html?: string; replyTo?: string; configSet?: string; inReplyTo?: string; references?: string }): Promise<string> {
+/** Imagen incrustada en el cuerpo con `cid:`, como hace Gmail al insertar una foto. */
+export interface InlineImage {
+  /** Identificador referenciado desde el HTML como `src="cid:..."`. */
+  cid: string;
+  contentType: string;
+  data: Uint8Array;
+  filename?: string;
+}
+
+/** Archivo adjunto: se descarga aparte, no se muestra dentro del cuerpo. */
+export interface Attachment {
+  filename: string;
+  contentType: string;
+  data: Uint8Array;
+}
+
+// SendRawEmail (SES v1) topa el mensaje en 10 MB y base64 infla ~33%, así que el
+// contenido útil real es menor. Se corta antes de llegar a SES para poder dar un
+// error entendible en vez de un rechazo del proveedor.
+export const MAX_RAW_MESSAGE_BYTES = 9 * 1024 * 1024;
+
+export async function sendFromDomain(from: string, to: string, subject: string, body: string, opts?: { html?: string; replyTo?: string; configSet?: string; inReplyTo?: string; references?: string; inlineImages?: InlineImage[]; attachments?: Attachment[]; cc?: string[]; bcc?: string[] }): Promise<string> {
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
 
@@ -454,14 +475,42 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
   const toAddr = normalizeAddress(to);
   const fromHeader = /<[^>]+>/.test(from) ? stripHeaderInjection(from) : fromAddr;
   const messageId = `<${crypto.randomUUID()}@${fromAddr.split("@")[1] ?? "mailmask.studio"}>`;
-  const boundary = `----=_Part_${Date.now()}`;
+  const stamp = Date.now();
+  const altBoundary = `----=_Alt_${stamp}`;
+  const relBoundary = `----=_Rel_${stamp}`;
+  const mixBoundary = `----=_Mix_${stamp}`;
+
+  // El correo se arma en capas, de dentro hacia fuera, y sólo se añade la capa que
+  // hace falta. Es la misma estructura que produce Gmail:
+  //
+  //   multipart/mixed        ← si hay adjuntos
+  //     multipart/related    ← si hay imágenes incrustadas (cid:)
+  //       multipart/alternative   ← siempre: texto plano + HTML
+  //
+  // Envolver de más no es inocuo: algunos clientes muestran un clip de "adjunto"
+  // por el simple hecho de ver un multipart/mixed, aunque venga vacío.
+  const inline = opts?.inlineImages?.length ? opts.inlineImages : null;
+  const attachments = opts?.attachments?.length ? opts.attachments : null;
+
+  const outerType = attachments
+    ? `multipart/mixed; boundary="${mixBoundary}"`
+    : inline
+    ? `multipart/related; type="multipart/alternative"; boundary="${relBoundary}"`
+    : `multipart/alternative; boundary="${altBoundary}"`;
+
+  // Cc va en los headers y Bcc NO: ése es justo el punto de la copia oculta. Ambos
+  // sí entran en Destinations, que es a quien SES entrega de verdad.
+  const ccList = (opts?.cc ?? []).map(normalizeAddress).filter(Boolean);
+  const bccList = (opts?.bcc ?? []).map(normalizeAddress).filter(Boolean);
+
   const headers = [
     `From: ${fromHeader}`,
     `To: ${toAddr}`,
+    ...(ccList.length ? [`Cc: ${ccList.join(", ")}`] : []),
     `Subject: ${encodeHeader(subject)}`,
     `Message-ID: ${messageId}`,
     `MIME-Version: 1.0`,
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    `Content-Type: ${outerType}`,
   ];
   if (opts?.replyTo) headers.push(`Reply-To: ${normalizeAddress(opts.replyTo)}`);
   if (opts?.inReplyTo) headers.push(`In-Reply-To: ${stripHeaderInjection(opts.inReplyTo)}`);
@@ -469,33 +518,86 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
 
   // base64: el cuerpo es UTF-8 y declararlo 7bit es mentira — se corrompe en tránsito.
   const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64").replace(/(.{76})/g, "$1\r\n");
+  const b64bin = (d: Uint8Array) => Buffer.from(d).toString("base64").replace(/(.{76})/g, "$1\r\n");
 
-  const parts = [
-    `--${boundary}`,
+  // --- capa 1: alternative (texto plano + HTML) ---
+  let lines: string[] = [
+    `--${altBoundary}`,
     `Content-Type: text/plain; charset=UTF-8`,
     `Content-Transfer-Encoding: base64`,
     ``,
     b64(body),
   ];
   if (opts?.html) {
-    parts.push(
+    lines.push(
       ``,
-      `--${boundary}`,
+      `--${altBoundary}`,
       `Content-Type: text/html; charset=UTF-8`,
       `Content-Transfer-Encoding: base64`,
       ``,
       b64(opts.html),
     );
   }
-  parts.push(``, `--${boundary}--`);
+  lines.push(``, `--${altBoundary}--`);
 
-  const rawEmail = [...headers, ``, ...parts].join("\r\n");
+  // --- capa 2: related (imágenes referenciadas por cid) ---
+  if (inline) {
+    lines = [
+      `--${relBoundary}`,
+      `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
+      ``,
+      ...lines,
+    ];
+    for (const img of inline) {
+      // El Content-ID va entre ángulos; el HTML lo referencia SIN ellos.
+      lines.push(
+        ``,
+        `--${relBoundary}`,
+        `Content-Type: ${stripHeaderInjection(img.contentType)}`,
+        `Content-Transfer-Encoding: base64`,
+        `Content-ID: <${stripHeaderInjection(img.cid)}>`,
+        `Content-Disposition: inline; filename="${stripHeaderInjection(img.filename ?? img.cid)}"`,
+        ``,
+        b64bin(img.data),
+      );
+    }
+    lines.push(``, `--${relBoundary}--`);
+  }
+
+  // --- capa 3: mixed (archivos adjuntos) ---
+  if (attachments) {
+    const innerType = inline
+      ? `multipart/related; type="multipart/alternative"; boundary="${relBoundary}"`
+      : `multipart/alternative; boundary="${altBoundary}"`;
+    lines = [`--${mixBoundary}`, `Content-Type: ${innerType}`, ``, ...lines];
+    for (const file of attachments) {
+      // El nombre se codifica RFC 2047: un adjunto llamado "cotización.pdf" llegaba
+      // con la tilde rota en varios clientes.
+      lines.push(
+        ``,
+        `--${mixBoundary}`,
+        `Content-Type: ${stripHeaderInjection(file.contentType)}`,
+        `Content-Transfer-Encoding: base64`,
+        `Content-Disposition: attachment; filename="${encodeHeader(stripHeaderInjection(file.filename))}"`,
+        ``,
+        b64bin(file.data),
+      );
+    }
+    lines.push(``, `--${mixBoundary}--`);
+  }
+
+  const rawEmail = [...headers, ``, ...lines].join("\r\n");
+  if (Buffer.byteLength(rawEmail, "utf8") > MAX_RAW_MESSAGE_BYTES) {
+    throw new Error("El correo excede el tamaño máximo. Usa archivos más ligeros.");
+  }
 
   // deno-lint-ignore no-explicit-any
   const cmd: any = {
     RawMessage: { Data: new TextEncoder().encode(rawEmail) },
     Source: fromAddr,
-    Destinations: [toAddr],
+    // Bcc entra aquí y no en los headers: así recibe la copia sin que los demás
+    // destinatarios lo vean.
+    Destinations: [toAddr, ...ccList, ...bccList],
   };
   if (opts?.configSet) cmd.ConfigurationSetName = opts.configSet;
 
@@ -873,5 +975,129 @@ export async function sendAlert(alertType: string, message: string): Promise<boo
   } catch (err) {
     log("error", "ses", "Failed to send alert", { alertType, error: String(err) });
     return false;
+  }
+}
+
+// --- Imágenes incrustadas en correos salientes ---
+//
+// Van al bucket de entrada bajo un prefijo propio. El bucket es PRIVADO y así debe
+// seguir, pero un cliente de correo trae las imágenes de forma anónima: no lleva
+// nuestra cookie ni puede firmar una petición. Por eso no se expone una URL de S3
+// sino una ruta nuestra (`GET /api/img/:key`) que lee de aquí y la sirve.
+//
+// El tipo se guarda junto al objeto y se vuelve a validar contra la lista blanca
+// al servir: nunca se confía en el Content-Type almacenado.
+export const EMAIL_IMAGE_PREFIX = "email-images/";
+/** Archivos adjuntos en tránsito: viven aquí sólo hasta que el correo sale. */
+export const EMAIL_FILE_PREFIX = "email-files/";
+
+export const ALLOWED_IMAGE_TYPES: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/gif": "gif",
+  "image/webp": "webp",
+};
+
+export async function putEmailImageToS3(key: string, body: Uint8Array, contentType: string): Promise<void> {
+  const s3 = await getS3();
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: `${EMAIL_IMAGE_PREFIX}${key}`,
+    Body: body,
+    ContentType: contentType,
+    // Sin ACL: el objeto sigue siendo privado. Se sirve por nuestra ruta.
+    CacheControl: "public, max-age=31536000, immutable",
+  }));
+}
+
+/**
+ * Borra una imagen ya incrustada en un correo enviado. Puede fallar sin
+ * consecuencias: el correo ya salió con los bytes dentro, así que el objeto en S3
+ * es desecho. Lo que quede sin borrar lo recoge el barrido diario.
+ */
+export async function deleteEmailImageFromS3(key: string): Promise<void> {
+  const s3 = await getS3();
+  const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: `${EMAIL_IMAGE_PREFIX}${key}` }));
+}
+
+/**
+ * Borra las imágenes subidas hace más de `maxAgeHours` que nadie llegó a enviar.
+ * Devuelve cuántas quitó.
+ *
+ * Existe porque el compositor sube la imagen para poder previsualizarla, mucho
+ * antes de que se decida mandar el correo — y a veces no se manda. Sin esto el
+ * bucket sólo crece.
+ */
+export async function sweepOrphanEmailImages(maxAgeHours = 24): Promise<number> {
+  return (await sweepPrefix(EMAIL_IMAGE_PREFIX, maxAgeHours)) +
+    (await sweepPrefix(EMAIL_FILE_PREFIX, maxAgeHours));
+}
+
+async function sweepPrefix(prefix: string, maxAgeHours: number): Promise<number> {
+  const s3 = await getS3();
+  const { ListObjectsV2Command, DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+  const cutoff = Date.now() - maxAgeHours * 3600_000;
+  let removed = 0;
+  let token: string | undefined;
+
+  do {
+    const res: any = await s3.send(new ListObjectsV2Command({
+      Bucket: S3_BUCKET,
+      Prefix: prefix,
+      ContinuationToken: token,
+    }));
+    for (const obj of res.Contents ?? []) {
+      if (!obj.Key || !obj.LastModified) continue;
+      if (new Date(obj.LastModified).getTime() >= cutoff) continue;
+      try {
+        await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: obj.Key }));
+        removed++;
+      } catch { /* mejor esfuerzo: el barrido de mañana lo reintenta */ }
+    }
+    token = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (token);
+
+  return removed;
+}
+
+export async function putEmailFileToS3(key: string, body: Uint8Array, contentType: string): Promise<void> {
+  const s3 = await getS3();
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: `${EMAIL_FILE_PREFIX}${key}`,
+    Body: body,
+    ContentType: contentType,
+  }));
+}
+
+export async function getEmailFileFromS3(key: string): Promise<{ body: Uint8Array; contentType: string } | null> {
+  const s3 = await getS3();
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  try {
+    const res = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: `${EMAIL_FILE_PREFIX}${key}` }));
+    return { body: await res.Body!.transformToByteArray(), contentType: res.ContentType ?? "application/octet-stream" };
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteEmailFileFromS3(key: string): Promise<void> {
+  const s3 = await getS3();
+  const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: `${EMAIL_FILE_PREFIX}${key}` }));
+}
+
+export async function getEmailImageFromS3(key: string): Promise<{ body: Uint8Array; contentType: string } | null> {
+  const s3 = await getS3();
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  try {
+    const res = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: `${EMAIL_IMAGE_PREFIX}${key}` }));
+    const body = await res.Body!.transformToByteArray();
+    return { body, contentType: res.ContentType ?? "application/octet-stream" };
+  } catch {
+    return null;
   }
 }

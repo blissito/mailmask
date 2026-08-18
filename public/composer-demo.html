@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compositor — demo</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="/css/bandeja.css">
+  <style>
+    body {
+      margin: 0;
+      background: var(--mesa-bg, #18181b);
+      color: var(--mesa-text, #fafafa);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .demo-head {
+      padding: 20px 24px 0;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .demo-head h1 { margin: 0 0 4px; font-size: 20px; }
+    .demo-head p { margin: 0 0 4px; color: var(--mesa-text-2, #a1a1aa); font-size: 14px; }
+    .demo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      padding: 20px 24px 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+      align-items: start;
+    }
+    @media (max-width: 900px) { .demo-grid { grid-template-columns: 1fr; } }
+    .demo-panel > h2 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--mesa-text-3, #71717a);
+      margin: 0 0 8px;
+    }
+    .demo-note { font-size: 12px; color: var(--mesa-text-3, #71717a); margin: 6px 0 0; }
+    pre.demo-out {
+      margin: 0;
+      padding: 12px 14px;
+      background: var(--mesa-surface, #27272a);
+      border: 1px solid var(--mesa-border, #3f3f46);
+      border-radius: 8px;
+      font-size: 12.5px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 260px;
+      overflow: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--mesa-border, #3f3f46) transparent;
+    }
+    pre.demo-out::-webkit-scrollbar { width: 4px; height: 4px; }
+    pre.demo-out::-webkit-scrollbar-track { background: transparent; }
+    pre.demo-out::-webkit-scrollbar-thumb { background: var(--mesa-border, #3f3f46); border-radius: 2px; }
+    /* El correo se previsualiza dentro de un iframe con fondo blanco: es como se
+       verá en el cliente del destinatario, no con el tema oscuro de la app. */
+    iframe.demo-mail {
+      width: 100%;
+      height: 420px;
+      border: 1px solid var(--mesa-border, #3f3f46);
+      border-radius: 8px;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-head">
+    <h1>Compositor de correo — demo</h1>
+    <p>Escribe a la izquierda. A la derecha ves lo que recibe el destinatario: el HTML real que genera el servidor, y la parte de texto plano.</p>
+    <p>Prueba <b>Aa</b> para el formato, pega texto desde Word o Gmail, o arrastra una imagen.</p>
+  </div>
+
+  <div class="demo-grid">
+    <div class="demo-panel">
+      <h2>Compositor — el mismo de la Bandeja</h2>
+      <div class="mesa-composer" id="composer">
+        <textarea class="mesa-composer-textarea" id="demo-input" placeholder="Escribe tu respuesta..."></textarea>
+        <div class="mesa-composer-footer">
+          <div class="mesa-composer-mode">
+            <button class="mesa-mode-btn active" id="mode-reply" data-mode="reply">Responder</button>
+            <button class="mesa-mode-btn note-mode" id="mode-note" data-mode="note">Nota interna</button>
+          </div>
+          <div class="mesa-composer-right">
+            <span class="mesa-composer-hint">
+              <kbd class="mesa-composer-kbd">Ctrl+Enter</kbd> enviar
+            </span>
+            <button class="mesa-send-btn" id="btn-send">Enviar</button>
+          </div>
+        </div>
+      </div>
+      <p class="demo-note">Marcado idéntico al de <code>public/bandeja.html</code>. La subida de imágenes necesita un dominio verificado, por eso aquí no aparece ese botón.</p>
+
+      <h2 style="margin-top:20px;">Markdown que viaja al servidor</h2>
+      <pre class="demo-out" id="demo-md"></pre>
+    </div>
+
+    <div class="demo-panel">
+      <h2>Lo que ve el destinatario (text/html)</h2>
+      <iframe class="demo-mail" id="demo-mail" title="Vista previa del correo"></iframe>
+
+      <h2 style="margin-top:20px;">Parte text/plain</h2>
+      <pre class="demo-out" id="demo-text"></pre>
+    </div>
+  </div>
+
+  <script src="/js/composer.js"></script>
+  <script>
+    const input = document.getElementById("demo-input");
+    const mdOut = document.getElementById("demo-md");
+    const textOut = document.getElementById("demo-text");
+    const frame = document.getElementById("demo-mail");
+
+    const editor = window.MailMaskComposer.create({
+      textarea: input,
+      placeholder: "Escribe tu correo…",
+    });
+
+    let timer = null;
+    async function refresh() {
+      const markdown = editor.getMarkdown();
+      mdOut.textContent = markdown || "(vacío)";
+      try {
+        const res = await fetch("/api/email-preview", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ markdown }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "error");
+        // srcdoc y no innerHTML: el correo trae su propio <html> completo y no debe
+        // heredar ni contaminar los estilos de esta página.
+        frame.srcdoc = data.html || "<p style='font-family:sans-serif;color:#888'>(vacío)</p>";
+        textOut.textContent = data.text || "(vacío)";
+      } catch (err) {
+        textOut.textContent = "Error: " + err.message;
+      }
+    }
+
+    // Mismo comportamiento que bandeja.js: el modo cambia el estilo del compositor.
+    const btnReply = document.getElementById("mode-reply");
+    const btnNote = document.getElementById("mode-note");
+    const btnSend = document.getElementById("btn-send");
+    function setMode(mode) {
+      const isNote = mode === "note";
+      btnReply.classList.toggle("active", !isNote);
+      btnNote.classList.toggle("active", isNote);
+      btnSend.classList.toggle("note-mode", isNote);
+      btnSend.textContent = isNote ? "Agregar nota" : "Enviar";
+    }
+    btnReply.addEventListener("click", () => setMode("reply"));
+    btnNote.addEventListener("click", () => setMode("note"));
+    btnSend.addEventListener("click", () => {
+      const original = btnSend.textContent;
+      btnSend.textContent = "En la demo no se envía";
+      setTimeout(() => { btnSend.textContent = original; }, 1600);
+    });
+
+    // El editor no expone onUpdate en esta demo: se sondea el textarea espejo.
+    input.addEventListener("input", refresh);
+    new MutationObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(refresh, 250);
+    }).observe(document.querySelector(".mm-composer-content"), {
+      childList: true, subtree: true, characterData: true,
+    });
+
+    editor.setMarkdown([
+      "## Hola Brenda",
+      "",
+      "Va la propuesta que platicamos:",
+      "",
+      "| Concepto | Precio |",
+      "| --- | --- |",
+      "| Diseño de identidad | $5,000 |",
+      "| Soporte 3 meses | $1,200 |",
+      "",
+      "> [!WARNING]",
+      "> Esta cotización vence el viernes.",
+      "",
+      "- Entrega en **dos semanas**",
+      "- Incluye *dos rondas* de ajustes",
+      "",
+      "> [!TIP]",
+      "> Puedes pagar en línea con tarjeta.",
+      "",
+      "Más info en https://mailmask.studio",
+    ].join("\n"));
+    refresh();
+  </script>
+</body>
+</html>

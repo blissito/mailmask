@@ -758,3 +758,330 @@ body {
   animation: mesa-spin 0.6s linear infinite;
   margin: 0 auto;
 }
+
+/* --- Compositor con formato (composer.ts) ------------------------------------
+   El editor debe verse igual que el textarea al que sustituye: misma caja, mismo
+   borde, mismo foco. La barra de formato arranca colapsada. */
+
+.mm-composer-hidden-input {
+  display: none !important;
+}
+.mm-composer {
+  position: relative;
+  background: var(--mesa-surface);
+  border: 1px solid var(--mesa-border);
+  border-radius: 8px;
+}
+.mm-composer:focus-within {
+  border-color: var(--mesa-accent);
+}
+.mm-composer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--mesa-border);
+}
+.mm-composer-toolbar[hidden] { display: none; }
+.mm-composer-tool {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mesa-text-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+.mm-composer-tool:hover {
+  background: var(--mesa-bg);
+  color: var(--mesa-text);
+}
+.mm-composer-tool.is-active {
+  background: var(--mesa-bg);
+  color: var(--mesa-accent);
+}
+.mm-composer-surface {
+  /* Más alto que el textarea que sustituye (80px): con formato, tabla y cajas, esa
+     altura obligaba a escribir por una rendija. */
+  min-height: 130px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+/* Pantalla completa: el compositor se convierte en un modal centrado. Se posiciona
+   con `fixed` en vez de mover el nodo a otro padre, porque reparentarlo destruiría
+   la vista de ProseMirror y con ella el borrador sin guardar. */
+.mm-composer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .6);
+  backdrop-filter: blur(2px);
+  z-index: 998;
+}
+.mm-composer-backdrop[hidden] { display: none; }
+body.mm-composer-locked { overflow: hidden; }
+
+/* El que se vuelve modal es el contenedor de la Bandeja: así viajan con él los
+   botones Responder / Nota interna / Enviar. */
+.mesa-composer.is-expanded {
+  position: fixed;
+  top: 3vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(880px, 94vw);
+  height: 94vh;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--mesa-border);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
+}
+.mesa-composer.is-expanded .mm-composer {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mesa-composer.is-expanded .mm-composer-surface {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+.mesa-composer.is-expanded .mesa-composer-footer { flex-shrink: 0; }
+
+/* Expandir dentro del modal de "Redactar": crece el propio modal. No se añade otra
+   capa oscura —ya hay una— ni otro z-index, que era lo que dejaba el editor
+   atrapado debajo y sólo dejaba ver el overlay. */
+.mesa-modal.is-expanded {
+  width: min(880px, 94vw);
+  max-width: 94vw;
+  height: 94vh;
+  display: flex;
+  flex-direction: column;
+}
+.mesa-modal.is-expanded .mm-composer {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mesa-modal.is-expanded .mm-composer-surface {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+/* Los campos De/Para/Asunto y los botones no se estiran: todo el alto sobrante es
+   para escribir. */
+.mesa-modal.is-expanded .mesa-field-label,
+.mesa-modal.is-expanded .mesa-field,
+.mesa-modal.is-expanded .mesa-modal-actions { flex-shrink: 0; }
+/* Misma barra fina que .mesa-list y .mesa-messages: la del sistema se ve como un
+   bloque blanco encima del texto. */
+.mm-composer-surface::-webkit-scrollbar { width: 4px; }
+.mm-composer-surface::-webkit-scrollbar-track { background: transparent; }
+.mm-composer-surface::-webkit-scrollbar-thumb { background: var(--mesa-border); border-radius: 2px; }
+.mm-composer-surface { scrollbar-width: thin; scrollbar-color: var(--mesa-border) transparent; }
+.mm-composer-content {
+  padding: 10px 14px;
+  color: var(--mesa-text);
+  font-size: 14px;
+  line-height: 1.5;
+  outline: none;
+}
+.mm-composer-content > * + * { margin-top: 8px; }
+.mm-composer-content ul,
+.mm-composer-content ol { padding-left: 22px; }
+.mm-composer-content h2 { font-size: 17px; font-weight: 700; }
+.mm-composer-content h3 { font-size: 15px; font-weight: 700; }
+.mm-composer-content blockquote {
+  padding-left: 10px;
+  border-left: 3px solid var(--mesa-border);
+  color: var(--mesa-text-2);
+}
+.mm-composer-content a { color: var(--mesa-accent); text-decoration: underline; }
+.mm-composer-content img { max-width: 100%; height: auto; border-radius: 6px; }
+.mm-composer-content code {
+  background: var(--mesa-bg);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 13px;
+}
+/* El placeholder de Tiptap: un pseudo-elemento sobre el primer párrafo vacío. */
+.mm-composer-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--mesa-text-3);
+}
+.mm-composer-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 6px;
+}
+.mm-composer-toggle {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mesa-text-3);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.mm-composer-toggle:hover { background: var(--mesa-bg); color: var(--mesa-text); }
+.mm-composer-toggle.is-active { color: var(--mesa-accent); }
+/* El de expandir se separa del de formato y se va a la derecha. */
+.mm-composer-expand { margin-left: auto; }
+.mm-composer-hint-md {
+  font-size: 11px;
+  color: var(--mesa-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Caja de aviso y tabla dentro del editor. Aquí sí se puede usar CSS moderno: esto
+   se ve en la app, no en el correo. La versión que viaja la genera el servidor. */
+.mm-composer-content .mm-callout {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--mesa-accent);
+  border-radius: 0 6px 6px 0;
+  background: rgba(255, 255, 255, .04);
+}
+.mm-composer-content .mm-callout-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--mesa-text-3);
+  margin-bottom: 2px;
+  user-select: none;
+}
+.mm-composer-content .mm-callout-body > *:last-child { margin-bottom: 0; }
+.mm-composer-content .mm-callout-note { border-left-color: #3b82f6; }
+.mm-composer-content .mm-callout-tip { border-left-color: #22c55e; }
+.mm-composer-content .mm-callout-important { border-left-color: #a78bfa; }
+.mm-composer-content .mm-callout-warning { border-left-color: #f59e0b; }
+.mm-composer-content .mm-callout-caution { border-left-color: #ef4444; }
+
+.mm-composer-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  table-layout: fixed;
+}
+.mm-composer-content th,
+.mm-composer-content td {
+  border: 1px solid var(--mesa-border);
+  padding: 5px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.mm-composer-content th {
+  background: var(--mesa-bg);
+  font-weight: 700;
+}
+/* La celda seleccionada, para saber dónde se está escribiendo. */
+.mm-composer-content .selectedCell {
+  background: rgba(255, 255, 255, .06);
+}
+
+/* Adjuntos: viven fuera del texto, entre el editor y la barra. */
+.mm-composer-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px 0;
+}
+.mm-composer-files[hidden] { display: none; }
+.mm-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--mesa-border);
+  border-radius: 999px;
+  background: var(--mesa-bg);
+  font-size: 12px;
+}
+.mm-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mesa-text);
+}
+.mm-file-size { color: var(--mesa-text-3); flex-shrink: 0; }
+.mm-file-remove {
+  border: 0;
+  background: transparent;
+  color: var(--mesa-text-3);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.mm-file-remove:hover { color: var(--mesa-text); }
+
+/* Menú de respuestas guardadas. */
+.mm-canned-menu {
+  position: absolute;
+  z-index: 5;
+  top: 40px;
+  left: 8px;
+  width: min(340px, calc(100% - 16px));
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--mesa-border-active);
+  border-radius: 8px;
+  background: var(--mesa-surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .45);
+  scrollbar-width: thin;
+  scrollbar-color: var(--mesa-border) transparent;
+}
+.mm-canned-menu::-webkit-scrollbar { width: 4px; }
+.mm-canned-menu::-webkit-scrollbar-track { background: transparent; }
+.mm-canned-menu::-webkit-scrollbar-thumb { background: var(--mesa-border); border-radius: 2px; }
+.mm-canned-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.mm-canned-item:hover { background: var(--mesa-bg); }
+.mm-canned-title { font-size: 13px; font-weight: 600; color: var(--mesa-text); }
+.mm-canned-preview {
+  font-size: 11.5px;
+  color: var(--mesa-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mm-canned-empty { padding: 10px; font-size: 12.5px; color: var(--mesa-text-3); }
+
+/* CC/BCC en el modal de redactar y en la respuesta. */
+.mm-copy-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--mesa-text-3);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.mm-copy-toggle:hover { color: var(--mesa-accent); }
+.mm-copy-row[hidden] { display: none; }

@@ -24,6 +24,7 @@ import {
   apiKeys,
   addons,
   orders,
+  cannedResponses,
 } from "./schema.js";
 
 export { db };
@@ -57,6 +58,8 @@ export interface Domain {
   verificationToken: string;
   createdAt: string;
   registeredViaMailmask?: boolean;
+  /** Firma en markdown que el compositor añade al final de lo que se envía. */
+  signature?: string | null;
 }
 
 export interface Alias {
@@ -218,6 +221,7 @@ function rowToDomain(r: typeof domains.$inferSelect): Domain {
     verificationToken: r.verificationToken,
     createdAt: r.createdAt,
     registeredViaMailmask: r.registeredViaMailmask || false,
+    signature: r.signature ?? null,
   };
 }
 
@@ -431,11 +435,13 @@ export function listUserDomains(email: string): Domain[] {
   return rows.map(rowToDomain);
 }
 
-export function updateDomain(id: string, updates: Partial<Pick<Domain, "verified" | "mxConfigured">>): Domain | null {
-  if (updates.verified === undefined && updates.mxConfigured === undefined) return getDomain(id);
+export function updateDomain(id: string, updates: Partial<Pick<Domain, "verified" | "mxConfigured" | "signature">>): Domain | null {
+  if (updates.verified === undefined && updates.mxConfigured === undefined && updates.signature === undefined) return getDomain(id);
   const set: Record<string, any> = {};
   if (updates.verified !== undefined) set.verified = updates.verified;
   if (updates.mxConfigured !== undefined) set.mxConfigured = updates.mxConfigured;
+  // null es un valor válido: es como se borra una firma.
+  if (updates.signature !== undefined) set.signature = updates.signature;
   const rows = db.update(domains).set(set).where(eq(domains.id, id)).returning().all();
   return rows.length ? rowToDomain(rows[0]) : null;
 }
@@ -1948,4 +1954,46 @@ export async function getUserByApiKey(key: string): Promise<User | null> {
   // Update lastUsedAt
   db.update(apiKeys).set({ lastUsedAt: new Date().toISOString() }).where(eq(apiKeys.keyHash, keyH)).run();
   return getUser(rows[0].userEmail);
+}
+
+
+// --- Respuestas guardadas del compositor ---
+
+export interface CannedResponse {
+  id: string;
+  domainId: string;
+  title: string;
+  /** Markdown, igual que todo lo que produce el compositor. */
+  body: string;
+  createdAt: string;
+}
+
+export function listCannedResponses(domainId: string): CannedResponse[] {
+  return db.select().from(cannedResponses)
+    .where(eq(cannedResponses.domainId, domainId))
+    .orderBy(asc(cannedResponses.title)).all();
+}
+
+export function createCannedResponse(domainId: string, title: string, body: string): CannedResponse {
+  const rows = db.insert(cannedResponses).values({ domainId, title, body }).returning().all();
+  return rows[0];
+}
+
+export function updateCannedResponse(id: string, domainId: string, updates: { title?: string; body?: string }): CannedResponse | null {
+  const set: Record<string, any> = {};
+  if (updates.title !== undefined) set.title = updates.title;
+  if (updates.body !== undefined) set.body = updates.body;
+  if (!Object.keys(set).length) return null;
+  // El domainId va en el WHERE y no sólo el id: sin eso, conocer un id ajeno bastaría
+  // para editar la plantilla de otro dominio.
+  const rows = db.update(cannedResponses).set(set)
+    .where(and(eq(cannedResponses.id, id), eq(cannedResponses.domainId, domainId)))
+    .returning().all();
+  return rows.length ? rows[0] : null;
+}
+
+export function deleteCannedResponse(id: string, domainId: string): boolean {
+  const res = db.delete(cannedResponses)
+    .where(and(eq(cannedResponses.id, id), eq(cannedResponses.domainId, domainId))).run();
+  return res.changes > 0;
 }

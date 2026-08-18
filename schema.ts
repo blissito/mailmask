@@ -31,6 +31,8 @@ export const domains = sqliteTable("domains", {
   dkimTokens: text("dkim_tokens", { mode: "json" }).$type<string[]>().notNull().default([]),
   verificationToken: text("verification_token").notNull(),
   registeredViaMailmask: integer("registered_via_mailmask", { mode: "boolean" }).notNull().default(false),
+  /** Firma en markdown que se añade al final de lo que se envía desde este dominio. */
+  signature: text("signature"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
 });
 
@@ -384,3 +386,20 @@ export const referralCredits = sqliteTable("referral_credits", {
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
   usedAt: text("used_at"),
 });
+
+/**
+ * Respuestas guardadas ("canned responses"): plantillas cortas que se insertan en el
+ * compositor. Es lo que más tiempo ahorra en una bandeja compartida, donde media
+ * docena de preguntas se repiten todo el día.
+ *
+ * El cuerpo se guarda en markdown, igual que todo lo que escribe el compositor.
+ */
+export const cannedResponses = sqliteTable("canned_responses", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  domainId: text("domain_id").notNull().references(() => domains.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
+}, (table) => [
+  index("idx_canned_domain").on(table.domainId),
+]);

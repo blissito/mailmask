@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "build:css": "npx tailwindcss -c tailwind.config.ts -i public/css/input.css -o public/css/styles.css --minify",
-    "build:chat": "esbuild public/js/docs-chat.tsx --bundle --outfile=public/js/docs-chat.js --format=esm --jsx=automatic --target=es2020 --minify"
+    "build:chat": "esbuild public/js/docs-chat.tsx --bundle --outfile=public/js/docs-chat.js --format=esm --jsx=automatic --target=es2020 --minify",
+    "build:composer": "NODE_ENV=production esbuild public/js/composer.ts --bundle --outfile=public/js/composer.js --format=iife --target=es2020 --minify"
   },
   "dependencies": {
     "@aws-sdk/client-iam": "^3",
@@ -27,23 +28,42 @@
     "better-sqlite3": "^11",
     "drizzle-orm": "^0.38",
     "elysia": "^1.2",
+    "html-to-text": "^10.0.0",
+    "juice": "^12.1.2",
+    "markdown-it": "^15.0.0",
+    "markdown-it-github-alerts": "^1.0.1",
     "mercadopago": "^2",
     "node-cron": "^3",
     "postal-mime": "^2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "sanitize-html": "^2.17.7",
     "streamdown": "^2.3.0",
     "tsx": "^4"
   },
   "devDependencies": {
+    "@tiptap/core": "^3.30.2",
+    "@tiptap/extension-image": "^3.30.2",
+    "@tiptap/extension-placeholder": "^3.30.2",
+    "@tiptap/extension-table": "^3.30.2",
+    "@tiptap/pm": "^3.30.2",
+    "@tiptap/starter-kit": "^3.30.2",
     "@types/better-sqlite3": "^7",
+    "@types/html-to-text": "^9.0.4",
+    "@types/markdown-it": "^14.2.0",
     "@types/node": "^22",
     "@types/node-cron": "^3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/sanitize-html": "^2.16.1",
     "drizzle-kit": "^0.30",
     "esbuild": "^0.27.3",
     "tailwindcss": "^3.4.19",
+    "tiptap-markdown": "^0.9.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "^8.5.26",
+    "deepmerge-ts": "^8.0.1"
   }
 }

@@ -57,6 +57,13 @@
       "when": 1787000000000,
       "tag": "0007_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1787100000000,
+      "tag": "0008_composer",
+      "breakpoints": true
     }
   ]
 }

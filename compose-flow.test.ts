@@ -5,7 +5,7 @@ import { describe, it, before, mock } from "node:test";
 import assert from "node:assert/strict";
 
 const suffix = Date.now();
-const sent: { from: string; to: string; subject: string; opts?: Record<string, unknown> }[] = [];
+const sent: { from: string; to: string; subject: string; body: string; opts?: Record<string, unknown> }[] = [];
 
 describe("Bandeja: redactar — camino feliz", () => {
   // deno-lint-ignore no-explicit-any
@@ -23,8 +23,11 @@ describe("Bandeja: redactar — camino feliz", () => {
     mock.module("./ses.ts", {
       namedExports: {
         ...realSes,
-        sendFromDomain: async (from: string, to: string, subject: string, _body: string, opts?: Record<string, unknown>) => {
-          sent.push({ from, to, subject, opts });
+        // El 4º argumento es la parte text/plain. Se captura porque durante meses fue
+        // `(textBody ?? html)`: al mandar sólo HTML, el marcado crudo viajaba como
+        // texto plano y quien leyera en modo texto veía etiquetas.
+        sendFromDomain: async (from: string, to: string, subject: string, body: string, opts?: Record<string, unknown>) => {
+          sent.push({ from, to, subject, body, opts });
           return `<stub-${crypto.randomUUID()}@test>`;
         },
       },
@@ -133,6 +136,46 @@ describe("Bandeja: redactar — camino feliz", () => {
     assert.equal(last.to, "cliente@example.com");
     assert.match(last.subject, /^Re: /);
     assert.ok(last.opts?.inReplyTo, "el reply sí debe referenciar el mensaje anterior");
+  });
+
+  it("con markdown, la parte de texto es texto y la de HTML es HTML", async () => {
+    const res = await compose({
+      subject: "Con formato",
+      body: undefined,
+      markdown: "Hola **Brenda**\n\n- uno\n- dos",
+    });
+    assert.equal(res.status, 201);
+    await res.body?.cancel();
+
+    const last = sent[sent.length - 1];
+    // La parte text/plain no puede llevar marcado: es lo que lee quien tiene el
+    // cliente en modo texto.
+    assert.ok(!last.body.includes("<"), `la parte de texto trae etiquetas: ${last.body}`);
+    assert.match(last.body, /Hola \*\*Brenda\*\*/);
+
+    const html = last.opts?.html as string;
+    assert.ok(html, "debe ir una parte text/html");
+    assert.notEqual(html, last.body, "las dos partes no pueden ser idénticas");
+    assert.match(html, /<strong/i);
+    assert.match(html, /<li/i);
+    // Outlook renderiza con el motor de Word: sin flexbox ni grid.
+    assert.ok(!/display:\s*(flex|grid)/i.test(html));
+    // Gmail recorta el head en mensajes largos y se llevaría el <style>.
+    assert.ok(!/<style[\s>]/i.test(html));
+  });
+
+  it("con html crudo se deriva el texto plano en vez de repetir el marcado", async () => {
+    const res = await compose({
+      subject: "Desde el SDK",
+      body: undefined,
+      html: "<p>Hola <b>mundo</b></p>",
+    });
+    assert.equal(res.status, 201);
+    await res.body?.cancel();
+
+    const last = sent[sent.length - 1];
+    assert.ok(!last.body.includes("<"), `la parte de texto trae etiquetas: ${last.body}`);
+    assert.match(last.body, /Hola mundo/);
   });
 
   it("responder no consume la cuota de envíos", async () => {

@@ -210,6 +210,17 @@ Objetivo: solidificar el tronco del servicio. Blindar seguridad, rendimiento y r
 - [ ] Evaluar pattern de almacenamiento de mensajes en Bandeja: ¿leer body de S3 on demand vs duplicar en SQLite? Investigar otros patterns (cache intermedio, pre-procesado a formato ligero, CDN/signed URLs). Concluir cuál es el mejor approach antes de implementar.
 - [ ] **Radar de Actividad por Alias**: Dashboard analítico por alias — volumen de emails por día/semana, horas pico, ratio legítimo vs marketing/spam, aliases "muertos" (30+ días sin actividad) con sugerencia de desactivarlos. Layer de IA (via formmy.app) que genera resumen semanal en lenguaje natural ("Tu alias newsletter@ recibió 47 emails esta semana, 82% son marketing — considera desactivarlo"). El 90% son queries SQL sobre datos existentes (logs/mensajes), la IA solo genera el resumen. Email semanal via SES con cron. Implementación: 3-4 días. Disponible en todos los planes como feature de retención.
 
+### Compositor de correo
+
+- [ ] **Corrección ortográfica en el compositor**. Hoy el editor de la Bandeja
+  (`public/js/composer.ts`, Tiptap) no revisa ortografía. Lo barato es dejar el
+  corrector nativo del navegador (`spellcheck="true"` en el elemento editable),
+  que ya trae el diccionario del sistema y no cuesta nada — verificar que
+  ProseMirror no lo esté apagando. Lo caro y diferenciador sería una revisión
+  propia en español (sugerencias en línea, tono, muletillas), que se apoyaría en
+  los agentes de Formmy; eso entra en la sesión de "qué features de IA añadir".
+  Empezar por lo nativo y medir si alguien pide más.
+
 ### Diseño
 - [ ] **Tema claro con toggle**. Hoy todo el sitio es oscuro fijo. La evidencia de 2026 dice que no hay ganador universal: oscuro rinde en herramientas de desarrollo, claro en público no técnico que necesita confiar rápido —que es el público de la home— y **lo que mejor funciona es híbrido**, claro donde se lee y oscuro donde se enfatiza. Hay casos documentados donde la versión clara ganó 16% más clics pero 42% menos conversiones, así que no se cambia a ciegas: **toggle y medir**, no reemplazar.
 

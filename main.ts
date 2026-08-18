@@ -134,6 +134,9 @@ import {
   getDomainRegistrationsByUser,
   updateDomainRegistration,
   getDomainRegistrationByPaymentId,
+  listCannedResponses,
+  createCannedResponse,
+  deleteCannedResponse,
 } from "./db.js";
 import type { AddonKind } from "./db.js";
 import {
@@ -169,6 +172,9 @@ import {
 import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, extractAttachmentByIndex, rebuildConversationsFromS3 } from "./forwarding.js";
 import { fetchEmailFromS3, repairReceiptRules, ensureSnsSubscription, AWS_REGION, getBackupBytesFromS3 } from "./ses.js";
 import { runDbBackup, DB_BACKUP_SUFFIX } from "./backup.js";
+import { resolveEmailBody, extractInlineImages, appendSignature, quotePrevious, MAX_EMAIL_HTML_BYTES } from "./email-html.js";
+import { putEmailImageToS3, getEmailImageFromS3, deleteEmailImageFromS3, sweepOrphanEmailImages, putEmailFileToS3, getEmailFileFromS3, deleteEmailFileFromS3, ALLOWED_IMAGE_TYPES } from "./ses.js";
+import type { InlineImage, Attachment } from "./ses.js";
 import { sqlite } from "./pg.js";
 import { log } from "./logger.js";
 import { createSmtpIamCredential, revokeSmtpIamCredential } from "./ses.js";
@@ -266,6 +272,103 @@ async function serveStatic(filePath: string): Promise<Response> {
       return new Response("Not found", { status: 404 });
     }
   }
+}
+
+/**
+ * Prepara el cuerpo de un correo de la Bandeja para salir con sus imágenes
+ * incrustadas, como hace Gmail: se adjuntan dentro del mensaje y el HTML las
+ * referencia con `cid:` en vez de con una URL nuestra.
+ *
+ * Sólo aplica al correo de persona a persona. El envío masivo sigue con enlace
+ * hospedado: adjuntar la misma imagen a cada destinatario multiplicaría los bytes.
+ */
+async function attachInlineImages(html: string | undefined): Promise<{ html?: string; inlineImages?: InlineImage[] }> {
+  if (!html) return {};
+  const { html: rewritten, keys } = extractInlineImages(html);
+  if (!keys.length) return { html };
+
+  const images: InlineImage[] = [];
+  for (const key of keys) {
+    const image = await getEmailImageFromS3(key);
+    // Si una imagen no está, se manda el correo sin ella: perder el correo entero
+    // por una foto sería peor. El cliente mostrará el hueco del alt.
+    if (!image) {
+      log("warn", "ses", "Inline image missing from S3", { key });
+      continue;
+    }
+    images.push({ cid: key, contentType: image.contentType, data: image.body, filename: key });
+  }
+  return { html: rewritten, inlineImages: images };
+}
+
+/**
+ * Quita de S3 las imágenes que ya viajaron dentro de un correo enviado. Mejor
+ * esfuerzo: si falla, el barrido diario las recoge. Nunca debe tumbar un envío que
+ * ya salió bien.
+ */
+async function discardSentImages(images: InlineImage[] | undefined): Promise<void> {
+  for (const img of images ?? []) {
+    try {
+      await deleteEmailImageFromS3(img.cid);
+    } catch (err) {
+      log("warn", "ses", "Could not delete inline image after send", { key: img.cid, error: String(err) });
+    }
+  }
+}
+
+/** Tamaño máximo de un adjunto. Ver MAX_RAW_MESSAGE_BYTES: base64 infla ~33%. */
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+
+// Extensiones que casi ningún proveedor entrega y que sólo sirven para que nos
+// marquen como origen de malware. Bloquearlas aquí evita gastar reputación.
+const BLOCKED_ATTACHMENT_EXT = /\.(exe|scr|com|pif|bat|cmd|msi|jar|vbs|js|apk|dll)$/i;
+
+interface AttachmentRef { key: string; filename: string; contentType: string }
+
+/** Baja de S3 los adjuntos que el cliente referenció por llave. */
+async function collectAttachments(refs: AttachmentRef[] | undefined): Promise<{ attachments: Attachment[]; keys: string[] }> {
+  const attachments: Attachment[] = [];
+  const keys: string[] = [];
+  for (const ref of refs ?? []) {
+    if (!/^[0-9a-f-]{36}$/i.test(ref.key)) continue;
+    const file = await getEmailFileFromS3(ref.key);
+    if (!file) {
+      log("warn", "ses", "Attachment missing from S3", { key: ref.key });
+      continue;
+    }
+    attachments.push({
+      // El nombre llega del cliente en el envío, no del que se saneó al subir. Una
+      // comilla o una barra rompen el Content-Disposition (que es una cadena
+      // entrecomillada) y dejarían colar parámetros de más.
+      filename: (ref.filename || "archivo").replace(/[\r\n"\\;\x00-\x1f]/g, "").slice(0, 200) || "archivo",
+      // El tipo se toma del objeto guardado, no de lo que diga el cliente ahora.
+      contentType: file.contentType,
+      data: file.body,
+    });
+    keys.push(ref.key);
+  }
+  return { attachments, keys };
+}
+
+/** Borra de S3 los adjuntos que ya viajaron dentro del correo. Mejor esfuerzo. */
+async function discardSentFiles(keys: string[]): Promise<void> {
+  for (const key of keys) {
+    try {
+      await deleteEmailFileFromS3(key);
+    } catch (err) {
+      log("warn", "ses", "Could not delete attachment after send", { key, error: String(err) });
+    }
+  }
+}
+
+/** Normaliza y valida una lista de direcciones de Cc/Bcc. */
+function parseCopyList(value: unknown, max = 20): string[] {
+  if (!Array.isArray(value)) return [];
+  const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return value
+    .map((v) => normalizeAddress(String(v ?? "")))
+    .filter((v) => re.test(v))
+    .slice(0, max);
 }
 
 function getIp(request: Request): string {
@@ -484,7 +587,7 @@ const app = new Elysia({ adapter: node() })
       tags: ["Auth", "Billing", "Admin", "Webhooks", "Coupons", "Referrals",
              "Export", "Bandeja", "Agents", "Domain Registration"],
       paths: [
-        "/", "/login", "/register", "/app", "/css/*", "/js/*", "/img/*",
+        "/", "/login", "/register", "/app", "/composer-demo", "/css/*", "/js/*", "/img/*",
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
@@ -531,6 +634,9 @@ const app = new Elysia({ adapter: node() })
     if (url.pathname.startsWith("/api/webhooks/")) return;
     // Skip CSRF for auth entry points (user doesn't have token yet)
     if (url.pathname.startsWith("/api/auth/") || url.pathname === "/api/referrals/track" || url.pathname === "/api/billing/checkout" || url.pathname === "/api/billing/guest-checkout") return;
+    // La vista previa no muta nada y en desarrollo se usa desde la página de demo,
+    // que no tiene sesión ni cookie CSRF. En producción el endpoint exige sesión.
+    if (url.pathname === "/api/email-preview" && process.env.NODE_ENV !== "production") return;
     // Skip CSRF for Bearer token auth (inherently CSRF-safe)
     const authHeader = request.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) return;
@@ -627,6 +733,10 @@ const app = new Elysia({ adapter: node() })
   .get("/login", () => serveStatic("/login.html"))
   .get("/register", () => serveStatic("/register.html"))
   .get("/app", () => serveStatic("/app.html"))
+  // Página de prueba del compositor. Sólo en desarrollo: no es parte del producto.
+  .get("/composer-demo", () => process.env.NODE_ENV === "production"
+    ? new Response("No encontrado", { status: 404 })
+    : serveStatic("/composer-demo.html"))
   .get("/css/*", ({ params }) => serveStatic(`/css/${params["*"]}`))
   .get("/js/*", ({ params }) => serveStatic(`/js/${params["*"]}`))
   .get("/img/*", ({ params }) => serveStatic(`/img/${params["*"]}`))
@@ -3152,10 +3262,17 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Dominio no verificado" }), { status: 400 });
     }
 
-    const { to, subject, html, body: textBody, replyTo, from: fromLocal, fromName } = sendBody;
-    if (!to || !subject || (!html && !textBody)) {
-      return new Response(JSON.stringify({ error: "to, subject y body/html requeridos" }), { status: 400 });
+    const { to, subject, html, body: textBody, markdown, replyTo, from: fromLocal, fromName } = sendBody;
+    if (!to || !subject || (!html && !textBody && !markdown)) {
+      return new Response(JSON.stringify({ error: "to, subject y body/html/markdown requeridos" }), { status: 400 });
     }
+    if (html && Buffer.byteLength(html, "utf8") > MAX_EMAIL_HTML_BYTES) {
+      return new Response(JSON.stringify({ error: "El HTML excede 100 KB; Gmail recorta el mensaje" }), { status: 413 });
+    }
+    // Un solo lugar decide qué va como text/plain y qué como text/html. Antes se
+    // mandaba `(textBody ?? html)` como texto plano: quien leyera en modo texto
+    // recibía el marcado crudo.
+    const rendered = resolveEmailBody({ markdown, html, body: textBody });
 
     const recipient = normalizeAddress(to);
     if (await isSuppressed(domain.id, recipient)) {
@@ -3198,8 +3315,8 @@ const app = new Elysia({ adapter: node() })
       ? `${encodeHeader(fromName.trim())} <${bareFrom}>`
       : bareFrom;
     try {
-      const messageId = await sendFromDomain(fromAddress, recipient, subject, (textBody ?? html)!, {
-        html,
+      const messageId = await sendFromDomain(fromAddress, recipient, subject, rendered.text, {
+        html: rendered.html,
         replyTo,
         configSet: getConfigSetName(domain.domain),
       });
@@ -3217,6 +3334,7 @@ const app = new Elysia({ adapter: node() })
       subject: t.String(),
       body: t.Optional(t.String()),
       html: t.Optional(t.String()),
+      markdown: t.Optional(t.String()),
       replyTo: t.Optional(t.String()),
       from: t.Optional(t.String()),
       fromName: t.Optional(t.String()),
@@ -3529,16 +3647,30 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(ip, 20, 60_000);
     if (limited) return limited;
 
-    const { domainId, to, subject, body: textBody, html, fromAlias } = newBody;
-    if (!domainId || !to || !subject || (!textBody && !html) || !fromAlias) {
-      return new Response(JSON.stringify({ error: "domainId, to, subject, fromAlias y body/html requeridos" }), { status: 400 });
+    const { domainId, to, subject, body: textBody, html, markdown, fromAlias } = newBody;
+    if (!domainId || !to || !subject || (!textBody && !html && !markdown) || !fromAlias) {
+      return new Response(JSON.stringify({ error: "domainId, to, subject, fromAlias y body/html/markdown requeridos" }), { status: 400 });
     }
+    if (html && Buffer.byteLength(html, "utf8") > MAX_EMAIL_HTML_BYTES) {
+      return new Response(JSON.stringify({ error: "El HTML excede 100 KB; Gmail recorta el mensaje" }), { status: 413 });
+    }
+    const cc = parseCopyList((newBody as Record<string, unknown>).cc);
+    const bcc = parseCopyList((newBody as Record<string, unknown>).bcc);
+    const attachRefs = (newBody as Record<string, unknown>).attachments as AttachmentRef[] | undefined;
 
     // Redactar crea identidad saliente nueva, así que pide permiso de escritura —
     // no el owner||agent inline que usa el resto de la Bandeja.
     const access = await checkDomainAccess(auth.email, domainId, "write");
     if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     const domain = access.domain;
+
+    // La firma se pega al markdown y no al HTML: así sale también en la parte de
+    // texto plano. Pegada al HTML, quien lea en texto vería un correo sin firmar.
+    const rendered = resolveEmailBody({
+      markdown: markdown ? appendSignature(markdown, domain.signature) : undefined,
+      html,
+      body: textBody,
+    });
 
     const user = (await getUser(auth.email))!;
     const plan = user.subscription?.plan ?? "basico";
@@ -3584,14 +3716,25 @@ const app = new Elysia({ adapter: node() })
 
     const fromAddress = `${match.alias}@${domain.domain}`;
     let messageId: string;
+    // Fuera del try: hace falta después para borrar de S3 las imágenes ya enviadas y
+    // para guardar en la Bandeja el HTML tal como salió.
+    let withImages: { html?: string; inlineImages?: InlineImage[] } = {};
+    let sentFileKeys: string[] = [];
     try {
       // Sin inReplyTo/references: es el primer mensaje del hilo. El Message-ID lo genera
       // sendFromDomain y se guarda en threadReferences para que la respuesta del contacto
       // reenganche aquí. Ojo: SES puede reescribir ese header en SendRawEmail — si lo
       // hace, el hilo no reengancha. El log "Inbound created new conversation" con
       // unmatchedRefs lo delata en producción.
-      messageId = await sendFromDomain(fromAddress, recipient, String(subject), (textBody ?? html)!, {
-        html,
+      withImages = await attachInlineImages(rendered.html);
+      const files = await collectAttachments(attachRefs);
+      sentFileKeys = files.keys;
+      messageId = await sendFromDomain(fromAddress, recipient, String(subject), rendered.text, {
+        html: withImages.html,
+        inlineImages: withImages.inlineImages,
+        attachments: files.attachments.length ? files.attachments : undefined,
+        cc: cc.length ? cc : undefined,
+        bcc: bcc.length ? bcc : undefined,
         configSet: getConfigSetName(domain.domain),
       });
     } catch (err) {
@@ -3599,6 +3742,10 @@ const app = new Elysia({ adapter: node() })
       log("error", "ses", "Compose send failed", { error: String(err), domainId: domain.id });
       return new Response(JSON.stringify({ error: "Error enviando email" }), { status: 500 });
     }
+
+    // El correo ya salió con imágenes y adjuntos dentro: las copias en S3 son desecho.
+    await discardSentImages(withImages.inlineImages);
+    await discardSentFiles(sentFileKeys);
 
     try {
       // Convención invertida a propósito, igual que en las conversaciones entrantes:
@@ -3620,8 +3767,11 @@ const app = new Elysia({ adapter: node() })
       await addMessage({
         conversationId: conv.id,
         from: fromAddress,
-        body: textBody ?? "",
-        html: html ?? "",
+        body: rendered.text,
+        // El HTML tal como salió, con `cid:` y no con la URL: esa URL ya no existe
+        // —la imagen se borró de S3 tras enviar— y guardarla sería registrar algo
+        // que nadie podrá volver a abrir.
+        html: withImages.html ?? rendered.html ?? "",
         direction: "outbound",
         createdAt: new Date().toISOString(),
         messageId,
@@ -3661,8 +3811,244 @@ const app = new Elysia({ adapter: node() })
       fromAlias: t.String(),
       body: t.Optional(t.String()),
       html: t.Optional(t.String()),
+      markdown: t.Optional(t.String()),
+      cc: t.Optional(t.Array(t.String())),
+      bcc: t.Optional(t.Array(t.String())),
+      attachments: t.Optional(t.Array(t.Object({
+        key: t.String(),
+        filename: t.String(),
+        contentType: t.Optional(t.String()),
+      }))),
     }),
     detail: { tags: ["Bandeja"], summary: "Compose a new conversation and send the first email", security: [{ cookieAuth: [] }] },
+  })
+
+  // Vista previa: devuelve el mismo HTML que recibiría el destinatario, sin enviar
+  // nada ni consumir cuota. Sirve para la demo del compositor y para que el usuario
+  // vea el resultado antes de mandar.
+  .post("/api/email-preview", async ({ request, body: previewBody }) => {
+    // En desarrollo se deja abierto para poder probar el compositor sin montar una
+    // cuenta con dominio verificado. En producción exige sesión como todo lo demás.
+    const isDev = process.env.NODE_ENV !== "production";
+    if (!isDev) {
+      const auth = await getAuthUser(request);
+      if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    }
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 60, 60_000);
+    if (limited) return limited;
+
+    const rendered = resolveEmailBody({
+      markdown: previewBody.markdown,
+      html: previewBody.html,
+      body: previewBody.body,
+    });
+    return new Response(JSON.stringify({ html: rendered.html ?? "", text: rendered.text }), {
+      headers: { "content-type": "application/json" },
+    });
+  }, {
+    body: t.Object({
+      markdown: t.Optional(t.String()),
+      html: t.Optional(t.String()),
+      body: t.Optional(t.String()),
+    }),
+    detail: { tags: ["Send"], summary: "Render an email preview without sending it", security: [{ cookieAuth: [] }] },
+  })
+
+  // --- Imágenes para correos salientes ---
+  //
+  // Un cliente de correo trae las imágenes de forma ANÓNIMA: no manda nuestra
+  // cookie. Por eso el par es subida autenticada + servido público, y no una URL
+  // firmada ni un bucket abierto (el bucket es privado y debe seguir así).
+  .post("/api/domains/:id/images", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 20, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const form = await request.formData().catch(() => null);
+    const file = form?.get("file");
+    if (!(file instanceof File)) {
+      return new Response(JSON.stringify({ error: "Falta el archivo" }), { status: 400 });
+    }
+
+    // Lista blanca de tipos. Sin SVG: es un documento que puede traer script, y se
+    // serviría desde nuestro origen.
+    const ext = ALLOWED_IMAGE_TYPES[file.type];
+    if (!ext) {
+      return new Response(JSON.stringify({ error: "Formato no permitido. Usa PNG, JPG, GIF o WebP" }), { status: 415 });
+    }
+    // 2 MB y no 5: en la Bandeja la imagen viaja DENTRO del correo, base64 la infla
+    // ~33% y SendRawEmail topa el mensaje en 10 MB. Con 5 MB un correo con dos fotos
+    // ya no salía.
+    if (file.size > 2 * 1024 * 1024) {
+      return new Response(JSON.stringify({ error: "La imagen no puede pesar más de 2 MB" }), { status: 413 });
+    }
+
+    // El nombre es un UUID y no el del archivo: es la única credencial de la ruta
+    // pública, así que no debe ser adivinable ni permitir escribir fuera del prefijo.
+    const key = `${crypto.randomUUID()}.${ext}`;
+    try {
+      await putEmailImageToS3(key, new Uint8Array(await file.arrayBuffer()), file.type);
+    } catch (err) {
+      log("error", "ses", "Email image upload failed", { error: String(err), domainId: access.domain.id });
+      return new Response(JSON.stringify({ error: "No se pudo subir la imagen" }), { status: 500 });
+    }
+
+    const appUrl = process.env.APP_URL ?? "https://www.mailmask.studio";
+    return new Response(JSON.stringify({ ok: true, url: `${appUrl}/api/img/${key}` }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  }, {
+    detail: { tags: ["Send"], summary: "Upload an image to embed in outgoing email", security: [{ cookieAuth: [] }] },
+  })
+
+  // Adjuntos. A diferencia de las imágenes NO se sirven por HTTP: viajan dentro del
+  // correo y se borran de S3 al enviarlo. Aquí sólo se guardan mientras se redacta.
+  .post("/api/domains/:id/attachments", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 20, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const form = await request.formData().catch(() => null);
+    const file = form?.get("file");
+    if (!(file instanceof File)) {
+      return new Response(JSON.stringify({ error: "Falta el archivo" }), { status: 400 });
+    }
+    // Los saltos de línea y comillas romperían el header Content-Disposition.
+    const filename = file.name.replace(/[\r\n"\\\x00-\x1f]/g, "").slice(0, 200) || "archivo";
+    if (BLOCKED_ATTACHMENT_EXT.test(filename)) {
+      return new Response(JSON.stringify({ error: "Ese tipo de archivo no se puede enviar por correo" }), { status: 415 });
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      return new Response(JSON.stringify({ error: "El archivo no puede pesar más de 5 MB" }), { status: 413 });
+    }
+
+    const key = crypto.randomUUID();
+    try {
+      // El navegador manda el Content-Type y es texto libre. Se acota a la forma
+      // "tipo/subtipo": así no puede colar parámetros en la cabecera MIME del correo.
+      const tipo = /^[a-z0-9.+-]+\/[a-z0-9.+-]+$/i.test(file.type) ? file.type : "application/octet-stream";
+      await putEmailFileToS3(key, new Uint8Array(await file.arrayBuffer()), tipo);
+    } catch (err) {
+      log("error", "ses", "Attachment upload failed", { error: String(err), domainId: access.domain.id });
+      return new Response(JSON.stringify({ error: "No se pudo subir el archivo" }), { status: 500 });
+    }
+
+    return new Response(JSON.stringify({ ok: true, key, filename, size: file.size }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  }, {
+    detail: { tags: ["Send"], summary: "Upload a file to attach to an outgoing email", security: [{ cookieAuth: [] }] },
+  })
+
+  // --- Firma del dominio ---
+  .put("/api/domains/:id/signature", async ({ request, params, body: sigBody }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const firma = (sigBody.signature ?? "").trim();
+    if (firma.length > 2000) {
+      return new Response(JSON.stringify({ error: "La firma es demasiado larga" }), { status: 400 });
+    }
+    // Cadena vacía borra la firma; por eso se guarda null y no "".
+    const updated = updateDomain(access.domain.id, { signature: firma || null });
+    return new Response(JSON.stringify({ ok: true, signature: updated?.signature ?? null }), {
+      headers: { "content-type": "application/json" },
+    });
+  }, {
+    body: t.Object({ signature: t.Optional(t.String()) }),
+    detail: { tags: ["Bandeja"], summary: "Set the signature appended to outgoing email", security: [{ cookieAuth: [] }] },
+  })
+
+  // --- Respuestas guardadas ---
+  .get("/api/domains/:id/canned", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const access = await checkDomainAccess(auth.email, params.id, "read");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    return new Response(JSON.stringify(listCannedResponses(access.domain.id)), {
+      headers: { "content-type": "application/json" },
+    });
+  }, { detail: { tags: ["Bandeja"], summary: "List saved replies", security: [{ cookieAuth: [] }] } })
+
+  .post("/api/domains/:id/canned", async ({ request, params, body: cannedBody }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const title = (cannedBody.title ?? "").trim();
+    const cuerpo = (cannedBody.body ?? "").trim();
+    if (!title || !cuerpo) {
+      return new Response(JSON.stringify({ error: "Título y contenido requeridos" }), { status: 400 });
+    }
+    if (listCannedResponses(access.domain.id).length >= 50) {
+      return new Response(JSON.stringify({ error: "Máximo 50 respuestas guardadas por dominio" }), { status: 429 });
+    }
+    return new Response(JSON.stringify(createCannedResponse(access.domain.id, title.slice(0, 120), cuerpo.slice(0, 10_000))), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  }, {
+    body: t.Object({ title: t.Optional(t.String()), body: t.Optional(t.String()) }),
+    detail: { tags: ["Bandeja"], summary: "Create a saved reply", security: [{ cookieAuth: [] }] },
+  })
+
+  .delete("/api/domains/:id/canned/:cannedId", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    const ok = deleteCannedResponse(params.cannedId, access.domain.id);
+    return new Response(JSON.stringify({ ok }), { status: ok ? 200 : 404, headers: { "content-type": "application/json" } });
+  }, { detail: { tags: ["Bandeja"], summary: "Delete a saved reply", security: [{ cookieAuth: [] }] } })
+
+  // Público a propósito: lo abre el cliente de correo del destinatario, que no
+  // tiene sesión. El UUID del nombre es la credencial, y el contenido ya es
+  // público por definición: va dentro de un correo enviado.
+  .get("/api/img/:key", async ({ params }) => {
+    // El key sólo puede ser lo que generamos nosotros. Sin esto, un `..` leería
+    // otros objetos del bucket, donde vive el correo entrante.
+    if (!/^[0-9a-f-]{36}\.(png|jpg|gif|webp)$/i.test(params.key)) {
+      return new Response("No encontrado", { status: 404 });
+    }
+    const image = await getEmailImageFromS3(params.key);
+    if (!image) return new Response("No encontrado", { status: 404 });
+
+    // El Content-Type se deriva de la extensión que nosotros pusimos, no de lo que
+    // diga el objeto: así no hay forma de que un tipo inesperado se sirva desde
+    // nuestro origen.
+    const ext = params.key.split(".").pop()!.toLowerCase();
+    const type = ext === "png" ? "image/png"
+      : ext === "gif" ? "image/gif"
+      : ext === "webp" ? "image/webp"
+      : "image/jpeg";
+
+    // Buffer y no Uint8Array: es lo que el tipo de Response acepta sin ceder tipos.
+    return new Response(Buffer.from(image.body), {
+      headers: {
+        "content-type": type,
+        "content-disposition": "inline",
+        "x-content-type-options": "nosniff",
+        "cache-control": "public, max-age=31536000, immutable",
+      },
+    });
+  }, {
+    detail: { tags: ["Send"], summary: "Serve an image embedded in an outgoing email" },
   })
 
   .post("/api/bandeja/conversations/:id/reply", async ({ request, params, body: replyBody }) => {
@@ -3672,10 +4058,19 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(ip, 20, 60_000);
     if (limited) return limited;
 
-    const { domainId, body: replyBodyText, html } = replyBody;
-    if (!domainId || (!replyBodyText && !html)) {
-      return new Response(JSON.stringify({ error: "domainId y body/html requeridos" }), { status: 400 });
+    const { domainId, body: replyBodyText, html, markdown } = replyBody;
+    if (!domainId || (!replyBodyText && !html && !markdown)) {
+      return new Response(JSON.stringify({ error: "domainId y body/html/markdown requeridos" }), { status: 400 });
     }
+    if (html && Buffer.byteLength(html, "utf8") > MAX_EMAIL_HTML_BYTES) {
+      return new Response(JSON.stringify({ error: "El HTML excede 100 KB; Gmail recorta el mensaje" }), { status: 413 });
+    }
+    const cc = parseCopyList((replyBody as Record<string, unknown>).cc);
+    const bcc = parseCopyList((replyBody as Record<string, unknown>).bcc);
+    const attachRefs = (replyBody as Record<string, unknown>).attachments as AttachmentRef[] | undefined;
+    // El cliente decide si cita: al responder de un vistazo la cita estorba, y en un
+    // hilo largo es lo que da contexto.
+    const quote = (replyBody as Record<string, unknown>).quote !== false;
 
     const domain = await getDomain(domainId);
     if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
@@ -3718,19 +4113,51 @@ const app = new Elysia({ adapter: node() })
     const fromAddress = `${conv.to.split("@")[0]}@${domain.domain}`;
     const lastRef = conv.threadReferences[conv.threadReferences.length - 1];
 
+    // Cita del último mensaje recibido y firma, en ese orden: la firma va pegada a lo
+    // que se escribe, no debajo del texto citado.
+    let cuerpoMarkdown = markdown;
+    if (cuerpoMarkdown) {
+      cuerpoMarkdown = appendSignature(cuerpoMarkdown, domain.signature);
+      if (quote) {
+        const previos = listMessages(conv.id).filter((m) => m.direction === "inbound");
+        const ultimo = previos[previos.length - 1];
+        if (ultimo) {
+          cuerpoMarkdown = quotePrevious(cuerpoMarkdown, {
+            from: ultimo.from,
+            date: ultimo.createdAt,
+            text: ultimo.body ?? "",
+          });
+        }
+      }
+    }
+    const rendered = resolveEmailBody({ markdown: cuerpoMarkdown, html, body: replyBodyText });
+
+    let sentFileKeys: string[] = [];
     try {
-      const messageId = await sendFromDomain(fromAddress, recipient, `Re: ${conv.subject}`, (replyBodyText ?? html)!, {
-        html,
+      const withImages = await attachInlineImages(rendered.html);
+      const files = await collectAttachments(attachRefs);
+      sentFileKeys = files.keys;
+      const messageId = await sendFromDomain(fromAddress, recipient, `Re: ${conv.subject}`, rendered.text, {
+        html: withImages.html,
+        inlineImages: withImages.inlineImages,
+        attachments: files.attachments.length ? files.attachments : undefined,
+        cc: cc.length ? cc : undefined,
+        bcc: bcc.length ? bcc : undefined,
         configSet: getConfigSetName(domain.domain),
         inReplyTo: lastRef,
         references: conv.threadReferences.join(" "),
       });
 
+      // Ya salió con imágenes y adjuntos dentro: las copias en S3 sobran.
+      await discardSentImages(withImages.inlineImages);
+      await discardSentFiles(sentFileKeys);
+
       await addMessage({
         conversationId: conv.id,
         from: fromAddress,
-        body: replyBodyText ?? "",
-        html: html ?? "",
+        body: rendered.text,
+        // El HTML tal como salió, con `cid:`: la URL de S3 ya no resuelve.
+        html: withImages.html ?? rendered.html ?? "",
         direction: "outbound",
         createdAt: new Date().toISOString(),
         messageId,
@@ -3754,6 +4181,15 @@ const app = new Elysia({ adapter: node() })
       domainId: t.String(),
       body: t.Optional(t.String()),
       html: t.Optional(t.String()),
+      markdown: t.Optional(t.String()),
+      cc: t.Optional(t.Array(t.String())),
+      bcc: t.Optional(t.Array(t.String())),
+      quote: t.Optional(t.Boolean()),
+      attachments: t.Optional(t.Array(t.Object({
+        key: t.String(),
+        filename: t.String(),
+        contentType: t.Optional(t.String()),
+      }))),
     }),
     detail: { tags: ["Bandeja"], summary: "Reply to a conversation", security: [{ cookieAuth: [] }] },
   })
@@ -4936,6 +5372,11 @@ cron.schedule("* * * * *", async () => {
       continue;
     }
 
+    // El job guarda HTML crudo. Se sanea y se le deriva el texto plano una sola vez
+    // por lote, no por destinatario: antes se mandaba `job.html` también como parte
+    // text/plain y quien leyera en modo texto recibía el marcado.
+    const bulkRendered = resolveEmailBody({ html: job.html });
+
     for (const recipient of batch) {
       // Check suppression
       if (await isSuppressed(job.domainId, recipient)) {
@@ -4953,8 +5394,8 @@ cron.schedule("* * * * *", async () => {
       }
 
       try {
-        await sendFromDomain(job.from, recipient, job.subject, job.html, {
-          html: job.html,
+        await sendFromDomain(job.from, recipient, job.subject, bulkRendered.text, {
+          html: bulkRendered.html,
           configSet,
         });
         job.sent++;
@@ -5000,6 +5441,18 @@ cron.schedule("0 4 * * *", async () => {
   } catch (err) {
     log("error", "backup", "Daily backup failed", { error: String(err) });
     await sendAlert("backup-failure", `Daily backup failed: ${String(err)}`);
+  }
+});
+
+// Imágenes que se subieron al compositor y nunca se enviaron. Las que sí salieron ya
+// se borran al enviar; esto recoge los borradores abandonados, que si no se acumulan
+// para siempre. A las 4:20 para no chocar con el respaldo de las 4:00.
+cron.schedule("20 4 * * *", async () => {
+  try {
+    const removed = await sweepOrphanEmailImages(24);
+    if (removed > 0) log("info", "ses", "Orphan email images swept", { removed });
+  } catch (err) {
+    log("error", "ses", "Orphan image sweep failed", { error: String(err) });
   }
 });
 
