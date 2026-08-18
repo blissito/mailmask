@@ -16,6 +16,21 @@ cd sdk && npm version patch --no-git-tag-version && npm run build && npm publish
 ```
 Package: `@easybits.cloud/mailmask` on npm.
 
+**Antes de publicar, corre `npm test -- sdk.test.ts`.** Ese archivo ejercita el
+SDK real contra la app real (in-process, vía el `fetch` inyectable de
+`MailMaskConfig`) y es lo único que ata el cliente a las rutas del servidor.
+
+Existe porque la 0.1.4 salió a npm rota de raíz y nadie lo notó por meses: los
+cuatro métodos de `aliases.*` pegaban a `/aliases` cuando el servidor expone
+`/alias` en singular, `bulkSend`/`bulkStatus` apuntaban a rutas inexistentes, y
+`SendEmailInput` declaraba `fromLocal` cuando la ruta lee `from` — o sea que
+**todo correo salía desde `noreply@` en silencio**, sin error. La suite vieja no
+lo veía porque `integration.test.ts` pega a las rutas a mano, lo que justamente
+enmascaraba el desajuste.
+
+Al agregar un método al SDK, agrégale su caso en `sdk.test.ts`. Un test que sólo
+comprueba "no es 404" ya vale: eso solo habría atrapado 6 de los 10 bugs.
+
 ## AWS S3 Buckets
 These buckets must exist before the app works correctly. Create them manually if they don't exist:
 ```bash
@@ -58,7 +73,8 @@ Override with env vars `S3_BUCKET` and `S3_BACKUP_BUCKET` respectively.
 - **Plans**: Defined in `db.ts` as `PLANS` constant (basico, freelancer, developer; legacy: pro, agencia)
 - **Add-ons**: `ADDONS` en `db.ts` (`sends25` $49, `sends100` $99, `domain` $99 c/u). Tabla `addons`, preapproval propio de MP con `external_reference: "addon:{id}"`. `getUserPlanLimits()` los suma; `sendsUnlocked` es el flag que decide si se puede enviar. **Básico tiene `sends: 0`**: no envía correo nuevo sin add-on, pero sí responde desde la Bandeja (`mesaActions: true` para todos los planes).
 - **Límites**: se cuentan **por dominio**, no por cuenta (`getSendCount()` y el rate limit de forwarding se llavean con `domainId`). Son dos distintos: `sends` (saliente que origina el usuario, por día) y `forwardPerHour` (reenvío de entrada, el caso de uso principal, un orden de magnitud mayor). Falta un tope mensual — ver `monthlyForwards` en el backlog, pendiente de revisitar.
-- **Migraciones**: el snapshot de drizzle está desincronizado respecto a `api_keys` (el hash se aplicó con `scripts/migrate-api-keys-hash.ts`, fuera de drizzle). `drizzle-kit generate` pedirá input interactivo y quiere emitir un `ALTER TABLE api_keys` que **rompería producción**. Hasta que se reconcilie, escribe las migraciones a mano en `drizzle/` y agrégalas a `meta/_journal.json`.
+- **Migraciones**: el snapshot de drizzle sigue desincronizado respecto a `api_keys`. `drizzle-kit generate` pedirá input interactivo y quiere emitir un `ALTER TABLE api_keys` que **rompería producción**. Hasta que se reconcilie, escribe las migraciones a mano en `drizzle/` y agrégalas a `meta/_journal.json`.
+- **`api_keys` se repara sola al arrancar** (`pg.ts`, justo después de `migrate()`). El paso de llaves en claro a SHA-256 se aplicó a producción con `scripts/migrate-api-keys-hash.ts`, un script suelto que nunca entró a las migraciones: por eso **toda base nueva —tests, dev, un despliegue limpio— nacía con la tabla vieja y `createApiKey` moría** con `no column named key_hash`. Producción funcionaba y nadie lo veía. La reparación es idempotente (sólo actúa si existe la columna `key`), conserva las llaves hasheándolas y no toca una base ya migrada. Va en código y no en un `.sql` porque hay bases en los dos estados y SQL no puede preguntar por una columna. El script suelto queda como referencia histórica.
 
 ## Billing
 - MercadoPago PreApproval API for subscriptions

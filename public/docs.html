@@ -205,14 +205,14 @@
 
 <span class="cm">// Crear alias</span>
 <span class="kw">const</span> alias = <span class="kw">await</span> mm.aliases.<span class="fn">create</span>(<span class="str">"domain-id"</span>, {
-  local: <span class="str">"hello"</span>,
-  forwardTo: <span class="str">"me@gmail.com"</span>
+  alias: <span class="str">"hello"</span>,
+  destinations: [<span class="str">"me@gmail.com"</span>]
 });
 
 <span class="cm">// Crear alias con m&uacute;ltiples destinos</span>
 <span class="kw">const</span> alias = <span class="kw">await</span> mm.aliases.<span class="fn">create</span>(<span class="str">"domain-id"</span>, {
-  local: <span class="str">"team"</span>,
-  forwardTo: [<span class="str">"alice@company.com"</span>, <span class="str">"bob@company.com"</span>]
+  alias: <span class="str">"team"</span>,
+  destinations: [<span class="str">"alice@company.com"</span>, <span class="str">"bob@company.com"</span>]
 });
 
 <span class="cm">// Actualizar alias</span>
@@ -247,7 +247,8 @@
       <p class="text-zinc-400 mb-4">Env&iacute;a emails individuales o masivos desde cualquier alias de tu dominio.</p>
       <pre class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Enviar email</span>
 <span class="kw">await</span> mm.send.<span class="fn">send</span>(<span class="str">"domain-id"</span>, {
-  fromLocal: <span class="str">"hello"</span>,
+  from: <span class="str">"hello"</span>,
+  fromName: <span class="str">"Mi Tienda"</span>,
   to: <span class="str">"client@example.com"</span>,
   subject: <span class="str">"Hola!"</span>,
   html: <span class="str">"&lt;p&gt;Contenido del email&lt;/p&gt;"</span>
@@ -255,14 +256,14 @@
 
 <span class="cm">// Env&iacute;o masivo</span>
 <span class="kw">const</span> job = <span class="kw">await</span> mm.send.<span class="fn">bulkSend</span>(<span class="str">"domain-id"</span>, {
-  from: <span class="str">"hello@midominio.com"</span>,
+  from: <span class="str">"hello"</span>,
   recipients: [<span class="str">"a@test.com"</span>, <span class="str">"b@test.com"</span>],
   subject: <span class="str">"Newsletter"</span>,
   html: <span class="str">"&lt;p&gt;Contenido&lt;/p&gt;"</span>
 });
 
 <span class="cm">// Consultar estado del env&iacute;o masivo</span>
-<span class="kw">const</span> status = <span class="kw">await</span> mm.send.<span class="fn">bulkStatus</span>(<span class="str">"domain-id"</span>, job.id);</code></pre>
+<span class="kw">const</span> status = <span class="kw">await</span> mm.send.<span class="fn">bulkStatus</span>(<span class="str">"domain-id"</span>, job.jobId);</code></pre>
 
       <!-- Logs -->
       <h2 id="logs" class="text-2xl font-bold mt-12 mb-4 border-b border-zinc-800 pb-2">Logs</h2>

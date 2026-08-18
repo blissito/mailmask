@@ -13,7 +13,7 @@ npm i @easybits.cloud/mailmask
 ```ts
 import { MailMask } from "@easybits.cloud/mailmask";
 
-const mm = new MailMask({ apiKey: "mm_live_..." });
+const mm = new MailMask({ apiKey: "mk_..." });
 
 // Get your domains
 const domains = await mm.domains.list();
@@ -21,13 +21,14 @@ const domainId = domains[0].id;
 
 // Create an alias — emails to hello@yourdomain.com forward to your inbox
 const alias = await mm.aliases.create(domainId, {
-  local: "hello",
+  alias: "hello",
   destinations: ["you@example.com"],
 });
 
 // Send an email (routed through MailMask for high deliverability)
 await mm.send.send(domainId, {
-  from: "hello",
+  from: "hello",              // must be an active alias; defaults to `noreply`
+  fromName: "Acme",           // optional display name: Acme <hello@yourdomain.com>
   to: "client@example.com",
   subject: "Welcome!",
   html: "<p>Thanks for signing up.</p>",
