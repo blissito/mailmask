@@ -32,7 +32,11 @@
 import { PLANS, ADDONS, planLabel, addonLabel } from "./plans.js";
 
 export const ALERT_FROM = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
-export const FROM_HEADER = `MailMask <${ALERT_FROM}>`;
+// `ALERT_FROM_EMAIL` puede venir como dirección pelada o ya con display name
+// ("MailMask <noreply@...>"). Envolver a ciegas producía `MailMask <MailMask
+// <noreply@...>>`, un header inválido: SES rechazaba con "Missing '>'" y **todo**
+// correo de plantilla —incluida la verificación de cuenta— moría con 500.
+export const FROM_HEADER = /<[^<>]+>/.test(ALERT_FROM) ? ALERT_FROM : `MailMask <${ALERT_FROM}>`;
 export const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL ?? "brenda@fixter.org";
 
 // La mascarita, servida desde el sitio. Va como imagen remota porque no hay otra vía:

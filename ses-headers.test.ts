@@ -104,3 +104,42 @@ describe("encodeHeader — asuntos largos y passthrough", () => {
     assert.equal(encodeHeader(already), already);
   });
 });
+
+// Regresión: `ALERT_FROM_EMAIL` en producción venía como "MailMask <noreply@...>",
+// FROM_HEADER lo volvía a envolver y `normalizeAddress` devolvía "mailmask <noreply@..."
+// sin cerrar. SES contestaba InvalidParameterValue "Missing '>'" y todo correo de
+// plantilla —verificación de cuenta incluida— devolvía 500.
+describe("normalizeAddress con display name anidado", () => {
+  it("saca la dirección del grupo más interno", () => {
+    assert.equal(
+      normalizeAddress("MailMask <MailMask <noreply@mailmask.studio>>"),
+      "noreply@mailmask.studio",
+    );
+  });
+
+  it("sigue funcionando con un solo nivel y con dirección pelada", () => {
+    assert.equal(normalizeAddress("MailMask <noreply@mailmask.studio>"), "noreply@mailmask.studio");
+    assert.equal(normalizeAddress("noreply@mailmask.studio"), "noreply@mailmask.studio");
+  });
+});
+
+describe("FROM_HEADER", () => {
+  it("no envuelve dos veces si ALERT_FROM ya trae display name", async () => {
+    const anterior = process.env.ALERT_FROM_EMAIL;
+    process.env.ALERT_FROM_EMAIL = "MailMask <noreply@mailmask.studio>";
+    const mod = await import(`./emails.ts?from-header-${Date.now()}`);
+    assert.equal(mod.FROM_HEADER, "MailMask <noreply@mailmask.studio>");
+    assert.equal(normalizeAddress(mod.FROM_HEADER), "noreply@mailmask.studio");
+    if (anterior === undefined) delete process.env.ALERT_FROM_EMAIL;
+    else process.env.ALERT_FROM_EMAIL = anterior;
+  });
+
+  it("envuelve una dirección pelada", async () => {
+    const anterior = process.env.ALERT_FROM_EMAIL;
+    process.env.ALERT_FROM_EMAIL = "noreply@mailmask.studio";
+    const mod = await import(`./emails.ts?bare-${Date.now()}`);
+    assert.equal(mod.FROM_HEADER, "MailMask <noreply@mailmask.studio>");
+    if (anterior === undefined) delete process.env.ALERT_FROM_EMAIL;
+    else process.env.ALERT_FROM_EMAIL = anterior;
+  });
+});

@@ -440,7 +440,9 @@ export function encodeHeader(value: string): string {
 // From con display name, y eso no sirve ni como destinatario de SES ni para buscar en la
 // lista de supresión.
 export function normalizeAddress(value: string): string {
-  const m = value.match(/<([^>]+)>/);
+  // Se toma el grupo MÁS INTERNO: un valor anidado ("A <B <x@y>>") con `<([^>]+)>`
+  // devolvía "B <x@y", sin cerrar, y SES respondía "Missing '>'".
+  const m = value.match(/<([^<>]+)>/);
   return stripHeaderInjection(m ? m[1] : value).toLowerCase();
 }
 
