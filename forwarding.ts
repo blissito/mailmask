@@ -4,6 +4,7 @@ import { sendTemplate, firstEmailReceived } from "./emails.js";
 import { checkRateLimit } from "./rate-limit.js";
 import { log } from "./logger.js";
 import { programar } from "./scheduler.js";
+import { acotarTexto } from "./regex-guard.js";
 import { notifyBandeja } from "./sse-hub.js";
 
 // --- SNS notification types ---
@@ -615,14 +616,12 @@ export async function evaluateRules(rules: Rule[], email: { to: string; from: st
       case "regex":
         try {
           const re = new RegExp(rule.value, "i");
-          // Guard against ReDoS: race regex against a timeout
-          const regexResult = await new Promise<boolean>((resolve) => {
-            const timer = setTimeout(() => resolve(false), 50);
-            const result = re.test(fieldValue);
-            clearTimeout(timer);
-            resolve(result);
-          });
-          matches = regexResult;
+          // El patrón ya se revisó al guardar la regla (regex-guard.ts); aquí sólo se
+          // acota el texto, que es la segunda red. Antes había un `setTimeout` de 50 ms
+          // alrededor del `test`, que no protegía de nada: `test` es síncrono, así que
+          // el temporizador no puede dispararse mientras corre — medido, ese guard
+          // devolvía a los 20 segundos.
+          matches = re.test(acotarTexto(fieldValue));
         } catch {
           matches = false;
         }

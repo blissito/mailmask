@@ -5,6 +5,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as dns from "node:dns/promises";
 import { programar, esServidor } from "./scheduler.js";
+import { revisarPatron } from "./regex-guard.js";
 import { addSseClient } from "./sse-hub.js";
 import { db } from "./pg.js";
 import { users as usersTable } from "./schema.js";
@@ -1836,21 +1837,12 @@ const app = new Elysia({ adapter: node() })
       );
     }
 
-    // ReDoS: limit regex pattern length
+    // ReDoS: la revisión va aquí, al guardar, porque en tiempo de evaluación ya no hay
+    // forma de defenderse — ver regex-guard.ts.
     if (match === "regex") {
-      if (value.length > 200) {
-        return new Response(
-          JSON.stringify({ error: "Patrón regex demasiado largo (máx 200 caracteres)" }),
-          { status: 400 },
-        );
-      }
-      try {
-        new RegExp(value);
-      } catch {
-        return new Response(
-          JSON.stringify({ error: "Patrón regex inválido" }),
-          { status: 400 },
-        );
+      const motivo = revisarPatron(value);
+      if (motivo) {
+        return new Response(JSON.stringify({ error: motivo }), { status: 400 });
       }
     }
 
@@ -1919,23 +1911,13 @@ const app = new Elysia({ adapter: node() })
       );
     }
 
-    // ReDoS: limit regex pattern length
+    // Mismo criterio que al crear: ver regex-guard.ts.
     const effectiveMatch = match ?? undefined;
     const effectiveValue = value ?? undefined;
     if (effectiveMatch === "regex" && effectiveValue) {
-      if (effectiveValue.length > 200) {
-        return new Response(
-          JSON.stringify({ error: "Patrón regex demasiado largo (máx 200 caracteres)" }),
-          { status: 400 },
-        );
-      }
-      try {
-        new RegExp(effectiveValue);
-      } catch {
-        return new Response(
-          JSON.stringify({ error: "Patrón regex inválido" }),
-          { status: 400 },
-        );
+      const motivo = revisarPatron(effectiveValue);
+      if (motivo) {
+        return new Response(JSON.stringify({ error: motivo }), { status: 400 });
       }
     }
 

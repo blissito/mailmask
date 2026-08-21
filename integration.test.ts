@@ -448,6 +448,23 @@ describe("Rules", () => {
     const badData = await badRes.json();
     assert.ok(badData.error.includes("inválido"));
 
+    // ReDoS: cuantificador anidado. Es corto y compila, así que las dos validaciones
+    // anteriores lo dejaban pasar — y una regla así congela el proceso entero cuando
+    // llega un correo que casi coincide.
+    const redosRes = await jsonPost(`/api/domains/${domain.id}/rules`, {
+      field: "subject", match: "regex", value: "^(a+)+$", action: "discard",
+    }, cookie, csrf);
+    assert.equal(redosRes.status, 400);
+    const redosData = await redosRes.json();
+    assert.ok(redosData.error.includes("cuantificador"));
+
+    // Una regex normal sigue guardándose
+    const regexOkRes = await jsonPost(`/api/domains/${domain.id}/rules`, {
+      field: "subject", match: "regex", value: "^factura-\\d+$", action: "discard",
+    }, cookie, csrf);
+    assert.equal(regexOkRes.status, 201);
+    await regexOkRes.body?.cancel();
+
     // Valid rule succeeds
     const okRes = await jsonPost(`/api/domains/${domain.id}/rules`, {
       field: "from", match: "contains", value: "spam", action: "discard",

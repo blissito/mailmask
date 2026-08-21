@@ -320,7 +320,7 @@ const resultado = await new Promise((resolve) => {
 
         <h2>Qué hace MailMask con esto</h2>
 
-        <p>MailMask deja crear <a href="/blog/gestionar-emails-dominio-equipo">reglas por dominio</a> que se evalúan contra cada correo que entra, así que esto no es para nosotros una curiosidad académica sino parte del trabajo. Toda expresión se valida al guardarse antes de llegar a producción, y el endurecimiento contra el peor caso es un frente abierto que seguimos midiendo — porque medirlo es justamente lo que separa una defensa de una intención.</p>
+        <p>MailMask deja crear <a href="/blog/gestionar-emails-dominio-equipo">reglas por dominio</a> que se evalúan contra cada correo que entra, así que esto no es para nosotros una curiosidad académica sino parte del trabajo. Aplicamos las dos primeras defensas de esta lista: la expresión se revisa al guardarse —si trae cuantificadores anidados, la regla no se crea y te decimos por qué— y el texto que se evalúa va acotado, de modo que el peor caso queda limitado por construcción.</p>
 
         <p>La lección general que nos llevamos es más aplicable que el detalle técnico: <strong>una protección que nadie midió no es una protección</strong>. El guard con <code>setTimeout</code> es el mejor ejemplo — se lee perfecto en la revisión de código, tranquiliza a quien lo escribe y no hace absolutamente nada. La única forma de saberlo es correrlo con la entrada mala y ver el reloj.</p>
 
