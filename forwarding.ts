@@ -3,7 +3,7 @@ import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchE
 import { sendTemplate, firstEmailReceived } from "./emails.js";
 import { checkRateLimit } from "./rate-limit.js";
 import { log } from "./logger.js";
-import cron from "node-cron";
+import { programar } from "./scheduler.js";
 import { notifyBandeja } from "./sse-hub.js";
 
 // --- SNS notification types ---
@@ -692,7 +692,7 @@ async function doForward(rawContent: string, from: string, to: string, domainId:
 
 // --- Retry cron (every 5 minutes) ---
 
-cron.schedule("*/5 * * * *", async () => {
+programar("*/5 * * * *", async () => {
   const now = Date.now();
   const items = await listForwardQueue();
   let processed = 0;

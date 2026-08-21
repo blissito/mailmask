@@ -1,4 +1,4 @@
-import cron from "node-cron";
+import { programar } from "./scheduler.js";
 import { deleteEmailFromS3, sendAlert } from "./ses.js";
 import { log } from "./logger.js";
 import { db } from "./pg.js";
@@ -9,7 +9,7 @@ import { sendTemplate, expiryWarning, addonShutdown } from "./emails.js";
 import { reconcilePendingAddons } from "./addon-sync.js";
 
 // Cada 5 minutos — activar add-ons ya pagados cuyo webhook nunca llegó.
-cron.schedule("*/5 * * * *", async () => {
+programar("*/5 * * * *", async () => {
   try {
     await reconcilePendingAddons();
   } catch (err) {
@@ -18,7 +18,7 @@ cron.schedule("*/5 * * * *", async () => {
 });
 
 // Daily at 14:00 UTC — warn users whose subscription expires within 3 days
-cron.schedule("0 14 * * *", async () => {
+programar("0 14 * * *", async () => {
   // El remitente y la URL base salían de aquí con un dominio por defecto distinto al
   // de main.ts (`mailmask.studio` contra `www.mailmask.studio`). Ahora los dos vienen
   // de emails.ts.
@@ -77,7 +77,7 @@ cron.schedule("0 14 * * *", async () => {
 });
 
 // Every 15 minutes — clean up expired rows
-cron.schedule("*/15 * * * *", async () => {
+programar("*/15 * * * *", async () => {
   try {
     const now = new Date().toISOString();
     const results = await Promise.all([
@@ -106,7 +106,7 @@ cron.schedule("*/15 * * * *", async () => {
 // Diario 4:00 UTC — apagar add-ons cuyo plan base ya expiró.
 // Sin esto MercadoPago sigue cobrando el add-on mientras getUserPlanLimits devuelve cero:
 // se le cobra al cliente por algo que no recibe.
-cron.schedule("0 4 * * *", async () => {
+programar("0 4 * * *", async () => {
   const mpToken = process.env.MP_ACCESS_TOKEN;
   try {
     const now = new Date().toISOString();
@@ -179,7 +179,7 @@ cron.schedule("0 4 * * *", async () => {
 
 // Diario 5:00 UTC — reconciliar MercadoPago contra la base.
 // Existe porque una clienta pagó y el webhook no la registró; nadie se enteró en semanas.
-cron.schedule("0 5 * * *", async () => {
+programar("0 5 * * *", async () => {
   const mpToken = process.env.MP_ACCESS_TOKEN;
   if (!mpToken) return;
   try {
@@ -207,7 +207,7 @@ cron.schedule("0 5 * * *", async () => {
 });
 
 // Daily at 3:00 UTC — purge conversations deleted >15 days ago + their S3 objects
-cron.schedule("0 3 * * *", async () => {
+programar("0 3 * * *", async () => {
   try {
     const s3Keys = await purgeDeletedConversations(15);
     for (const { s3Bucket, s3Key } of s3Keys) {
@@ -224,7 +224,7 @@ cron.schedule("0 3 * * *", async () => {
 });
 
 // Every minute — poll Route 53 domain registrations in "registering" status
-cron.schedule("* * * * *", async () => {
+programar("* * * * *", async () => {
   let regs;
   try {
     regs = getDomainRegistrationsByStatus("registering");

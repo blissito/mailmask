@@ -4,7 +4,7 @@ import { openapi } from "@elysiajs/openapi";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as dns from "node:dns/promises";
-import cron from "node-cron";
+import { programar, esServidor } from "./scheduler.js";
 import { addSseClient } from "./sse-hub.js";
 import { db } from "./pg.js";
 import { users as usersTable } from "./schema.js";
@@ -5331,7 +5331,7 @@ const app = new Elysia({ adapter: node() })
 
 // --- Bulk send cron (every minute, processes 14 emails/sec) ---
 
-cron.schedule("* * * * *", async () => {
+programar("* * * * *", async () => {
   const jobs = await listPendingBulkJobs();
   if (jobs.length === 0) return;
 
@@ -5419,7 +5419,7 @@ cron.schedule("* * * * *", async () => {
 
 // --- Monitoring cron (every 5 minutes) ---
 
-cron.schedule("*/5 * * * *", async () => {
+programar("*/5 * * * *", async () => {
   const queueDepth = await getQueueDepth();
   const deadLetterCount = await getDeadLetterCount();
 
@@ -5432,7 +5432,7 @@ cron.schedule("*/5 * * * *", async () => {
 
 // --- Daily backup cron (4:00 UTC) ---
 
-cron.schedule("0 4 * * *", async () => {
+programar("0 4 * * *", async () => {
   try {
     const result = await runDbBackup();
     log("info", "backup", "Daily backup completed", {
@@ -5447,7 +5447,7 @@ cron.schedule("0 4 * * *", async () => {
 // Imágenes que se subieron al compositor y nunca se enviaron. Las que sí salieron ya
 // se borran al enviar; esto recoge los borradores abandonados, que si no se acumulan
 // para siempre. A las 4:20 para no chocar con el respaldo de las 4:00.
-cron.schedule("20 4 * * *", async () => {
+programar("20 4 * * *", async () => {
   try {
     const removed = await sweepOrphanEmailImages(24);
     if (removed > 0) log("info", "ses", "Orphan email images swept", { removed });
@@ -5456,10 +5456,12 @@ cron.schedule("20 4 * * *", async () => {
   }
 });
 
-const port = parseInt(process.env.PORT ?? "8000", 10);
-app.listen({ port, hostname: "0.0.0.0" }, () => {
-  console.log(`MailMask running on port ${port}`);
-});
+if (esServidor) {
+  const port = parseInt(process.env.PORT ?? "8000", 10);
+  app.listen({ port, hostname: "0.0.0.0" }, () => {
+    console.log(`MailMask running on port ${port}`);
+  });
+}
 
 // Graceful shutdown. Without these handlers the process ignored SIGINT/SIGTERM and Fly
 // waited out its kill timeout — roughly 6 seconds of the deploy downtime window was the
@@ -5497,7 +5499,7 @@ process.on("unhandledRejection", (err) => {
 
 // Repair receipt rules missing SNS TopicArn (one-time fix for rules created before SNS_TOPIC_ARN was set)
 // Receipt rule repair already imported at top
-(async () => {
+if (esServidor) (async () => {
   try {
     const repaired = await repairReceiptRules();
     if (repaired > 0) log("info", "startup", `Repaired ${repaired} receipt rule(s) with missing TopicArn`);
