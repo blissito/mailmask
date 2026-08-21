@@ -605,12 +605,39 @@ export function firstEmailReceived(d: { alias: string; domain: string; from: str
  * recibo que rebota es un fallo de cobranza invisible.
  */
 export async function sendTemplate(to: string, email: Email, opts?: { from?: string }): Promise<string> {
-  const { sendFromDomain } = await import("./ses.js");
-  return sendFromDomain(opts?.from ?? FROM_HEADER, to, email.subject, email.text, {
-    html: email.html,
-    replyTo: SUPPORT_EMAIL,
-    ...(process.env.SES_CONFIG_SET ? { configSet: process.env.SES_CONFIG_SET } : {}),
-  });
+  const { sendFromDomain, sendAlert } = await import("./ses.js");
+  try {
+    return await sendFromDomain(opts?.from ?? FROM_HEADER, to, email.subject, email.text, {
+      html: email.html,
+      replyTo: SUPPORT_EMAIL,
+      ...(process.env.SES_CONFIG_SET ? { configSet: process.env.SES_CONFIG_SET } : {}),
+    });
+  } catch (err) {
+    // El aviso va aquí y no en cada llamador porque varios se tragan el error: el
+    // registro, por ejemplo, loguea y devuelve 201 igual. Un From mal formado dejó
+    // ocho días sin salir NINGÚN correo de plantilla y nos enteramos por WhatsApp.
+    // `sendAlert` ya trae throttle de una alerta por tipo por hora, así que una
+    // ráfaga no inunda el buzón de soporte.
+    try {
+      await sendAlert(
+        "plantilla-fallida",
+        [
+          "Un correo de plantilla no pudo enviarse.",
+          "",
+          `Destinatario: ${to}`,
+          `Asunto: ${email.subject}`,
+          `From: ${opts?.from ?? FROM_HEADER}`,
+          `Error: ${String(err)}`,
+          "",
+          "Ojo: esto suele fallar para TODOS los correos a la vez (remitente,",
+          "credenciales o cuota de SES), no solo para este destinatario.",
+        ].join("\n"),
+      );
+    } catch {
+      // Avisar es lo accesorio; lo que importa es que el error original suba intacto.
+    }
+    throw err;
+  }
 }
 
 /** Catálogo para el script de preview y para las pruebas. */
