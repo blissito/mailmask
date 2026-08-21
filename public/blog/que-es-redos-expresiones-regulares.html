@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ReDoS: cómo una expresión regular tumba tu servidor — MailMask</title>
+    <meta name="description" content="Qué es un ataque ReDoS, por qué una regex de diez caracteres puede congelar Node por horas, por qué el truco del setTimeout no protege y qué sí funciona." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/que-es-redos-expresiones-regulares" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="ReDoS: cómo una expresión regular tumba tu servidor" />
+    <meta property="og:description" content="Qué es un ataque ReDoS, por qué una regex de diez caracteres puede congelar Node por horas, por qué el truco del setTimeout no protege y qué sí funciona." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/que-es-redos-expresiones-regulares" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="og:image" content="https://www.mailmask.studio/blog/img/redos.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="ReDoS: una expresión regular puede tumbar tu servidor" />
+    <meta property="og:image:secure_url" content="https://www.mailmask.studio/blog/img/redos.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta name="twitter:image" content="https://www.mailmask.studio/blog/img/redos.jpg" />
+    <meta property="article:published_time" content="2026-08-21" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="ReDoS: cómo una expresión regular tumba tu servidor" />
+    <meta name="twitter:description" content="Qué es un ataque ReDoS, por qué una regex de diez caracteres puede congelar Node por horas, y qué defensas sí funcionan." />
+    <script src="/js/analytics.js"></script>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "ReDoS: cómo una expresión regular tumba tu servidor",
+      "description": "Qué es un ataque ReDoS, por qué una regex de diez caracteres puede congelar Node por horas, por qué el truco del setTimeout no protege y qué sí funciona.",
+      "datePublished": "2026-08-21",
+      "dateModified": "2026-08-21",
+      "image": "https://www.mailmask.studio/blog/img/redos.jpg",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/que-es-redos-expresiones-regulares"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "ReDoS: cómo una expresión regular tumba tu servidor", "item": "https://www.mailmask.studio/blog/que-es-redos-expresiones-regulares" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Qué es un ataque ReDoS?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "ReDoS (Regular expression Denial of Service) es un ataque que aprovecha expresiones regulares cuyo tiempo de evaluación crece de forma exponencial con la longitud del texto. El atacante manda una cadena corta, de treinta o cuarenta caracteres, y el servidor se queda evaluándola segundos u horas. En un entorno de un solo hilo como Node.js eso congela el proceso entero: deja de responder a todas las peticiones, no solo a la del atacante."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Por qué una expresión regular puede tardar horas?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Porque los motores de regex más comunes usan backtracking: cuando una posibilidad falla, retroceden y prueban otra. Con cuantificadores anidados como (a+)+ el número de repartos posibles del texto se duplica con cada caracter. Medido en Node 22, /^(a+)+$/ contra 30 letras tarda 4.6 segundos; contra 32 letras, 18 segundos; a los 40 caracteres serían más de una hora."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Sirve envolver la regex en un setTimeout para limitar su duración?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. En JavaScript, RegExp.test() es síncrono: mientras corre, el event loop está bloqueado y ningún setTimeout puede dispararse. El temporizador solo se ejecuta cuando la regex ya terminó, es decir, siempre tarde. Medido: un guard de 50 ms sobre una regex vulnerable devolvió su resultado a los 20 segundos."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo se protege de verdad contra ReDoS?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Hay tres defensas reales. La más barata es validar la expresión al guardarla: rechazar cuantificadores anidados y limitar la longitud del texto de entrada. La segunda es evaluar la regex en un worker thread, que sí se puede matar cuando pasa un tiempo límite. La tercera y definitiva es usar un motor sin backtracking como RE2, que garantiza tiempo lineal a cambio de renunciar a algunas construcciones como los lookbehind."
+          }
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
+      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>ReDoS: cómo una expresión regular tumba tu servidor</h1>
+        <div class="meta">
+          <span>📅 21 Ago 2026</span>
+          <span>⏱ 8 min de lectura</span>
+        </div>
+      </header>
+
+      <div class="blog-content">
+        <p>Casi cualquier producto que procese texto del usuario acaba aceptando una expresión regular: filtros de correo, reglas de validación, buscadores, parsers de logs. Y casi siempre se asume que evaluar una regex es instantáneo.</p>
+
+        <p>No lo es. Hay expresiones de diez caracteres que, con la entrada correcta, tardan horas — y en Node.js eso no significa "esa petición va lenta", significa que <strong>el servidor entero deja de responder</strong>.</p>
+
+        <h2>¿Qué es un ataque ReDoS?</h2>
+
+        <p><strong>ReDoS</strong> son las siglas de <em>Regular expression Denial of Service</em>: negación de servicio por expresión regular. El atacante no necesita volumen ni una botnet; le basta con mandar una cadena corta que haga trabajar al motor de regex durante una eternidad.</p>
+
+        <p>Es un ataque especialmente incómodo porque el texto malicioso no se ve malicioso. No hay comillas, ni <code>&lt;script&gt;</code>, ni nada que un filtro reconozca. Son treinta letras <code>a</code> seguidas de una <code>X</code>.</p>
+
+        <h2>¿Por qué una expresión regular puede tardar horas?</h2>
+
+        <p>Porque los motores de regex de JavaScript, Python, Java, Ruby y PHP usan <strong>backtracking</strong>: cuando un camino falla, retroceden y prueban el siguiente. Con la mayoría de las expresiones hay pocos caminos. Con un cuantificador dentro de otro cuantificador, los caminos se duplican por cada caracter.</p>
+
+        <p>El ejemplo canónico es <code>/^(a+)+$/</code>. El <code>a+</code> interno puede quedarse con una letra, o con dos, o con todas; el <code>+</code> externo repite ese grupo. Para el texto <code>aaaa</code> eso son ocho formas distintas de repartir cuatro letras. Para treinta letras, más de quinientos millones.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 720 292" width="100%" role="img" aria-labelledby="diagBacktracking" xmlns="http://www.w3.org/2000/svg">
+            <title id="diagBacktracking">El motor de regex prueba todos los repartos posibles del texto entre los dos cuantificadores anidados; como el texto termina en X nunca puede coincidir, así que agota la lista completa antes de rendirse, y esa lista se duplica con cada caracter añadido.</title>
+            <defs>
+              <marker id="arwRedos" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" fill="rgb(var(--mask-500))" />
+              </marker>
+            </defs>
+
+            <text x="120" y="30" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="12" letter-spacing="1.5">LA ENTRADA</text>
+            <text x="378" y="30" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="12" letter-spacing="1.5">REPARTOS QUE PRUEBA</text>
+            <text x="620" y="30" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="12" letter-spacing="1.5">EL RESULTADO</text>
+
+            <rect x="20" y="52" width="200" height="70" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="40" y="80" fill="#fafafa" font-family="ui-monospace, Menlo, monospace" font-size="16">aaaa<tspan fill="#f87171">X</tspan></text>
+            <text x="40" y="104" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">contra /^(a+)+$/</text>
+
+            <rect x="20" y="142" width="200" height="86" rx="8" fill="#18181b" stroke="#3f3f46" stroke-dasharray="4 4" />
+            <text x="40" y="166" fill="#f87171" font-family="system-ui, sans-serif" font-size="12" font-weight="600">Nunca va a coincidir</text>
+            <text x="40" y="188" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">La X final rompe cualquier</text>
+            <text x="40" y="204" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">reparto posible. Pero el motor</text>
+            <text x="40" y="220" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">tiene que probarlos todos.</text>
+
+            <path d="M220 88 H268" fill="none" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwRedos)" />
+
+            <g font-family="ui-monospace, Menlo, monospace" font-size="13">
+              <rect x="280" y="52" width="196" height="26" rx="5" fill="#18181b" stroke="#3f3f46" />
+              <text x="294" y="70" fill="#d4d4d8">(aaaa)</text>
+              <text x="452" y="70" fill="#f87171" font-size="12" text-anchor="end">falla</text>
+
+              <rect x="280" y="86" width="196" height="26" rx="5" fill="#18181b" stroke="#3f3f46" />
+              <text x="294" y="104" fill="#d4d4d8">(aaa)(a)</text>
+              <text x="452" y="104" fill="#f87171" font-size="12" text-anchor="end">falla</text>
+
+              <rect x="280" y="120" width="196" height="26" rx="5" fill="#18181b" stroke="#3f3f46" />
+              <text x="294" y="138" fill="#d4d4d8">(aa)(aa)</text>
+              <text x="452" y="138" fill="#f87171" font-size="12" text-anchor="end">falla</text>
+
+              <rect x="280" y="154" width="196" height="26" rx="5" fill="#18181b" stroke="#3f3f46" />
+              <text x="294" y="172" fill="#d4d4d8">(aa)(a)(a)</text>
+              <text x="452" y="172" fill="#f87171" font-size="12" text-anchor="end">falla</text>
+
+              <rect x="280" y="188" width="196" height="26" rx="5" fill="#18181b" stroke="#3f3f46" />
+              <text x="294" y="206" fill="#d4d4d8">(a)(a)(a)(a)</text>
+              <text x="452" y="206" fill="#f87171" font-size="12" text-anchor="end">falla</text>
+            </g>
+
+            <text x="378" y="238" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="11">…y así con cada reparto restante</text>
+
+            <path d="M476 132 H544" fill="none" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwRedos)" />
+
+            <rect x="554" y="52" width="150" height="160" rx="8" fill="#18181b" stroke="rgb(var(--mask-500))" stroke-width="2" />
+            <text x="629" y="78" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">cada letra de más</text>
+            <text x="629" y="96" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">duplica la lista</text>
+            <line x1="572" y1="110" x2="686" y2="110" stroke="#3f3f46" />
+            <text x="572" y="132" fill="#d4d4d8" font-family="ui-monospace, Menlo, monospace" font-size="12">20 letras</text>
+            <text x="686" y="132" text-anchor="end" fill="#fafafa" font-family="ui-monospace, Menlo, monospace" font-size="12">23 ms</text>
+            <text x="572" y="156" fill="#d4d4d8" font-family="ui-monospace, Menlo, monospace" font-size="12">30 letras</text>
+            <text x="686" y="156" text-anchor="end" fill="#fafafa" font-family="ui-monospace, Menlo, monospace" font-size="12">4.6 s</text>
+            <text x="572" y="180" fill="#d4d4d8" font-family="ui-monospace, Menlo, monospace" font-size="12">32 letras</text>
+            <text x="686" y="180" text-anchor="end" fill="#fafafa" font-family="ui-monospace, Menlo, monospace" font-size="12">18 s</text>
+            <text x="572" y="204" fill="#d4d4d8" font-family="ui-monospace, Menlo, monospace" font-size="12">40 letras</text>
+            <text x="686" y="204" text-anchor="end" fill="#f87171" font-family="ui-monospace, Menlo, monospace" font-size="12">~1.3 h</text>
+
+            <rect x="554" y="228" width="150" height="52" rx="8" fill="#18181b" stroke="#3f3f46" stroke-dasharray="4 4" />
+            <text x="629" y="250" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">y mientras tanto</text>
+            <text x="629" y="268" text-anchor="middle" fill="#f87171" font-family="system-ui, sans-serif" font-size="11" font-weight="600">Node no atiende a nadie</text>
+          </svg>
+          <figcaption>Los tiempos son reales, medidos en Node 22 sobre <code>/^(a+)+$/</code>. El salto de 30 a 32 caracteres cuadruplica la espera.</figcaption>
+        </figure>
+
+        <p>Fíjate en el detalle que hace daño: <strong>el texto que nunca coincide es el peor caso</strong>, no el que coincide. Si el texto encaja, el motor para en cuanto encuentra un reparto que sirve. Si no encaja, tiene que agotar la lista entera antes de poder decir "no".</p>
+
+        <h2>¿Por qué esto es peor en Node.js que en otros lenguajes?</h2>
+
+        <p>Node ejecuta tu código en un solo hilo. Mientras ese hilo está ocupado, no acepta conexiones, no responde peticiones, no corre temporizadores, no atiende el health check.</p>
+
+        <p>En un servidor con hilos por petición, una regex atascada arruina esa petición y deja al resto trabajando. En Node, una sola petición maliciosa <strong>congela a todos los usuarios a la vez</strong>. Es la diferencia entre un cliente molesto y una caída total.</p>
+
+        <p>Y como el proceso deja de responder al health check, en plataformas como Fly, Railway o Kubernetes el orquestador acaba reiniciando la máquina — con lo que se pierde también lo que estuviera en vuelo.</p>
+
+        <h2>¿Cómo se cuela una regex peligrosa en un servicio de correo?</h2>
+
+        <p>Casi nunca por un atacante externo. Las tres vías reales son más aburridas:</p>
+
+        <ul>
+          <li><strong>Reglas escritas por el propio usuario.</strong> Cualquier producto con filtros de correo ("si el asunto coincide con…") termina ejecutando expresiones que escribió alguien más, contra cada mensaje que entra.</li>
+          <li><strong>Validaciones copiadas de internet.</strong> Las regex de email, URL o teléfono que circulan en foros son un catálogo de cuantificadores anidados. La regex de validación de email "completa" es un caso clásico documentado.</li>
+          <li><strong>Dependencias.</strong> Buena parte de los avisos de seguridad de npm cada año son ReDoS en librerías de parseo — de <em>user-agents</em>, de cabeceras, de fechas, de Markdown.</li>
+        </ul>
+
+        <p>En los tres casos el patrón es el mismo: una expresión que nadie revisó se ejecuta contra texto que llega de fuera.</p>
+
+        <h2>¿Sirve envolver la regex en un setTimeout?</h2>
+
+        <p>No, y es la trampa más común. El código se ve razonable:</p>
+
+        <pre><code>// NO funciona
+const resultado = await new Promise((resolve) => {
+  const timer = setTimeout(() => resolve(false), 50);
+  const r = re.test(texto);        // ← bloquea aquí
+  clearTimeout(timer);
+  resolve(r);
+});</code></pre>
+
+        <p>La intención es "corta a los 50 ms". Lo que realmente pasa es que <code>re.test()</code> es <strong>síncrono</strong>: mientras corre, el event loop está bloqueado y el <code>setTimeout</code> no puede dispararse. El temporizador solo llega a ejecutarse cuando la regex ya terminó — o sea, siempre tarde, y siempre inútil.</p>
+
+        <p>Con la regex de arriba y treinta caracteres, ese "guard de 50 ms" devuelve su resultado a los <strong>20 segundos</strong>. No cortó nada; solo dio la sensación de que había una protección.</p>
+
+        <p>El mismo razonamiento invalida cualquier variante: <code>Promise.race</code>, <code>AbortController</code> o un <code>async</code> alrededor. Ninguno puede interrumpir código síncrono, porque todos necesitan que el event loop esté libre para actuar.</p>
+
+        <h2>¿Cómo se protege de verdad?</h2>
+
+        <p>Tres defensas, de la más barata a la más definitiva. Se pueden combinar.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 720 300" width="100%" role="img" aria-labelledby="diagDefensas" xmlns="http://www.w3.org/2000/svg">
+            <title id="diagDefensas">Comparación entre el guard con setTimeout, que corre la regex en el mismo hilo y por eso no puede cortarla, y la evaluación en un worker thread, que sí se puede terminar al vencer el tiempo límite.</title>
+
+            <text x="180" y="28" text-anchor="middle" fill="#f87171" font-family="system-ui, sans-serif" font-size="12" letter-spacing="1.5">NO PROTEGE</text>
+            <text x="540" y="28" text-anchor="middle" fill="rgb(var(--mask-500))" font-family="system-ui, sans-serif" font-size="12" letter-spacing="1.5">SÍ PROTEGE</text>
+
+            <line x1="360" y1="44" x2="360" y2="284" stroke="#3f3f46" stroke-dasharray="4 4" />
+
+            <g font-family="system-ui, sans-serif">
+              <rect x="24" y="50" width="312" height="94" rx="8" fill="#18181b" stroke="#3f3f46" />
+              <text x="44" y="76" fill="#fafafa" font-size="14" font-weight="600">Hilo principal</text>
+              <text x="44" y="98" fill="#a1a1aa" font-size="11">setTimeout(cortar, 50)  ← queda en cola</text>
+              <text x="44" y="118" fill="#a1a1aa" font-size="11">re.test(texto)          ← bloquea el hilo</text>
+              <text x="44" y="136" fill="#71717a" font-size="11">nada más puede correr aquí dentro</text>
+
+              <rect x="24" y="160" width="312" height="52" rx="8" fill="#18181b" stroke="#f87171" />
+              <text x="44" y="182" fill="#f87171" font-size="12" font-weight="600">El temporizador espera su turno</text>
+              <text x="44" y="200" fill="#a1a1aa" font-size="11">y sólo corre cuando la regex ya acabó</text>
+
+              <rect x="24" y="228" width="312" height="46" rx="8" fill="#18181b" stroke="#3f3f46" stroke-dasharray="4 4" />
+              <text x="44" y="250" fill="#a1a1aa" font-size="11" font-weight="600">Resultado medido</text>
+              <text x="44" y="267" fill="#71717a" font-size="11">guard de 50 ms → devolvió a los 20 000 ms</text>
+
+              <rect x="384" y="50" width="312" height="94" rx="8" fill="#18181b" stroke="#3f3f46" />
+              <text x="404" y="76" fill="#fafafa" font-size="14" font-weight="600">Hilo principal</text>
+              <text x="404" y="98" fill="#a1a1aa" font-size="11">manda el texto al worker</text>
+              <text x="404" y="118" fill="#a1a1aa" font-size="11">arranca su temporizador</text>
+              <text x="404" y="136" fill="rgb(var(--mask-500))" font-size="11">sigue atendiendo peticiones</text>
+
+              <rect x="384" y="160" width="312" height="52" rx="8" fill="#18181b" stroke="rgb(var(--mask-500))" />
+              <text x="404" y="182" fill="rgb(var(--mask-500))" font-size="12" font-weight="600">Worker thread</text>
+              <text x="404" y="200" fill="#a1a1aa" font-size="11">corre la regex; se puede terminar a la fuerza</text>
+
+              <rect x="384" y="228" width="312" height="46" rx="8" fill="#18181b" stroke="#3f3f46" stroke-dasharray="4 4" />
+              <text x="404" y="250" fill="#a1a1aa" font-size="11" font-weight="600">Al vencer el plazo</text>
+              <text x="404" y="267" fill="#71717a" font-size="11">worker.terminate() y la regla se marca inválida</text>
+            </g>
+          </svg>
+          <figcaption>La diferencia no es el temporizador: es <em>quién</em> corre la regex. Un temporizador solo sirve si hay alguien libre para atenderlo.</figcaption>
+        </figure>
+
+        <h3>1. Validar la expresión al guardarla</h3>
+
+        <p>Es lo más barato y ataja la mayoría de los casos reales. Cuando el usuario guarda su regla, se revisa la expresión — <strong>una vez</strong>, no en cada correo — y se rechaza si tiene la forma peligrosa:</p>
+
+        <ul>
+          <li>Un cuantificador dentro de otro: <code>(a+)+</code>, <code>(a*)*</code>, <code>(a+)*</code>.</li>
+          <li>Alternancias que se solapan y se repiten: <code>(a|a)+</code>, <code>(\d|\w)+</code>.</li>
+          <li>Expresiones absurdamente largas.</li>
+        </ul>
+
+        <p>En el mismo paso conviene <strong>limitar el texto de entrada</strong>. Si nunca evalúas más de 200 caracteres, el peor caso queda acotado por construcción — y en un correo, el asunto y el remitente ya son cortos por naturaleza.</p>
+
+        <h3>2. Evaluar en un worker thread</h3>
+
+        <p>Si necesitas admitir expresiones arbitrarias, la regex tiene que correr donde sí se pueda matar. Un <code>Worker</code> de Node se termina con <code>worker.terminate()</code> desde el hilo principal, que sigue libre para contar el tiempo.</p>
+
+        <p>Cuesta unos milisegundos por evaluación y algo de complejidad, así que tiene sentido cuando la regex es de verdad impredecible.</p>
+
+        <h3>3. Usar un motor sin backtracking</h3>
+
+        <p>La solución de fondo. <strong>RE2</strong> (en Node, el paquete <code>node-re2</code>) garantiza tiempo lineal: nunca retrocede, así que el ReDoS deja de existir como categoría. Se paga con una dependencia nativa y con renunciar a algunas construcciones — lookbehind, backreferences — que casi ninguna regla de usuario usa.</p>
+
+        <h2>¿Cómo saber si tus expresiones son peligrosas?</h2>
+
+        <p>Una revisión rápida, en orden:</p>
+
+        <ol>
+          <li><strong>Busca cuantificadores anidados</strong> en tu código: <code>grep -rn "+)+\|\*)\*\|+)\*" .</code> Casi todo ReDoS real tiene esa forma.</li>
+          <li><strong>Pregunta de dónde viene el texto.</strong> Una regex peligrosa contra una constante del código es inofensiva; contra el asunto de un correo, no.</li>
+          <li><strong>Mídelo.</strong> Genera la entrada del peor caso —el prefijo que casi coincide más un caracter que rompe— y cronometra. Si el tiempo se cuadruplica al añadir dos caracteres, ya tienes la respuesta.</li>
+          <li><strong>Corre <code>npm audit</code></strong> y lee los avisos de ReDoS en dependencias en vez de saltártelos.</li>
+        </ol>
+
+        <h2>Qué hace MailMask con esto</h2>
+
+        <p>MailMask deja crear <a href="/blog/gestionar-emails-dominio-equipo">reglas por dominio</a> que se evalúan contra cada correo que entra, así que esto no es para nosotros una curiosidad académica sino parte del trabajo. Toda expresión se valida al guardarse antes de llegar a producción, y el endurecimiento contra el peor caso es un frente abierto que seguimos midiendo — porque medirlo es justamente lo que separa una defensa de una intención.</p>
+
+        <p>La lección general que nos llevamos es más aplicable que el detalle técnico: <strong>una protección que nadie midió no es una protección</strong>. El guard con <code>setTimeout</code> es el mejor ejemplo — se lee perfecto en la revisión de código, tranquiliza a quien lo escribe y no hace absolutamente nada. La única forma de saberlo es correrlo con la entrada mala y ver el reloj.</p>
+
+        <p>Si te interesa cómo tratamos el correo entrante, sigue con <a href="/blog/que-es-email-forwarding">qué es el email forwarding</a> o con <a href="/blog/que-son-dkim-spf-dmarc">DKIM, SPF y DMARC explicados</a>.</p>
+
+        <h2>Resumen rápido</h2>
+
+        <ul>
+          <li><strong>ReDoS</strong> = una regex con cuantificadores anidados tarda tiempo exponencial contra texto que casi coincide.</li>
+          <li><strong>En Node</strong> congela el proceso entero, no solo la petición del atacante.</li>
+          <li><strong>El truco del <code>setTimeout</code> no sirve</strong>: no se puede interrumpir código síncrono desde el mismo hilo.</li>
+          <li><strong>Lo que sí sirve</strong>: validar la expresión al guardarla y acotar la entrada; un worker thread que se pueda matar; o RE2.</li>
+        </ul>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Reglas de correo que no tumban nada</h2>
+      <p>Filtra, reenvía y responde desde tu dominio. Desde $49 MXN/mes.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-zinc-800 py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">
+        © 2026 by fixter.org
+      </p>
+    </footer>
+  </body>
+</html>
