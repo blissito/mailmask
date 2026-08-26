@@ -519,12 +519,14 @@ async function showAddonsModal() {
 }
 
 async function buyAddon(kind) {
+  const payerEmail = await askMpEmail();
+  if (!payerEmail) return;
   const err = document.getElementById("addons-error");
   err.classList.add("hidden");
   const res = await fetch("/api/addons/checkout", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ kind }),
+    body: JSON.stringify({ kind, payerEmail }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.init_point) {
@@ -712,7 +714,47 @@ function getCheckoutLabel() {
   return "Activar Plan — $49/mes";
 }
 
+// Pide el correo de la cuenta de MercadoPago y resuelve con él (o con null si cancelan).
+// Existe porque MP exige que `payer_email` sea el correo de la cuenta con la que se paga
+// —si no coincide, el checkout muere con "Tu e-mail no coincide con el de la
+// suscripción"— y el campo es obligatorio en su API, así que no se puede omitir.
+function askMpEmail() {
+  return new Promise((resolve) => {
+    const form = document.getElementById("form-mp-email");
+    const errEl = document.getElementById("mp-email-error");
+    errEl.classList.add("hidden");
+    form.payerEmail.value = currentUser?.email ?? "";
+    let done = false;
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      form.removeEventListener("submit", onSubmit);
+      cancelBtn?.removeEventListener("click", onCancel);
+      hideModal("modal-mp-email");
+      resolve(value);
+    };
+    const onSubmit = (e) => {
+      e.preventDefault();
+      const email = form.payerEmail.value.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errEl.textContent = "Ingresa un correo válido";
+        errEl.classList.remove("hidden");
+        return;
+      }
+      finish(email);
+    };
+    const onCancel = () => finish(null);
+    const cancelBtn = document.querySelector('#modal-mp-email [data-modal="modal-mp-email"]');
+    form.addEventListener("submit", onSubmit);
+    cancelBtn?.addEventListener("click", onCancel);
+    showModal("modal-mp-email");
+    setTimeout(() => form.payerEmail.focus(), 100);
+  });
+}
+
 async function startCheckout() {
+  const payerEmail = await askMpEmail();
+  if (!payerEmail) return;
   const btn = document.getElementById("btn-checkout");
   if (btn) { btn.textContent = "Redirigiendo..."; btn.disabled = true; }
   try {
@@ -721,7 +763,7 @@ async function startCheckout() {
     const res = await fetch("/api/billing/checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ plan, billing: "monthly", coupon }),
+      body: JSON.stringify({ plan, billing: "monthly", coupon, payerEmail }),
     });
     const data = await res.json();
     if (data.init_point) {

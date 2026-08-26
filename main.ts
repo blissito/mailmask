@@ -2130,7 +2130,7 @@ const app = new Elysia({ adapter: node() })
     detail: { tags: ["Billing"], summary: "Create guest checkout session via MercadoPago" },
   })
 
-  .post("/api/billing/checkout", async ({ body: { plan = "basico", billing = "monthly", coupon }, request }) => {
+  .post("/api/billing/checkout", async ({ body: { plan = "basico", billing = "monthly", coupon, payerEmail: rawPayerEmail }, request }) => {
     const ip = getIp(request);
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
@@ -2140,6 +2140,21 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "No autenticado" }), {
         status: 401,
       });
+
+    // MercadoPago exige que `payer_email` sea el correo de la cuenta de MP de quien
+    // paga: si no coincide, el checkout muere con "Tu e-mail no coincide con el de la
+    // suscripción" y no hay forma de omitir el campo (es obligatorio en la API). Por eso
+    // se pregunta aparte, con el correo de MailMask como default. `external_reference`
+    // sigue siendo `user.email`, que es lo que usa el webhook para vincular.
+    const payerEmail = typeof rawPayerEmail === "string" && rawPayerEmail.trim()
+      ? rawPayerEmail.toLowerCase().trim()
+      : user.email;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail)) {
+      return new Response(JSON.stringify({ error: "El correo de MercadoPago no es válido" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      });
+    }
 
     const planKey = plan as keyof typeof PLANS;
     if (!PLANS[planKey]) {
@@ -2190,7 +2205,7 @@ const app = new Elysia({ adapter: node() })
             },
           }),
         },
-        payer_email: user.email,
+        payer_email: payerEmail,
         back_url: backUrl,
         external_reference: user.email,
         notification_url: `${getMainDomainUrl()}/api/webhooks/mercadopago`,
@@ -2221,6 +2236,7 @@ const app = new Elysia({ adapter: node() })
       plan: t.Optional(t.String()),
       billing: t.Optional(t.String()),
       coupon: t.Optional(t.String()),
+      payerEmail: t.Optional(t.String()),
     }),
     detail: { tags: ["Billing"], summary: "Create authenticated checkout session via MercadoPago", security: [{ cookieAuth: [] }] },
   })
@@ -3051,11 +3067,20 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
 
-    const { kind } = addonBody;
+    const { kind, payerEmail: rawPayerEmail } = addonBody;
     if (!(kind in ADDONS)) {
       return new Response(JSON.stringify({ error: "Add-on inválido" }), { status: 400 });
     }
     const addonKind = kind as AddonKind;
+
+    // Mismo motivo que en /api/billing/checkout: `payer_email` tiene que ser el correo
+    // de la cuenta de MercadoPago del pagador, no el de MailMask.
+    const payerEmail = typeof rawPayerEmail === "string" && rawPayerEmail.trim()
+      ? rawPayerEmail.toLowerCase().trim()
+      : auth.email;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail)) {
+      return new Response(JSON.stringify({ error: "El correo de MercadoPago no es válido" }), { status: 400 });
+    }
 
     const user = await getUser(auth.email);
     if (!user) return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404 });
@@ -3108,7 +3133,7 @@ const app = new Elysia({ adapter: node() })
             transaction_amount: ADDONS[addonKind].price / 100,
             currency_id: "MXN",
           },
-          payer_email: auth.email,
+          payer_email: payerEmail,
           back_url: `${getMainDomainUrl()}/app?addon=success`,
           external_reference: `addon:${addon.id}`,
           // El tipo del SDK no declara notification_url, pero la API sí lo acepta.
@@ -3126,7 +3151,7 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Error creando la suscripción del add-on" }), { status: 500 });
     }
   }, {
-    body: t.Object({ kind: t.String() }),
+    body: t.Object({ kind: t.String(), payerEmail: t.Optional(t.String()) }),
     detail: { tags: ["Billing"], summary: "Start add-on subscription checkout", security: [{ cookieAuth: [] }] },
   })
 

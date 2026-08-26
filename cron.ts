@@ -187,13 +187,21 @@ programar("0 5 * * *", async () => {
     const huerfanos: string[] = [];
     for (const u of rows) {
       if (u.subMpId) continue;
-      const res = await fetch(
-        `https://api.mercadopago.com/preapproval/search?payer_email=${encodeURIComponent(u.email)}`,
-        { headers: { Authorization: `Bearer ${mpToken}` }, signal: AbortSignal.timeout(15_000) },
-      );
-      if (!res.ok) continue;
-      const j = await res.json();
-      const dePlan = (j.results ?? []).filter((p: { status: string; external_reference?: string }) =>
+      // Se busca por los dos lados: `external_reference` es el correo de MailMask en el
+      // checkout autenticado, y `payer_email` puede ser otro (el de la cuenta de MP del
+      // pagador, que ahora se pregunta aparte). Buscar solo por payer_email dejaba de
+      // encontrar justamente a quien pagó con otra cuenta de MercadoPago.
+      const encontradas = new Map<string, { id: string; status: string; external_reference?: string }>();
+      for (const q of [`external_reference=${encodeURIComponent(u.email)}`, `payer_email=${encodeURIComponent(u.email)}`]) {
+        const res = await fetch(
+          `https://api.mercadopago.com/preapproval/search?${q}`,
+          { headers: { Authorization: `Bearer ${mpToken}` }, signal: AbortSignal.timeout(15_000) },
+        );
+        if (!res.ok) continue;
+        const j = await res.json();
+        for (const p of j.results ?? []) encontradas.set(p.id, p);
+      }
+      const dePlan = [...encontradas.values()].filter((p) =>
         p.status === "authorized" && !(p.external_reference ?? "").startsWith("addon:"));
       if (dePlan.length > 0) huerfanos.push(`${u.email} → ${dePlan[0].id}`);
     }

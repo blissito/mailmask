@@ -117,13 +117,29 @@ function toggleBilling() {
   applyCouponToCard();
 }
 
-function showEmailModal(plan, billing, btn) {
+// `mode` distingue los dos usos del mismo modal:
+//   "guest" — invitado sin cuenta: el correo sirve para crear la cuenta Y como payer_email.
+//   "mp"    — ya tiene sesión: solo pedimos el correo de su cuenta de MercadoPago, porque
+//             MP rechaza el pago si el payer_email no es el de la cuenta con la que paga
+//             ("Tu e-mail no coincide con el de la suscripción") y el campo es obligatorio
+//             en su API, así que no hay forma de omitirlo.
+function showEmailModal(plan, billing, btn, mode = "guest") {
   const modal = document.getElementById("email-modal");
   const input = document.getElementById("email-modal-input");
   const error = document.getElementById("email-modal-error");
-  const form = document.getElementById("email-modal-form");
-  input.value = "";
+  const title = document.getElementById("email-modal-title");
+  const hint = document.getElementById("email-modal-hint");
+  if (mode === "mp") {
+    title.textContent = "Tu correo de MercadoPago";
+    hint.textContent = "Debe ser el correo de la cuenta de MercadoPago con la que vas a pagar. Si no coincide, MercadoPago rechaza el pago.";
+    input.value = _loggedInUser?.email ?? "";
+  } else {
+    title.textContent = "Tu email para continuar";
+    hint.textContent = "Usaremos este email para tu cuenta y recibos. Debe ser el de tu cuenta de MercadoPago.";
+    input.value = "";
+  }
   error.textContent = "";
+  modal.dataset.mode = mode;
   modal.dataset.plan = plan;
   modal.dataset.billing = billing;
   modal._btn = btn;
@@ -156,20 +172,25 @@ document.addEventListener("DOMContentLoaded", () => {
     error.textContent = "";
     const btn = modal._btn;
     hideEmailModal();
-    await doCheckout(modal.dataset.plan, modal.dataset.billing, btn, email);
+    if (modal.dataset.mode === "mp") {
+      await doAuthCheckout(modal.dataset.plan, modal.dataset.billing, btn, email);
+    } else {
+      await doCheckout(modal.dataset.plan, modal.dataset.billing, btn, email);
+    }
   });
 });
 
 async function startCheckout(plan, billing, btn) {
   if (_loggedInUser) {
-    // Authenticated checkout — skip email modal
-    await doAuthCheckout(plan, billing, btn);
+    // Con sesión igual preguntamos el correo: el de MailMask no tiene por qué ser el de
+    // su cuenta de MercadoPago, y MP rechaza el pago si no coinciden.
+    showEmailModal(plan, billing, btn, "mp");
   } else {
     showEmailModal(plan, billing, btn);
   }
 }
 
-async function doAuthCheckout(plan, billing, btn) {
+async function doAuthCheckout(plan, billing, btn, payerEmail) {
   btn.disabled = true;
   btn.textContent = "Redirigiendo...";
   try {
@@ -177,7 +198,7 @@ async function doAuthCheckout(plan, billing, btn) {
     const res = await fetch("/api/billing/checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ plan, billing: (loadedCoupon && plan === loadedCoupon.plan) ? "monthly" : billing, coupon }),
+      body: JSON.stringify({ plan, billing: (loadedCoupon && plan === loadedCoupon.plan) ? "monthly" : billing, coupon, payerEmail }),
     });
     const data = await res.json();
     if (data.init_point) {

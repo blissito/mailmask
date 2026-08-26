@@ -49,8 +49,15 @@ const rotos: { email: string; mpId: string; motivo: string }[] = [];
 for (const u of rows) {
   let encontrados: Preapproval[] = [];
   try {
-    const r = await mpGet(`/preapproval/search?payer_email=${encodeURIComponent(u.email)}`);
-    encontrados = ((r.results as Preapproval[]) ?? []).filter((p) => p.status === "authorized");
+    // Por los dos lados: en el checkout autenticado `external_reference` es el correo de
+    // MailMask, mientras que `payer_email` es el de la cuenta de MercadoPago del pagador,
+    // que puede ser distinto.
+    const porId = new Map<string, Preapproval>();
+    for (const q of [`external_reference=${encodeURIComponent(u.email)}`, `payer_email=${encodeURIComponent(u.email)}`]) {
+      const r = await mpGet(`/preapproval/search?${q}`);
+      for (const p of ((r.results as Preapproval[]) ?? [])) porId.set(p.id, p);
+    }
+    encontrados = [...porId.values()].filter((p) => p.status === "authorized");
   } catch (err) {
     console.error(`  ${u.email}: error consultando MP — ${String(err)}`);
     continue;

@@ -279,6 +279,26 @@
     </div>
   </div>
 
+  <!-- Modal: correo de MercadoPago.
+       MP exige que `payer_email` sea el correo de la cuenta con la que se paga; si no
+       coincide, el checkout muere con "Tu e-mail no coincide con el de la suscripción".
+       El campo es obligatorio en su API, así que no se puede omitir: hay que preguntarlo. -->
+  <div id="modal-mp-email" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+      <h3 class="text-lg font-bold mb-2">Tu correo de MercadoPago</h3>
+      <p class="text-sm text-zinc-400 mb-4">Debe ser el correo de la cuenta de MercadoPago con la que vas a pagar. Si no coincide, MercadoPago rechaza el pago.</p>
+      <form id="form-mp-email">
+        <input type="email" name="payerEmail" required placeholder="tu@correo.com"
+          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+        <div id="mp-email-error" class="text-red-400 text-sm mt-2 hidden"></div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-mp-email">Cancelar</button>
+          <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Continuar al pago</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Modal: Show API Key (once) -->
   <div id="modal-apikey-show" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
     <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg p-6">
