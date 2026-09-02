@@ -113,6 +113,11 @@
       <div class="blog-content">
         <p>Llega una captura de pantalla: Gmail devolvió un correo a <code>hola@</code> un dominio de cliente con <code>550 5.1.1 Requested action not taken: mailbox unavailable</code>. Se revisa lo de siempre y todo está impecable. El MX apunta a <code>inbound-smtp.us-east-1.amazonaws.com</code>, el SPF está, la identidad del dominio en SES dice <code>Success</code> y los tres CNAME de DKIM coinciden con los tokens guardados. El panel del producto lo muestra como <strong>verificado</strong>.</p>
 
+        <figure class="screenshot">
+          <img src="/blog/img/rebote-550-gmail.jpg" width="738" height="1005" alt="Rebote de Gmail: 'No se encontró la dirección', con la respuesta del servidor remoto 550 5.1.1 Requested action not taken: mailbox unavailable" loading="lazy" />
+          <figcaption>El rebote tal como lo ve el remitente en Gmail. La línea que importa es la última: <code>550 5.1.1</code> la emite SES, no Gmail.</figcaption>
+        </figure>
+
         <p>Y aun así no entra un solo correo. Este artículo es sobre por qué eso es perfectamente coherente, cómo se reconstruye lo que pasó con CloudTrail en cinco minutos, y el patrón de código que vuelve el problema imposible de repetir: <strong>reconciliar la base de datos contra AWS al arrancar</strong>.</p>
 
         <h2>¿Qué necesita un dominio para recibir correo en Amazon SES?</h2>
