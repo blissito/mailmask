@@ -40,6 +40,9 @@ async function getS3() {
 }
 
 const SNS_TOPIC_ARN = process.env.SNS_TOPIC_ARN ?? "";
+// Tópico al que SES publica rebotes y quejas de salida (event destination de
+// cada config set). Sin él, la lista de supresión nunca se alimenta.
+const SNS_OUTBOUND_TOPIC_ARN = process.env.SNS_OUTBOUND_TOPIC_ARN ?? "";
 const RECEIPT_RULE_SET = process.env.SES_RULE_SET ?? "formmy-email-forwarding";
 const S3_BUCKET = process.env.S3_BUCKET ?? "mailmask-inbound";
 
@@ -91,7 +94,7 @@ function configSetName(domain: string): string {
 
 async function createConfigurationSet(domain: string): Promise<void> {
   const ses = await getSesOutbound();
-  const { CreateConfigurationSetCommand, CreateConfigurationSetEventDestinationCommand } = await import("@aws-sdk/client-ses");
+  const { CreateConfigurationSetCommand } = await import("@aws-sdk/client-ses");
   const name = configSetName(domain);
 
   try {
@@ -103,23 +106,38 @@ async function createConfigurationSet(domain: string): Promise<void> {
     if (!String(err).includes("AlreadyExists")) throw err;
   }
 
-  const snsTopicArn = process.env.SNS_OUTBOUND_TOPIC_ARN;
-  if (snsTopicArn) {
-    try {
-      await ses.send(new CreateConfigurationSetEventDestinationCommand({
-        ConfigurationSetName: name,
-        EventDestination: {
-          Name: `${name}-events`,
-          Enabled: true,
-          MatchingEventTypes: ["bounce", "complaint"],
-          SNSDestination: { TopicARN: snsTopicArn },
-        },
-      }));
-    } catch (err: any) {
-      if (!String(err).includes("AlreadyExists")) {
-        log("warn", "ses", "Could not create event destination", { domain, error: String(err) });
-      }
-    }
+  await ensureConfigSetEventDestination(domain);
+}
+
+/**
+ * Engancha el config set al tópico de rebotes/quejas. Va aparte de la creación
+ * del set porque los sets se crearon durante meses sin SNS_OUTBOUND_TOPIC_ARN y
+ * hay que poder rellenarles el destino después (lo hace ensureDomainInbound).
+ * Idempotente: AlreadyExists se ignora.
+ */
+export async function ensureConfigSetEventDestination(domain: string): Promise<{ created: boolean }> {
+  if (!SNS_OUTBOUND_TOPIC_ARN) return { created: false };
+
+  const ses = await getSesOutbound();
+  const { CreateConfigurationSetEventDestinationCommand } = await import("@aws-sdk/client-ses");
+  const name = configSetName(domain);
+
+  try {
+    await ses.send(new CreateConfigurationSetEventDestinationCommand({
+      ConfigurationSetName: name,
+      EventDestination: {
+        Name: `${name}-events`,
+        Enabled: true,
+        MatchingEventTypes: ["bounce", "complaint"],
+        SNSDestination: { TopicARN: SNS_OUTBOUND_TOPIC_ARN },
+      },
+    }));
+    log("info", "ses", "Event destination created", { domain, configSet: name });
+    return { created: true };
+  } catch (err: any) {
+    if (String(err).includes("AlreadyExists")) return { created: false };
+    log("warn", "ses", "Could not create event destination", { domain, error: String(err) });
+    return { created: false };
   }
 }
 
@@ -919,17 +937,26 @@ async function getSns() {
   return _sns;
 }
 
-export async function ensureSnsSubscription(appUrl: string): Promise<string> {
-  if (!SNS_TOPIC_ARN) {
-    log("warn", "ses", "SNS_TOPIC_ARN not set, skipping SNS subscription check");
+export type SnsSubscriptionKind = "inbound" | "outbound";
+
+/**
+ * Asegura la suscripción HTTPS de un tópico SNS al webhook que le toca:
+ * `inbound` (mailmask-notifications → /api/webhooks/ses-inbound) y `outbound`
+ * (rebotes y quejas → /api/webhooks/ses-events).
+ */
+export async function ensureSnsSubscription(appUrl: string, kind: SnsSubscriptionKind = "inbound"): Promise<string> {
+  const topicArn = kind === "inbound" ? SNS_TOPIC_ARN : SNS_OUTBOUND_TOPIC_ARN;
+  const path = kind === "inbound" ? "/api/webhooks/ses-inbound" : "/api/webhooks/ses-events";
+  if (!topicArn) {
+    log("warn", "ses", `${kind === "inbound" ? "SNS_TOPIC_ARN" : "SNS_OUTBOUND_TOPIC_ARN"} not set, skipping SNS subscription check`);
     return "skipped";
   }
 
-  const endpoint = `${appUrl.replace(/\/+$/, "")}/api/webhooks/ses-inbound`;
+  const endpoint = `${appUrl.replace(/\/+$/, "")}${path}`;
   const sns = await getSns();
   const { ListSubscriptionsByTopicCommand, SubscribeCommand } = await import("@aws-sdk/client-sns");
 
-  const res = await sns.send(new ListSubscriptionsByTopicCommand({ TopicArn: SNS_TOPIC_ARN }));
+  const res = await sns.send(new ListSubscriptionsByTopicCommand({ TopicArn: topicArn }));
   const subscriptions = res.Subscriptions ?? [];
 
   const existing = subscriptions.find(
@@ -937,15 +964,10 @@ export async function ensureSnsSubscription(appUrl: string): Promise<string> {
   );
 
   if (existing) {
-    // If pending confirmation, delete and re-subscribe to trigger a new confirmation
+    // If pending confirmation, re-subscribe to trigger a new confirmation
     if (existing.SubscriptionArn === "PendingConfirmation") {
       log("info", "ses", "SNS subscription pending, will re-subscribe", { endpoint });
-      // Can't delete PendingConfirmation subs, just re-subscribe to trigger new confirmation
-      await sns.send(new SubscribeCommand({
-        TopicArn: SNS_TOPIC_ARN,
-        Protocol: "https",
-        Endpoint: endpoint,
-      }));
+      await sns.send(new SubscribeCommand({ TopicArn: topicArn, Protocol: "https", Endpoint: endpoint }));
       log("info", "ses", "Re-subscribed SNS to trigger confirmation", { endpoint });
       return "re-subscribed";
     }
@@ -953,11 +975,7 @@ export async function ensureSnsSubscription(appUrl: string): Promise<string> {
     return "exists";
   }
 
-  await sns.send(new SubscribeCommand({
-    TopicArn: SNS_TOPIC_ARN,
-    Protocol: "https",
-    Endpoint: endpoint,
-  }));
+  await sns.send(new SubscribeCommand({ TopicArn: topicArn, Protocol: "https", Endpoint: endpoint }));
 
   log("info", "ses", "Created SNS subscription", { endpoint });
   return "created";

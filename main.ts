@@ -453,8 +453,9 @@ function buildSnsStringToSign(body: Record<string, string>): string {
 async function verifySnsSignature(
   body: Record<string, string>,
 ): Promise<boolean> {
-  const expectedTopicArn = process.env.SNS_TOPIC_ARN;
-  if (expectedTopicArn && body.TopicArn !== expectedTopicArn) return false;
+  // Dos tópicos legítimos: entrada (SES inbound) y salida (rebotes/quejas).
+  const allowedTopics = [process.env.SNS_TOPIC_ARN, process.env.SNS_OUTBOUND_TOPIC_ARN].filter(Boolean);
+  if (allowedTopics.length && !allowedTopics.includes(body.TopicArn)) return false;
 
   const certUrl = body.SigningCertURL;
   if (!certUrl) return false;
@@ -471,6 +472,57 @@ async function verifySnsSignature(
     log("error", "server", "SNS signature verification failed", { error: String(err) });
     return false;
   }
+}
+
+/**
+ * Rebotes y quejas de salida (SES → SNS → aquí). El dominio se resuelve por el
+ * remitente del correo original, no por el nombre del config set: ese nombre
+ * cambia los puntos por guiones y un dominio con guión (`mi-marca.com`) no se
+ * puede reconstruir. Sólo el rebote Permanent suprime; un buzón lleno
+ * (Transient) no debe bloquear al contacto para siempre.
+ */
+export async function registrarEventoSes(message: any): Promise<{ suppressed: number }> {
+  const eventType = String(message.eventType ?? message.notificationType ?? "").toLowerCase();
+  let recipients: { emailAddress?: string }[] = [];
+  let reason = "";
+  if (eventType === "bounce") {
+    const bounce = message.bounce ?? message;
+    if (bounce.bounceType !== "Permanent") {
+      log("info", "ses", "Transient bounce, not suppressing", { bounceType: bounce.bounceType, source: message.mail?.source });
+      return { suppressed: 0 };
+    }
+    recipients = bounce.bouncedRecipients ?? [];
+    reason = "bounce:Permanent";
+  } else if (eventType === "complaint") {
+    recipients = (message.complaint ?? message).complainedRecipients ?? [];
+    reason = "complaint";
+  } else {
+    return { suppressed: 0 };
+  }
+
+  const source = String(message.mail?.source ?? "");
+  let domainName = source.includes("@") ? source.split("@").pop()!.replace(/>$/, "").toLowerCase() : "";
+  if (!domainName) {
+    const configSet = message.mail?.tags?.["ses:configuration-set"]?.[0] ?? "";
+    domainName = configSet.replace(/^mailmask-/, "").replace(/-/g, ".");
+  }
+  if (!domainName) return { suppressed: 0 };
+
+  const { getDomainByName } = await import("./db.js");
+  const domainRecord = await getDomainByName(domainName);
+  if (!domainRecord) {
+    log("warn", "ses", "SES event for unknown domain", { domainName, eventType });
+    return { suppressed: 0 };
+  }
+
+  let suppressed = 0;
+  for (const r of recipients) {
+    if (!r.emailAddress) continue;
+    await addSuppression(domainRecord.id, r.emailAddress, reason);
+    suppressed++;
+    log("info", "ses", `Added to suppression (${reason})`, { email: r.emailAddress, domain: domainName });
+  }
+  return { suppressed };
 }
 
 const GRACE_PERIOD_MS = 15 * 24 * 60 * 60 * 1000; // 15 days
@@ -4632,10 +4684,29 @@ const app = new Elysia({ adapter: node() })
   .post("/api/webhooks/ses-events", async ({ request }) => {
     const body = await request.json();
 
+    // Todo mensaje —incluida la confirmación de suscripción— va firmado. Antes
+    // este webhook no verificaba nada: cualquiera podía inventar un rebote y
+    // meter a un destinatario ajeno en la lista de supresión.
+    if (!body.Type || !body.Signature || !body.SigningCertURL) {
+      return new Response(JSON.stringify({ error: "Invalid SNS message" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    const valid = await verifySnsSignature(body);
+    if (!valid) {
+      log("warn", "server", "SES events: invalid SNS signature");
+      return new Response(JSON.stringify({ error: "Invalid signature" }), {
+        status: 403,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
     if (body.Type === "SubscriptionConfirmation" && body.SubscribeURL) {
       const parsed = new URL(body.SubscribeURL);
       if (parsed.hostname.endsWith(".amazonaws.com") && parsed.protocol === "https:") {
         await fetch(body.SubscribeURL);
+        log("info", "ses", "SNS subscription confirmed", { endpoint: request.url });
       }
       return new Response("OK", { status: 200 });
     }
@@ -4644,41 +4715,7 @@ const app = new Elysia({ adapter: node() })
 
     try {
       const message = JSON.parse(body.Message);
-      const eventType = message.eventType ?? message.notificationType;
-
-      if (eventType === "Bounce" || eventType === "bounce") {
-        const bounce = message.bounce ?? message;
-        const recipients = bounce.bouncedRecipients ?? [];
-        for (const r of recipients) {
-          const email = r.emailAddress;
-          const configSet = message.mail?.tags?.["ses:configuration-set"]?.[0] ?? "";
-          const domainName = configSet.replace("mailmask-", "").replace(/-/g, ".");
-          if (domainName) {
-            const { getDomainByName } = await import("./db.js");
-            const domainRecord = await getDomainByName(domainName);
-            if (domainRecord) {
-              await addSuppression(domainRecord.id, email, `bounce:${bounce.bounceType}`);
-              log("info", "ses", "Added to suppression (bounce)", { email, domain: domainName });
-            }
-          }
-        }
-      } else if (eventType === "Complaint" || eventType === "complaint") {
-        const complaint = message.complaint ?? message;
-        const recipients = complaint.complainedRecipients ?? [];
-        for (const r of recipients) {
-          const email = r.emailAddress;
-          const configSet = message.mail?.tags?.["ses:configuration-set"]?.[0] ?? "";
-          const domainName = configSet.replace("mailmask-", "").replace(/-/g, ".");
-          if (domainName) {
-            const { getDomainByName } = await import("./db.js");
-            const domainRecord = await getDomainByName(domainName);
-            if (domainRecord) {
-              await addSuppression(domainRecord.id, email, "complaint");
-              log("info", "ses", "Added to suppression (complaint)", { email, domain: domainName });
-            }
-          }
-        }
-      }
+      await registrarEventoSes(message);
     } catch (err) {
       log("error", "ses", "SES event processing error", { error: String(err) });
     }
@@ -4687,8 +4724,6 @@ const app = new Elysia({ adapter: node() })
   }, {
     detail: { tags: ["Webhooks"], summary: "SES bounce/complaint events via SNS", hide: true },
   })
-
-  // --- Webhook: SES inbound via SNS ---
 
   .post("/api/webhooks/ses-inbound", async ({ request }) => {
     const body = await request.json();
@@ -5540,8 +5575,10 @@ if (esServidor) (async () => {
     if (normalized > 0) log("info", "startup", `Normalized ${normalized} suppression key(s) to lowercase`);
 
     const appUrl = process.env.APP_URL ?? "https://www.mailmask.studio";
-    const subStatus = await ensureSnsSubscription(appUrl);
-    log("info", "startup", `SNS subscription: ${subStatus}`);
+    const subStatus = await ensureSnsSubscription(appUrl, "inbound");
+    log("info", "startup", `SNS subscription (inbound): ${subStatus}`);
+    const outStatus = await ensureSnsSubscription(appUrl, "outbound");
+    log("info", "startup", `SNS subscription (outbound): ${outStatus}`);
   } catch (err) {
     log("error", "startup", "Startup repair failed", { error: String(err) });
   }

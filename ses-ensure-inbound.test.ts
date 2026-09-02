@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 
 const comandos: string[] = [];
 let reglaExiste = false;
+let eventDestExiste = false;
 
 describe("ensureDomainInbound", () => {
   // deno-lint-ignore no-explicit-any
@@ -15,6 +16,7 @@ describe("ensureDomainInbound", () => {
 
   before(async () => {
     process.env.SNS_TOPIC_ARN = "arn:aws:sns:us-east-1:1:test";
+    process.env.SNS_OUTBOUND_TOPIC_ARN = "arn:aws:sns:us-east-1:1:out";
     mock.module("@aws-sdk/client-ses", {
       namedExports: {
         SESClient: class {
@@ -27,6 +29,9 @@ describe("ensureDomainInbound", () => {
             if (cmd.tipo === "CreateReceiptRule") reglaExiste = true;
             if (cmd.tipo === "CreateConfigurationSet") {
               throw new Error("ConfigurationSetAlreadyExistsException: AlreadyExists");
+            }
+            if (cmd.tipo === "CreateEventDest" && eventDestExiste) {
+              throw new Error("EventDestinationAlreadyExistsException: AlreadyExists");
             }
             return {};
           }
@@ -46,6 +51,22 @@ describe("ensureDomainInbound", () => {
     const r = await ensureDomainInbound("brendago.design");
     assert.equal(r.ruleCreated, true);
     assert.ok(comandos.includes("CreateReceiptRule"));
+  });
+
+  it("rellena el event destination en un config set que ya existía", async () => {
+    comandos.length = 0;
+    reglaExiste = true;
+    eventDestExiste = false;
+    await ensureDomainInbound("brendago.design");
+    assert.ok(comandos.includes("CreateEventDest"));
+  });
+
+  it("tolera un event destination ya existente", async () => {
+    comandos.length = 0;
+    reglaExiste = true;
+    eventDestExiste = true;
+    const r = await ensureDomainInbound("brendago.design");
+    assert.equal(r.ruleCreated, false);
   });
 
   it("no toca la regla si ya existe", async () => {
