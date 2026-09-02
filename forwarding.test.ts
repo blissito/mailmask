@@ -11,8 +11,7 @@ import {
   listLogs, updateUserSubscription, createRule,
   findConversationByThread, listConversations,
   deleteUser, deleteDomain,
-  type Rule, type ForwardQueueItem,
-} from "./db.ts";
+  addSuppression, type Rule, type ForwardQueueItem,} from "./db.ts";
 import { hashPassword } from "./auth.ts";
 import { checkRateLimit } from "./rate-limit.ts";
 
@@ -235,6 +234,25 @@ describe("processInbound", () => {
     assert.equal(processed, true);
 
     if (queued) dequeueForward(queued.id);
+  });
+
+  it("no reenvía a un destino en la lista de supresión", async () => {
+    createAlias(fwdDomainId, "rebota", ["suprimido@example.com"]);
+    addSuppression(fwdDomainId, "suprimido@example.com", "bounce:Permanent");
+    const msgId = `supp-test-${crypto.randomUUID()}`;
+    const result = await processInbound(makeSnsNotification({
+      from: "sender@external.com",
+      to: `rebota@${fwdDomain}`,
+      subject: "A un buzón muerto",
+      messageId: msgId,
+    }));
+    assert.equal(result.action, "processed");
+    const queued = listForwardQueue().find((q) => q.to === "suprimido@example.com");
+    assert.equal(queued, undefined, "no debe encolarse un destino suprimido");
+    const entry = listLogs(fwdDomainId, 20).find((l) => l.forwardedTo === "suprimido@example.com");
+    assert.ok(entry);
+    assert.equal(entry!.status, "discarded");
+    assert.match(entry!.error ?? "", /supresión/);
   });
 
   it("dedup prevents reprocessing", async () => {

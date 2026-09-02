@@ -1,4 +1,4 @@
-import { getDomainByName, getAlias, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, type Rule, type ForwardQueueItem } from "./db.js";
+import { getDomainByName, getAlias, isSuppressed, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, type Rule, type ForwardQueueItem } from "./db.js";
 import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchEmailHeadersFromS3, sendFromDomain } from "./ses.js";
 import { sendTemplate, firstEmailReceived } from "./emails.js";
 import { checkRateLimit } from "./rate-limit.js";
@@ -636,6 +636,21 @@ export async function evaluateRules(rules: Rule[], email: { to: string; from: st
 // --- Forward helper ---
 
 async function doForward(rawContent: string, from: string, to: string, domainId: string, domainName: string, originalTo: string, subject: string, logDays = 15, s3Bucket?: string, s3Key?: string): Promise<void> {
+  // Un destino que rebotó Permanent o se quejó no vuelve a recibir nada, ni
+  // por reenvío: insistir sólo daña la reputación del dominio en SES.
+  if (isSuppressed(domainId, to)) {
+    log("warn", "forwarding", "Destination suppressed, skipping forward", { to, domain: domainName });
+    await addLog({
+      domainId,
+      timestamp: new Date().toISOString(),
+      from, to: originalTo, subject,
+      status: "discarded",
+      forwardedTo: to,
+      sizeBytes: rawContent.length,
+      error: "Destino en lista de supresión",
+    }, logDays);
+    return;
+  }
   if (!rawContent) {
     // S3 fetch failed — enqueue with S3 coords for later retry
     if (s3Bucket && s3Key) {

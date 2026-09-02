@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verificado no significa que recibe: anatomía de un dominio en Amazon SES — MailMask</title>
+    <meta name="description" content="Un dominio con DNS perfecto, identidad verificada y DKIM en verde puede rebotar todo con 550 5.1.1. Los tres recursos que necesita un dominio en SES, cómo CloudTrail reconstruye qué pasó y el patrón de reconciliación que lo deja autocurable." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/dominio-verificado-que-rebota-anatomia-ses" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="Verificado no significa que recibe: anatomía de un dominio en Amazon SES" />
+    <meta property="og:description" content="Un dominio con DNS perfecto, identidad verificada y DKIM en verde puede rebotar todo con 550 5.1.1. Los tres recursos que necesita un dominio en SES y el patrón de reconciliación que lo deja autocurable." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/dominio-verificado-que-rebota-anatomia-ses" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="og:image" content="https://www.mailmask.studio/blog/img/anatomia-ses.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Los tres recursos que necesita un dominio en Amazon SES" />
+    <meta property="og:image:secure_url" content="https://www.mailmask.studio/blog/img/anatomia-ses.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta name="twitter:image" content="https://www.mailmask.studio/blog/img/anatomia-ses.jpg" />
+    <meta property="article:published_time" content="2026-09-02" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Verificado no significa que recibe: anatomía de un dominio en Amazon SES" />
+    <meta name="twitter:description" content="Los tres recursos que necesita un dominio en SES, cómo CloudTrail reconstruye qué pasó y el patrón de reconciliación que lo deja autocurable." />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Verificado no significa que recibe: anatomía de un dominio en Amazon SES",
+      "description": "Un dominio con DNS perfecto, identidad verificada y DKIM en verde puede rebotar todo con 550 5.1.1. Los tres recursos que necesita un dominio en SES, cómo CloudTrail reconstruye qué pasó y el patrón de reconciliación que lo deja autocurable.",
+      "datePublished": "2026-09-02",
+      "dateModified": "2026-09-02",
+      "image": "https://www.mailmask.studio/blog/img/anatomia-ses.jpg",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/dominio-verificado-que-rebota-anatomia-ses"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Verificado no significa que recibe: anatomía de un dominio en Amazon SES", "item": "https://www.mailmask.studio/blog/dominio-verificado-que-rebota-anatomia-ses" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Qué necesita un dominio para recibir correo en Amazon SES?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Tres recursos distintos, creados por llamadas distintas de la API: la identidad del dominio (lo que se 'verifica'), una regla de recepción dentro del rule set activo que liste al dominio entre sus destinatarios, y un configuration set para el correo de salida. El MX en DNS solo apunta el tráfico hacia SES; quien decide si el correo se acepta es la regla de recepción."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Por qué un dominio verificado en SES puede rebotar todo con 550 5.1.1?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Porque 'verificado' describe solo la identidad. Si en el rule set activo no hay ninguna regla cuyos destinatarios incluyan al dominio, SES rechaza cada mensaje en la conversación SMTP con 550 5.1.1 'mailbox unavailable', aunque la identidad y el DKIM estén en Success. El remitente recibe un rebote de su propio proveedor y el dueño del dominio no ve nada."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo se averigua quién borró un recurso en AWS?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Con CloudTrail: aws cloudtrail lookup-events --lookup-attribute AttributeKey=EventName,AttributeValue=DeleteReceiptRule devuelve cada llamada con su fecha, el usuario IAM que la hizo, los parámetros y el user agent. Combinando DeleteReceiptRule, DeleteIdentity, CreateReceiptRule y VerifyDomainIdentity se reconstruye la línea de tiempo completa sin tocar el servidor."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo se evita que la base de datos y AWS se desincronicen?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Con una reconciliación idempotente al arrancar: para cada dominio de la base, preguntar a SES si existe su regla de recepción (DescribeReceiptRule) y su configuration set, y crearlos si faltan. Cuesta unas tres llamadas por dominio y convierte cualquier desajuste, incluido uno causado por restaurar un respaldo, en algo que se corrige solo en el siguiente despliegue."
+          }
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
+      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Verificado no significa que recibe: anatomía de un dominio en Amazon SES</h1>
+        <div class="meta">
+          <span>📅 2 Sep 2026</span>
+          <span>⏱ 7 min de lectura</span>
+        </div>
+      </header>
+
+      <div class="blog-content">
+        <p>Llega una captura de pantalla: Gmail devolvió un correo a <code>hola@</code> un dominio de cliente con <code>550 5.1.1 Requested action not taken: mailbox unavailable</code>. Se revisa lo de siempre y todo está impecable. El MX apunta a <code>inbound-smtp.us-east-1.amazonaws.com</code>, el SPF está, la identidad del dominio en SES dice <code>Success</code> y los tres CNAME de DKIM coinciden con los tokens guardados. El panel del producto lo muestra como <strong>verificado</strong>.</p>
+
+        <p>Y aun así no entra un solo correo. Este artículo es sobre por qué eso es perfectamente coherente, cómo se reconstruye lo que pasó con CloudTrail en cinco minutos, y el patrón de código que vuelve el problema imposible de repetir: <strong>reconciliar la base de datos contra AWS al arrancar</strong>.</p>
+
+        <h2>¿Qué necesita un dominio para recibir correo en Amazon SES?</h2>
+
+        <p><strong>Tres recursos distintos, creados por tres llamadas distintas de la API.</strong> Se suele hablar de "verificar el dominio" como si fuera un solo paso, pero verificar solo toca al primero:</p>
+
+        <ol>
+          <li><strong>La identidad</strong> (<code>VerifyDomainIdentity</code> + <code>VerifyDomainDkim</code>). Es lo que produce el TXT y los CNAME que pegas en tu DNS, y lo único que SES marca como <em>verified</em>. Sirve para <strong>enviar</strong> desde el dominio.</li>
+          <li><strong>La regla de recepción</strong> (<code>CreateReceiptRule</code>) dentro del <em>rule set</em> activo. Lista los dominios o direcciones que SES acepta y qué hacer con cada mensaje: guardarlo en S3, avisar por SNS, invocar una Lambda. Es lo único que decide si el correo <strong>entra</strong>.</li>
+          <li><strong>El configuration set</strong> (<code>CreateConfigurationSet</code>). Etiqueta el correo de salida para recibir eventos de rebote y queja. No afecta la recepción, pero sin él la lista de supresión nunca se alimenta.</li>
+        </ol>
+
+        <p>El MX en DNS no forma parte de la lista: solo apunta el tráfico hacia SES. Una vez que el mensaje llega, quien lo acepta o lo rechaza es la regla.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 720 300" width="100%" role="img" aria-labelledby="diagAnatomia" xmlns="http://www.w3.org/2000/svg">
+            <title id="diagAnatomia">Camino de un correo entrante: el DNS apunta a SES, SES consulta el rule set activo, y solo si hay una regla con el dominio entre sus destinatarios el mensaje se guarda en S3 y se avisa a la app; si no hay regla, responde 550. La identidad y el configuration set son recursos aparte que no participan en esa decisión.</title>
+            <defs>
+              <marker id="arwAnat" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" fill="rgb(var(--mask-500))" />
+              </marker>
+              <marker id="arwAnatRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" fill="#f87171" />
+              </marker>
+            </defs>
+
+            <!-- Row 1: the inbound path -->
+            <rect x="16" y="40" width="120" height="52" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="76" y="62" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Gmail</text>
+            <text x="76" y="80" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">remitente</text>
+
+            <line x1="136" y1="66" x2="180" y2="66" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwAnat)" />
+            <text x="158" y="56" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">MX</text>
+
+            <rect x="182" y="40" width="130" height="52" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="247" y="62" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">SES inbound</text>
+            <text x="247" y="80" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">us-east-1</text>
+
+            <line x1="312" y1="66" x2="356" y2="66" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwAnat)" />
+            <text x="334" y="56" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">consulta</text>
+
+            <rect x="358" y="28" width="170" height="76" rx="8" fill="#18181b" stroke="rgb(var(--mask-500))" stroke-width="2" />
+            <text x="443" y="50" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Rule set activo</text>
+            <text x="443" y="68" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">¿hay una regla con</text>
+            <text x="443" y="84" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">este dominio en Recipients?</text>
+
+            <!-- yes branch -->
+            <line x1="528" y1="52" x2="580" y2="52" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwAnat)" />
+            <text x="554" y="44" text-anchor="middle" fill="#4ade80" font-family="system-ui, sans-serif" font-size="10" font-weight="600">sí</text>
+            <rect x="582" y="30" width="122" height="44" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="643" y="48" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="12" font-weight="600">S3 + SNS → app</text>
+            <text x="643" y="64" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">reenvío, reglas, bandeja</text>
+
+            <!-- no branch -->
+            <line x1="528" y1="84" x2="580" y2="84" stroke="#f87171" stroke-width="2" marker-end="url(#arwAnatRed)" />
+            <text x="554" y="98" text-anchor="middle" fill="#f87171" font-family="system-ui, sans-serif" font-size="10" font-weight="600">no</text>
+            <rect x="582" y="80" width="122" height="44" rx="8" fill="#18181b" stroke="#f87171" />
+            <text x="643" y="98" text-anchor="middle" fill="#fca5a5" font-family="system-ui, sans-serif" font-size="12" font-weight="600">550 5.1.1</text>
+            <text x="643" y="114" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">mailbox unavailable</text>
+
+            <!-- Row 2: the other two resources, outside the decision -->
+            <line x1="16" y1="160" x2="704" y2="160" stroke="#3f3f46" stroke-dasharray="4 4" />
+            <text x="16" y="182" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11" letter-spacing="1.5">NO PARTICIPAN EN ESA DECISIÓN</text>
+
+            <rect x="16" y="196" width="220" height="76" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="126" y="218" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Identidad</text>
+            <text x="126" y="236" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">VerifyDomainIdentity + DKIM</text>
+            <text x="126" y="254" text-anchor="middle" fill="#4ade80" font-family="system-ui, sans-serif" font-size="11">esto es lo "verificado"</text>
+
+            <rect x="250" y="196" width="220" height="76" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="360" y="218" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Configuration set</text>
+            <text x="360" y="236" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">etiqueta el correo de salida</text>
+            <text x="360" y="254" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">rebotes y quejas → SNS</text>
+
+            <rect x="484" y="196" width="220" height="76" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="594" y="218" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">DNS del cliente</text>
+            <text x="594" y="236" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">MX, SPF, 3 CNAME de DKIM</text>
+            <text x="594" y="254" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">solo apunta el tráfico</text>
+          </svg>
+          <figcaption>La única pregunta que decide si un correo entra es si el rule set activo tiene una regla con ese dominio. La identidad, el DNS y el configuration set pueden estar perfectos y no cambia la respuesta.</figcaption>
+        </figure>
+
+        <h2>¿Por qué un dominio verificado puede rebotar todo con 550 5.1.1?</h2>
+
+        <p><strong>Porque "verificado" describe la identidad, y la recepción depende de la regla.</strong> Son objetos independientes en la API de SES: se crean por separado, se borran por separado, y ninguna consulta de estado del uno dice nada del otro. <code>GetIdentityVerificationAttributes</code> devuelve <code>Success</code> feliz mientras el rule set no tiene ni idea de que el dominio existe.</p>
+
+        <p>El código de respuesta lo confirma. <code>550 5.1.1</code> es un rechazo <em>permanente</em> emitido durante la conversación SMTP, en el comando <code>RCPT TO</code>. SES no está diciendo "no pude entregarlo"; está diciendo "esa dirección no existe aquí". Y desde su punto de vista es verdad: sin regla, no hay ningún destino configurado para ese dominio.</p>
+
+        <p>Lo que hace al caso interesante es la <strong>asimetría de la señal</strong>. El rechazo se lo lleva el remitente: Gmail le arma un correo bonito con un ícono de interrogación. El dueño del dominio no recibe nada, porque para recibir el aviso tendría que recibir correo. Y el producto que administra el dominio tampoco, porque su verificación pregunta por la identidad. Todos los indicadores en verde, cero mensajes entrando.</p>
+
+        <h2>¿Cómo se averigua quién borró un recurso en AWS?</h2>
+
+        <p><strong>Con CloudTrail, sin tocar el servidor.</strong> Cada llamada a la API de SES queda registrada con fecha, usuario IAM, parámetros y hasta la versión del SDK que la hizo. Una consulta por nombre de evento devuelve la historia completa:</p>
+
+        <pre><code>aws cloudtrail lookup-events \
+  --lookup-attribute AttributeKey=EventName,AttributeValue=DeleteReceiptRule \
+  --query 'Events[].CloudTrailEvent' --output json</code></pre>
+
+        <p>Repetida para <code>DeleteIdentity</code>, <code>CreateReceiptRule</code> y <code>VerifyDomainIdentity</code>, la línea de tiempo del dominio quedó así (horas en UTC):</p>
+
+        <table>
+          <thead>
+            <tr><th>Cuándo</th><th>Evento en CloudTrail</th><th>Qué significa</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>29 jul, 23:04:55</td><td><code>DeleteReceiptRule</code>, <code>DeleteConfigurationSet</code>, <code>DeleteIdentity</code></td><td>La app borró el dominio completo. Tres llamadas en el mismo segundo, desde el user agent del servidor: es el endpoint de eliminar dominio.</td></tr>
+            <tr><td>29 jul, entre 23:05 y 23:50</td><td>— (nada en CloudTrail)</td><td>Se restauró un respaldo de la base de datos. La fila del dominio revivió; sus recursos en SES no, porque un respaldo de SQLite no sabe nada de AWS.</td></tr>
+            <tr><td>18 ago, 04:19:25</td><td><code>VerifyDomainIdentity</code>, <code>VerifyDomainDkim</code></td><td>Alguien notó que la identidad faltaba y la recreó a mano. Solo la identidad: la verificación volvió a verde.</td></tr>
+            <tr><td>1 sep, ~01:36</td><td>— (el rebote vive en Gmail, no en AWS)</td><td>Un cliente escribe a <code>hola@</code> y recibe el 550.</td></tr>
+          </tbody>
+        </table>
+
+        <p>Dos detalles que solo CloudTrail puede dar. El primero es el <strong>user agent</strong>: <code>aws-sdk-js/3.995.0 … os/linux#6.12.47-fly</code> apunta directo a la máquina de producción, así que no fue un humano en la consola. El segundo es el hueco: la restauración no deja rastro en AWS, y precisamente por eso es el sospechoso. Cuando la base de datos dice una cosa y AWS otra, y AWS no registra el cambio, el cambio fue en la base.</p>
+
+        <h2>¿Cómo se evita que la base de datos y AWS se desincronicen?</h2>
+
+        <p><strong>Reconciliando al arrancar: para cada dominio de la base, preguntar a SES si sus recursos existen y crearlos si no.</strong> No hace falta detectar el caso raro; basta con que el estado deseado (la base) se imponga sobre el estado real (AWS) cada vez que el proceso levanta.</p>
+
+        <p>La función es corta porque la API ya es idempotente en casi todo. <code>DescribeReceiptRule</code> lanza <code>RuleDoesNotExistException</code> si falta, y <code>CreateConfigurationSet</code> lanza <code>AlreadyExists</code> si sobra; los dos errores son la señal, no un problema:</p>
+
+        <pre><code>export async function ensureDomainInbound(domain: string) {
+  const ruleName = `mailmask-${domain.replace(/\./g, "-")}`;
+  let ruleCreated = false;
+
+  try {
+    await ses.send(new DescribeReceiptRuleCommand({ RuleSetName, RuleName: ruleName }));
+  } catch (err) {
+    if (!String(err).includes("RuleDoesNotExist")) throw err;
+    await createReceiptRule(domain);   // S3Action + TopicArn, igual que en el alta
+    ruleCreated = true;
+  }
+
+  await createConfigurationSet(domain); // tolera AlreadyExists
+  await ensureConfigSetEventDestination(domain); // rebotes y quejas → SNS
+  return { ruleCreated };
+}
+
+// Al arrancar, y también en POST /api/domains/:id/verify
+for (const d of listAllDomains()) await ensureDomainInbound(d.domain);</code></pre>
+
+        <p>El costo es medido, no estimado: <strong>tres llamadas a SES por dominio, unos 350 ms cada dominio</strong> en la reconciliación de producción. Con tres dominios, un segundo al arrancar. Con trescientos, dos minutos, que ya pediría paralelizar o correr en segundo plano, pero sigue siendo barato comparado con un mes de correo perdido.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 720 250" width="100%" role="img" aria-labelledby="diagReconcile" xmlns="http://www.w3.org/2000/svg">
+            <title id="diagReconcile">Comparación: sin reconciliación, el alta crea los recursos una vez y nadie vuelve a comprobarlos, así que un respaldo restaurado deja la fila sin recursos para siempre. Con reconciliación, cada arranque compara la base contra SES y recrea lo que falte.</title>
+            <defs>
+              <marker id="arwRec" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" fill="rgb(var(--mask-500))" />
+              </marker>
+            </defs>
+
+            <!-- left column: before -->
+            <text x="176" y="24" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="12" letter-spacing="1.5">SOLO EN EL ALTA</text>
+            <rect x="60" y="40" width="232" height="40" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="176" y="65" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="12">POST /api/domains → crea los 3 recursos</text>
+            <line x1="176" y1="80" x2="176" y2="104" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwRec)" />
+            <rect x="60" y="106" width="232" height="40" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="176" y="131" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="12">se restaura un respaldo de la base</text>
+            <line x1="176" y1="146" x2="176" y2="170" stroke="#f87171" stroke-width="2" marker-end="url(#arwRec)" />
+            <rect x="60" y="172" width="232" height="52" rx="8" fill="#18181b" stroke="#f87171" />
+            <text x="176" y="193" text-anchor="middle" fill="#fca5a5" font-family="system-ui, sans-serif" font-size="12" font-weight="600">fila sin recursos, para siempre</text>
+            <text x="176" y="211" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">nadie vuelve a preguntar</text>
+
+            <!-- divider -->
+            <line x1="360" y1="16" x2="360" y2="234" stroke="#3f3f46" stroke-dasharray="4 4" />
+
+            <!-- right column: after -->
+            <text x="544" y="24" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="12" letter-spacing="1.5">EN CADA ARRANQUE</text>
+            <rect x="428" y="40" width="232" height="40" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="544" y="65" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="12">listAllDomains() de la base</text>
+            <line x1="544" y1="80" x2="544" y2="104" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwRec)" />
+            <rect x="428" y="106" width="232" height="40" rx="8" fill="#18181b" stroke="rgb(var(--mask-500))" stroke-width="2" />
+            <text x="544" y="131" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="12">DescribeReceiptRule por dominio</text>
+            <line x1="544" y1="146" x2="544" y2="170" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwRec)" />
+            <rect x="428" y="172" width="232" height="52" rx="8" fill="#18181b" stroke="#4ade80" />
+            <text x="544" y="193" text-anchor="middle" fill="#86efac" font-family="system-ui, sans-serif" font-size="12" font-weight="600">falta → CreateReceiptRule</text>
+            <text x="544" y="211" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">existe → nada, ~350 ms por dominio</text>
+          </svg>
+          <figcaption>La diferencia no está en el alta, que ya hacía lo correcto. Está en que la base de datos y AWS se comparan de forma rutinaria en vez de una sola vez.</figcaption>
+        </figure>
+
+        <h2>¿Qué más conviene reconciliar mientras se está en eso?</h2>
+
+        <p><strong>Todo recurso externo que la base "recuerda" haber creado.</strong> Una vez que existe el bucle de arranque, agregarle comprobaciones cuesta una función cada una. Estas tres salieron de la misma sesión:</p>
+
+        <ul>
+          <li><strong>El event destination del configuration set.</strong> Es lo que publica rebotes y quejas a SNS para alimentar la lista de supresión. Se crea con <code>CreateConfigurationSetEventDestination</code> y, si la variable con el ARN del tópico no existía cuando se dio de alta el dominio, el set queda mudo. El bucle lo rellena en dominios viejos sin script de migración.</li>
+          <li><strong>La suscripción HTTPS del tópico SNS al webhook.</strong> <code>ListSubscriptionsByTopic</code> dice si existe y si sigue en <code>PendingConfirmation</code>; en ese caso, volver a suscribir dispara una confirmación nueva.</li>
+          <li><strong>La firma de esa confirmación.</strong> Un detalle que solo aparece al ejercitar la ruta: la cadena a firmar de un <code>SubscriptionConfirmation</code> incluye el campo <code>Token</code>, y <code>SignatureVersion: "2"</code> significa SHA256, no SHA1. Un verificador escrito solo para <code>Notification</code> rechaza toda confirmación, y la suscripción se queda pendiente para siempre sin decir por qué.</li>
+        </ul>
+
+        <p>La regla general: si el código tiene una función <code>create*</code> hacia un servicio externo y la base guarda que se llamó, merece una <code>ensure*</code> idempotente que corra sin que nadie se lo pida.</p>
+
+        <h2>Qué hace MailMask con esto</h2>
+
+        <p>MailMask administra dominios de clientes sobre SES: cada alta crea los tres recursos, y cada baja los borra. Desde esta semana, además, <strong>cada arranque compara la lista de dominios contra el rule set y los configuration sets</strong>, y el botón de verificar del panel hace lo mismo para el dominio en cuestión. La verificación sigue mirando la identidad, porque eso es lo que la verificación significa; lo que cambió es que ya no es la única comprobación.</p>
+
+        <p>La lección que nos llevamos es más general que SES: <strong>una restauración de respaldo es una operación de escritura sobre la base, pero no sobre el mundo</strong>. Todo lo que vive fuera de la base y se creó a partir de ella queda potencialmente desfasado, y la única forma honesta de saberlo es preguntar.</p>
+
+        <p>Si te interesa cómo tratamos el correo entrante, sigue con <a href="/blog/que-es-email-forwarding">qué es el email forwarding</a>, con <a href="/blog/que-son-dkim-spf-dmarc">DKIM, SPF y DMARC</a>, o con <a href="/blog/que-es-redos-expresiones-regulares">cómo una expresión regular tumba un servidor</a>, que salió del mismo tipo de sesión.</p>
+
+        <h2>Resumen rápido</h2>
+
+        <ul>
+          <li><strong>Un dominio en SES son tres recursos</strong>: identidad, regla de recepción y configuration set. "Verificado" habla solo del primero.</li>
+          <li><strong>Sin regla en el rule set activo</strong>, SES responde <code>550 5.1.1</code> a todo, y el único que lo ve es el remitente.</li>
+          <li><strong>CloudTrail reconstruye la historia</strong> de cualquier recurso de AWS por nombre de evento, con usuario, parámetros y user agent.</li>
+          <li><strong>Restaurar un respaldo no restaura AWS.</strong> Una reconciliación idempotente al arrancar, a ~350 ms por dominio, cierra ese hueco para siempre.</li>
+        </ul>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Dominios que se cuidan solos</h2>
+      <p>Reenvía, filtra y responde desde tu dominio, con SES bien configurado por ti. Desde $49 MXN/mes.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-zinc-800 py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-zinc-500 text-sm flex gap-4">
+          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
+          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-zinc-600 text-xs mt-4">
+        © 2026 by fixter.org
+      </p>
+    </footer>
+  </body>
+</html>
