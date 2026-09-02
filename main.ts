@@ -438,11 +438,15 @@ function buildSnsStringToSign(body: Record<string, string>): string {
     fields.push("Timestamp", "TopicArn", "Type");
   } else {
     // SubscriptionConfirmation / UnsubscribeConfirmation
+    // El Token forma parte de la cadena firmada; sin él toda confirmación
+    // fallaba (nunca se notó porque el webhook de entrada no verificaba
+    // confirmaciones).
     fields = [
       "Message",
       "MessageId",
       "SubscribeURL",
       "Timestamp",
+      "Token",
       "TopicArn",
       "Type",
     ];
@@ -465,7 +469,8 @@ async function verifySnsSignature(
     const stringToSign = buildSnsStringToSign(body);
 
     const { createVerify } = await import("node:crypto");
-    const verifier = createVerify("SHA1");
+    // SignatureVersion 1 = SHA1, 2 = SHA256.
+    const verifier = createVerify(body.SignatureVersion === "2" ? "SHA256" : "SHA1");
     verifier.update(stringToSign);
     return verifier.verify(pem, body.Signature, "base64");
   } catch (err) {
