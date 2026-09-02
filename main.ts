@@ -171,7 +171,7 @@ import {
   deleteDomainIdentity,
 } from "./ses.js";
 import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, extractAttachmentByIndex, rebuildConversationsFromS3 } from "./forwarding.js";
-import { fetchEmailFromS3, repairReceiptRules, ensureSnsSubscription, AWS_REGION, getBackupBytesFromS3 } from "./ses.js";
+import { fetchEmailFromS3, repairReceiptRules, ensureDomainInbound, ensureSnsSubscription, AWS_REGION, getBackupBytesFromS3 } from "./ses.js";
 import { runDbBackup, DB_BACKUP_SUFFIX } from "./backup.js";
 import { resolveEmailBody, extractInlineImages, appendSignature, quotePrevious, MAX_EMAIL_HTML_BYTES } from "./email-html.js";
 import { putEmailImageToS3, getEmailImageFromS3, deleteEmailImageFromS3, sweepOrphanEmailImages, putEmailFileToS3, getEmailFileFromS3, deleteEmailFileFromS3, ALLOWED_IMAGE_TYPES } from "./ses.js";
@@ -1500,6 +1500,16 @@ const app = new Elysia({ adapter: node() })
           domain: domain.domain,
           domainId: domain.id,
         });
+      }
+    }
+
+    // Identidad verificada no implica recepción: la regla del rule set es
+    // otro recurso y puede faltar (brendago.design, sep-2026). Se repara aquí.
+    if (status.respondio && status.verified) {
+      try {
+        await ensureDomainInbound(domain.domain);
+      } catch (err) {
+        log("warn", "ses", "No se pudo asegurar la regla de recepción", { domain: domain.domain, error: String(err) });
       }
     }
 
@@ -5510,6 +5520,19 @@ if (esServidor) (async () => {
   try {
     const repaired = await repairReceiptRules();
     if (repaired > 0) log("info", "startup", `Repaired ${repaired} receipt rule(s) with missing TopicArn`);
+
+    // Reconciliar base vs SES: cada dominio debe tener regla de recepción y
+    // config set. Una fila puede sobrevivir a sus recursos (restauración de
+    // respaldo tras un DELETE) y sin esto nadie lo nota hasta que rebota.
+    const { listAllDomains } = await import("./db.js");
+    for (const d of listAllDomains()) {
+      try {
+        const { ruleCreated } = await ensureDomainInbound(d.domain);
+        if (ruleCreated) log("warn", "startup", `Recreated missing receipt rule for ${d.domain}`);
+      } catch (err) {
+        log("warn", "startup", "Could not reconcile domain with SES", { domain: d.domain, error: String(err) });
+      }
+    }
 
     // Las filas escritas antes de que la clave de supresión fuera consistente quedaron
     // con las mayúsculas de SES y ya no matcheaban. Idempotente.

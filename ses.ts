@@ -200,6 +200,42 @@ export async function createReceiptRule(domain: string): Promise<void> {
   }));
 }
 
+/**
+ * Garantiza que un dominio de la base tenga sus recursos en SES: la regla de
+ * recepción (sin ella SES responde 550 "mailbox unavailable" a todo) y el
+ * configuration set de salida. Idempotente.
+ *
+ * Existe porque el 29-jul-2026 el DELETE de brendago.design borró regla,
+ * config set e identidad en SES, pero la fila revivió al restaurar un
+ * respaldo ese mismo día. El 18-ago se reparó a mano sólo la identidad, así
+ * que MailMask decía "verificado" mientras Gmail rebotaba cada correo con
+ * 550 5.1.1. La verificación mira la identidad; la recepción depende de la
+ * regla, y nadie comparaba la base contra el rule set.
+ */
+export async function ensureDomainInbound(domain: string): Promise<{ ruleCreated: boolean }> {
+  const ses = await getSesInbound();
+  const { DescribeReceiptRuleCommand } = await import("@aws-sdk/client-ses");
+  const ruleName = `mailmask-${domain.replace(/\./g, "-")}`;
+
+  let ruleCreated = false;
+  try {
+    await ses.send(new DescribeReceiptRuleCommand({ RuleSetName: RECEIPT_RULE_SET, RuleName: ruleName }));
+  } catch (err) {
+    if (!String(err).includes("RuleDoesNotExist")) throw err;
+    await createReceiptRule(domain);
+    ruleCreated = true;
+    log("warn", "ses", "Receipt rule was missing; recreated", { domain, ruleName });
+  }
+
+  try {
+    await createConfigurationSet(domain);
+  } catch (err) {
+    log("warn", "ses", "Could not ensure configuration set", { domain, error: String(err) });
+  }
+
+  return { ruleCreated };
+}
+
 export async function repairReceiptRules(): Promise<number> {
   if (!SNS_TOPIC_ARN) {
     log("warn", "ses", "SNS_TOPIC_ARN not set, skipping receipt rule repair");

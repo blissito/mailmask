@@ -430,6 +430,10 @@ export function getDomainByName(domain: string): Domain | null {
   return rows.length ? rowToDomain(rows[0]) : null;
 }
 
+export function listAllDomains(): Domain[] {
+  return db.select().from(domains).orderBy(asc(domains.createdAt)).all().map(rowToDomain);
+}
+
 export function listUserDomains(email: string): Domain[] {
   const rows = db.select().from(domains).where(eq(domains.ownerEmail, email)).orderBy(asc(domains.createdAt)).all();
   return rows.map(rowToDomain);
