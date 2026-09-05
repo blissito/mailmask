@@ -112,6 +112,8 @@ import {
   generateReferralSlug,
   setReferralSlug,
   getUserByReferralSlug,
+  setReferralName,
+  getReferralPublicBySlug,
   createReferral,
   getReferralByReferred,
   listReferrals,
@@ -1420,6 +1422,33 @@ const app = new Elysia({ adapter: node() })
   }, {
     body: t.Object({ slug: t.String() }),
     detail: { tags: ["Referrals"], summary: "Update referral slug", security: [{ cookieAuth: [] }] },
+  })
+
+  .put("/api/referrals/name", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 5, 60_000);
+    if (limited) return limited;
+    const ok = setReferralName(auth.email, body.name ?? "");
+    if (!ok) return new Response(JSON.stringify({ error: "Nombre inválido: 2-40 caracteres" }), { status: 400 });
+    return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  }, {
+    body: t.Object({ name: t.String() }),
+    detail: { tags: ["Referrals"], summary: "Set the public name shown to invitees", security: [{ cookieAuth: [] }] },
+  })
+
+  // Público: /register lo usa para decir "Brenda te invitó" en vez del slug crudo.
+  .get("/api/referrals/lookup/:slug", async ({ request, params }) => {
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 30, 60_000);
+    if (limited) return limited;
+    const slug = String(params.slug ?? "").toLowerCase().trim();
+    const found = /^[a-z0-9-]{3,30}$/.test(slug) ? getReferralPublicBySlug(slug) : null;
+    if (!found) return new Response(JSON.stringify({ error: "No encontrado" }), { status: 404 });
+    return new Response(JSON.stringify(found), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Referrals"], summary: "Public name behind a referral slug" },
   })
 
   .post("/api/referrals/track", async ({ request, body }) => {

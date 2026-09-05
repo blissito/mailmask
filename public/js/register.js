@@ -14,7 +14,15 @@ const _hasRef = _refParam || localStorage.getItem("mailmask_ref");
 if (_hasRef) {
   document.getElementById("referral-card")?.classList.remove("hidden");
   const inviterEl = document.getElementById("referral-inviter");
-  if (inviterEl) inviterEl.textContent = _hasRef;
+  if (inviterEl) {
+    // Mientras llega el nombre real, el slug con mayúscula inicial ("brendi" → "Brendi").
+    const pretty = _hasRef.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    inviterEl.textContent = pretty;
+    fetch(`/api/referrals/lookup/${encodeURIComponent(_hasRef)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.name) inviterEl.textContent = d.name; })
+      .catch(() => {});
+  }
 }
 
 document.getElementById("register-form").addEventListener("submit", async (e) => {

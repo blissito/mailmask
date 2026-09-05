@@ -2022,7 +2022,7 @@ async function revokeSmtpCredentialUI(credId) {
 
 // --- Referral slug ---
 
-async function saveSlug(slug) {
+async function saveSlug(slug, name) {
   const errEl = document.getElementById("edit-slug-error");
   errEl.classList.add("hidden");
 
@@ -2031,6 +2031,20 @@ async function saveSlug(slug) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ slug }),
   });
+
+  if (res.ok && name) {
+    const r2 = await fetch("/api/referrals/name", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (!r2.ok) {
+      const data = await r2.json();
+      errEl.textContent = data.error || "Error al guardar el nombre";
+      errEl.classList.remove("hidden");
+      return;
+    }
+  }
 
   if (res.ok) {
     hideModal("modal-edit-slug");
@@ -2488,6 +2502,7 @@ function setupEventListeners() {
     if (editSlug) {
       const form = document.getElementById("form-edit-slug");
       if (form && currentUser?.referralSlug) form.slug.value = currentUser.referralSlug;
+      if (form && currentUser?.referralStats?.name) form.name.value = currentUser.referralStats.name;
       showModal("modal-edit-slug");
       return;
     }
@@ -2496,7 +2511,7 @@ function setupEventListeners() {
   // Form: Edit slug
   document.getElementById("form-edit-slug")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    await saveSlug(e.target.slug.value.trim().toLowerCase());
+    await saveSlug(e.target.slug.value.trim().toLowerCase(), e.target.name.value.trim());
   });
 
   // (Add domain form replaced by unified search modal — handled via btn-add-domain-search)

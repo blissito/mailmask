@@ -18,6 +18,7 @@ export const users = sqliteTable("users", {
   subMpId: text("sub_mp_id"),
   subPeriodEnd: text("sub_period_end"),
   referralSlug: text("referral_slug").unique(),
+  referralName: text("referral_name"),
   referredBy: text("referred_by"),
   paymentCount: integer("payment_count").notNull().default(0),
 });

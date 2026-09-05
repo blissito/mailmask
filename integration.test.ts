@@ -1515,3 +1515,48 @@ describe("Bandeja: redactar", () => {
     sqlite.prepare("UPDATE domains SET verified = 1 WHERE id = ?").run(domainId);
   });
 });
+
+describe("Referidos: nombre público", () => {
+  let cookie: string, csrf: string;
+  const slug = `ref-${suffix}`.slice(0, 30).toLowerCase().replace(/[^a-z0-9-]/g, "");
+
+  before(async () => {
+    const res = await jsonPost("/api/auth/register", { email: `ref-name-${suffix}@example.com`, password: "password123" });
+    const c = extractCookies(res);
+    cookie = c.cookie!; csrf = c.csrfToken!;
+    await res.body?.cancel();
+    const r2 = await jsonPut("/api/referrals/slug", { slug }, cookie, csrf);
+    assert.equal(r2.status, 200);
+    await r2.body?.cancel();
+  });
+
+  it("GET /api/referrals/lookup/:slug — sin nombre devuelve name null, nunca el correo", async () => {
+    const res = await jsonGet(`/api/referrals/lookup/${slug}`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.deepEqual(body, { name: null });
+  });
+
+  it("PUT /api/referrals/name — guarda y el lookup lo devuelve", async () => {
+    const r = await jsonPut("/api/referrals/name", { name: "  Brenda   Go " }, cookie, csrf);
+    assert.equal(r.status, 200);
+    await r.body?.cancel();
+    const res = await jsonGet(`/api/referrals/lookup/${slug}`);
+    assert.deepEqual(await res.json(), { name: "Brenda Go" });
+  });
+
+  it("PUT /api/referrals/name — rechaza 1 caracter y sin sesión", async () => {
+    const r = await jsonPut("/api/referrals/name", { name: "B" }, cookie, csrf);
+    assert.equal(r.status, 400);
+    await r.body?.cancel();
+    const r2 = await jsonPut("/api/referrals/name", { name: "Brenda" });
+    assert.equal(r2.status, 403); // sin cookie el CSRF corta antes que la auth
+    await r2.body?.cancel();
+  });
+
+  it("GET /api/referrals/lookup/:slug — slug inexistente 404", async () => {
+    const res = await jsonGet("/api/referrals/lookup/no-existe-xyz");
+    assert.equal(res.status, 404);
+    await res.body?.cancel();
+  });
+});

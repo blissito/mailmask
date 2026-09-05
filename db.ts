@@ -1707,6 +1707,20 @@ export function setReferralSlug(email: string, slug: string): boolean {
   }
 }
 
+/** Nombre visible de quien invita (2-40 caracteres). Lo ve el invitado en /register. */
+export function setReferralName(email: string, name: string): boolean {
+  const clean = name.trim().replace(/\s+/g, " ");
+  if (clean.length < 2 || clean.length > 40) return false;
+  db.update(users).set({ referralName: clean }).where(eq(users.email, email)).run();
+  return true;
+}
+
+/** Lo único público de un slug: el nombre que eligió quien invita. Nunca el correo. */
+export function getReferralPublicBySlug(slug: string): { name: string | null } | null {
+  const rows = db.select({ name: users.referralName }).from(users).where(eq(users.referralSlug, slug)).all();
+  return rows.length ? { name: rows[0].name ?? null } : null;
+}
+
 export function getUserByReferralSlug(slug: string): { email: string } | null {
   const rows = db.select({ email: users.email }).from(users).where(eq(users.referralSlug, slug)).all();
   return rows.length ? rows[0] : null;
@@ -1763,7 +1777,7 @@ export function getReferralStats(email: string) {
   const converted = rows.filter(r => r.status === "converted" || r.status === "credited").length;
   const credits = db.select({ c: count() }).from(referralCredits)
     .where(and(eq(referralCredits.email, email), eq(referralCredits.used, false))).all();
-  const userRow = db.select({ referralSlug: users.referralSlug }).from(users).where(eq(users.email, email)).all();
+  const userRow = db.select({ referralSlug: users.referralSlug, referralName: users.referralName }).from(users).where(eq(users.email, email)).all();
   const clickStats = getReferralClickStats(email);
   return {
     total,
@@ -1771,6 +1785,7 @@ export function getReferralStats(email: string) {
     converted,
     creditsAvailable: credits[0]?.c ?? 0,
     slug: userRow[0]?.referralSlug ?? null,
+    name: userRow[0]?.referralName ?? null,
     clicks: clickStats,
   };
 }
