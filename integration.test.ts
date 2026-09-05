@@ -550,6 +550,116 @@ async function postWebhook(body: unknown, dataId: string, fixedRequestId?: strin
   ));
 }
 
+describe("Google sign-in", () => {
+  const CLIENT_ID = "test-client.apps.googleusercontent.com";
+  function idToken(payload: Record<string, unknown>): string {
+    const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+    return `${b64({ alg: "RS256" })}.${b64(payload)}.sig`;
+  }
+  function seedState(state: string, value: Record<string, unknown> = {}, ttlMs = 60_000): void {
+    sqlite.prepare("INSERT INTO tokens (token, kind, value, expires_at) VALUES (?, 'oauth-state', ?, ?)")
+      .run(state, JSON.stringify(value), new Date(Date.now() + ttlMs).toISOString());
+  }
+  function mockGoogle(email: string, extra: Record<string, unknown> = {}) {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === "https://oauth2.googleapis.com/token") {
+        return new Response(JSON.stringify({ id_token: idToken({ aud: CLIENT_ID, email, email_verified: true, sub: "g-1", ...extra }) }));
+      }
+      return originalFetch(input, init);
+    };
+    return () => { globalThis.fetch = originalFetch; };
+  }
+  const suffix = crypto.randomUUID().slice(0, 8);
+  let envBackup: { id?: string; secret?: string };
+  before(() => {
+    envBackup = { id: process.env.GOOGLE_CLIENT_ID, secret: process.env.GOOGLE_CLIENT_SECRET };
+    process.env.GOOGLE_CLIENT_ID = CLIENT_ID;
+    process.env.GOOGLE_CLIENT_SECRET = "test-secret";
+  });
+
+  it("start redirects to Google with a stored state", async () => {
+    const res = await app.fetch(new Request("http://localhost/api/auth/google?ref=abc&coupon=XY"));
+    assert.equal(res.status, 302);
+    const loc = new URL(res.headers.get("location")!);
+    assert.equal(loc.origin, "https://accounts.google.com");
+    assert.equal(loc.searchParams.get("client_id"), CLIENT_ID);
+    assert.equal(loc.searchParams.get("redirect_uri"), "http://localhost/api/auth/google/callback");
+    const state = loc.searchParams.get("state")!;
+    const row = sqlite.prepare("SELECT value FROM tokens WHERE token = ? AND kind = 'oauth-state'").get(state) as { value: string };
+    assert.deepEqual(JSON.parse(row.value), { ref: "abc", coupon: "XY" });
+  });
+
+  it("callback creates a verified account and logs in", async () => {
+    const email = `google-new-${suffix}@example.com`;
+    const state = `st-${crypto.randomUUID()}`;
+    seedState(state, { coupon: "PROMO" });
+    const restore = mockGoogle(email);
+    try {
+      const res = await app.fetch(new Request(`http://localhost/api/auth/google/callback?code=c0de&state=${state}`));
+      assert.equal(res.status, 302);
+      assert.ok(res.headers.get("location")!.endsWith("/app?coupon=PROMO"));
+      const cookies = res.headers.getSetCookie();
+      assert.ok(cookies.some((c) => c.startsWith("token=")));
+      assert.ok(cookies.some((c) => c.startsWith("csrf_token=")));
+      const user = getUser(email);
+      assert.ok(user);
+      assert.equal(user!.emailVerified, true);
+      // state is single-use
+      const again = await app.fetch(new Request(`http://localhost/api/auth/google/callback?code=c0de&state=${state}`));
+      assert.ok(again.headers.get("location")!.includes("error=google-state"));
+    } finally {
+      restore();
+    }
+  });
+
+  it("callback on an existing password account is the same account; password still works", async () => {
+    const email = `google-existing-${suffix}@example.com`;
+    createUser(email, await hashPassword("password123"));
+    const state = `st-${crypto.randomUUID()}`;
+    seedState(state);
+    const restore = mockGoogle(email);
+    try {
+      const res = await app.fetch(new Request(`http://localhost/api/auth/google/callback?code=c0de&state=${state}`));
+      assert.equal(res.status, 302);
+      assert.ok(res.headers.get("location")!.endsWith("/app"));
+      assert.equal(getUser(email)!.emailVerified, true);
+    } finally {
+      restore();
+    }
+    const login = await app.fetch(new Request("http://localhost/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "password123" }),
+    }));
+    assert.equal(login.status, 200);
+    await login.body?.cancel();
+    assert.equal(sqlite.prepare("SELECT count(*) AS c FROM users WHERE email = ?").get(email)!.c, 1);
+  });
+
+  it("callback rejects an unverified Google email and a wrong audience", async () => {
+    const email = `google-unverified-${suffix}@example.com`;
+    let state = `st-${crypto.randomUUID()}`;
+    seedState(state);
+    let restore = mockGoogle(email, { email_verified: false });
+    try {
+      const res = await app.fetch(new Request(`http://localhost/api/auth/google/callback?code=c0de&state=${state}`));
+      assert.ok(res.headers.get("location")!.includes("error=google-no-verificado"));
+    } finally { restore(); }
+    state = `st-${crypto.randomUUID()}`;
+    seedState(state);
+    restore = mockGoogle(email, { aud: "otro" });
+    try {
+      const res = await app.fetch(new Request(`http://localhost/api/auth/google/callback?code=c0de&state=${state}`));
+      assert.ok(res.headers.get("location")!.includes("error=google-aud"));
+    } finally { restore(); }
+    assert.equal(getUser(email), null);
+    process.env.GOOGLE_CLIENT_ID = envBackup.id;
+    process.env.GOOGLE_CLIENT_SECRET = envBackup.secret;
+  });
+});
+
 describe("Webhook", () => {
   it("invalid HMAC returns 401", async () => {
     const res = await app.fetch(new Request(
@@ -1165,6 +1275,116 @@ describe("Webhook", () => {
       // Should be ~35 days from original end (monthly buffer)
       const diffDays = (newEnd.getTime() - originalEnd.getTime()) / 86400000;
       assert.ok(diffDays >= 34 && diffDays <= 36, `Expected ~35 days extension, got ${diffDays}`);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("migrate: relinks subscription, keeps period, cancels old preapproval, records no order", async () => {
+    const email = `webhook-migrate-${suffix}@example.com`;
+    createUser(email, await hashPassword("testpass123"));
+    const oldId = `sub-old-${crypto.randomUUID()}`;
+    const newId = `sub-new-${crypto.randomUUID()}`;
+    const periodEnd = new Date(Date.now() + 20 * 86400000).toISOString();
+    updateUserSubscription(email, { plan: "basico", status: "active", mpSubscriptionId: oldId, currentPeriodEnd: periodEnd });
+    const ordersBefore = sqlite.prepare("SELECT count(*) AS c FROM orders WHERE user_email = ?").get(email) as { c: number };
+
+    const cancelled: string[] = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("api.mercadopago.com/preapproval/") && init?.method === "PUT") {
+        cancelled.push(url.split("/").pop()!);
+        return new Response(JSON.stringify({ status: "cancelled" }));
+      }
+      if (url.includes(`api.mercadopago.com/preapproval/${newId}`)) {
+        return new Response(JSON.stringify({
+          status: "authorized",
+          payer_email: "otra-cuenta@example.com",
+          external_reference: `migrate:${email}`,
+          next_payment_date: "2026-09-28T18:38:13.000-04:00",
+          auto_recurring: { transaction_amount: 49, frequency: 1, start_date: "2026-09-28T18:38:13.000-04:00" },
+        }));
+      }
+      return originalFetch(input, init);
+    };
+    try {
+      const res = await postWebhook({ type: "subscription_preapproval", data: { id: newId } }, newId);
+      assert.equal(res.status, 200);
+      await res.body?.cancel();
+
+      const user = getUser(email);
+      assert.equal(user?.subscription?.mpSubscriptionId, newId);
+      assert.equal(user?.subscription?.plan, "basico");
+      assert.equal(user?.subscription?.status, "active");
+      assert.equal(user?.subscription?.currentPeriodEnd, periodEnd);
+      assert.deepEqual(cancelled, [oldId]);
+      const ordersAfter = sqlite.prepare("SELECT count(*) AS c FROM orders WHERE user_email = ?").get(email) as { c: number };
+      assert.equal(ordersAfter.c, ordersBefore.c);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("migrate: non-authorized status changes nothing", async () => {
+    const email = `webhook-migrate-pending-${suffix}@example.com`;
+    createUser(email, await hashPassword("testpass123"));
+    const oldId = `sub-old-${crypto.randomUUID()}`;
+    const newId = `sub-new-${crypto.randomUUID()}`;
+    updateUserSubscription(email, { plan: "basico", status: "active", mpSubscriptionId: oldId, currentPeriodEnd: new Date(Date.now() + 86400000).toISOString() });
+
+    let puts = 0;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (init?.method === "PUT") { puts++; return new Response("{}"); }
+      if (url.includes(`api.mercadopago.com/preapproval/${newId}`)) {
+        return new Response(JSON.stringify({ status: "pending", external_reference: `migrate:${email}` }));
+      }
+      return originalFetch(input, init);
+    };
+    try {
+      const res = await postWebhook({ type: "subscription_preapproval", data: { id: newId } }, newId);
+      assert.equal(res.status, 200);
+      await res.body?.cancel();
+      assert.equal(getUser(email)?.subscription?.mpSubscriptionId, oldId);
+      assert.equal(puts, 0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("addon with future start_date activates until start+35 without recording a charge", async () => {
+    const email = `webhook-addon-deferred-${suffix}@example.com`;
+    createUser(email, await hashPassword("testpass123"));
+    updateUserSubscription(email, { plan: "basico", status: "active", currentPeriodEnd: new Date(Date.now() + 30 * 86400000).toISOString() });
+    const addon = createAddon(email, "sends25");
+    const mpId = `addon-deferred-${crypto.randomUUID()}`;
+    updateAddon(addon.id, { mpPreapprovalId: mpId });
+    const start = new Date(Date.now() + 14 * 86400000);
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes(`api.mercadopago.com/preapproval/${mpId}`)) {
+        return new Response(JSON.stringify({
+          status: "authorized",
+          external_reference: `addon:${addon.id}`,
+          auto_recurring: { transaction_amount: 49, currency_id: "MXN", start_date: start.toISOString() },
+        }));
+      }
+      return originalFetch(input, init);
+    };
+    try {
+      const res = await postWebhook({ type: "subscription_preapproval", data: { id: mpId } }, mpId);
+      assert.equal(res.status, 200);
+      await res.body?.cancel();
+      const after = getAddonById(addon.id)!;
+      assert.equal(after.status, "active");
+      const diffDays = (new Date(after.currentPeriodEnd!).getTime() - start.getTime()) / 86400000;
+      assert.ok(diffDays >= 34 && diffDays <= 36, `expected start+35, got ${diffDays}`);
+      const charges = sqlite.prepare("SELECT count(*) AS c FROM orders WHERE subject_id = ? AND kind = 'charge'").get(addon.id) as { c: number };
+      assert.equal(charges.c, 0);
     } finally {
       globalThis.fetch = originalFetch;
     }

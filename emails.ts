@@ -473,6 +473,77 @@ export function addonShutdown(d: { addonLabels: string[]; planEndedAt?: string |
   };
 }
 
+/**
+ * Invitación a migrar la suscripción a la app correcta de MercadoPago. Existe por el
+ * incidente de sep-2026: las suscripciones nacieron bajo una app cuyo webhook apuntaba
+ * a otro proyecto, así que ningún cobro recurrente nos llegaba. Las dos suscripciones
+ * nuevas se crean con `start_date` igual a la fecha ya pagada: no hay cobro doble.
+ */
+export function subscriptionMigration(d: {
+  planLabel: string;
+  planStart: string;
+  planLink: string;
+  sendsLabel?: string;
+  sendsStart?: string;
+  sendsLink?: string;
+}): Email {
+  const rows: [string, string][] = [
+    [`Plan ${d.planLabel}`, `Primer cargo el ${shortDate(d.planStart)}`],
+  ];
+  if (d.sendsLabel && d.sendsStart) rows.push([d.sendsLabel, `Primer cargo el ${shortDate(d.sendsStart)}`]);
+
+  const intro = "Tuvimos un error de configuración en nuestra cuenta de MercadoPago: tus pagos sí se cobraron, pero las notificaciones de cobro no nos llegaban. Ya lo corregimos. Para que no vuelva a pasar, necesitamos que autorices de nuevo tu suscripción en la cuenta correcta.";
+  const noCharge = "Cada suscripción nueva tiene como fecha de primer cargo la que ya tienes pagada, así que no hay cobro doble y tu servicio no se interrumpe. MercadoPago hace un cargo de validación de $10 MXN al autorizar; te lo devolvemos el mismo día.";
+  const sendsNote = d.sendsLabel
+    ? `Tu add-on de ${d.sendsLabel} quedó cancelado en MercadoPago por ese mismo error. Sigue activo hasta el ${shortDate(d.sendsStart)}; para conservarlo después, autorízalo también.`
+    : null;
+
+  return {
+    subject: cleanSubject("Necesitamos que autorices de nuevo tu suscripción — MailMask"),
+    html: layout({
+      preheader: "Un error nuestro; no hay cobro extra. Sólo hace falta autorizar de nuevo.",
+      heading: "Autoriza de nuevo tu suscripción",
+      body: p(intro)
+        + calloutBox(noCharge, "info")
+        + detailTable(rows)
+        + (sendsNote ? p(sendsNote) : "")
+        + (d.sendsLink ? pRaw(`Add-on de envíos: <a href="${escHtml(d.sendsLink)}" target="_blank" rel="noopener noreferrer" style="color:${C.accent};">${escHtml(d.sendsLink)}</a>`) : "")
+        + p("Cuando termines, tu suscripción anterior se cancela sola. Si algo no cuadra, responde a este correo."),
+      cta: { label: `Autorizar plan ${d.planLabel}`, url: d.planLink },
+      billing: true,
+    }),
+    text: textBlock([
+      intro,
+      noCharge,
+      textRows(rows),
+      `Autorizar plan ${d.planLabel}: ${d.planLink}`,
+      sendsNote,
+      d.sendsLink ? `Autorizar add-on de envíos: ${d.sendsLink}` : null,
+      "Cuando termines, tu suscripción anterior se cancela sola. Si algo no cuadra, responde a este correo.",
+    ], true),
+  };
+}
+
+export function migrationDone(d: { planLabel: string; nextChargeAt?: string | null }): Email {
+  const next = d.nextChargeAt ? `Tu próximo cargo es el ${shortDate(d.nextChargeAt)}.` : "Tu próximo cargo será en la fecha de siempre.";
+  return {
+    subject: cleanSubject("Suscripción migrada — MailMask"),
+    html: layout({
+      preheader: `Listo. ${next}`,
+      heading: "Tu suscripción ya está en la cuenta correcta",
+      body: p(`Gracias por autorizarla de nuevo. Tu plan ${d.planLabel} sigue igual, sin cobros extra. ${next}`)
+        + p("La suscripción anterior quedó cancelada; no tienes que hacer nada más."),
+      cta: { label: "Ir a mi panel", url: `${baseUrl()}/app` },
+      billing: true,
+    }),
+    text: textBlock([
+      `Gracias por autorizarla de nuevo. Tu plan ${d.planLabel} sigue igual, sin cobros extra. ${next}`,
+      "La suscripción anterior quedó cancelada; no tienes que hacer nada más.",
+      `Ir a tu panel: ${baseUrl()}/app`,
+    ], true),
+  };
+}
+
 export function courtesyGranted(d: {
   addonLabel: string;
   until?: string | null;
@@ -684,6 +755,13 @@ export const TEMPLATE_FIXTURES: Record<string, () => Email> = {
   expiryWarningAuto: () => expiryWarning({ endDate: "2026-09-02T00:00:00.000Z", hasMpSubscription: true }),
   expiryWarningManual: () => expiryWarning({ endDate: "2026-09-02T00:00:00.000Z", hasMpSubscription: false }),
   addonShutdown: () => addonShutdown({ addonLabels: ["Envíos 25/día", "Dominio extra"], planEndedAt: "2026-09-02T00:00:00.000Z" }),
+  subscriptionMigration: () => subscriptionMigration({
+    planLabel: "Básico", planStart: "2026-09-28T00:00:00.000Z",
+    planLink: "https://www.mercadopago.com.mx/subscriptions/checkout?preapproval_id=abc",
+    sendsLabel: ADDONS.sends25.label, sendsStart: "2026-09-18T00:00:00.000Z",
+    sendsLink: "https://www.mercadopago.com.mx/subscriptions/checkout?preapproval_id=def",
+  }),
+  migrationDone: () => migrationDone({ planLabel: "Básico", nextChargeAt: "2026-09-28T00:00:00.000Z" }),
   courtesyGranted: () => courtesyGranted({
     addonLabel: ADDONS.domain.label, until: "2027-12-31T00:00:00.000Z",
     listPriceCents: ADDONS.domain.price, note: "Compensación por la falla de cobro del 29 de julio",

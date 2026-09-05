@@ -8,7 +8,7 @@ import { programar, esServidor } from "./scheduler.js";
 import { revisarPatron } from "./regex-guard.js";
 import { addSseClient } from "./sse-hub.js";
 import { db } from "./pg.js";
-import { users as usersTable } from "./schema.js";
+import { users as usersTable, tokens as tokensTable } from "./schema.js";
 import { eq } from "drizzle-orm";
 import {
   getUser,
@@ -189,6 +189,7 @@ import {
   renewalReceipt,
   chargeFailed,
   guestWelcome,
+  migrationDone,
   SUPPORT_EMAIL,
 } from "./emails.js";
 import "./cron.js";
@@ -219,6 +220,14 @@ function getMainDomainUrl(): string {
   const raw = process.env.MAIN_DOMAIN ?? "www.mailmask.studio";
   const bare = raw.replace(/^https?:\/\//, "").replace(/\/+$/, "");
   return `https://${bare}`;
+}
+
+// En desarrollo Google redirige a localhost; en producción, al dominio principal. Las
+// dos URIs tienen que estar dadas de alta en la consola de Google Cloud.
+function googleRedirectUri(request: Request): string {
+  const host = new URL(request.url).host;
+  const origin = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) ? `http://${host}` : getMainDomainUrl();
+  return `${origin}/api/auth/google/callback`;
 }
 
 const PUBLIC_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), "public");
@@ -730,7 +739,7 @@ const app = new Elysia({ adapter: node() })
       );
       response.headers.set(
         "content-security-policy",
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.googletagmanager.com https://www.clarity.ms; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms; connect-src 'self' https://www.formmy.app https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms; frame-src https://www.googletagmanager.com",
+        "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.clarity.ms; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms; connect-src 'self' https://www.formmy.app https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms; frame-src https://www.googletagmanager.com",
       );
     }
     return response;
@@ -943,6 +952,120 @@ const app = new Elysia({ adapter: node() })
       password: t.String(),
     }),
     detail: { tags: ["Auth"], summary: "Login with email and password" },
+  })
+
+  // --- Login con Google (OAuth 2.0, authorization code) ---
+  // El state vive en `tokens` (kind "oauth-state", 10 min) y carga el referido y el
+  // cupón que traía la página, porque Google no devuelve nada más que el code.
+  .get("/api/auth/google", async ({ request, query }) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) return new Response(JSON.stringify({ error: "Login con Google no configurado" }), { status: 500, headers: { "content-type": "application/json" } });
+    const limited = await rateLimitGuard(getIp(request), 20, 60_000);
+    if (limited) return limited;
+
+    const state = crypto.randomUUID();
+    const ref = typeof query.ref === "string" ? query.ref.slice(0, 64) : undefined;
+    const coupon = typeof query.coupon === "string" ? query.coupon.slice(0, 64) : undefined;
+    await db.insert(tokensTable).values({
+      token: state,
+      kind: "oauth-state",
+      value: { ref, coupon },
+      expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+    });
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: googleRedirectUri(request),
+      response_type: "code",
+      scope: "openid email",
+      state,
+      prompt: "select_account",
+    });
+    // No Response.redirect(): sus headers son inmutables y onAfterHandle no podría
+    // agregar los de seguridad (TypeError: immutable).
+    return new Response(null, { status: 302, headers: { location: `https://accounts.google.com/o/oauth2/v2/auth?${params}` } });
+  }, {
+    detail: { tags: ["Auth"], summary: "Start Google sign-in" },
+  })
+
+  .get("/api/auth/google/callback", async ({ request, query }) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const fail = (reason: string) => new Response(null, { status: 302, headers: { location: `${getMainDomainUrl()}/login?error=${encodeURIComponent(reason)}` } });
+    if (!clientId || !clientSecret) return fail("google-no-configurado");
+    const limited = await rateLimitGuard(getIp(request), 20, 60_000);
+    if (limited) return limited;
+
+    const code = typeof query.code === "string" ? query.code : "";
+    const state = typeof query.state === "string" ? query.state : "";
+    if (!code || !state) return fail("google-cancelado");
+
+    const stateRow = db.select().from(tokensTable)
+      .where(eq(tokensTable.token, state)).get();
+    if (!stateRow || stateRow.kind !== "oauth-state" || stateRow.expiresAt < new Date().toISOString()) return fail("google-state");
+    db.delete(tokensTable).where(eq(tokensTable.token, state)).run();
+    const carried = (stateRow.value ?? {}) as { ref?: string; coupon?: string };
+
+    let idPayload: { email?: string; email_verified?: boolean; aud?: string; sub?: string };
+    try {
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code,
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: googleRedirectUri(request),
+          grant_type: "authorization_code",
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!tokenRes.ok) {
+        log("warn", "auth", "Google token exchange failed", { status: tokenRes.status, body: (await tokenRes.text().catch(() => "")).slice(0, 300) });
+        return fail("google-token");
+      }
+      const tokenJson = await tokenRes.json() as { id_token?: string };
+      if (!tokenJson.id_token) return fail("google-token");
+      // El id_token llega directo de Google por TLS en respuesta a nuestro secreto, así
+      // que no hace falta verificar la firma: basta con leer el payload y checar `aud`.
+      const payloadB64 = tokenJson.id_token.split(".")[1] ?? "";
+      idPayload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8"));
+    } catch (err) {
+      log("error", "auth", "Google sign-in error", { error: String(err) });
+      return fail("google-error");
+    }
+
+    if (idPayload.aud !== clientId) return fail("google-aud");
+    const email = (idPayload.email ?? "").toLowerCase().trim();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail("google-sin-email");
+    if (!idPayload.email_verified) return fail("google-no-verificado");
+
+    let user = await getUser(email);
+    if (!user) {
+      // Sin contraseña utilizable: quien entra con Google puede fijar una después con
+      // "olvidé mi contraseña". El hash aleatorio no lo adivina nadie.
+      await createUser(email, await hashPassword(crypto.randomUUID() + crypto.randomUUID()));
+      generateReferralSlug(email);
+      if (carried.ref) {
+        const referrer = await getUserByReferralSlug(carried.ref);
+        if (referrer && referrer.email !== email) {
+          await setUserReferredBy(email, referrer.email);
+          await createReferral(referrer.email, email);
+        }
+      }
+      log("info", "auth", "Usuario creado con Google", { email, ref: carried.ref ?? null });
+      user = await getUser(email);
+    }
+    // Google ya verificó el buzón: no tiene sentido pedirle que abra un correo nuestro.
+    if (user && !user.emailVerified) verifyUserEmail(email);
+
+    const token = await signJwt({ email });
+    const csrfToken = generateCsrfToken();
+    const headers = new Headers({ location: `${getMainDomainUrl()}/app${carried.coupon ? `?coupon=${encodeURIComponent(carried.coupon)}` : ""}` });
+    headers.append("set-cookie", makeAuthCookie(token));
+    headers.append("set-cookie", makeCsrfCookie(csrfToken));
+    return new Response(null, { status: 302, headers });
+  }, {
+    detail: { tags: ["Auth"], summary: "Google sign-in callback" },
   })
 
   .post("/api/auth/logout", () => {
@@ -2448,19 +2571,24 @@ const app = new Elysia({ adapter: node() })
           if (!addon) {
             log("warn", "webhook", "Add-on preapproval sin fila", { externalRef });
           } else if (sub.status === "authorized") {
-            const end = new Date();
+            // Un preapproval con `start_date` futura (migración a la app correcta de MP,
+            // ver scripts/migrate-subscription.ts) se autoriza sin cobrar: el add-on se
+            // activa hasta esa fecha más la gracia, y el recibo llega con el cobro real.
+            const startDate = sub.auto_recurring?.start_date ? new Date(sub.auto_recurring.start_date) : null;
+            const deferred = !!startDate && !Number.isNaN(startDate.getTime()) && startDate.getTime() > Date.now() + 86_400_000;
+            const end = deferred ? startDate! : new Date();
             end.setDate(end.getDate() + 35);
             updateAddon(addon.id, {
               status: "active",
               mpPreapprovalId: body.data.id,
               currentPeriodEnd: end.toISOString(),
             });
-            log("info", "billing", "Add-on activado", { addonId: addon.id, kind: addon.kind, email: addon.userEmail });
+            log("info", "billing", "Add-on activado", { addonId: addon.id, kind: addon.kind, email: addon.userEmail, deferred });
 
             // La clave es el id del add-on y no el del evento: MercadoPago puede
             // reenviar `authorized` para el mismo preapproval indefinidamente, y solo
             // el primero es un cobro.
-            const order = recordOrder({
+            const order = deferred ? null : recordOrder({
               userEmail: addon.userEmail,
               kind: "charge",
               subject: "addon",
@@ -2506,6 +2634,48 @@ const app = new Elysia({ adapter: node() })
               eventKey: `addon-cancel:${addon.id}`,
               raw: sub,
             });
+          }
+          await markWebhookProcessed(eventKey);
+          return new Response("OK", { status: 200 });
+        }
+
+        // Migración de suscripción a la app correcta de MercadoPago (sep-2026): el
+        // preapproval nuevo nace con `start_date` en la fecha ya pagada, así que
+        // autorizarlo no es una compra. Sólo se cambia el id vinculado y se cancela
+        // el viejo; el plan y el periodo quedan intactos. Ver scripts/migrate-subscription.ts.
+        if (externalRef.startsWith("migrate:")) {
+          const email = externalRef.slice("migrate:".length).toLowerCase().trim();
+          const user = await getUser(email);
+          const newId = String(body.data.id);
+          if (!user?.subscription) {
+            log("warn", "webhook", "Migración: usuario sin suscripción", { email, newId });
+          } else if (sub.status === "authorized") {
+            const oldId = user.subscription.mpSubscriptionId;
+            if (oldId === newId) {
+              log("info", "webhook", "Migración ya aplicada", { email, newId });
+            } else {
+              await updateUserSubscription(email, { ...user.subscription, mpSubscriptionId: newId });
+              log("info", "billing", "Suscripción migrada", { email, oldId, newId, plan: user.subscription.plan });
+              if (oldId) {
+                try {
+                  await cancelMpPreapproval(oldId, mpAccessToken);
+                } catch (err) {
+                  // No puede quedar viva: cobraría dos veces. Se avisa para cancelarla a mano.
+                  log("error", "billing", "Migración: no se pudo cancelar el preapproval viejo", { email, oldId, error: String(err) });
+                  await sendAlert("mp-migracion", `La suscripción de ${email} migró a ${newId} pero el preapproval viejo ${oldId} NO se pudo cancelar en MercadoPago. Cancélalo a mano antes del próximo cobro.\n\n${String(err)}`);
+                }
+              }
+              try {
+                await sendTemplate(email, migrationDone({
+                  planLabel: planLabel(user.subscription.plan),
+                  nextChargeAt: sub.next_payment_date ?? null,
+                }));
+              } catch (err) {
+                log("error", "billing", "No se pudo mandar el aviso de migración", { email, error: String(err) });
+              }
+            }
+          } else {
+            log("info", "webhook", "Migración: preapproval no autorizado, sin cambios", { email, newId, mpStatus: sub.status });
           }
           await markWebhookProcessed(eventKey);
           return new Response("OK", { status: 200 });
