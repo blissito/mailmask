@@ -269,8 +269,8 @@ async function doCheckout(plan, billing, btn, email) {
       const b = 49 + DOMINIO_EXTRA;
       return { base: b, conEnvio: b + ENVIOS, plan: "Básico + 1 dominio extra" };
     }
-    if (d <= 5) return { base: 249, conEnvio: 249, plan: "Equipo · hasta 5 dominios" };
-    const b = 249 + (d - 5) * DOMINIO_EXTRA;
+    if (d <= 5) return { base: 299, conEnvio: 299, plan: "Equipo · hasta 5 dominios" };
+    const b = 299 + (d - 5) * DOMINIO_EXTRA;
     return { base: b, conEnvio: b, plan: `Equipo + ${d - 5} dominio${d - 5 > 1 ? "s" : ""} extra` };
   }
 

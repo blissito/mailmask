@@ -74,7 +74,7 @@ mexicanos (MXN), no en dólares. Ningún plan es gratuito.
   historial de 15 días, reenvío de entrada 100/hora, API y SDK. **No incluye envío de
   correo nuevo**: requiere el add-on de envíos (ver abajo). Sí puede responder
   conversaciones desde la Bandeja, que viene incluida para una persona.
-- Equipo — $249 MXN/mes o $2,490 MXN/año: 5 dominios, máscaras ilimitadas, reglas,
+- Equipo — $299 MXN/mes o $2,990 MXN/año: 5 dominios, máscaras ilimitadas, reglas,
   historial de 90 días, 200 envíos/día por dominio, reenvío de entrada 1,000/hora por
   dominio, Bandeja compartida con 5 miembros de equipo por dominio (asignación y notas),
   API, SDK, webhooks y SMTP relay.
@@ -91,7 +91,7 @@ Add-ons: se compran encima de cualquier plan activo y se cobran aparte, mes a me
 Los dos add-ons de envíos son mutuamente excluyentes y sólo aplican a Básico (Equipo ya
 incluye envío). Se compran una vez y aplican a todos los dominios de la cuenta; el tope
 sigue contando por dominio y por día. Desde el tercer dominio conviene pasar a Equipo:
-Básico con dos dominios extra cuesta $207 sin envíos ($306 con envíos) y Equipo $249 con todo incluido.
+Básico con dos dominios extra cuesta $207 sin envíos ($306 con envíos) y Equipo $299 con todo incluido.
 Si alguien necesita más de 200 envíos al día o más de 20 dominios, debe escribir a
 hola@mailmask.studio.
 
