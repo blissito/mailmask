@@ -280,8 +280,9 @@
           <p class="mt-4 text-sm text-fg-subtle">Primer mes gratis · Pago con MercadoPago · Sin tarjeta para probar</p>
         </div>
 
-        <!-- Maqueta de la Bandeja (datos ficticios) -->
-        <div class="mock animate-fade-up opacity-0 anim-delay-200" aria-label="Vista de la Bandeja de MailMask" role="img">
+        <!-- Maqueta de la Bandeja (datos ficticios). landing.js la anima en bucle:
+             llega un correo, se asigna, se responde, se firma y se resuelve. -->
+        <div id="hero-demo" class="mock animate-fade-up opacity-0 anim-delay-200" aria-label="Vista de la Bandeja de MailMask" role="img">
           <div class="mock-bar">
             <span class="mock-dot"></span><span class="mock-dot"></span><span class="mock-dot"></span>
             <span class="ml-3 font-mono text-[11px]">app.mailmask.studio/bandeja</span>
@@ -291,50 +292,50 @@
             <div class="min-w-0 border-b md:border-b-0 md:border-r border-line">
               <div class="flex flex-wrap items-center gap-2 px-3 py-2.5 border-b border-line">
                 <span class="font-semibold text-fg">Bandeja</span>
-                <span class="chip">Abiertos <b class="text-fg">4</b></span>
+                <span class="chip">Abiertos <b class="text-fg demo-count" data-demo="count">4</b></span>
                 <span class="ml-auto chip hidden sm:inline-flex">c · Redactar</span>
               </div>
-              <ul class="p-2 space-y-0.5">
-                <li class="rounded-lg bg-bg-inset px-3 py-2.5 border border-line">
-                  <div class="flex items-center justify-between gap-2"><span class="font-semibold text-fg truncate">Ana García</span><span class="text-[11px] text-fg-subtle">hace 5m</span></div>
+              <ul class="p-2 space-y-0.5 demo-list">
+                <li class="demo-item demo-new rounded-lg px-3 py-2.5 border border-transparent" data-demo="ana">
+                  <div class="flex items-center justify-between gap-2"><span class="font-semibold text-fg truncate flex items-center gap-1.5"><span class="demo-dot h-1.5 w-1.5 rounded-full bg-accent"></span>Ana García</span><span class="text-[11px] text-fg-subtle" data-demo="ana-time">ahora</span></div>
                   <p class="text-fg-muted truncate">Cotización para proyecto web</p>
-                  <div class="mt-1.5 flex items-center gap-1.5"><span class="chip">ventas@</span><span class="chip">Tú</span></div>
+                  <div class="mt-1.5 flex items-center gap-1.5"><span class="chip">ventas@</span><span class="chip demo-pop" data-demo="assign">Tú</span></div>
                 </li>
-                <li class="rounded-lg px-3 py-2.5">
+                <li class="demo-item rounded-lg px-3 py-2.5 border border-transparent" data-demo="luis">
                   <div class="flex items-center justify-between gap-2"><span class="font-medium text-fg truncate">Luis Ramírez</span><span class="text-[11px] text-fg-subtle">hace 2h</span></div>
                   <p class="text-fg-muted truncate">Re: Factura pendiente de agosto</p>
                   <div class="mt-1.5 flex items-center gap-1.5"><span class="chip">cobranza@</span><span class="chip">Mariana</span></div>
                 </li>
-                <li class="rounded-lg px-3 py-2.5">
+                <li class="demo-item rounded-lg px-3 py-2.5 border border-transparent">
                   <div class="flex items-center justify-between gap-2"><span class="font-medium text-fg truncate">Tienda Shopify</span><span class="text-[11px] text-fg-subtle">ayer</span></div>
                   <p class="text-fg-muted truncate">Nuevo pedido #1042 · $1,890</p>
                   <div class="mt-1.5 flex items-center gap-1.5"><span class="chip">pedidos@</span></div>
                 </li>
-                <li class="rounded-lg px-3 py-2.5 hidden md:block">
+                <li class="demo-item rounded-lg px-3 py-2.5 border border-transparent hidden md:block">
                   <div class="flex items-center justify-between gap-2"><span class="font-medium text-fg truncate">Paola Reyes</span><span class="text-[11px] text-fg-subtle">ayer</span></div>
                   <p class="text-fg-muted truncate">¿Hacen sitios en WordPress?</p>
                   <div class="mt-1.5 flex items-center gap-1.5"><span class="chip">hola@</span><span class="chip">Sin asignar</span></div>
                 </li>
               </ul>
             </div>
-            <div class="min-w-0 p-4 space-y-3">
+            <div class="min-w-0 p-4 space-y-3 demo-detail" data-demo="detail">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="font-semibold text-fg truncate">Cotización para proyecto web</p>
-                  <p class="text-fg-subtle text-xs truncate">Ana García &lt;ana@cliente.com&gt; → ventas@tuempresa.com</p>
+                  <p class="font-semibold text-fg truncate" data-demo="subject">Cotización para proyecto web</p>
+                  <p class="text-fg-subtle text-xs truncate" data-demo="from">Ana García &lt;ana@cliente.com&gt; → ventas@tuempresa.com</p>
                 </div>
-                <span class="chip chip-ok flex-shrink-0">Abierto</span>
+                <span class="chip chip-ok flex-shrink-0" data-demo="status">Abierto</span>
               </div>
-              <div class="rounded-xl bg-bg-inset px-3.5 py-3 text-fg-muted leading-relaxed">
+              <div class="rounded-xl bg-bg-inset px-3.5 py-3 text-fg-muted leading-relaxed demo-pop" data-demo="msg">
                 Hola, me interesa una cotización para rediseñar nuestra página. ¿Podrían enviarme información de sus paquetes?
               </div>
-              <div class="rounded-xl border border-accent/30 bg-accent/[0.06] px-3.5 py-3 leading-relaxed">
+              <div class="rounded-xl border border-accent/30 bg-accent/[0.06] px-3.5 py-3 leading-relaxed demo-pop" data-demo="reply">
                 <p class="text-[11px] text-accent-text font-medium mb-1">Tú · desde ventas@tuempresa.com</p>
-                <p class="text-fg-muted">¡Hola Ana! Con gusto. Te adjunto el catálogo con los tres paquetes y tiempos de entrega…</p>
+                <p class="text-fg-muted min-h-[2.6em]"><span data-demo="typed">¡Hola Ana! Con gusto. Te adjunto el catálogo con los tres paquetes y tiempos de entrega…</span><span class="demo-caret" aria-hidden="true"></span></p>
               </div>
               <div class="flex items-center gap-2 text-xs">
-                <span class="chip border-amber-500/30 bg-amber-500/10 text-amber-700">Nota interna: seguimiento el viernes</span>
-                <span class="ml-auto text-fg-subtle hidden sm:inline">Firmado con DKIM ✓</span>
+                <span class="chip border-amber-500/30 bg-amber-500/10 text-amber-700 demo-pop" data-demo="note">Nota interna: seguimiento el viernes</span>
+                <span class="ml-auto text-fg-subtle hidden sm:inline demo-pop" data-demo="dkim">Firmado con DKIM ✓</span>
               </div>
             </div>
           </div>
@@ -602,6 +603,7 @@
             <li>✓ 10 máscaras: hola@, ventas@, facturas@… al buzón que elijas</li>
             <li>✓ Bandeja web para leer y responder desde tu dominio</li>
             <li>✓ Entrega fuera de spam (DKIM + SPF automáticos)</li>
+            <li>✓ Hasta 3,000 correos reenviados al mes</li>
             <li>✓ Historial de 15 días</li>
             <li>✓ API REST + SDK</li>
             <li class="text-fg-muted">+ Iniciar correos nuevos: <a href="/pricing#addons" class="text-accent-text hover:underline">add-on desde $49</a></li>
@@ -637,6 +639,7 @@
             <li>✓ Máscaras ilimitadas</li>
             <li>✓ Reglas de enrutado y webhooks</li>
             <li>✓ SMTP relay para tu SaaS o sistema</li>
+            <li>✓ Hasta 30,000 correos reenviados al mes</li>
             <li>✓ Historial de 90 días</li>
             <li>✓ API REST + SDK y soporte por email</li>
           </ul>

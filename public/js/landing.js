@@ -440,7 +440,8 @@ function applyCouponToCard() {
   const load = (muted) => {
     if (loaded) return;
     loaded = true;
-    const q = muted ? "autoplay=1&mute=1&loop=1&playlist=" + encodeURIComponent(id) : "autoplay=1";
+    // Arranca en 1:12, donde Brenda entra en materia.
+    const q = (muted ? "autoplay=1&mute=1&loop=1&playlist=" + encodeURIComponent(id) : "autoplay=1") + "&start=72";
     const iframe = document.createElement("iframe");
     iframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?${q}&rel=0&playsinline=1`;
     iframe.title = "Brenda cuenta cómo usa MailMask";
@@ -454,4 +455,109 @@ function applyCouponToCard() {
   new IntersectionObserver((entries, obs) => {
     if (entries.some((e) => e.isIntersecting)) { load(true); obs.disconnect(); }
   }, { threshold: 0.5 }).observe(box);
+})();
+
+// --- Demo animada de la Bandeja (hero) ---
+// Un guion en bucle: llega el correo de Ana, se asigna, se responde (tecleado), sale
+// firmado con DKIM, se deja una nota interna y se resuelve. Con prefers-reduced-motion
+// no arranca y la maqueta queda en su estado final, que es el markup tal cual.
+(() => {
+  const root = document.getElementById("hero-demo");
+  if (!root || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const q = (k) => root.querySelector(`[data-demo="${k}"]`);
+  const el = {
+    count: q("count"), ana: q("ana"), luis: q("luis"), assign: q("assign"), detail: q("detail"),
+    subject: q("subject"), from: q("from"), status: q("status"), msg: q("msg"), reply: q("reply"),
+    typed: q("typed"), note: q("note"), dkim: q("dkim"), anaTime: q("ana-time"),
+  };
+  const caret = root.querySelector(".demo-caret");
+  const REPLY = el.typed.textContent;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const on = (...xs) => xs.forEach((x) => x && x.classList.add("on"));
+  const off = (...xs) => xs.forEach((x) => x && x.classList.remove("on"));
+  let running = true;
+  document.addEventListener("visibilitychange", () => { running = !document.hidden; });
+
+  const setCount = (n) => {
+    el.count.textContent = String(n);
+    el.count.classList.add("bump");
+    setTimeout(() => el.count.classList.remove("bump"), 250);
+  };
+  const showDetail = async (subject, from, msgText) => {
+    el.detail.classList.add("swap");
+    await sleep(300);
+    el.subject.textContent = subject;
+    el.from.textContent = from;
+    el.msg.textContent = msgText;
+    el.status.textContent = "Abierto";
+    el.status.className = "chip chip-ok flex-shrink-0";
+    off(el.reply, el.note, el.dkim);
+    el.detail.classList.remove("swap");
+    await sleep(120);
+    on(el.msg);
+  };
+  const type = async (text) => {
+    el.typed.textContent = "";
+    caret.classList.remove("off");
+    for (let i = 0; i < text.length; i++) {
+      if (!running) { await sleep(400); i--; continue; }
+      el.typed.textContent += text[i];
+      await sleep(text[i] === " " ? 34 : 22 + Math.random() * 30);
+    }
+    caret.classList.add("off");
+  };
+
+  async function scene() {
+    root.classList.add("is-live");
+    // Estado inicial: Ana todavía no ha escrito; leemos a Luis.
+    off(el.ana, el.assign, el.reply, el.note, el.dkim);
+    el.ana.classList.remove("done", "on");
+    el.status.classList.remove("chip-done");
+    setCount(3);
+    on(el.luis);
+    await showDetail("Re: Factura pendiente de agosto", "Luis Ramírez <luis@proveedor.mx> → cobranza@tuempresa.com",
+      "Buen día, ¿me confirman si ya quedó programado el pago de la factura 0821? Gracias.");
+    await sleep(1600);
+
+    // Llega Ana.
+    el.anaTime.textContent = "ahora";
+    on(el.ana); setCount(4);
+    await sleep(1400);
+
+    // La abrimos y la asignamos.
+    off(el.luis); el.ana.classList.add("on");
+    await showDetail("Cotización para proyecto web", "Ana García <ana@cliente.com> → ventas@tuempresa.com",
+      "Hola, me interesa una cotización para rediseñar nuestra página. ¿Podrían enviarme información de sus paquetes?");
+    await sleep(900);
+    on(el.assign);
+    await sleep(700);
+
+    // Respondemos desde ventas@, tecleado.
+    el.typed.textContent = "";
+    on(el.reply);
+    await sleep(350);
+    await type(REPLY);
+    await sleep(400);
+    on(el.dkim);
+    await sleep(900);
+
+    // Nota interna y resolver.
+    on(el.note);
+    await sleep(1400);
+    el.status.textContent = "Resuelto";
+    el.status.className = "chip chip-done flex-shrink-0";
+    el.ana.classList.add("done");
+    el.anaTime.textContent = "hace 1m";
+    setCount(3);
+    await sleep(2600);
+  }
+
+  (async () => {
+    // Espera a que el hero haya entrado (la maqueta trae fade-up de 0.7s).
+    await sleep(900);
+    for (;;) {
+      if (!running) { await sleep(500); continue; }
+      await scene();
+    }
+  })();
 })();

@@ -247,3 +247,27 @@
   :root:not([data-theme="light"]) .theme-toggle .sun { display: block; }
   :root:not([data-theme="light"]) .theme-toggle .moon { display: none; }
 }
+
+/* ====== Demo animada de la Bandeja en el hero ======
+   Sin JS (o con prefers-reduced-motion) la maqueta se ve completa y quieta: el estado
+   final. Con JS, landing.js pone .is-live en #hero-demo y va encendiendo cada pieza. */
+#hero-demo .demo-item { transition: background-color .35s, border-color .35s, opacity .5s, transform .5s; }
+#hero-demo .demo-item.on { background: rgb(var(--bg-inset)); border-color: rgb(var(--line)); }
+#hero-demo .demo-item.done { opacity: .45; }
+#hero-demo .demo-dot { display: none; }
+#hero-demo .demo-caret { display: none; }
+#hero-demo.is-live .demo-pop { opacity: 0; transform: translateY(6px) scale(.98); transition: opacity .4s ease, transform .4s ease; }
+#hero-demo.is-live .demo-pop.on { opacity: 1; transform: none; }
+#hero-demo.is-live .demo-new { opacity: 0; transform: translateY(-14px); transition: opacity .45s ease, transform .45s cubic-bezier(.2,.9,.3,1.2); }
+#hero-demo.is-live .demo-new.on { opacity: 1; transform: none; }
+#hero-demo.is-live .demo-new.on .demo-dot { display: inline-block; animation: demoPulse 1.2s ease-in-out infinite; }
+#hero-demo.is-live .demo-new.on.done .demo-dot { display: none; }
+#hero-demo.is-live .demo-caret { display: inline-block; width: 2px; height: 1em; margin-left: 1px; vertical-align: -0.15em; background: rgb(var(--accent)); animation: demoBlink .9s steps(2) infinite; }
+#hero-demo.is-live .demo-caret.off { display: none; }
+#hero-demo .demo-count { display: inline-block; transition: transform .25s; }
+#hero-demo .demo-count.bump { transform: scale(1.35); }
+#hero-demo .demo-detail { transition: opacity .3s; }
+#hero-demo .demo-detail.swap { opacity: 0; }
+#hero-demo .chip.chip-done { border-color: rgb(var(--fg-subtle) / .4); background: rgb(var(--bg-inset)); color: rgb(var(--fg-muted)); }
+@keyframes demoPulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.6); opacity: .5 } }
+@keyframes demoBlink { to { visibility: hidden } }
