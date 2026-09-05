@@ -5174,8 +5174,17 @@ const app = new Elysia({ adapter: node() })
 
     if (body.Type !== "Notification") return new Response("OK", { status: 200 });
 
+    // Al crear o actualizar un event destination, SES publica al tópico un texto
+    // plano ("Successfully validated SNS topic for Amazon SES event publishing.")
+    // que no es JSON. Antes tronaba en JSON.parse y ensuciaba el log como error.
+    const raw = typeof body.Message === "string" ? body.Message.trim() : "";
+    if (!raw.startsWith("{")) {
+      log("info", "ses", "SES events: non-JSON notification ignored", { message: raw.slice(0, 120) });
+      return new Response("OK", { status: 200 });
+    }
+
     try {
-      const message = JSON.parse(body.Message);
+      const message = JSON.parse(raw);
       await registrarEventoSes(message);
     } catch (err) {
       log("error", "ses", "SES event processing error", { error: String(err) });
