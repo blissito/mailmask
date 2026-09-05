@@ -425,18 +425,31 @@ function applyCouponToCard() {
   } catch { /* ignore */ }
 })();
 
-// Video de Brenda: el iframe de YouTube se carga sólo al hacer clic (lite embed).
-// El thumbnail es local para no abrir img-src en la CSP; frame-src sí permite
-// youtube-nocookie.com.
-document.getElementById("brenda-play")?.addEventListener("click", (e) => {
-  const box = e.currentTarget.closest("[data-video-id]");
+// Video de Brenda: lite embed. El iframe de YouTube se carga cuando la sección
+// entra en pantalla, en silencio y en bucle (los navegadores sólo permiten
+// autoplay sin audio); el usuario activa el sonido con los controles del player.
+// Si el usuario da clic antes, arranca con audio. Thumbnail local para no abrir
+// img-src en la CSP; frame-src sí permite youtube-nocookie.com.
+(() => {
+  const box = document.getElementById("brenda-video");
   if (!box) return;
   const id = box.dataset.videoId;
-  const iframe = document.createElement("iframe");
-  iframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0`;
-  iframe.title = "Brenda cuenta cómo usa MailMask";
-  iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-  iframe.allowFullscreen = true;
-  iframe.className = "absolute inset-0 h-full w-full";
-  box.replaceChildren(iframe);
-});
+  let loaded = false;
+  const load = (muted) => {
+    if (loaded) return;
+    loaded = true;
+    const q = muted ? "autoplay=1&mute=1&loop=1&playlist=" + encodeURIComponent(id) : "autoplay=1";
+    const iframe = document.createElement("iframe");
+    iframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?${q}&rel=0&playsinline=1`;
+    iframe.title = "Brenda cuenta cómo usa MailMask";
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+    iframe.allowFullscreen = true;
+    iframe.className = "absolute inset-0 h-full w-full";
+    box.replaceChildren(iframe);
+  };
+  document.getElementById("brenda-play")?.addEventListener("click", () => load(false));
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  new IntersectionObserver((entries, obs) => {
+    if (entries.some((e) => e.isIntersecting)) { load(true); obs.disconnect(); }
+  }, { threshold: 0.5 }).observe(box);
+})();
