@@ -88,7 +88,7 @@ function Chat() {
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: "#09090b",
+        background: "rgb(var(--bg-elev))",
         overflow: "hidden",
       }}
     >
@@ -96,7 +96,7 @@ function Chat() {
       <div
         style={{
           padding: "12px 16px",
-          borderBottom: "1px solid #27272a",
+          borderBottom: "1px solid rgb(var(--line))",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -112,7 +112,7 @@ function Chat() {
               background: "#22c55e",
             }}
           />
-          <span style={{ fontWeight: 600, fontSize: 16, color: "#fafafa" }}>
+          <span style={{ fontWeight: 600, fontSize: 16, color: "rgb(var(--fg))" }}>
             Asistente MailMask
           </span>
         </div>
@@ -121,7 +121,7 @@ function Chat() {
           style={{
             background: "none",
             border: "none",
-            color: "#71717a",
+            color: "rgb(var(--fg-subtle))",
             cursor: "pointer",
             fontSize: 12,
             padding: "4px 8px",
@@ -149,7 +149,7 @@ function Chat() {
           <div
             style={{
               textAlign: "center",
-              color: "#52525b",
+              color: "rgb(var(--fg-subtle))",
               fontSize: 15,
               marginTop: 40,
             }}
@@ -180,11 +180,11 @@ function Chat() {
                     sendMessage(q);
                   }}
                   style={{
-                    background: "#18181b",
-                    border: "1px solid #27272a",
+                    background: "rgb(var(--bg-inset))",
+                    border: "1px solid rgb(var(--line))",
                     borderRadius: 8,
                     padding: "6px 12px",
-                    color: "#a1a1aa",
+                    color: "rgb(var(--fg-muted))",
                     fontSize: 14,
                     cursor: "pointer",
                   }}
@@ -217,10 +217,10 @@ function Chat() {
                   ...(isUser
                     ? {
                         background:
-                          "linear-gradient(135deg, rgb(var(--mask-600)), rgb(var(--mask-500)))",
+                          "linear-gradient(135deg, rgb(var(--accent-text)), rgb(var(--accent)))",
                         color: "#fff",
                       }
-                    : { color: "#d4d4d8" }),
+                    : { color: "rgb(var(--fg-muted))" }),
                 }}
               >
                 {isUser ? (
@@ -249,7 +249,7 @@ function Chat() {
                   width: 6,
                   height: 6,
                   borderRadius: "50%",
-                  background: "#52525b",
+                  background: "rgb(var(--fg-subtle))",
                   animation: `pulse 1s ease-in-out ${i * 0.15}s infinite`,
                 }}
               />
@@ -263,7 +263,7 @@ function Chat() {
               color: "#ef4444",
               fontSize: 12,
               padding: "8px 12px",
-              background: "#1c1917",
+              background: "rgb(var(--accent) / 0.08)",
               borderRadius: 8,
             }}
           >
@@ -279,7 +279,7 @@ function Chat() {
         onSubmit={handleSubmit}
         style={{
           padding: 12,
-          borderTop: "1px solid #27272a",
+          borderTop: "1px solid rgb(var(--line))",
           display: "flex",
           gap: 8,
           flexShrink: 0,
@@ -292,24 +292,24 @@ function Chat() {
           disabled={isLoading}
           style={{
             flex: 1,
-            background: "#18181b",
-            border: "1px solid #27272a",
+            background: "rgb(var(--bg-inset))",
+            border: "1px solid rgb(var(--line))",
             borderRadius: 10,
             padding: "10px 14px",
-            color: "#fafafa",
+            color: "rgb(var(--fg))",
             fontSize: 15,
             outline: "none",
           }}
           onFocus={(e) =>
-            (e.currentTarget.style.borderColor = "rgb(var(--mask-500))")
+            (e.currentTarget.style.borderColor = "rgb(var(--accent))")
           }
-          onBlur={(e) => (e.currentTarget.style.borderColor = "#27272a")}
+          onBlur={(e) => (e.currentTarget.style.borderColor = "rgb(var(--line))")}
         />
         <button
           type="submit"
           disabled={isLoading || !input.trim()}
           style={{
-            background: "rgb(var(--mask-500))",
+            background: "rgb(var(--accent))",
             border: "none",
             borderRadius: 10,
             padding: "0 16px",
@@ -339,10 +339,10 @@ function Chat() {
         .streamdown-wrap .bg-\[var\(--sdm-bg\,inherit\)\] {
           background-color: var(--sdm-bg, inherit);
         }
-        .streamdown-wrap .bg-background { background-color: #09090b; }
-        .streamdown-wrap .text-muted-foreground { color: #71717a; }
-        .streamdown-wrap .text-foreground { color: #fafafa; }
-        .streamdown-wrap .border-border { border-color: #27272a; }
+        .streamdown-wrap .bg-background { background-color: rgb(var(--bg-elev)); }
+        .streamdown-wrap .text-muted-foreground { color: rgb(var(--fg-subtle)); }
+        .streamdown-wrap .text-foreground { color: rgb(var(--fg)); }
+        .streamdown-wrap .border-border { border-color: rgb(var(--line)); }
         .streamdown-wrap .text-sm { font-size: 0.875rem; }
         .streamdown-wrap .text-xs { font-size: 0.75rem; }
         .streamdown-wrap .font-mono { font-family: ui-monospace, SFMono-Regular, monospace; }
@@ -371,14 +371,14 @@ function Chat() {
         .streamdown-wrap .p-1 { padding: 0.25rem; }
         .streamdown-wrap .cursor-pointer { cursor: pointer; }
         .streamdown-wrap .transition-all { transition: all 150ms; }
-        .streamdown-wrap .divide-y > * + * { border-top: 1px solid #27272a; }
+        .streamdown-wrap .divide-y > * + * { border-top: 1px solid rgb(var(--line)); }
         .streamdown-wrap {
           min-width: 0;
           overflow: hidden;
         }
         .streamdown-wrap [data-streamdown="code-block"] {
-          background: #18181b;
-          border: 1px solid #27272a;
+          background: rgb(var(--bg-inset));
+          border: 1px solid rgb(var(--line));
           border-radius: 12px;
           overflow: hidden;
           margin: 8px 0;
@@ -395,13 +395,13 @@ function Chat() {
           margin: 0;
         }
         .streamdown-wrap [data-streamdown="code-block-header"] {
-          background: #18181b;
-          border-bottom: 1px solid #27272a;
+          background: rgb(var(--bg-inset));
+          border-bottom: 1px solid rgb(var(--line));
           padding: 0 12px;
         }
         .streamdown-wrap pre {
-          background: #18181b !important;
-          border: 1px solid #27272a;
+          background: rgb(var(--bg-inset)) !important;
+          border: 1px solid rgb(var(--line));
           border-radius: 8px;
           overflow-x: auto;
           font-size: 13px;
@@ -420,23 +420,23 @@ function Chat() {
           background: transparent;
         }
         .streamdown-wrap ::-webkit-scrollbar-thumb {
-          background: #3f3f46;
+          background: rgb(var(--line));
           border-radius: 4px;
         }
         .streamdown-wrap p { margin: 6px 0; }
         .streamdown-wrap ul, .streamdown-wrap ol { margin: 6px 0; padding-left: 20px; }
-        .streamdown-wrap a { color: rgb(var(--mask-400)); text-decoration: underline; }
+        .streamdown-wrap a { color: rgb(var(--accent-text)); text-decoration: underline; }
         .streamdown-wrap h1, .streamdown-wrap h2, .streamdown-wrap h3 {
-          color: #fafafa;
+          color: rgb(var(--fg));
           margin: 12px 0 6px;
           font-weight: 600;
         }
         .streamdown-wrap code:not(pre code) {
-          background: #27272a;
+          background: rgb(var(--line));
           padding: 2px 6px;
           border-radius: 4px;
           font-size: 13px;
-          color: rgb(var(--mask-400));
+          color: rgb(var(--accent-text));
         }
       `}</style>
     </div>
@@ -459,7 +459,7 @@ function MobileChat() {
             width: 52,
             height: 52,
             borderRadius: "50%",
-            background: "rgb(var(--mask-500))",
+            background: "rgb(var(--accent))",
             border: "none",
             color: "#fff",
             fontSize: 22,
@@ -493,7 +493,7 @@ function MobileChat() {
             position: "fixed",
             inset: 0,
             zIndex: 1001,
-            background: "#09090b",
+            background: "rgb(var(--bg-elev))",
             display: "flex",
             flexDirection: "column",
           }}
@@ -511,7 +511,7 @@ function MobileChat() {
               style={{
                 background: "none",
                 border: "none",
-                color: "#71717a",
+                color: "rgb(var(--fg-subtle))",
                 fontSize: 22,
                 cursor: "pointer",
                 padding: 4,

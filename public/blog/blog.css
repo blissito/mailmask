@@ -1,4 +1,4 @@
-/* Blog styles — dark theme consistent with MailMask */
+/* Blog styles — usa los tokens de tema de input.css (claro/oscuro) */
 
 .blog-index {
   max-width: 48rem;
@@ -7,24 +7,25 @@
 }
 
 .blog-index h1 {
-  font-size: 2.25rem;
+  font-family: "Bricolage Grotesque", Inter, system-ui, sans-serif;
+  font-size: 2.75rem;
   font-weight: 800;
-  color: #f4f4f5;
+  color: rgb(var(--fg));
   margin-bottom: 0.5rem;
   letter-spacing: -0.025em;
 }
 
 .blog-index .blog-subtitle {
-  color: rgb(var(--mask-400));
+  color: rgb(var(--accent-text));
   font-size: 1.125rem;
   margin-bottom: 3rem;
 }
 
 .post-card {
   display: block;
-  border: 1px solid rgba(63, 63, 70, 0.5);
+  border: 1px solid rgb(var(--line));
   border-radius: 0.75rem;
-  background: rgba(39, 39, 42, 0.4);
+  background: rgb(var(--bg-elev));
   overflow: hidden;
   transition: border-color 0.2s, box-shadow 0.2s;
   text-decoration: none;
@@ -52,13 +53,12 @@ img.post-card-img {
 }
 
 .post-card:hover {
-  border-color: rgb(var(--mask-600));
-  box-shadow: 0 0 30px rgb(var(--mask-500) / 0.1);
+  border-color: rgb(var(--fg-subtle));
 }
 
 .post-card time {
   font-size: 0.75rem;
-  color: #a1a1aa;
+  color: rgb(var(--fg-muted));
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -66,14 +66,14 @@ img.post-card-img {
 .post-card h2 {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #f4f4f5;
+  color: rgb(var(--fg));
   margin: 0.5rem 0;
   line-height: 1.4;
 }
 
 .post-card p {
   font-size: 0.938rem;
-  color: #a1a1aa;
+  color: rgb(var(--fg-muted));
   line-height: 1.6;
 }
 
@@ -82,7 +82,7 @@ img.post-card-img {
   margin-top: 0.75rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: rgb(var(--mask-400));
+  color: rgb(var(--accent-text));
 }
 
 .posts-grid {
@@ -109,14 +109,15 @@ img.post-card-img {
 
 .blog-article header {
   margin-bottom: 2.5rem;
-  border-bottom: 1px solid rgba(63, 63, 70, 0.5);
+  border-bottom: 1px solid rgb(var(--line));
   padding-bottom: 1.5rem;
 }
 
 .blog-article header h1 {
-  font-size: 2rem;
+  font-family: "Bricolage Grotesque", Inter, system-ui, sans-serif;
+  font-size: 2.25rem;
   font-weight: 800;
-  color: #f4f4f5;
+  color: rgb(var(--fg));
   line-height: 1.25;
   letter-spacing: -0.025em;
   margin-bottom: 0.75rem;
@@ -133,7 +134,7 @@ img.post-card-img {
   flex-wrap: wrap;
   gap: 1rem;
   font-size: 0.875rem;
-  color: #a1a1aa;
+  color: rgb(var(--fg-muted));
 }
 
 .blog-article header .meta span {
@@ -146,28 +147,28 @@ img.post-card-img {
 .blog-content h2 {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #e4e4e7;
+  color: rgb(var(--fg));
   margin: 2rem 0 0.75rem;
 }
 
 .blog-content h3 {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #e4e4e7;
+  color: rgb(var(--fg));
   margin: 1.5rem 0 0.5rem;
 }
 
 .blog-content p {
   font-size: 1.0625rem;
   line-height: 1.75;
-  color: #d4d4d8;
+  color: rgb(var(--fg-muted));
   margin-bottom: 1.25rem;
 }
 
 .blog-content ul,
 .blog-content ol {
   margin: 0.75rem 0 1.25rem 1.5rem;
-  color: #d4d4d8;
+  color: rgb(var(--fg-muted));
   font-size: 1.0625rem;
   line-height: 1.75;
 }
@@ -185,31 +186,31 @@ img.post-card-img {
 }
 
 .blog-content a {
-  color: rgb(var(--mask-400));
+  color: rgb(var(--accent-text));
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .blog-content a:hover {
-  color: rgb(var(--mask-500));
+  color: rgb(var(--accent));
 }
 
 .blog-content strong {
-  color: #f4f4f5;
+  color: rgb(var(--fg));
   font-weight: 600;
 }
 
 .blog-content code {
-  background: rgba(39, 39, 42, 0.8);
+  background: rgb(var(--bg-inset));
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
   font-size: 0.9em;
-  color: rgb(var(--mask-400));
+  color: rgb(var(--accent-text));
 }
 
 .blog-content pre {
-  background: #18181b;
-  border: 1px solid rgba(63, 63, 70, 0.5);
+  background: rgb(var(--bg-inset));
+  border: 1px solid rgb(var(--line));
   border-radius: 0.5rem;
   padding: 1rem 1.25rem;
   overflow-x: auto;
@@ -222,16 +223,16 @@ img.post-card-img {
   background: none;
   padding: 0;
   border-radius: 0;
-  color: #d4d4d8;
+  color: rgb(var(--fg-muted));
 }
 
 .blog-content blockquote {
-  border-left: 3px solid rgb(var(--mask-600));
+  border-left: 3px solid rgb(var(--accent));
   padding: 0.75rem 1rem;
   margin: 1rem 0 1.5rem;
-  background: rgba(39, 39, 42, 0.3);
+  background: rgb(var(--bg-inset));
   border-radius: 0 0.5rem 0.5rem 0;
-  color: #a1a1aa;
+  color: rgb(var(--fg-muted));
   font-style: italic;
 }
 
@@ -247,20 +248,20 @@ img.post-card-img {
   margin: 0 auto 3rem;
   padding: 2rem 1.5rem;
   text-align: center;
-  border: 1px solid rgba(63, 63, 70, 0.5);
+  border: 1px solid rgb(var(--line));
   border-radius: 0.75rem;
-  background: rgba(39, 39, 42, 0.3);
+  background: rgb(var(--bg-inset));
 }
 
 .blog-cta h2 {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #f4f4f5;
+  color: rgb(var(--fg));
   margin-bottom: 0.5rem;
 }
 
 .blog-cta p {
-  color: #a1a1aa;
+  color: rgb(var(--fg-muted));
   font-size: 0.938rem;
   margin-bottom: 1.25rem;
 }
@@ -268,7 +269,7 @@ img.post-card-img {
 .blog-cta .cta-btn {
   display: inline-block;
   padding: 0.625rem 1.5rem;
-  background: rgb(var(--mask-600));
+  background: rgb(var(--accent));
   color: #fff;
   font-weight: 600;
   font-size: 0.938rem;
@@ -278,7 +279,7 @@ img.post-card-img {
 }
 
 .blog-cta .cta-btn:hover {
-  background: rgb(var(--mask-700));
+  background: rgb(var(--accent-text));
 }
 
 /* Back link */
@@ -287,29 +288,29 @@ img.post-card-img {
   align-items: center;
   gap: 0.25rem;
   font-size: 0.875rem;
-  color: #a1a1aa;
+  color: rgb(var(--fg-muted));
   text-decoration: none;
   margin-bottom: 1.5rem;
 }
 
 .blog-back:hover {
-  color: rgb(var(--mask-400));
+  color: rgb(var(--accent-text));
 }
 
 /* Modern post elements (2026) */
 .blog-content .tldr {
-  background: linear-gradient(135deg, rgba(var(--mask-600), 0.12), rgba(var(--mask-500), 0.06));
-  border: 1px solid rgba(var(--mask-600), 0.25);
+  background: linear-gradient(135deg, rgb(var(--accent) / 0.10), rgb(var(--accent) / 0.04));
+  border: 1px solid rgb(var(--accent) / 0.25);
   border-radius: 0.75rem;
   padding: 1.25rem 1.5rem;
   margin: 0 0 2rem;
   font-size: 0.95rem;
   line-height: 1.7;
-  color: #d4d4d8;
+  color: rgb(var(--fg-muted));
 }
 
 .blog-content .tldr strong {
-  color: rgb(var(--mask-400));
+  color: rgb(var(--accent-text));
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -321,8 +322,9 @@ img.post-card-img {
    navegador, que descuadraba el SVG respecto al texto. */
 .blog-content figure.diagram {
   margin: 1.75rem 0;
+  /* Los SVG de los posts se dibujaron con fondos #18181b y texto claro: se quedan sobre placa oscura en ambos temas. */
   background: #18181b;
-  border: 1px solid rgba(63, 63, 70, 0.5);
+  border: 1px solid rgb(var(--line));
   border-radius: 0.625rem;
   padding: 1.25rem;
   overflow-x: auto;
@@ -348,25 +350,25 @@ img.post-card-img {
 }
 .blog-content figure.screenshot img {
   margin: 0;
-  border: 1px solid rgba(63, 63, 70, 0.6);
+  border: 1px solid rgb(var(--line));
 }
 .blog-content figure.screenshot figcaption {
   margin-top: 0.75rem;
-  color: #a1a1aa;
+  color: rgb(var(--fg-muted));
   font-size: 0.85rem;
   line-height: 1.5;
   text-align: center;
 }
 
 .blog-content .callout {
-  border-left: 3px solid rgb(var(--mask-500));
-  background: rgba(var(--mask-600), 0.08);
+  border-left: 3px solid rgb(var(--accent));
+  background: rgb(var(--accent) / 0.06);
   border-radius: 0 0.625rem 0.625rem 0;
   padding: 1rem 1.25rem;
   margin: 1.5rem 0;
   font-size: 0.95rem;
   line-height: 1.7;
-  color: #d4d4d8;
+  color: rgb(var(--fg-muted));
 }
 
 .blog-content .callout p {
@@ -378,8 +380,8 @@ img.post-card-img {
   display: flex;
   gap: 1rem;
   align-items: flex-start;
-  background: rgba(39, 39, 42, 0.5);
-  border: 1px solid rgba(63, 63, 70, 0.4);
+  background: rgb(var(--bg-elev));
+  border: 1px solid rgb(var(--line));
   border-radius: 0.75rem;
   padding: 1.25rem;
   margin: 0.75rem 0;
@@ -392,7 +394,7 @@ img.post-card-img {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgb(var(--mask-600));
+  background: rgb(var(--accent));
   color: #fff;
   font-weight: 700;
   font-size: 0.875rem;
@@ -406,19 +408,19 @@ img.post-card-img {
 .blog-content .step-card h4 {
   font-size: 1rem;
   font-weight: 600;
-  color: #f4f4f5;
+  color: rgb(var(--fg));
   margin: 0 0 0.25rem;
 }
 
 .blog-content .step-card p {
   font-size: 0.938rem;
   margin: 0;
-  color: #a1a1aa;
+  color: rgb(var(--fg-muted));
 }
 
 .blog-content .highlight-box {
   background: rgba(39, 39, 42, 0.6);
-  border: 1px solid rgba(63, 63, 70, 0.5);
+  border: 1px solid rgb(var(--line));
   border-radius: 0.75rem;
   padding: 1.5rem;
   margin: 1.5rem 0;
@@ -429,7 +431,7 @@ img.post-card-img {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgb(var(--mask-400));
+  color: rgb(var(--accent-text));
   margin: 0 0 0.75rem;
 }
 
@@ -447,8 +449,8 @@ img.post-card-img {
 }
 
 .blog-content .comparison-card {
-  background: rgba(39, 39, 42, 0.5);
-  border: 1px solid rgba(63, 63, 70, 0.4);
+  background: rgb(var(--bg-elev));
+  border: 1px solid rgb(var(--line));
   border-radius: 0.75rem;
   padding: 1.25rem;
 }
@@ -456,7 +458,7 @@ img.post-card-img {
 .blog-content .comparison-card h4 {
   font-size: 0.938rem;
   font-weight: 700;
-  color: #f4f4f5;
+  color: rgb(var(--fg));
   margin: 0 0 0.5rem;
 }
 
@@ -479,14 +481,14 @@ img.post-card-img {
   padding: 0.2rem 0.625rem;
   border-radius: 9999px;
   background: rgba(var(--mask-600), 0.15);
-  color: rgb(var(--mask-400));
+  color: rgb(var(--accent-text));
   margin-bottom: 0.75rem;
 }
 
 .blog-content .big-number {
   font-size: 2.5rem;
   font-weight: 800;
-  color: rgb(var(--mask-400));
+  color: rgb(var(--accent-text));
   line-height: 1;
   letter-spacing: -0.03em;
 }

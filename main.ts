@@ -138,7 +138,10 @@ import {
   listCannedResponses,
   createCannedResponse,
   deleteCannedResponse,
+  listSuppressions,
+  removeSuppression,
 } from "./db.js";
+import { emitEvent, listWebhooks, getWebhook, createWebhook, updateWebhook, deleteWebhook, enqueuePing, listDeliveries, WEBHOOK_EVENTS, MAX_WEBHOOKS_PER_DOMAIN } from "./webhooks.js";
 import type { AddonKind } from "./db.js";
 import {
   hashPassword,
@@ -333,7 +336,7 @@ const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 // marquen como origen de malware. Bloquearlas aquí evita gastar reputación.
 const BLOCKED_ATTACHMENT_EXT = /\.(exe|scr|com|pif|bat|cmd|msi|jar|vbs|js|apk|dll)$/i;
 
-interface AttachmentRef { key: string; filename: string; contentType: string }
+interface AttachmentRef { key: string; filename: string; contentType?: string }
 
 /** Baja de S3 los adjuntos que el cliente referenció por llave. */
 async function collectAttachments(refs: AttachmentRef[] | undefined): Promise<{ attachments: Attachment[]; keys: string[] }> {
@@ -510,6 +513,24 @@ export async function registrarEventoSes(message: any): Promise<{ suppressed: nu
   } else if (eventType === "complaint") {
     recipients = (message.complaint ?? message).complainedRecipients ?? [];
     reason = "complaint";
+  } else if (eventType === "delivery") {
+    // No suprime nada: sólo dispara el webhook `email.delivered`.
+    const source = String(message.mail?.source ?? "");
+    const domainName = source.includes("@") ? source.split("@").pop()!.replace(/>$/, "").toLowerCase() : "";
+    const { getDomainByName } = await import("./db.js");
+    const domainRecord = domainName ? await getDomainByName(domainName) : null;
+    if (domainRecord) {
+      for (const recipient of (message.delivery?.recipients ?? []) as string[]) {
+        emitEvent(domainRecord.id, "email.delivered", {
+          recipient,
+          messageId: message.mail?.messageId ?? null,
+          subject: message.mail?.commonHeaders?.subject ?? null,
+          smtpResponse: message.delivery?.smtpResponse ?? null,
+          processingTimeMillis: message.delivery?.processingTimeMillis ?? null,
+        });
+      }
+    }
+    return { suppressed: 0 };
   } else {
     return { suppressed: 0 };
   }
@@ -535,6 +556,12 @@ export async function registrarEventoSes(message: any): Promise<{ suppressed: nu
     await addSuppression(domainRecord.id, r.emailAddress, reason);
     suppressed++;
     log("info", "ses", `Added to suppression (${reason})`, { email: r.emailAddress, domain: domainName });
+    emitEvent(domainRecord.id, eventType === "bounce" ? "email.bounced" : "email.complained", {
+      recipient: r.emailAddress,
+      reason,
+      messageId: message.mail?.messageId ?? null,
+      subject: message.mail?.commonHeaders?.subject ?? null,
+    });
   }
   return { suppressed };
 }
@@ -554,6 +581,18 @@ async function checkEmailVerified(email: string): Promise<Response | null> {
       headers: { "content-type": "application/json" },
     },
   );
+}
+
+/** Devuelve el mensaje de error o null. Sólo https y hosts públicos: el receptor recibe datos de correo. */
+function validateWebhookInput(url: string, events: string[]): string | null {
+  const u = (url ?? "").trim();
+  if (!u || u.length > 2000) return "URL requerida (máx 2000 caracteres)";
+  if (!u.startsWith("https://")) return "La URL del webhook debe ser https";
+  if (isPrivateUrl(u)) return "La URL del webhook debe ser pública";
+  if (!Array.isArray(events) || !events.length) return "Indica al menos un evento";
+  const invalid = events.filter((e) => !(WEBHOOK_EVENTS as readonly string[]).includes(e));
+  if (invalid.length) return `Eventos inválidos: ${invalid.join(", ")}. Válidos: ${WEBHOOK_EVENTS.join(", ")}`;
+  return null;
 }
 
 // --- SSRF protection ---
@@ -739,7 +778,7 @@ const app = new Elysia({ adapter: node() })
       );
       response.headers.set(
         "content-security-policy",
-        "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.clarity.ms; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms; connect-src 'self' https://www.formmy.app https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms; frame-src https://www.googletagmanager.com",
+        "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.clarity.ms; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms; connect-src 'self' https://www.formmy.app https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms; frame-src https://www.googletagmanager.com https://www.youtube-nocookie.com",
       );
     }
     return response;
@@ -3506,7 +3545,26 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Dominio no verificado" }), { status: 400 });
     }
 
-    const { to, subject, html, body: textBody, markdown, replyTo, from: fromLocal, fromName } = sendBody;
+    // Idempotencia: un reintento del cliente con la misma clave devuelve la
+    // respuesta guardada sin volver a enviar ni consumir cuota. La clave se
+    // llavea por usuario para que dos cuentas no colisionen.
+    const idemHeader = request.headers.get("idempotency-key")?.trim();
+    if (idemHeader !== undefined && idemHeader !== "" && idemHeader.length > 128) {
+      return new Response(JSON.stringify({ error: "Idempotency-Key demasiado larga (máx 128)" }), { status: 400 });
+    }
+    const idemToken = idemHeader ? `idem:${auth.email}:${idemHeader}` : null;
+    if (idemToken) {
+      const prev = db.select().from(tokensTable).where(eq(tokensTable.token, idemToken)).get();
+      if (prev && prev.kind === "idempotency" && prev.expiresAt > new Date().toISOString()) {
+        return new Response(JSON.stringify(prev.value), {
+          headers: { "content-type": "application/json", "idempotent-replayed": "true" },
+        });
+      }
+    }
+
+    const { to, subject, html, body: textBody, markdown, replyTo, from: fromLocal, fromName, inReplyTo, references } = sendBody;
+    const sendCc = parseCopyList(sendBody.cc);
+    const sendBcc = parseCopyList(sendBody.bcc);
     if (!to || !subject || (!html && !textBody && !markdown)) {
       return new Response(JSON.stringify({ error: "to, subject y body/html/markdown requeridos" }), { status: 400 });
     }
@@ -3519,8 +3577,10 @@ const app = new Elysia({ adapter: node() })
     const rendered = resolveEmailBody({ markdown, html, body: textBody });
 
     const recipient = normalizeAddress(to);
-    if (await isSuppressed(domain.id, recipient)) {
-      return new Response(JSON.stringify({ error: "Destinatario en lista de supresión (bounce/complaint previo)" }), { status: 422 });
+    for (const addr of [recipient, ...sendCc, ...sendBcc]) {
+      if (await isSuppressed(domain.id, addr)) {
+        return new Response(JSON.stringify({ error: `Destinatario en lista de supresión (bounce/complaint previo): ${addr}` }), { status: 422 });
+      }
     }
 
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -3558,13 +3618,34 @@ const app = new Elysia({ adapter: node() })
     const fromAddress = fromName?.trim()
       ? `${encodeHeader(fromName.trim())} <${bareFrom}>`
       : bareFrom;
+    let sentFileKeys: string[] = [];
     try {
+      // Adjuntos: llaves devueltas por POST /api/domains/:id/attachments. Mismo
+      // camino que la Bandeja; el archivo se borra de S3 una vez enviado.
+      const files = await collectAttachments(sendBody.attachments);
+      sentFileKeys = files.keys;
       const messageId = await sendFromDomain(fromAddress, recipient, subject, rendered.text, {
         html: rendered.html,
         replyTo,
+        cc: sendCc.length ? sendCc : undefined,
+        bcc: sendBcc.length ? sendBcc : undefined,
+        inReplyTo: inReplyTo?.trim() || undefined,
+        references: references?.trim() || undefined,
+        attachments: files.attachments.length ? files.attachments : undefined,
         configSet: getConfigSetName(domain.domain),
       });
-      return new Response(JSON.stringify({ ok: true, messageId }), {
+      await discardSentFiles(sentFileKeys);
+      const result = { ok: true, messageId };
+      if (idemToken) {
+        db.insert(tokensTable).values({
+          token: idemToken,
+          kind: "idempotency",
+          value: result,
+          expiresAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
+        }).onConflictDoNothing().run();
+      }
+      emitEvent(domain.id, "email.sent", { to: recipient, cc: sendCc, subject, from: bareFrom, messageId });
+      return new Response(JSON.stringify(result), {
         headers: { "content-type": "application/json" },
       });
     } catch (err) {
@@ -3582,8 +3663,142 @@ const app = new Elysia({ adapter: node() })
       replyTo: t.Optional(t.String()),
       from: t.Optional(t.String()),
       fromName: t.Optional(t.String()),
+      cc: t.Optional(t.Array(t.String())),
+      bcc: t.Optional(t.Array(t.String())),
+      inReplyTo: t.Optional(t.String()),
+      references: t.Optional(t.String()),
+      attachments: t.Optional(t.Array(t.Object({
+        key: t.String(),
+        filename: t.String(),
+        contentType: t.Optional(t.String()),
+      }))),
     }),
     detail: { tags: ["Send", "SDK"], summary: "Send an email from a domain", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  // --- Suppression list ---
+
+  .get("/api/domains/:id/suppressions", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const access = await checkDomainAccess(auth.email, params.id, "read");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    return new Response(JSON.stringify(listSuppressions(params.id)), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Suppression", "SDK"], summary: "List suppressed recipients for a domain", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .post("/api/domains/:id/suppressions", async ({ request, params, body: supBody }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    const [addr] = parseCopyList([supBody.email], 1);
+    if (!addr) return new Response(JSON.stringify({ error: "Correo inválido" }), { status: 400 });
+    addSuppression(params.id, addr, "manual");
+    return new Response(JSON.stringify({ email: addr, reason: "manual" }), { status: 201, headers: { "content-type": "application/json" } });
+  }, {
+    body: t.Object({ email: t.String() }),
+    detail: { tags: ["Suppression", "SDK"], summary: "Manually suppress a recipient", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .delete("/api/domains/:id/suppressions/:email", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    const addr = decodeURIComponent(params.email);
+    if (!isSuppressed(params.id, addr)) return new Response(JSON.stringify({ error: "Ese correo no está en la lista" }), { status: 404 });
+    removeSuppression(params.id, addr);
+    return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Suppression", "SDK"], summary: "Remove a recipient from the suppression list", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  // --- Webhooks de eventos ---
+
+  .get("/api/domains/:id/webhooks", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const access = await checkDomainAccess(auth.email, params.id, "read");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    return new Response(JSON.stringify(listWebhooks(params.id)), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Webhooks", "SDK"], summary: "List webhooks for a domain", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .post("/api/domains/:id/webhooks", async ({ request, params, body: whBody }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    if (limited) return limited;
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    const owner = await getUser(access.domain.ownerEmail);
+    if (!owner || !getUserPlanLimits(owner).webhooks) {
+      return new Response(JSON.stringify({ error: "Los webhooks requieren plan Developer" }), { status: 403 });
+    }
+    const bad = validateWebhookInput(whBody.url, whBody.events);
+    if (bad) return new Response(JSON.stringify({ error: bad }), { status: 400 });
+    if (listWebhooks(params.id).length >= MAX_WEBHOOKS_PER_DOMAIN) {
+      return new Response(JSON.stringify({ error: `Máximo ${MAX_WEBHOOKS_PER_DOMAIN} webhooks por dominio` }), { status: 400 });
+    }
+    const created = createWebhook(params.id, whBody.url.trim(), whBody.events);
+    return new Response(JSON.stringify(created), { status: 201, headers: { "content-type": "application/json" } });
+  }, {
+    body: t.Object({ url: t.String(), events: t.Array(t.String()) }),
+    detail: { tags: ["Webhooks", "SDK"], summary: "Create a webhook (secret is returned once)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .put("/api/domains/:id/webhooks/:whId", async ({ request, params, body: whBody }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    if (!getWebhook(params.id, params.whId)) return new Response(JSON.stringify({ error: "Webhook no encontrado" }), { status: 404 });
+    const bad = validateWebhookInput(whBody.url ?? "https://placeholder.invalid/", whBody.events ?? ["email.sent"]);
+    if (bad) return new Response(JSON.stringify({ error: bad }), { status: 400 });
+    const updated = updateWebhook(params.id, params.whId, { url: whBody.url?.trim(), events: whBody.events, enabled: whBody.enabled });
+    return new Response(JSON.stringify(updated), { headers: { "content-type": "application/json" } });
+  }, {
+    body: t.Object({ url: t.Optional(t.String()), events: t.Optional(t.Array(t.String())), enabled: t.Optional(t.Boolean()) }),
+    detail: { tags: ["Webhooks", "SDK"], summary: "Update a webhook", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .delete("/api/domains/:id/webhooks/:whId", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    if (!deleteWebhook(params.id, params.whId)) return new Response(JSON.stringify({ error: "Webhook no encontrado" }), { status: 404 });
+    return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Webhooks", "SDK"], summary: "Delete a webhook", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .post("/api/domains/:id/webhooks/:whId/test", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    if (limited) return limited;
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    if (!getWebhook(params.id, params.whId)) return new Response(JSON.stringify({ error: "Webhook no encontrado" }), { status: 404 });
+    const deliveryId = enqueuePing(params.whId, params.id);
+    return new Response(JSON.stringify({ ok: true, deliveryId }), { status: 202, headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Webhooks", "SDK"], summary: "Queue a ping delivery to a webhook", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .get("/api/domains/:id/webhooks/:whId/deliveries", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const access = await checkDomainAccess(auth.email, params.id, "read");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    if (!getWebhook(params.id, params.whId)) return new Response(JSON.stringify({ error: "Webhook no encontrado" }), { status: 404 });
+    return new Response(JSON.stringify(listDeliveries(params.whId)), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Webhooks", "SDK"], summary: "Last 50 deliveries of a webhook", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
   // --- Bulk send ---
@@ -4784,7 +4999,7 @@ const app = new Elysia({ adapter: node() })
     if (!owner) return new Response(JSON.stringify({ error: "Cuenta no encontrada" }), { status: 404 });
     const limits = getUserPlanLimits(owner);
     if (!limits.smtpRelay) {
-      return new Response(JSON.stringify({ error: "SMTP relay no disponible en tu plan. Actualiza a Freelancer o Developer." }), { status: 403 });
+      return new Response(JSON.stringify({ error: "SMTP relay no disponible en tu plan. Actualiza a Developer." }), { status: 403 });
     }
 
     const label = (smtpBody.label ?? "").trim();
@@ -5621,11 +5836,12 @@ programar("* * * * *", async () => {
       }
 
       try {
-        await sendFromDomain(job.from, recipient, job.subject, bulkRendered.text, {
+        const bulkMessageId = await sendFromDomain(job.from, recipient, job.subject, bulkRendered.text, {
           html: bulkRendered.html,
           configSet,
         });
         job.sent++;
+        emitEvent(job.domainId, "email.sent", { to: recipient, subject: job.subject, from: job.from, messageId: bulkMessageId, bulkJobId: job.id });
       } catch (err) {
         decrementSendCount(job.domainId); // devolver la cuota reservada
         job.failed++;

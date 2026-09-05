@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ====== Tokens ======
+   --mask-*: verde de marca (fijo en ambos temas).
+   Semánticos: el sitio público (landing, pricing, login, registro) los usa vía las
+   clases bg-bg / text-fg / border-line / text-accent de tailwind.config.ts.
+   Claro es el default; `data-theme` lo fija theme.js, y si no hay elección se respeta
+   prefers-color-scheme. La app (/app, /bandeja) sigue con sus clases zinc-* y no
+   depende de estos tokens. */
 :root {
   --mask-50: 236 253 245;
   --mask-100: 209 250 229;
@@ -11,24 +18,78 @@
   --mask-700: 4 120 87;
   --mask-800: 6 95 70;
   --mask-900: 4 78 56;
+
+  --bg: 250 246 238;         /* crema cálido */
+  --bg-elev: 255 253 249;
+  --bg-inset: 242 236 223;
+  --line: 228 220 205;
+  --fg: 28 25 23;
+  --fg-muted: 87 83 78;
+  --fg-subtle: 120 113 108;
+  --accent: 215 38 61;       /* rojo de máscara: botón, titular, puntos */
+  --accent-text: 179 31 51;  /* texto y links: 5.6:1 sobre --bg */
+  --gold: 242 183 5;         /* sólo detalles de la máscara y una línea */
+  --mascara: 215 38 61;      /* relleno de la máscara */
+  --mascara-sombra: 160 24 44;
+  --shadow: 60 30 20;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: 22 18 15;
+  --bg-elev: 32 26 22;
+  --bg-inset: 42 35 30;
+  --line: 62 52 45;
+  --fg: 245 239 230;
+  --fg-muted: 184 173 160;
+  --fg-subtle: 138 127 115;
+  --accent: 240 75 90;
+  --accent-text: 255 122 133;
+  --gold: 250 204 21;
+  --mascara: 226 58 74;
+  --mascara-sombra: 160 24 44;
+  --shadow: 0 0 0;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: 22 18 15;
+    --bg-elev: 32 26 22;
+    --bg-inset: 42 35 30;
+    --line: 62 52 45;
+    --fg: 245 239 230;
+    --fg-muted: 184 173 160;
+    --fg-subtle: 138 127 115;
+    --accent: 240 75 90;
+    --accent-text: 255 122 133;
+    --gold: 250 204 21;
+    --mascara: 226 58 74;
+    --mascara-sombra: 160 24 44;
+    --shadow: 0 0 0;
+    color-scheme: dark;
+  }
 }
 
-/* Glow effects */
-.glow-hero {
-  filter: drop-shadow(0 0 40px rgb(var(--mask-500) / 0.3)) drop-shadow(0 0 80px rgb(var(--mask-500) / 0.15));
-}
-.glow-btn {
-  box-shadow: 0 0 20px rgb(var(--mask-500) / 0.4), 0 0 60px rgb(var(--mask-500) / 0.15);
-}
-.glow-btn:hover {
-  box-shadow: 0 0 25px rgb(var(--mask-500) / 0.5), 0 0 80px rgb(var(--mask-500) / 0.25);
-}
-.glow-card:hover {
-  box-shadow: 0 0 30px rgb(var(--mask-500) / 0.15), 0 0 60px rgb(var(--mask-500) / 0.08);
-}
-.glow-text {
-  text-shadow: 0 0 30px rgb(var(--mask-500) / 0.5), 0 0 60px rgb(var(--mask-500) / 0.25);
-}
+/* Sitio público: tipografía y piezas repetidas */
+.site { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-feature-settings: "cv11", "ss01"; }
+.site h1, .site h2 { font-family: "Bricolage Grotesque", "Inter", system-ui, sans-serif; font-weight: 800; letter-spacing: -0.03em; text-wrap: balance; font-variation-settings: "wdth" 96, "opsz" 48; }
+.site h3 { letter-spacing: -0.015em; text-wrap: balance; }
+.eyebrow { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(var(--fg-subtle)); }
+.btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-[rgb(var(--accent-text))]; }
+.btn-secondary { @apply inline-flex items-center justify-center gap-2 rounded-full border border-line bg-bg-elev px-6 py-3 text-[15px] font-semibold text-fg transition-colors hover:border-fg-subtle; }
+.card { @apply rounded-2xl border border-line bg-bg-elev; }
+.mock { @apply overflow-hidden rounded-2xl border border-line bg-bg-elev shadow-[0_24px_60px_-30px_rgb(var(--shadow)/0.25)]; }
+.mock-bar { @apply flex items-center gap-2 border-b border-line bg-bg-inset px-4 py-2.5 text-xs text-fg-muted; }
+.mock-dot { @apply h-2.5 w-2.5 rounded-full bg-line; }
+.chip { @apply inline-flex items-center gap-1 rounded-full border border-line bg-bg-inset px-2 py-0.5 text-[11px] font-medium text-fg-muted; }
+.chip-ok { @apply border-mask-600/30 bg-mask-500/10 text-mask-700; }
+:root[data-theme="dark"] .chip-ok { color: rgb(var(--mask-400)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .chip-ok { color: rgb(var(--mask-400)); } }
+.faq details { @apply border-t border-line; }
+.faq summary { @apply flex cursor-pointer items-center justify-between gap-4 py-5 font-semibold text-fg; list-style: none; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq details p { @apply pb-5 text-[15px] leading-relaxed text-fg-muted; }
+.faq details a { @apply text-accent-text underline decoration-accent/40 hover:decoration-accent; }
+.site input[type="range"] { accent-color: rgb(var(--accent)); }
 
 /* Staggered animation delays for landing page */
 .anim-delay-100 { animation-delay: 0.1s; }
@@ -93,64 +154,6 @@
     stroke-dashoffset: 0;
   }
   .icon-draw [fill="currentColor"] { animation: none; opacity: 1; }
-}
-
-/* Fondo animado de login y registro: dos manchas del verde de marca que derivan
-   despacio detrás de la tarjeta, más una rejilla tenue. Nada parpadea ni compite con
-   el formulario; con prefers-reduced-motion se queda quieto. */
-.auth-bg {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 50% 0%, rgb(var(--mask-500) / 0.06), transparent 60%),
-    rgb(9 9 11);
-}
-.auth-bg::before,
-.auth-bg::after {
-  content: "";
-  position: absolute;
-  width: 60vmax;
-  height: 60vmax;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.16;
-  will-change: transform;
-}
-.auth-bg::before {
-  top: -30vmax;
-  left: -20vmax;
-  background: radial-gradient(circle, rgb(var(--mask-500)), transparent 62%);
-  animation: auth-drift-a 26s ease-in-out infinite alternate;
-}
-.auth-bg::after {
-  bottom: -32vmax;
-  right: -22vmax;
-  background: radial-gradient(circle, rgb(var(--mask-400)), transparent 62%);
-  animation: auth-drift-b 32s ease-in-out infinite alternate;
-}
-.auth-bg-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px);
-  background-size: 44px 44px;
-  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
-}
-@keyframes auth-drift-a {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(14vmax, 10vmax) scale(1.12); }
-}
-@keyframes auth-drift-b {
-  from { transform: translate(0, 0) scale(1.08); }
-  to   { transform: translate(-12vmax, -9vmax) scale(0.96); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .auth-bg::before, .auth-bg::after { animation: none; }
 }
 
 /* ====== Dashboard (/app): pantalla inicial ======
@@ -232,4 +235,14 @@
   .plan-card .lines div.total span:last-child { @apply font-sans text-[13px] text-zinc-100; }
   .plan-card .foot { @apply mt-3.5 flex flex-wrap gap-3.5 text-[13px]; }
   .plan-card .foot .danger { @apply text-zinc-500 hover:text-red-400; }
+}
+
+/* Toggle de tema: en claro se ofrece la luna, en oscuro el sol. */
+.theme-toggle .sun { display: none; }
+.theme-toggle .moon { display: block; }
+:root[data-theme="dark"] .theme-toggle .sun { display: block; }
+:root[data-theme="dark"] .theme-toggle .moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-toggle .sun { display: block; }
+  :root:not([data-theme="light"]) .theme-toggle .moon { display: none; }
 }

@@ -74,9 +74,9 @@ function toggleBilling() {
   const badge = document.getElementById("promo-badge");
 
   dot.style.transform = isYearly ? "translateX(28px)" : "translateX(0)";
-  toggle.className = "relative w-14 h-7 " + (isYearly ? "bg-green-600" : "bg-zinc-700") + " rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-mask-500";
-  labelM.className = "text-sm font-semibold " + (isYearly ? "text-zinc-500" : "text-zinc-100");
-  labelY.className = "text-sm font-semibold " + (isYearly ? "text-zinc-100" : "text-zinc-500");
+  toggle.className = "relative w-14 h-7 " + (isYearly ? "bg-accent" : "bg-line") + " rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-mask-500";
+  labelM.className = "text-sm font-semibold " + (isYearly ? "text-fg-subtle" : "text-fg");
+  labelY.className = "text-sm font-semibold " + (isYearly ? "text-fg" : "text-fg-subtle");
   badge.textContent = isYearly ? "2 meses gratis" : "Primer mes gratis";
 
   document.querySelectorAll(".pricing-card[data-plan]").forEach((card) => {
@@ -393,7 +393,7 @@ function applyCouponToCard() {
   const displayPrice = Math.round(loadedCoupon.fixedPrice / 100);
   if (priceEl) {
     const originalPrice = currentBilling === "yearly" ? card.dataset.yearly : card.dataset.monthly;
-    priceEl.innerHTML = `<span class="line-through text-zinc-500 text-2xl mr-2">$${originalPrice}</span>$${displayPrice.toLocaleString("es-MX")}`;
+    priceEl.innerHTML = `<span class="line-through text-fg-subtle text-2xl mr-2">$${originalPrice}</span>$${displayPrice.toLocaleString("es-MX")}`;
   }
 
   // Lock period label to /mes since coupon is monthly
@@ -415,13 +415,28 @@ function applyCouponToCard() {
 
     // Add coupon badge
     const badgeEl = document.createElement("div");
-    badgeEl.className = "absolute -top-3 right-4 bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full";
+    badgeEl.className = "absolute -top-3 right-4 bg-accent text-white text-xs font-bold px-3 py-1 rounded-full";
     badgeEl.textContent = loadedCoupon.description;
     card.style.position = "relative";
     card.appendChild(badgeEl);
 
     // Highlight card border
-    card.classList.remove("border-zinc-800");
-    card.classList.add("border-green-600", "border-2");
+    card.classList.add("!border-accent");
   } catch { /* ignore */ }
 })();
+
+// Video de Brenda: el iframe de YouTube se carga sólo al hacer clic (lite embed).
+// El thumbnail es local para no abrir img-src en la CSP; frame-src sí permite
+// youtube-nocookie.com.
+document.getElementById("brenda-play")?.addEventListener("click", (e) => {
+  const box = e.currentTarget.closest("[data-video-id]");
+  if (!box) return;
+  const id = box.dataset.videoId;
+  const iframe = document.createElement("iframe");
+  iframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0`;
+  iframe.title = "Brenda cuenta cómo usa MailMask";
+  iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+  iframe.allowFullscreen = true;
+  iframe.className = "absolute inset-0 h-full w-full";
+  box.replaceChildren(iframe);
+});

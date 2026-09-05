@@ -52,7 +52,11 @@
       content="Recibe y envía email desde tu dominio desde $49 MXN/mes. Sin servidores, sin Google Workspace."
     />
     <script src="/js/analytics.js" async></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
     <link rel="stylesheet" href="/css/styles.css" />
+    <script src="/js/theme.js"></script>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -233,669 +237,386 @@
     <meta name="twitter:site" content="@HectorBlisS" />
     <meta name="twitter:creator" content="@HectorBlisS" />
 </head>
-  <body class="bg-zinc-950 text-zinc-100 antialiased">
-  <div class="auth-bg" aria-hidden="true"><div class="auth-bg-grid"></div></div>
+  <body class="site bg-bg text-fg antialiased">
     <!-- Success banner (guest checkout redirect) -->
-    <div
-      id="success-banner"
-      class="hidden fixed top-0 inset-x-0 z-50 bg-emerald-600 text-white text-center py-3 px-4 text-sm font-medium shadow-lg"
-    >
-      ¡Listo! Revisa tu email para configurar tu contraseña y empezar a usar
-      MailMask.
+    <div id="success-banner" class="hidden fixed top-0 inset-x-0 z-50 bg-accent text-white text-center py-3 px-4 text-sm font-medium shadow-lg">
+      ¡Listo! Revisa tu email para configurar tu contraseña y empezar a usar MailMask.
     </div>
     <!-- Top nav -->
-    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-end gap-4 px-6 py-4">
-      <a href="/pricing" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Precios</a>
-        <a href="/docs" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Docs</a>
-        <a href="/blog" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Blog</a>
-      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+    <nav class="fixed top-0 inset-x-0 z-40 border-b border-line/70 bg-bg/85 backdrop-blur">
+      <div class="max-w-6xl mx-auto flex items-center gap-6 px-5 h-14">
+        <a href="/" class="flex items-center gap-2 font-bold text-[15px] text-fg">
+          <svg class="w-7 h-7" viewBox="0 0 80 80" fill="none" aria-hidden="true"><ellipse cx="40" cy="42" rx="28" ry="24" fill="rgb(var(--mascara-sombra))"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mascara))"/><ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="30.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="26.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><circle cx="50.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><path d="M40 18 L40 26" stroke="rgb(var(--gold))" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="rgb(var(--gold))" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+          MailMask
+        </a>
+        <div class="hidden sm:flex items-center gap-5 ml-4 text-sm text-fg-muted">
+          <a href="#como-funciona" class="hover:text-fg transition-colors">Cómo funciona</a>
+          <a href="#bandeja" class="hover:text-fg transition-colors">Bandeja</a>
+          <a href="#pricing" class="hover:text-fg transition-colors">Precios</a>
+          <a href="/docs" class="hover:text-fg transition-colors">Docs</a>
+          <a href="/blog" class="hover:text-fg transition-colors">Blog</a>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+          <button type="button" data-theme-toggle class="theme-toggle inline-flex h-9 w-9 items-center justify-center rounded-full border border-line text-fg-muted hover:text-fg transition-colors" aria-label="Cambiar tema">
+            <svg class="h-4 w-4 sun" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path stroke-linecap="round" d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4l1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            <svg class="h-4 w-4 moon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+          </button>
+          <a href="/login" class="hidden sm:inline text-sm font-medium text-fg-muted hover:text-fg transition-colors px-3">Iniciar sesión</a>
+          <a href="/register" class="btn-primary !px-4 !py-2 !text-sm">Empezar</a>
+        </div>
+      </div>
     </nav>
 
     <!-- Hero -->
-    <section
-      class="relative min-h-[70vh] flex flex-col items-center justify-center px-4 pt-16 pb-12 text-center overflow-hidden"
-    >
-      <!-- Animated bg glow -->
-      <div class="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
-        <div class="w-[500px] h-[500px] bg-mask-600/10 rounded-full blur-3xl animate-hero-glow"></div>
+    <section class="max-w-6xl mx-auto px-5 pt-32 pb-16 md:pt-40 md:pb-24">
+      <div class="grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-12 lg:gap-14 items-center">
+        <div class="animate-fade-up opacity-0">
+          <p class="eyebrow mb-5 flex items-center gap-2"><span class="inline-block h-px w-6 bg-[rgb(var(--gold))]"></span>Email con tu dominio · desde $49 MXN/mes</p>
+          <h1 class="text-[2.6rem] leading-[1.05] sm:text-5xl md:text-[3.4rem] font-semibold tracking-tight">
+            Google cobra por persona.<br />
+            <span class="text-fg-muted">MailMask, por dominio.</span>
+          </h1>
+          <p class="mt-6 text-lg text-fg-muted max-w-lg leading-relaxed">
+            Alias como <span class="font-mono text-[0.95em] text-fg">ventas@</span> y <span class="font-mono text-[0.95em] text-fg">soporte@</span>, reenvío a donde ya lees tu correo, bandeja compartida para tu equipo y envío firmado con DKIM y SPF. Un precio por dominio, no por buzón.
+          </p>
+          <div class="mt-8 flex flex-col sm:flex-row gap-3">
+            <a href="/register" class="btn-primary group">
+              Configura tu dominio
+              <svg class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5-5 5M6 12h12"/></svg>
+            </a>
+            <a href="#pricing" class="btn-secondary">Ver precios</a>
+          </div>
+          <p class="mt-4 text-sm text-fg-subtle">Primer mes gratis · Pago con MercadoPago · Sin tarjeta para probar</p>
+        </div>
+
+        <!-- Maqueta de la Bandeja (datos ficticios) -->
+        <div class="mock animate-fade-up opacity-0 anim-delay-200" aria-label="Vista de la Bandeja de MailMask" role="img">
+          <div class="mock-bar">
+            <span class="mock-dot"></span><span class="mock-dot"></span><span class="mock-dot"></span>
+            <span class="ml-3 font-mono text-[11px]">app.mailmask.studio/bandeja</span>
+            <span class="chip chip-ok ml-auto">tuempresa.com</span>
+          </div>
+          <div class="grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] text-[13px] min-w-0">
+            <div class="min-w-0 border-b md:border-b-0 md:border-r border-line">
+              <div class="flex flex-wrap items-center gap-2 px-3 py-2.5 border-b border-line">
+                <span class="font-semibold text-fg">Bandeja</span>
+                <span class="chip">Abiertos <b class="text-fg">4</b></span>
+                <span class="ml-auto chip hidden sm:inline-flex">c · Redactar</span>
+              </div>
+              <ul class="p-2 space-y-0.5">
+                <li class="rounded-lg bg-bg-inset px-3 py-2.5 border border-line">
+                  <div class="flex items-center justify-between gap-2"><span class="font-semibold text-fg truncate">Ana García</span><span class="text-[11px] text-fg-subtle">hace 5m</span></div>
+                  <p class="text-fg-muted truncate">Cotización para proyecto web</p>
+                  <div class="mt-1.5 flex items-center gap-1.5"><span class="chip">ventas@</span><span class="chip">Tú</span></div>
+                </li>
+                <li class="rounded-lg px-3 py-2.5">
+                  <div class="flex items-center justify-between gap-2"><span class="font-medium text-fg truncate">Luis Ramírez</span><span class="text-[11px] text-fg-subtle">hace 2h</span></div>
+                  <p class="text-fg-muted truncate">Re: Factura pendiente de agosto</p>
+                  <div class="mt-1.5 flex items-center gap-1.5"><span class="chip">cobranza@</span><span class="chip">Mariana</span></div>
+                </li>
+                <li class="rounded-lg px-3 py-2.5">
+                  <div class="flex items-center justify-between gap-2"><span class="font-medium text-fg truncate">Tienda Shopify</span><span class="text-[11px] text-fg-subtle">ayer</span></div>
+                  <p class="text-fg-muted truncate">Nuevo pedido #1042 · $1,890</p>
+                  <div class="mt-1.5 flex items-center gap-1.5"><span class="chip">pedidos@</span></div>
+                </li>
+                <li class="rounded-lg px-3 py-2.5 hidden md:block">
+                  <div class="flex items-center justify-between gap-2"><span class="font-medium text-fg truncate">Paola Reyes</span><span class="text-[11px] text-fg-subtle">ayer</span></div>
+                  <p class="text-fg-muted truncate">¿Hacen sitios en WordPress?</p>
+                  <div class="mt-1.5 flex items-center gap-1.5"><span class="chip">hola@</span><span class="chip">Sin asignar</span></div>
+                </li>
+              </ul>
+            </div>
+            <div class="min-w-0 p-4 space-y-3">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="font-semibold text-fg truncate">Cotización para proyecto web</p>
+                  <p class="text-fg-subtle text-xs truncate">Ana García &lt;ana@cliente.com&gt; → ventas@tuempresa.com</p>
+                </div>
+                <span class="chip chip-ok flex-shrink-0">Abierto</span>
+              </div>
+              <div class="rounded-xl bg-bg-inset px-3.5 py-3 text-fg-muted leading-relaxed">
+                Hola, me interesa una cotización para rediseñar nuestra página. ¿Podrían enviarme información de sus paquetes?
+              </div>
+              <div class="rounded-xl border border-accent/30 bg-accent/[0.06] px-3.5 py-3 leading-relaxed">
+                <p class="text-[11px] text-accent-text font-medium mb-1">Tú · desde ventas@tuempresa.com</p>
+                <p class="text-fg-muted">¡Hola Ana! Con gusto. Te adjunto el catálogo con los tres paquetes y tiempos de entrega…</p>
+              </div>
+              <div class="flex items-center gap-2 text-xs">
+                <span class="chip border-amber-500/30 bg-amber-500/10 text-amber-700">Nota interna: seguimiento el viernes</span>
+                <span class="ml-auto text-fg-subtle hidden sm:inline">Firmado con DKIM ✓</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-
-      <!-- Mascarita icon -->
-      <div class="relative mb-6 animate-float">
-        <svg
-          class="w-28 h-28 mx-auto glow-hero"
-          viewBox="0 0 80 80"
-          fill="none"
-          aria-label="MailMask"
-        >
-          <title>MailMask</title>
-          <ellipse cx="40" cy="42" rx="28" ry="24" fill="rgb(var(--mask-600))" />
-          <ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mask-500))" />
-          <!-- Aberturas de la máscara -->
-          <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="#facc15" stroke-width="1.8"/>
-          <ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="#facc15" stroke-width="1.8"/>
-          <!-- Iris y pupila -->
-          <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/>
-          <circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/>
-          <circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/>
-          <circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
-          <!-- Doble brillo: luz y rebote -->
-          <circle cx="30.2" cy="34.9" r="1.9" fill="#ffffff"/>
-          <circle cx="54.2" cy="34.9" r="1.9" fill="#ffffff"/>
-          <circle cx="26.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/>
-          <circle cx="50.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/>
-          <!-- Lacing detail -->
-          <path
-            d="M40 18 L40 26"
-            stroke="#facc15"
-            stroke-width="2"
-            stroke-linecap="round"
-          />
-          <path
-            d="M36 19 L40 26 L44 19"
-            stroke="#facc15"
-            stroke-width="1.5"
-            fill="none"
-            stroke-linecap="round"
-          />
-          <!-- Mouth area -->
-        </svg>
-      </div>
-
-      <p class="text-sm tracking-widest uppercase text-mask-400/70 font-medium animate-fade-up opacity-0 mb-4">MailMask</p>
-      <h1
-        class="hero-title text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight animate-fade-up opacity-0"
-      >
-        Email profesional.<br />
-        <span class="text-mask-500 glow-text">Desde $49 MXN/mes.</span>
-      </h1>
-
-      <p
-        class="hero-sub mt-6 text-lg sm:text-xl text-zinc-400 max-w-xl animate-fade-up opacity-0 anim-delay-200"
-      >
-        Recibe y envía email desde tu dominio. Autenticación DKIM + SPF
-        automática — tus emails llegan al inbox, no a spam.
-      </p>
-
-      <div class="hero-sub mt-8 flex flex-col sm:flex-row gap-3 animate-fade-up opacity-0 anim-delay-300">
-        <a
-          href="/register"
-          class="group inline-flex items-center justify-center gap-2.5 bg-mask-600 hover:bg-mask-700 text-white font-semibold px-8 py-3 rounded-lg transition-all text-lg glow-btn"
-        >
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-          Empezar ahora
-          <svg class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5-5 5M6 12h12"/></svg>
-        </a>
-        <a
-          href="#pricing"
-          class="inline-flex items-center justify-center gap-2.5 border border-zinc-700 hover:border-zinc-500 text-zinc-300 font-semibold px-8 py-3 rounded-lg transition-colors text-lg"
-        >
-          <svg class="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M3 5a2 2 0 012-2h5.6a2 2 0 011.4.6l8.4 8.4a2 2 0 010 2.8l-5.6 5.6a2 2 0 01-2.8 0L3.6 12A2 2 0 013 10.6V5z"/></svg>
-          Ver precios
-        </a>
-      </div>
-
-      <p class="mt-4 text-sm text-zinc-400">
-        Primer mes gratis. Paga con MercadoPago.
-      </p>
-      <p class="mt-2 text-xs text-zinc-500">
-        © 2026 by <a href="https://fixter.org" target="_blank" rel="noopener" class="hover:text-zinc-400 underline decoration-dotted transition-colors">fixter.org</a>
-      </p>
-
     </section>
 
-    <!-- Calculator: la asimetría de precio -->
-    <section id="calculadora" class="max-w-4xl mx-auto px-4 py-16">
-      <h2 class="text-2xl font-bold text-center mb-2">Google cobra por persona. MailMask, por dominio.</h2>
-      <p class="text-center text-zinc-400 mb-10 max-w-xl mx-auto">
-        Ahí está toda la diferencia. Mueve los controles y mira cómo se separan las dos líneas.
-      </p>
-
-      <div class="grid sm:grid-cols-2 gap-6 mb-8 max-w-xl mx-auto">
+    <!-- Cómo funciona -->
+    <section id="como-funciona" class="max-w-6xl mx-auto px-5 py-20 border-t border-line">
+      <p class="eyebrow mb-3">01 — Cómo funciona</p>
+      <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight max-w-2xl">Tu dominio recibiendo y enviando correo en tres pasos.</h2>
+      <div class="grid md:grid-cols-3 gap-10 md:gap-8 mt-14">
         <div>
-          <label class="block text-sm font-medium text-zinc-300 mb-2" for="calc-users">
-            Personas con buzón: <span id="calc-users-val" class="text-mask-400 font-bold">6</span>
-          </label>
-          <input type="range" id="calc-users" min="1" max="20" value="6"
-            class="w-full accent-mask-500 h-2 rounded-lg appearance-none bg-zinc-700 cursor-pointer" />
-          <div class="flex justify-between text-xs text-zinc-400 mt-1"><span>1</span><span>20</span></div>
+          <div class="card p-4 h-40 flex flex-col justify-center gap-2 font-mono text-[12px]">
+            <div class="flex items-center gap-2 text-fg-muted"><span class="w-10 text-fg-subtle">MX</span><span class="truncate text-fg">inbound-smtp.us-east-1.amazonaws.com</span><span class="ml-auto text-accent-text">✓</span></div>
+            <div class="flex items-center gap-2 text-fg-muted"><span class="w-10 text-fg-subtle">TXT</span><span class="truncate text-fg">v=spf1 include:amazonses.com ~all</span><span class="ml-auto text-accent-text">✓</span></div>
+            <div class="flex items-center gap-2 text-fg-muted"><span class="w-10 text-fg-subtle">CNAME</span><span class="truncate text-fg">k1._domainkey → dkim.amazonses.com</span><span class="ml-auto text-accent-text">✓</span></div>
+            <div class="mt-2 flex gap-1.5"><span class="chip chip-ok">MX</span><span class="chip chip-ok">SPF</span><span class="chip chip-ok">DKIM</span></div>
+          </div>
+          <p class="eyebrow mt-6">01</p>
+          <h3 class="font-semibold text-lg mt-1">Agrega tu dominio</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">Pegas tres registros DNS en tu proveedor. MailMask verifica solo y deja DKIM y SPF activos.</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-zinc-300 mb-2" for="calc-domains">
-            Dominios: <span id="calc-domains-val" class="text-mask-400 font-bold">1</span>
-          </label>
-          <input type="range" id="calc-domains" min="1" max="10" value="1"
-            class="w-full accent-mask-500 h-2 rounded-lg appearance-none bg-zinc-700 cursor-pointer" />
-          <div class="flex justify-between text-xs text-zinc-400 mt-1"><span>1</span><span>10</span></div>
-        </div>
-      </div>
-
-      <!-- El gráfico: una línea trepa con cada persona, la otra no se mueve -->
-      <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 sm:p-6 overflow-hidden">
-        <svg id="calc-chart" viewBox="0 0 720 300" width="100%" role="img" aria-labelledby="chartT" style="display:block">
-          <title id="chartT">Costo mensual según el número de personas con buzón</title>
-          <g id="chart-grid"></g>
-          <path id="line-gw" fill="none" stroke="#f87171" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-          <path id="area-mm" fill="rgb(var(--mask-500))" fill-opacity="0.08" stroke="none" />
-          <path id="line-mm" fill="none" stroke="rgb(var(--mask-500))" stroke-width="3" stroke-linecap="round" />
-          <path id="line-env" fill="none" stroke="rgb(var(--mask-400))" stroke-width="2" stroke-dasharray="6 5" opacity="0.75" />
-          <circle id="dot-gw" r="6" fill="#f87171" />
-          <circle id="dot-mm" r="6" fill="rgb(var(--mask-500))" />
-          <text id="lbl-gw" fill="#f87171" font-family="system-ui,sans-serif" font-size="14" font-weight="700" text-anchor="middle"></text>
-          <text id="lbl-mm" fill="rgb(var(--mask-400))" font-family="system-ui,sans-serif" font-size="14" font-weight="700" text-anchor="middle"></text>
-          <text id="lbl-env" fill="rgb(var(--mask-400))" font-family="system-ui,sans-serif" font-size="11" opacity="0.85" text-anchor="middle"></text>
-          <text x="360" y="295" fill="#a1a1aa" font-family="system-ui,sans-serif" font-size="12" text-anchor="middle">personas con buzón →</text>
-        </svg>
-      </div>
-
-      <div class="grid sm:grid-cols-3 gap-4 mt-6 text-center">
-        <div class="border border-zinc-800 rounded-xl p-4 bg-zinc-900/50">
-          <p class="text-xs text-zinc-400 uppercase tracking-wide mb-1">Google Workspace</p>
-          <p id="calc-gw-price" class="text-2xl font-extrabold text-red-400">$648</p>
-          <p class="text-xs text-zinc-400 mt-1">$108 × <span id="calc-gw-users">6</span> personas</p>
-        </div>
-        <div class="border-2 border-mask-600 rounded-xl p-4 bg-zinc-900/50 shadow-lg shadow-mask-500/10">
-          <p class="text-xs text-zinc-400 uppercase tracking-wide mb-1">MailMask</p>
-          <p id="calc-mm-price" class="text-2xl font-extrabold text-mask-400">$49</p>
-          <p id="calc-mm-plan" class="text-xs text-zinc-400 mt-1">Básico · 1 dominio</p>
-          <p id="calc-mm-envio" class="text-xs text-mask-400 mt-1">+$49 si además quieres iniciar correos</p>
-        </div>
-        <div class="border border-zinc-800 rounded-xl p-4 bg-zinc-900/50">
-          <p class="text-xs text-zinc-400 uppercase tracking-wide mb-1">Ahorro al año</p>
-          <p id="calc-savings" class="text-2xl font-extrabold text-mask-400">$6,600</p>
-          <p id="calc-badge" class="text-xs text-zinc-400 mt-1">85% menos</p>
-        </div>
-      </div>
-
-      <p class="text-center text-xs text-zinc-400 mt-5 max-w-2xl mx-auto">
-        En MailMask el precio no cambia con el tamaño del equipo: los miembros no cuestan extra.
-        En Workspace, cada persona que necesita buzón es otra licencia.
-      </p>
-
-      <div class="text-center mt-8">
-        <a href="/register" class="inline-block bg-mask-600 hover:bg-mask-700 text-white font-semibold px-8 py-3 rounded-lg transition-all text-lg glow-btn">
-          Configura tu dominio ya mismo →
-        </a>
-      </div>
-    </section>
-
-    <!-- How it works -->
-    <section class="max-w-4xl mx-auto px-4 py-16">
-      <h2 class="text-2xl font-bold text-center mb-12">Cómo funciona</h2>
-      <div class="grid md:grid-cols-3 gap-8">
-        <div class="feature-card text-center animate-fade-up opacity-0 anim-delay-400">
-          <div
-            class="w-12 h-12 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
-          >
-            <svg class="w-6 h-6 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/>
-            </svg>
+          <div class="card p-4 h-40 flex flex-col justify-center gap-2.5 text-[13px]">
+            <div class="flex items-center gap-2"><span class="font-mono text-fg">ventas@</span><span class="text-fg-subtle">→</span><span class="text-fg-muted truncate">tu@gmail.com</span><span class="ml-auto h-2 w-2 rounded-full bg-accent"></span></div>
+            <div class="flex items-center gap-2"><span class="font-mono text-fg">soporte@</span><span class="text-fg-subtle">→</span><span class="text-fg-muted truncate">mariana@, luis@</span><span class="ml-auto h-2 w-2 rounded-full bg-accent"></span></div>
+            <div class="flex items-center gap-2"><span class="font-mono text-fg">pedidos@</span><span class="text-fg-subtle">→</span><span class="text-fg-muted truncate">webhook · n8n</span><span class="ml-auto h-2 w-2 rounded-full bg-accent"></span></div>
+            <div class="flex items-center gap-2 text-fg-subtle"><span class="font-mono">*@</span><span>→</span><span class="truncate">si asunto contiene “factura” → cobranza@</span></div>
           </div>
-          <h3 class="font-semibold text-lg mb-2">Agrega tu dominio</h3>
-          <p class="text-zinc-400 text-sm">
-            Ingresa tu dominio y configura los registros DNS. DKIM y SPF se activan automáticamente.
-          </p>
+          <p class="eyebrow mt-6">02</p>
+          <h3 class="font-semibold text-lg mt-1">Crea máscaras y reglas</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">Cada alias reenvía a una o varias personas. Las reglas reenvían, descartan o disparan un webhook según remitente o asunto.</p>
         </div>
-        <div class="feature-card text-center animate-fade-up opacity-0 anim-delay-500">
-          <div
-            class="w-12 h-12 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
-          >
-            <svg class="w-6 h-6 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
+        <div>
+          <div class="card p-4 h-40 flex flex-col justify-center gap-2 text-[13px]">
+            <div class="flex items-center gap-2 rounded-lg bg-bg-inset px-3 py-2"><span class="h-2 w-2 rounded-full bg-accent"></span><span class="text-fg font-medium truncate">Ana García</span><span class="chip ml-auto">ventas@</span></div>
+            <div class="flex items-center gap-2 rounded-lg px-3 py-2"><span class="h-2 w-2 rounded-full bg-accent"></span><span class="text-fg-muted truncate">Luis Ramírez</span><span class="chip ml-auto">cobranza@</span></div>
+            <div class="mt-1 flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-fg-subtle"><span>Responder desde ventas@…</span><span class="ml-auto btn-primary !px-2.5 !py-0.5 !text-[11px]">Enviar</span></div>
           </div>
-          <h3 class="font-semibold text-lg mb-2">Crea máscaras y reglas</h3>
-          <p class="text-zinc-400 text-sm">
-            Define alias como ventas@, soporte@ con múltiples destinatarios y reglas inteligentes: reenviar, descartar o enviar a webhook.
-          </p>
-        </div>
-        <div class="feature-card text-center animate-fade-up opacity-0 anim-delay-600">
-          <div
-            class="w-12 h-12 bg-mask-600/20 rounded-xl flex items-center justify-center mx-auto mb-4"
-          >
-            <svg class="w-6 h-6 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 011.037-.443 48.282 48.282 0 005.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
-            </svg>
-          </div>
-          <h3 class="font-semibold text-lg mb-2">Recibe, envía y gestiona</h3>
-          <p class="text-zinc-400 text-sm">
-            Bandeja integrada, envío desde tu dominio y logs de cada email. Todo en un solo lugar.
-          </p>
+          <p class="eyebrow mt-6">03</p>
+          <h3 class="font-semibold text-lg mt-1">Recibe, responde y gestiona</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">Lo que llega cae en la Bandeja con historial. Respondes desde tu dominio, asignas a tu equipo y dejas notas internas.</p>
         </div>
       </div>
     </section>
 
-    <!-- Comparison -->
-    <section class="max-w-3xl mx-auto px-4 py-16">
-      <h2 class="text-2xl font-bold text-center mb-8">
-        MailMask vs Google Workspace
-      </h2>
-      <div
-        class="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden"
-      >
-        <div
-          class="grid grid-cols-3 text-sm font-semibold bg-zinc-800/50 px-4 py-3"
-        >
-          <div></div>
-          <div class="text-center text-zinc-400">Google Workspace</div>
-          <div class="text-center text-mask-500">MailMask</div>
+    <!-- Testimonio -->
+    <section class="max-w-6xl mx-auto px-5 py-20 border-t border-line">
+      <p class="eyebrow mb-3">Lo dicen nuestros usuarios</p>
+      <div class="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-10 items-center mt-6">
+        <figure class="card p-7 sm:p-9 relative">
+          <svg class="absolute top-6 left-7 h-8 w-8 text-accent/30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.2 5C4.9 5 3 6.9 3 9.2c0 2.2 1.7 4 3.9 4.2-.4 1.6-1.5 2.9-3.1 3.6l.9 1.9C8.3 17.6 10.4 14.4 10.4 10V8.2C10.4 6.4 8.9 5 7.2 5zm10.4 0C15.3 5 13.4 6.9 13.4 9.2c0 2.2 1.7 4 3.9 4.2-.4 1.6-1.5 2.9-3.1 3.6l.9 1.9c3.6-1.3 5.7-4.5 5.7-8.9V8.2C20.8 6.4 19.3 5 17.6 5z"/></svg>
+          <blockquote class="pt-8 text-xl sm:text-2xl font-medium leading-snug tracking-tight">
+            <!-- TODO: sustituir por la cita textual de Brenda tomada del video -->
+            “Mi correo de brendago.design llega y sale desde mi dominio, y mi equipo lo atiende desde la misma Bandeja. Dejé de pagar por cada buzón.”
+          </blockquote>
+          <figcaption class="mt-7 flex items-center gap-3">
+            <img src="/img/brenda.jpg" alt="Brenda, diseñadora y fundadora de brendago.design" width="48" height="48" class="h-12 w-12 rounded-full object-cover" loading="lazy" />
+            <div>
+              <p class="font-semibold text-fg">Brenda</p>
+              <p class="text-sm text-fg-muted">Diseñadora · <a href="https://brendago.design" target="_blank" rel="noopener" class="text-accent-text hover:underline">brendago.design</a></p>
+            </div>
+          </figcaption>
+        </figure>
+        <div id="brenda-video" class="mock aspect-video relative bg-bg-inset" data-video-id="KRfrU_mZxmY">
+          <button type="button" id="brenda-play" class="group absolute inset-0 w-full h-full text-left" aria-label="Reproducir el video de Brenda sobre MailMask">
+            <img src="/img/brenda-video.jpg" alt="" width="480" height="360" class="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+            <span class="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></span>
+            <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 inline-flex h-16 w-16 items-center justify-center rounded-full bg-white text-zinc-900 shadow-lg group-hover:scale-105 transition-transform">
+              <svg class="h-6 w-6 ml-1" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            </span>
+            <span class="absolute bottom-3 left-3 chip !bg-white/90 !text-zinc-800 !border-transparent">Brenda cuenta cómo usa MailMask · YouTube</span>
+          </button>
         </div>
-        <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-500"
-        >
-          <div class="text-zinc-400">1 dominio</div>
-          <div class="text-center">$120 MXN/mes</div>
-          <div class="text-center text-mask-400 font-semibold">$49 MXN/mes</div>
+      </div>
+    </section>
+
+    <!-- Bandeja -->
+    <section id="bandeja" class="max-w-6xl mx-auto px-5 py-20 border-t border-line">
+      <p class="eyebrow mb-3">02 — Bandeja</p>
+      <div class="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 lg:gap-16 items-end">
+        <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight">Tu helpdesk, sin pagar otro SaaS.</h2>
+        <p class="text-lg text-fg-muted leading-relaxed">Ningún servicio de reenvío guarda el contenido. Aquí cada conversación queda con su hilo completo: respondes desde tu dominio, dejas notas que el cliente no ve y repartes los hilos con tu equipo.</p>
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-10 mt-14">
+        <div class="border-t border-line pt-5">
+          <p class="eyebrow">Redactar</p>
+          <h3 class="font-semibold text-lg mt-2">Escribe primero, no solo respondas</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">Botón <strong class="text-fg font-medium">Redactar</strong> o la tecla <kbd class="px-1.5 py-0.5 rounded border border-line bg-bg-inset text-xs font-mono">c</kbd>. Eliges el alias remitente y la respuesta cae en el mismo hilo. <a href="/blog/dejar-de-escribir-desde-gmail-personal" class="text-accent-text hover:underline">Ver cómo →</a></p>
         </div>
-        <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-600"
-        >
-          <div class="text-zinc-400">5 dominios</div>
-          <div class="text-center">$600 MXN/mes</div>
-          <div class="text-center text-mask-400 font-semibold">$449 MXN/mes</div>
+        <div class="border-t border-line pt-5">
+          <p class="eyebrow">Remitente</p>
+          <h3 class="font-semibold text-lg mt-2">Responde desde tu dominio</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">Tus clientes ven <code class="font-mono text-[0.95em] text-fg">ventas@tuempresa.com</code>, nunca tu Gmail personal. Incluido en todos los planes.</p>
         </div>
-        <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-700"
-        >
-          <div class="text-zinc-400">15+ dominios</div>
-          <div class="text-center">$1,800+ MXN/mes</div>
-          <div class="text-center text-mask-400 font-semibold">$999 MXN/mes</div>
+        <div class="border-t border-line pt-5">
+          <p class="eyebrow">Historial</p>
+          <h3 class="font-semibold text-lg mt-2">El hilo entero, siempre</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">Cada conversación con su contexto. Es lo que separa una bandeja de trabajo de un simple reenvío.</p>
         </div>
-        <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-800"
-        >
-          <div class="text-zinc-400">Máscaras (alias)</div>
-          <div class="text-center text-zinc-400">1 por usuario</div>
-          <div class="text-center text-mask-400 font-semibold">
-            0 — 50 por dominio
-          </div>
+        <div class="border-t border-line pt-5">
+          <p class="eyebrow">Notas</p>
+          <h3 class="font-semibold text-lg mt-2">Notas internas</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">Agrega contexto a una conversación sin que el cliente lo lea. Útil para pasar el hilo a otra persona.</p>
         </div>
-        <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-900"
-        >
-          <div class="text-zinc-400">Configuración</div>
-          <div class="text-center text-zinc-400">30+ minutos</div>
-          <div class="text-center text-mask-400 font-semibold">2 minutos</div>
+        <div class="border-t border-line pt-5">
+          <p class="eyebrow">Equipo</p>
+          <h3 class="font-semibold text-lg mt-2">Asigna a tu equipo</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">Invita miembros por dominio y reparte los hilos. Nadie responde dos veces lo mismo.</p>
         </div>
-        <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-1000"
-        >
-          <div class="text-zinc-400">Reglas de routing</div>
-          <div class="text-center text-zinc-400">Limitadas</div>
-          <div class="text-center text-mask-400 font-semibold">
-            0 — 50 por dominio
-          </div>
-        </div>
-        <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-1100"
-        >
-          <div class="text-zinc-400">Envío desde tu dominio</div>
-          <div class="text-center text-zinc-400">Solo con licencia</div>
-          <div class="text-center text-mask-400 font-semibold">Desde Freelancer o add-on</div>
-        </div>
-        <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-1100"
-        >
-          <div class="text-zinc-400">DKIM + SPF</div>
-          <div class="text-center text-zinc-400">Manual</div>
-          <div class="text-center text-mask-400 font-semibold">Automático</div>
-        </div>
-        <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-1100"
-        >
-          <div class="text-zinc-400">Dominio extra</div>
-          <div class="text-center text-zinc-400">Licencia completa por usuario</div>
-          <div class="text-center text-mask-400 font-semibold">+$99 MXN/mes</div>
-        </div>
-        <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-zinc-800 animate-fade-left opacity-0 anim-delay-1100"
-        >
-          <div class="text-zinc-400">Bandeja / helpdesk</div>
-          <div class="text-center text-zinc-400">Complemento extra</div>
-          <div class="text-center text-mask-400 font-semibold">Integrado</div>
+        <div class="border-t border-line pt-5">
+          <p class="eyebrow">Tiempo real</p>
+          <h3 class="font-semibold text-lg mt-2">Sin recargar nada</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">Los correos nuevos aparecen solos, con aviso. Si alguien responde, lo ves al instante.</p>
         </div>
       </div>
     </section>
 
     <!-- Product demo -->
-    <section class="max-w-4xl mx-auto px-4 py-16">
-      <h2 class="text-2xl font-bold text-center mb-4">
-        Tu panel de control
-      </h2>
-      <p class="text-center text-zinc-400 mb-12 max-w-xl mx-auto">
-        Dominios, máscaras, reglas, logs y bandeja de soporte — todo en un solo lugar.
-      </p>
+    <section class="max-w-6xl mx-auto px-5 py-20 border-t border-line">
+      <p class="eyebrow mb-3">03 — Panel</p>
+      <div class="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 lg:gap-16 items-end mb-12">
+        <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight">Todo tu dominio en una pantalla.</h2>
+        <p class="text-lg text-fg-muted leading-relaxed">Dominios, máscaras, reglas, logs y bandeja de soporte — todo en un solo lugar.</p>
+      </div>
 
       <!-- Dashboard mockup -->
-      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl shadow-black/40 animate-fade-up opacity-0 anim-delay-400">
+      <div class="mock max-w-4xl mx-auto">
         <!-- Mock nav bar -->
-        <div class="flex items-center gap-3 px-5 py-3 border-b border-zinc-800 bg-zinc-950/60">
-          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
-            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))"/>
-            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b"/>
-            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b"/>
-          </svg>
-          <span class="font-bold text-sm text-zinc-200">MailMask</span>
-          <span class="ml-auto text-xs text-zinc-400 font-mono">tu@email.com</span>
+        <div class="flex items-center gap-3 px-5 py-3 border-b border-line bg-bg-inset">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none" aria-hidden="true"><ellipse cx="40" cy="42" rx="28" ry="24" fill="rgb(var(--mascara-sombra))"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mascara))"/><ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="30.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="26.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><circle cx="50.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><path d="M40 18 L40 26" stroke="rgb(var(--gold))" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="rgb(var(--gold))" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+          <span class="font-bold text-sm text-fg">MailMask</span>
+          <span class="ml-auto text-xs text-fg-muted font-mono">tu@email.com</span>
         </div>
 
         <div class="p-5 sm:p-8 space-y-6">
           <!-- Domain header -->
           <div class="flex items-center gap-3 flex-wrap">
             <div class="flex items-center gap-2">
-              <svg class="w-6 h-6 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <svg class="w-6 h-6 text-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582"/>
               </svg>
               <span class="font-semibold">tuempresa.com</span>
             </div>
-            <span class="text-xs font-mono px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-400 border border-emerald-800/50">DNS verificado</span>
-            <span class="text-xs font-mono px-2 py-0.5 rounded bg-mask-600/15 text-mask-400 border border-mask-700/30">DKIM activo</span>
+            <span class="text-xs font-mono px-2 py-0.5 rounded chip chip-ok">DNS verificado</span>
+            <span class="text-xs font-mono px-2 py-0.5 rounded bg-accent/10 text-accent-text border border-accent/30">DKIM activo</span>
           </div>
 
           <!-- Aliases grid -->
           <div>
-            <p class="text-xs text-zinc-400 font-semibold uppercase tracking-wider mb-3">Máscaras activas</p>
+            <p class="text-xs text-fg-muted font-semibold uppercase tracking-wider mb-3">Máscaras activas</p>
             <div class="grid sm:grid-cols-3 gap-2">
-              <div class="flex items-center gap-2 bg-zinc-800/60 rounded-lg px-3 py-2 border border-zinc-700/50">
+              <div class="flex items-center gap-2 bg-bg-inset rounded-lg px-3 py-2 border border-line">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
                 <span class="text-sm font-mono truncate">ventas@</span>
-                <svg class="w-3.5 h-3.5 text-zinc-400 ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                <span class="text-xs text-zinc-400 truncate">gmail</span>
+                <svg class="w-3.5 h-3.5 text-fg-muted ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                <span class="text-xs text-fg-muted truncate">gmail</span>
               </div>
-              <div class="flex items-center gap-2 bg-zinc-800/60 rounded-lg px-3 py-2 border border-zinc-700/50">
+              <div class="flex items-center gap-2 bg-bg-inset rounded-lg px-3 py-2 border border-line">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
                 <span class="text-sm font-mono truncate">soporte@</span>
-                <svg class="w-3.5 h-3.5 text-zinc-400 ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                <span class="text-xs text-zinc-400 truncate">gmail</span>
+                <svg class="w-3.5 h-3.5 text-fg-muted ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                <span class="text-xs text-fg-muted truncate">gmail</span>
               </div>
-              <div class="flex items-center gap-2 bg-zinc-800/60 rounded-lg px-3 py-2 border border-zinc-700/50">
+              <div class="flex items-center gap-2 bg-bg-inset rounded-lg px-3 py-2 border border-line">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
                 <span class="text-sm font-mono truncate">hola@</span>
-                <svg class="w-3.5 h-3.5 text-zinc-400 ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                <span class="text-xs text-zinc-400 truncate">outlook</span>
+                <svg class="w-3.5 h-3.5 text-fg-muted ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                <span class="text-xs text-fg-muted truncate">outlook</span>
               </div>
             </div>
           </div>
 
           <!-- Recent logs -->
           <div>
-            <p class="text-xs text-zinc-400 font-semibold uppercase tracking-wider mb-3">Actividad reciente</p>
+            <p class="text-xs text-fg-muted font-semibold uppercase tracking-wider mb-3">Actividad reciente</p>
             <div class="space-y-1.5">
-              <div class="flex items-center gap-3 text-sm px-3 py-2 rounded-lg bg-zinc-800/40">
+              <div class="flex items-center gap-3 text-sm px-3 py-2 rounded-lg bg-bg-inset">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
-                <span class="text-zinc-300 truncate">cliente@ejemplo.com</span>
-                <svg class="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                <span class="font-mono text-mask-400 truncate">ventas@tuempresa.com</span>
-                <span class="ml-auto text-xs text-zinc-500 font-mono flex-shrink-0">hace 2m</span>
+                <span class="text-fg truncate">cliente@ejemplo.com</span>
+                <svg class="w-3.5 h-3.5 text-fg-subtle flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                <span class="font-mono text-accent-text truncate">ventas@tuempresa.com</span>
+                <span class="ml-auto text-xs text-fg-subtle font-mono flex-shrink-0">hace 2m</span>
               </div>
-              <div class="flex items-center gap-3 text-sm px-3 py-2 rounded-lg bg-zinc-800/40">
+              <div class="flex items-center gap-3 text-sm px-3 py-2 rounded-lg bg-bg-inset">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
-                <span class="text-zinc-300 truncate">newsletter@servicio.io</span>
-                <svg class="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                <span class="font-mono text-mask-400 truncate">hola@tuempresa.com</span>
-                <span class="ml-auto text-xs text-zinc-500 font-mono flex-shrink-0">hace 15m</span>
+                <span class="text-fg truncate">newsletter@servicio.io</span>
+                <svg class="w-3.5 h-3.5 text-fg-subtle flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                <span class="font-mono text-accent-text truncate">hola@tuempresa.com</span>
+                <span class="ml-auto text-xs text-fg-subtle font-mono flex-shrink-0">hace 15m</span>
               </div>
-              <div class="flex items-center gap-3 text-sm px-3 py-2 rounded-lg bg-zinc-800/40">
-                <span class="w-1.5 h-1.5 rounded-full bg-zinc-600 flex-shrink-0"></span>
-                <span class="text-zinc-400 truncate">spam@botnet.xyz</span>
-                <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-zinc-700/60 text-zinc-400">descartado por regla</span>
-                <span class="ml-auto text-xs text-zinc-500 font-mono flex-shrink-0">hace 1h</span>
+              <div class="flex items-center gap-3 text-sm px-3 py-2 rounded-lg bg-bg-inset">
+                <span class="w-1.5 h-1.5 rounded-full bg-fg-subtle flex-shrink-0"></span>
+                <span class="text-fg-muted truncate">spam@botnet.xyz</span>
+                <span class="text-xs font-mono px-1.5 py-0.5 rounded bg-bg-inset text-fg-muted">descartado por regla</span>
+                <span class="ml-auto text-xs text-fg-subtle font-mono flex-shrink-0">hace 1h</span>
               </div>
             </div>
           </div>
         </div>
       </div>
     </section>
-
-    <!-- Bandeja -->
-    <section id="bandeja" class="max-w-4xl mx-auto px-4 py-16">
-      <p class="text-mask-500 font-semibold text-sm tracking-widest uppercase text-center mb-4">Bandeja integrada</p>
-      <h2 class="text-2xl font-bold text-center mb-4">
-        Tu helpdesk, sin otro SaaS
-      </h2>
-      <p class="text-center text-zinc-400 mb-12 max-w-xl mx-auto">
-        Responde desde tu dominio, lleva historial de cada conversación, agrega notas internas y asigna tickets a tu equipo.
-      </p>
-
-      <!-- Bandeja mockup -->
-      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl shadow-black/40">
-        <div class="flex items-center gap-3 px-5 py-3 border-b border-zinc-800 bg-zinc-950/60">
-          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
-            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))"/>
-            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b"/>
-            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b"/>
-          </svg>
-          <span class="font-bold text-sm text-zinc-200">Bandeja</span>
-          <span class="ml-2 text-xs px-2 py-0.5 rounded bg-mask-600/15 text-mask-400 border border-mask-700/30">tuempresa.com</span>
-        </div>
-        <div class="grid md:grid-cols-[280px_1fr] divide-x divide-zinc-800">
-          <!-- Conversation list -->
-          <div class="p-3 space-y-1">
-            <div class="bg-mask-600/10 border border-mask-700/30 rounded-lg px-3 py-2.5">
-              <div class="flex items-center justify-between mb-1">
-                <span class="text-sm font-semibold text-zinc-100 truncate">Ana García</span>
-                <span class="text-[10px] text-zinc-400">hace 5m</span>
-              </div>
-              <p class="text-xs text-zinc-400 truncate">Cotización para proyecto web</p>
-            </div>
-            <div class="rounded-lg px-3 py-2.5 hover:bg-zinc-800/50">
-              <div class="flex items-center justify-between mb-1">
-                <span class="text-sm font-medium text-zinc-300 truncate">Luis Ramírez</span>
-                <span class="text-[10px] text-zinc-400">hace 2h</span>
-              </div>
-              <p class="text-xs text-zinc-400 truncate">Re: Factura pendiente</p>
-            </div>
-            <div class="rounded-lg px-3 py-2.5 hover:bg-zinc-800/50">
-              <div class="flex items-center justify-between mb-1">
-                <span class="text-sm font-medium text-zinc-300 truncate">Shopify Notifications</span>
-                <span class="text-[10px] text-zinc-400">ayer</span>
-              </div>
-              <p class="text-xs text-zinc-400 truncate">Nuevo pedido #1042</p>
-            </div>
-          </div>
-          <!-- Conversation detail -->
-          <div class="p-5 space-y-4 hidden md:block">
-            <div class="flex items-center justify-between">
-              <div>
-                <h3 class="font-semibold text-zinc-100">Cotización para proyecto web</h3>
-                <p class="text-xs text-zinc-400">Ana García &lt;ana@cliente.com&gt; → ventas@tuempresa.com</p>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-400 border border-emerald-800/50">Abierto</span>
-              </div>
-            </div>
-            <div class="bg-zinc-800/40 rounded-lg px-4 py-3 text-sm text-zinc-300">
-              <p>Hola, me interesa una cotización para rediseñar nuestra página web. ¿Podrían enviarme información de sus paquetes?</p>
-            </div>
-            <div class="bg-mask-600/10 border border-mask-700/20 rounded-lg px-4 py-3 text-sm text-zinc-300">
-              <p class="text-xs text-mask-400 mb-1">Tu respuesta desde ventas@tuempresa.com:</p>
-              <p>¡Hola Ana! Con gusto, te envío nuestro catálogo actualizado...</p>
-            </div>
-            <div class="flex items-center gap-2 text-xs text-zinc-500">
-              <span class="bg-yellow-900/20 text-yellow-500 px-2 py-0.5 rounded border border-yellow-800/30">Nota interna: seguimiento viernes</span>
-            </div>
-          </div>
-        </div>
+    <!-- Entregabilidad -->
+    <section class="max-w-6xl mx-auto px-5 py-20 border-t border-line">
+      <p class="eyebrow mb-3">04 — Entregabilidad</p>
+      <div class="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 lg:gap-16 items-end">
+        <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight">Tus correos llegan al inbox, no a spam.</h2>
+        <p class="text-lg text-fg-muted leading-relaxed">Gmail y Outlook exigen que el dominio firme y autorice lo que envía. MailMask lo configura al agregar tu dominio, sin certificados ni servidores.</p>
       </div>
-
-      <!-- Bandeja features -->
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-12">
-        <div class="group bg-zinc-900/80 border border-zinc-800 rounded-2xl p-6 hover:border-mask-800 hover:-translate-y-1 transition-all duration-300 glow-card animate-on-scroll animate-fade-up opacity-0 anim-delay-200">
-          <div class="w-12 h-12 bg-mask-600/15 rounded-xl flex items-center justify-center mb-5 group-hover:bg-mask-600/25 group-hover:scale-110 transition-all duration-300">
-            <svg class="w-6 h-6 text-mask-500 icon-draw" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" style="animation-delay:0.75s" stroke-linecap="round" stroke-linejoin="round"><path stroke-linecap="round" stroke-linejoin="round" d="M3 20c4-1 7-3 9-6M14 4l6 6-9 9-6 1 1-6 8-10z" pathLength="100"/></svg>
-          </div>
-          <h3 class="font-bold text-lg text-zinc-100 mb-1">Escribe primero</h3>
-          <p class="text-mask-400 text-sm font-medium mb-3">No solo respondas</p>
-          <p class="text-zinc-400 text-sm leading-relaxed">Botón <strong class="text-zinc-300">Redactar</strong> o la tecla <kbd class="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-xs">c</kbd>. Eliges el alias remitente y la respuesta cae en el mismo hilo.</p>
-          <a href="/blog/dejar-de-escribir-desde-gmail-personal" class="inline-block mt-3 text-mask-400 text-sm hover:underline">Ver cómo funciona →</a>
+      <div class="grid md:grid-cols-3 gap-x-8 gap-y-10 mt-14">
+        <div class="border-t border-line pt-5">
+          <p class="eyebrow">DKIM</p>
+          <h3 class="font-semibold text-lg mt-2">Firma digital automática</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">Cada correo sale firmado. Gmail muestra <span class="text-fg font-medium">“firmado por: tudominio.com”</span>, prueba de que el mensaje es auténtico.</p>
         </div>
-        <div class="group bg-zinc-900/80 border border-zinc-800 rounded-2xl p-6 hover:border-mask-800 hover:-translate-y-1 transition-all duration-300 glow-card animate-on-scroll animate-fade-up opacity-0 anim-delay-300">
-          <div class="w-12 h-12 bg-mask-600/15 rounded-xl flex items-center justify-center mb-5 group-hover:bg-mask-600/25 group-hover:scale-110 transition-all duration-300">
-            <svg class="w-6 h-6 text-mask-500 icon-draw" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" style="animation-delay:0.95s" stroke-linecap="round" stroke-linejoin="round"><path stroke-linecap="round" stroke-linejoin="round" d="M8 5L3 10l5 5M3 10h9a8 8 0 018 8v1" pathLength="100"/></svg>
-          </div>
-          <h3 class="font-bold text-lg text-zinc-100 mb-1">Responde desde tu dominio</h3>
-          <p class="text-mask-400 text-sm font-medium mb-3">Nunca desde tu Gmail</p>
-          <p class="text-zinc-400 text-sm leading-relaxed">Tus clientes ven <code class="text-zinc-300">ventas@tuempresa.com</code>, no tu correo personal. Incluido en todos los planes.</p>
+        <div class="border-t border-line pt-5">
+          <p class="eyebrow">SPF</p>
+          <h3 class="font-semibold text-lg mt-2">Autorización de envío</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">Los servidores verifican que el correo viene de un remitente autorizado por ti. Sin SPF, tus correos pueden rechazarse o marcarse como sospechosos.</p>
         </div>
-        <div class="group bg-zinc-900/80 border border-zinc-800 rounded-2xl p-6 hover:border-mask-800 hover:-translate-y-1 transition-all duration-300 glow-card animate-on-scroll animate-fade-up opacity-0 anim-delay-400">
-          <div class="w-12 h-12 bg-mask-600/15 rounded-xl flex items-center justify-center mb-5 group-hover:bg-mask-600/25 group-hover:scale-110 transition-all duration-300">
-            <svg class="w-6 h-6 text-mask-500 icon-draw" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" style="animation-delay:1.15s" stroke-linecap="round" stroke-linejoin="round"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4v16M6 7h13M6 12h9M6 17h13" pathLength="100"/></svg>
-          </div>
-          <h3 class="font-bold text-lg text-zinc-100 mb-1">Historial completo</h3>
-          <p class="text-mask-400 text-sm font-medium mb-3">El hilo entero, siempre</p>
-          <p class="text-zinc-400 text-sm leading-relaxed">Cada conversación con su contexto. Ningún competidor de reenvío guarda el contenido — aquí queda.</p>
-        </div>
-        <div class="group bg-zinc-900/80 border border-zinc-800 rounded-2xl p-6 hover:border-mask-800 hover:-translate-y-1 transition-all duration-300 glow-card animate-on-scroll animate-fade-up opacity-0 anim-delay-500">
-          <div class="w-12 h-12 bg-mask-600/15 rounded-xl flex items-center justify-center mb-5 group-hover:bg-mask-600/25 group-hover:scale-110 transition-all duration-300">
-            <svg class="w-6 h-6 text-mask-500 icon-draw" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" style="animation-delay:1.35s" stroke-linecap="round" stroke-linejoin="round"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3h10l4 4v14H5zM15 3v4h4M9 12h6M9 16h4" pathLength="100"/></svg>
-          </div>
-          <h3 class="font-bold text-lg text-zinc-100 mb-1">Notas internas</h3>
-          <p class="text-mask-400 text-sm font-medium mb-3">Solo las ve tu equipo</p>
-          <p class="text-zinc-400 text-sm leading-relaxed">Agrega contexto a una conversación sin que el cliente lo lea. Útil para pasar el hilo a otra persona.</p>
-        </div>
-        <div class="group bg-zinc-900/80 border border-zinc-800 rounded-2xl p-6 hover:border-mask-800 hover:-translate-y-1 transition-all duration-300 glow-card animate-on-scroll animate-fade-up opacity-0 anim-delay-600">
-          <div class="w-12 h-12 bg-mask-600/15 rounded-xl flex items-center justify-center mb-5 group-hover:bg-mask-600/25 group-hover:scale-110 transition-all duration-300">
-            <svg class="w-6 h-6 text-mask-500 icon-draw" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" style="animation-delay:1.55s" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7.5" r="3" pathLength="100"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 20a6 6 0 0 1 12 0" pathLength="100"/><circle cx="17.5" cy="9" r="2.2" pathLength="100"/><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 14.4A5 5 0 0 1 21.5 20" pathLength="100"/></svg>
-          </div>
-          <h3 class="font-bold text-lg text-zinc-100 mb-1">Asigna a tu equipo</h3>
-          <p class="text-mask-400 text-sm font-medium mb-3">Cada quien su conversación</p>
-          <p class="text-zinc-400 text-sm leading-relaxed">Invita miembros por dominio y reparte los hilos. Nadie responde dos veces lo mismo.</p>
-        </div>
-        <div class="group bg-zinc-900/80 border border-zinc-800 rounded-2xl p-6 hover:border-mask-800 hover:-translate-y-1 transition-all duration-300 glow-card animate-on-scroll animate-fade-up opacity-0 anim-delay-700">
-          <div class="w-12 h-12 bg-mask-600/15 rounded-xl flex items-center justify-center mb-5 group-hover:bg-mask-600/25 group-hover:scale-110 transition-all duration-300">
-            <svg class="w-6 h-6 text-mask-500 icon-draw" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" style="animation-delay:1.75s" stroke-linecap="round" stroke-linejoin="round"><path stroke-linecap="round" stroke-linejoin="round" d="M2 12h5l2-5 4 10 2-5h7" pathLength="100"/></svg>
-          </div>
-          <h3 class="font-bold text-lg text-zinc-100 mb-1">En tiempo real</h3>
-          <p class="text-mask-400 text-sm font-medium mb-3">Sin recargar nada</p>
-          <p class="text-zinc-400 text-sm leading-relaxed">Los correos nuevos aparecen solos en la Bandeja, con aviso. Si alguien responde, lo ves al instante.</p>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- Deliverability -->
-    <section class="relative max-w-5xl mx-auto px-4 py-24 overflow-hidden">
-      <!-- Subtle glow background -->
-      <div class="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
-        <div class="w-[600px] h-[600px] bg-mask-600/5 rounded-full blur-3xl"></div>
-      </div>
-
-      <div class="relative">
-        <p class="text-mask-500 font-semibold text-sm tracking-widest uppercase text-center mb-4">Entregabilidad</p>
-        <h2 class="text-3xl sm:text-4xl font-extrabold text-center tracking-tight mb-4">
-          Tus emails llegan al inbox,<br class="hidden sm:block" />
-          <span class="text-mask-500 glow-text">no a spam</span>
-        </h2>
-        <p class="text-center text-zinc-400 text-lg max-w-2xl mx-auto mb-16">
-          MailMask configura automáticamente los estándares que Gmail, Outlook y otros
-          proveedores exigen para entregar emails al inbox.
-        </p>
-
-        <div class="grid md:grid-cols-3 gap-6">
-          <!-- DKIM -->
-          <div class="group bg-zinc-900/80 border border-zinc-800 rounded-2xl p-8 hover:border-mask-800 transition-all glow-card">
-            <div class="w-12 h-12 bg-mask-600/15 rounded-xl flex items-center justify-center mb-6">
-              <svg class="w-6 h-6 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"/>
-              </svg>
-            </div>
-            <h3 class="font-bold text-xl text-zinc-100 mb-1">DKIM</h3>
-            <p class="text-mask-400 text-sm font-medium mb-3">Firma digital automática</p>
-            <p class="text-zinc-400 text-sm leading-relaxed">
-              Cada email sale firmado criptográficamente. Gmail muestra
-              <span class="text-zinc-300 font-medium">"firmado por: tudominio.com"</span>
-              — prueba de que el mensaje es auténtico.
-            </p>
-          </div>
-
-          <!-- SPF -->
-          <div class="group bg-zinc-900/80 border border-zinc-800 rounded-2xl p-8 hover:border-mask-800 transition-all glow-card">
-            <div class="w-12 h-12 bg-mask-600/15 rounded-xl flex items-center justify-center mb-6">
-              <svg class="w-6 h-6 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
-              </svg>
-            </div>
-            <h3 class="font-bold text-xl text-zinc-100 mb-1">SPF</h3>
-            <p class="text-mask-400 text-sm font-medium mb-3">Autorización de envío</p>
-            <p class="text-zinc-400 text-sm leading-relaxed">
-              Los servidores de correo verifican que el email viene de un
-              servidor autorizado por ti. Sin SPF, tus emails pueden ser
-              rechazados o marcados como sospechosos.
-            </p>
-          </div>
-
-          <!-- Amazon SES -->
-          <div class="group bg-zinc-900/80 border border-zinc-800 rounded-2xl p-8 hover:border-mask-800 transition-all glow-card">
-            <div class="w-12 h-12 bg-mask-600/15 rounded-xl flex items-center justify-center mb-6">
-              <svg class="w-6 h-6 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z"/>
-              </svg>
-            </div>
-            <h3 class="font-bold text-xl text-zinc-100 mb-1">Amazon SES</h3>
-            <p class="text-mask-400 text-sm font-medium mb-3">Infraestructura de clase mundial</p>
-            <p class="text-zinc-400 text-sm leading-relaxed">
-              La misma infraestructura que usan Netflix, Reddit y miles de
-              empresas. IPs con reputación alta y monitoreo constante de
-              entregabilidad.
-            </p>
-          </div>
-        </div>
-
-        <!-- Bottom note -->
-        <div class="mt-14 flex items-center justify-center gap-3">
-          <div class="h-px flex-1 max-w-[80px] bg-zinc-800"></div>
-          <p class="text-zinc-400 text-sm text-center">
-            Todo se configura <span class="text-zinc-300 font-medium">automáticamente</span> al agregar tu dominio — sin certificados, sin servidores, sin complicaciones.
-          </p>
-          <div class="h-px flex-1 max-w-[80px] bg-zinc-800"></div>
+        <div class="border-t border-line pt-5">
+          <p class="eyebrow">Amazon SES</p>
+          <h3 class="font-semibold text-lg mt-2">Infraestructura probada</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">La misma que usan Netflix, Reddit y miles de empresas. IPs con reputación alta y monitoreo constante de rebotes y quejas.</p>
         </div>
       </div>
     </section>
 
     <!-- Pricing -->
-    <section id="pricing" class="max-w-4xl mx-auto px-4 py-16">
-      <h2 class="text-2xl font-bold text-center mb-4">Precios simples</h2>
-      <p class="text-center text-zinc-400 mb-8">
-        Sin contratos ni letras chiquitas. Cancela cuando quieras.
-      </p>
+    <section id="pricing" class="max-w-6xl mx-auto px-5 py-20 border-t border-line">
+      <p class="eyebrow mb-3">05 — Precio</p>
+      <div class="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 lg:gap-16 items-end mb-12">
+        <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight">Precios simples. Un dominio, un precio.</h2>
+        <p class="text-lg text-fg-muted leading-relaxed">Sin contratos ni letras chiquitas. Cancela cuando quieras. Los miembros de tu equipo no cuestan extra.</p>
+      </div>
 
       <!-- Billing toggle -->
       <div class="flex items-center justify-center gap-3 mb-12">
-        <span id="label-monthly" class="text-sm font-semibold text-zinc-100">Mensual</span>
-        <button id="billing-toggle" class="relative w-14 h-7 bg-zinc-700 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-mask-500">
+        <span id="label-monthly" class="text-sm font-semibold text-fg">Mensual</span>
+        <button id="billing-toggle" class="relative w-14 h-7 bg-line rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent">
           <span id="toggle-dot" class="absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform"></span>
         </button>
-        <span id="label-yearly" class="text-sm font-semibold text-zinc-400">Anual</span>
-        <span id="promo-badge" class="text-xs bg-green-900/50 text-green-400 font-bold px-2 py-1 rounded-full">Primer mes gratis</span>
+        <span id="label-yearly" class="text-sm font-semibold text-fg-muted">Anual</span>
+        <span id="promo-badge" class="text-xs bg-accent/10 text-accent-text font-bold px-2 py-1 rounded-full">Primer mes gratis</span>
       </div>
 
       <div class="grid md:grid-cols-3 gap-6">
         <!-- Básico -->
         <div
-          class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 flex flex-col animate-fade-up opacity-0 anim-delay-600"
+          class="pricing-card card p-8 flex flex-col"
           data-plan="basico" data-monthly="49" data-yearly="490" data-savings="98"
         >
 
           <h3 class="font-semibold text-lg">Básico</h3>
-          <p class="text-sm text-zinc-400 mt-1">Reenvío + envío — 1 dominio</p>
+          <p class="text-sm text-fg-muted mt-1">Reenvío + envío — 1 dominio</p>
           <div class="mt-4">
-            <span class="plan-price text-4xl font-extrabold">$49</span>
-            <span class="plan-period text-zinc-400">/mes</span>
+            <span class="plan-price text-4xl font-semibold tracking-tight">$49</span>
+            <span class="plan-period text-fg-muted">/mes</span>
           </div>
-          <p class="plan-savings text-xs text-green-400 mt-1 hidden"></p>
-          <ul class="mt-6 space-y-3 text-sm text-zinc-300">
+          <p class="plan-savings text-xs text-accent-text mt-1 hidden"></p>
+          <ul class="mt-6 space-y-3 text-sm text-fg">
             <li>✓ 5 máscaras (alias)</li>
-            <li class="text-zinc-400">✗ Envío desde tu dominio — <a href="/pricing#addons" class="text-mask-400 hover:underline">add-on desde $49</a></li>
+            <li class="text-fg-muted">✗ Envío desde tu dominio — <a href="/pricing#addons" class="text-accent-text hover:underline">add-on desde $49</a></li>
             <li>✓ Reenvío de entrada — 100/hora (~2,400/día)</li>
-            <li class="text-zinc-400">✗ Sin reglas</li>
+            <li class="text-fg-muted">✗ Sin reglas</li>
             <li>✓ Historial 15 días</li>
             <li>✓ Entrega fuera de spam (DKIM + SPF)</li>
             <li>✓ Bandeja — helpdesk integrado</li>
-            <li class="text-zinc-400">✗ Sin miembros de equipo</li>
+            <li class="text-fg-muted">✗ Sin miembros de equipo</li>
           </ul>
           <button
-            class="checkout-btn mt-auto block w-full text-center border border-zinc-700 hover:border-zinc-500 text-zinc-300 font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
+            class="checkout-btn mt-auto block w-full text-center btn-secondary w-full disabled:opacity-50"
           >
             Empezar
           </button>
@@ -903,23 +624,23 @@
 
         <!-- Freelancer (FEATURED) -->
         <div
-          class="pricing-card bg-zinc-900 border-2 border-mask-600 rounded-xl p-8 relative flex flex-col animate-fade-up opacity-0 anim-delay-700 glow-btn"
+          class="pricing-card card !border-accent p-8 relative flex flex-col"
           data-plan="freelancer" data-monthly="449" data-yearly="4,490" data-savings="898"
         >
           <span
-            class="absolute -top-3 left-1/2 -translate-x-1/2 bg-mask-600 text-white text-xs font-bold px-3 py-1 rounded-full"
+            class="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-white text-xs font-bold px-3 py-1 rounded-full"
             >POPULAR</span
           >
 
           <h3 class="font-semibold text-lg">Freelancer</h3>
-          <p class="text-sm text-zinc-400 mt-1">Ideal para agencias y diseñadores web</p>
+          <p class="text-sm text-fg-muted mt-1">Ideal para agencias y diseñadores web</p>
           <div class="mt-4">
-            <span class="plan-price text-4xl font-extrabold">$449</span>
-            <span class="plan-period text-zinc-400">/mes</span>
+            <span class="plan-price text-4xl font-semibold tracking-tight">$449</span>
+            <span class="plan-period text-fg-muted">/mes</span>
           </div>
-          <p class="plan-savings text-xs text-green-400 mt-1 hidden"></p>
-          <p class="plan-per-domain text-xs text-mask-400 mt-1">15 dominios — $30/dominio</p>
-          <ul class="mt-6 space-y-3 text-sm text-zinc-300">
+          <p class="plan-savings text-xs text-accent-text mt-1 hidden"></p>
+          <p class="plan-per-domain text-xs text-accent-text mt-1">15 dominios — $30/dominio</p>
+          <ul class="mt-6 space-y-3 text-sm text-fg">
             <li>✓ 50 máscaras por dominio</li>
             <li>✓ Enviar como tu@dominio (200/día por dominio)</li>
             <li>✓ Reenvío de entrada — 500/hora por dominio (~12,000/día)</li>
@@ -928,13 +649,13 @@
             <li>✓ Entrega fuera de spam (DKIM + SPF)</li>
             <li>✓ Bandeja — helpdesk integrado</li>
             <li>✓ 3 miembros de equipo por dominio</li>
-            <li class="text-zinc-400">+ Dominios extra por $99/mes c/u</li>
-            <li>✓ Marca blanca <span class="text-xs text-zinc-400">(próximamente)</span></li>
+            <li class="text-fg-muted">+ Dominios extra por $99/mes c/u</li>
+            <li>✓ Marca blanca <span class="text-xs text-fg-muted">(próximamente)</span></li>
             <li>✓ API REST + SDK de JavaScript</li>
             <li>✓ Soporte por email</li>
           </ul>
           <button
-            class="checkout-btn mt-auto block w-full text-center bg-mask-600 hover:bg-mask-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
+            class="checkout-btn mt-auto block w-full text-center btn-primary w-full disabled:opacity-50"
           >
             Empezar
           </button>
@@ -942,19 +663,19 @@
 
         <!-- Developer -->
         <div
-          class="pricing-card bg-zinc-900 border border-zinc-800 rounded-xl p-8 flex flex-col animate-fade-up opacity-0 anim-delay-800"
+          class="pricing-card card p-8 flex flex-col"
           data-plan="developer" data-monthly="999" data-yearly="9,990" data-savings="1,998"
         >
 
           <h3 class="font-semibold text-lg">Developer</h3>
-          <p class="text-sm text-zinc-400 mt-1">API & SDK para tu SaaS</p>
+          <p class="text-sm text-fg-muted mt-1">API & SDK para tu SaaS</p>
           <div class="mt-4">
-            <span class="plan-price text-4xl font-extrabold">$999</span>
-            <span class="plan-period text-zinc-400">/mes</span>
+            <span class="plan-price text-4xl font-semibold tracking-tight">$999</span>
+            <span class="plan-period text-fg-muted">/mes</span>
           </div>
-          <p class="plan-savings text-xs text-green-400 mt-1 hidden"></p>
-          <p class="plan-per-domain text-xs text-mask-400 mt-1">20 dominios — $50/dominio</p>
-          <ul class="mt-6 space-y-3 text-sm text-zinc-300">
+          <p class="plan-savings text-xs text-accent-text mt-1 hidden"></p>
+          <p class="plan-per-domain text-xs text-accent-text mt-1">20 dominios — $50/dominio</p>
+          <ul class="mt-6 space-y-3 text-sm text-fg">
             <li>✓ 100 máscaras por dominio</li>
             <li>✓ Enviar como tu@dominio (1,000/día por dominio)</li>
             <li>✓ Reenvío de entrada — 2,000/hora por dominio (~48,000/día)</li>
@@ -962,172 +683,288 @@
             <li>✓ Historial 90 días</li>
             <li>✓ Entrega fuera de spam (DKIM + SPF)</li>
             <li>✓ API REST + SDK de JavaScript</li>
-            <li>✓ Webhooks <span class="text-xs text-zinc-400">(próximamente)</span></li>
-            <li>✓ Marca blanca <span class="text-xs text-zinc-400">(próximamente)</span></li>
-            <li>✓ IPs dedicadas <span class="text-xs text-zinc-400">(próximamente)</span></li>
+            <li>✓ Webhooks <span class="text-xs text-fg-muted">(próximamente)</span></li>
+            <li>✓ Marca blanca <span class="text-xs text-fg-muted">(próximamente)</span></li>
+            <li>✓ IPs dedicadas <span class="text-xs text-fg-muted">(próximamente)</span></li>
             <li>✓ Bandeja — helpdesk integrado</li>
             <li>✓ 10 miembros de equipo por dominio</li>
-            <li class="text-zinc-400">+ Dominios extra por $99/mes c/u</li>
+            <li class="text-fg-muted">+ Dominios extra por $99/mes c/u</li>
             <li>✓ SMTP relay — conecta tu SaaS o sistema existente</li>
             <li>✓ Soporte prioritario</li>
           </ul>
           <button
-            class="checkout-btn mt-auto block w-full text-center bg-mask-600 hover:bg-mask-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
+            class="checkout-btn mt-auto block w-full text-center btn-primary w-full disabled:opacity-50"
           >
             Empezar
           </button>
         </div>
       </div>
 
-      <p class="text-center text-sm text-zinc-400 mt-8">
+      <p class="text-center text-sm text-fg-muted mt-8">
         Todos los precios en MXN. Pago con MercadoPago.<br/>
-        ¿Solo te falta enviar o un dominio más? <a href="/pricing#addons" class="text-mask-400 hover:underline">Add-ons desde $49 →</a><br/>
+        ¿Solo te falta enviar o un dominio más? <a href="/pricing#addons" class="text-accent-text hover:underline">Add-ons desde $49 →</a><br/>
         Anual: Básico $490/año (ahorras $98) · Freelancer $4,490/año (ahorras $898) · Developer $9,990/año (ahorras $1,998)
       </p>
-    </section>
+    <!-- Calculator: la asimetría de precio -->
+    <div id="calculadora" class="max-w-4xl mx-auto mt-16">
+      <h3 class="text-2xl font-semibold tracking-tight text-center mb-2">Mueve los controles y mira cómo se separan las dos líneas.</h3>
+      <p class="text-center text-fg-muted mb-10 max-w-xl mx-auto">Google Workspace cobra por cada persona con buzón. En MailMask el equipo entero cabe en el precio del dominio.</p>
 
+      <div class="grid sm:grid-cols-2 gap-6 mb-8 max-w-xl mx-auto">
+        <div>
+          <label class="block text-sm font-medium text-fg mb-2" for="calc-users">
+            Personas con buzón: <span id="calc-users-val" class="text-accent-text font-bold">6</span>
+          </label>
+          <input type="range" id="calc-users" min="1" max="20" value="6"
+            class="w-full h-2 rounded-lg appearance-none bg-line cursor-pointer" />
+          <div class="flex justify-between text-xs text-fg-muted mt-1"><span>1</span><span>20</span></div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-fg mb-2" for="calc-domains">
+            Dominios: <span id="calc-domains-val" class="text-accent-text font-bold">1</span>
+          </label>
+          <input type="range" id="calc-domains" min="1" max="10" value="1"
+            class="w-full h-2 rounded-lg appearance-none bg-line cursor-pointer" />
+          <div class="flex justify-between text-xs text-fg-muted mt-1"><span>1</span><span>10</span></div>
+        </div>
+      </div>
+
+      <!-- El gráfico: una línea trepa con cada persona, la otra no se mueve -->
+      <div class="bg-bg-elev border border-line rounded-2xl p-4 sm:p-6 overflow-hidden">
+        <svg id="calc-chart" viewBox="0 0 720 300" width="100%" role="img" aria-labelledby="chartT" style="display:block">
+          <title id="chartT">Costo mensual según el número de personas con buzón</title>
+          <g id="chart-grid"></g>
+          <path id="line-gw" fill="none" stroke="rgb(var(--fg-subtle))" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+          <path id="area-mm" fill="rgb(var(--accent))" fill-opacity="0.08" stroke="none" />
+          <path id="line-mm" fill="none" stroke="rgb(var(--accent))" stroke-width="3" stroke-linecap="round" />
+          <path id="line-env" fill="none" stroke="rgb(var(--accent-text))" stroke-width="2" stroke-dasharray="6 5" opacity="0.75" />
+          <circle id="dot-gw" r="6" fill="rgb(var(--fg-subtle))" />
+          <circle id="dot-mm" r="6" fill="rgb(var(--accent))" />
+          <text id="lbl-gw" fill="rgb(var(--fg-subtle))" font-family="system-ui,sans-serif" font-size="14" font-weight="700" text-anchor="middle"></text>
+          <text id="lbl-mm" fill="rgb(var(--accent-text))" font-family="system-ui,sans-serif" font-size="14" font-weight="700" text-anchor="middle"></text>
+          <text id="lbl-env" fill="rgb(var(--accent-text))" font-family="system-ui,sans-serif" font-size="11" opacity="0.85" text-anchor="middle"></text>
+          <text x="360" y="295" fill="rgb(var(--fg-subtle))" font-family="system-ui,sans-serif" font-size="12" text-anchor="middle">personas con buzón →</text>
+        </svg>
+      </div>
+
+      <div class="grid sm:grid-cols-3 gap-4 mt-6 text-center">
+        <div class="border border-line rounded-2xl p-4 bg-bg-elev">
+          <p class="text-xs text-fg-muted uppercase tracking-wide mb-1">Google Workspace</p>
+          <p id="calc-gw-price" class="text-2xl font-semibold text-fg">$648</p>
+          <p class="text-xs text-fg-muted mt-1">$108 × <span id="calc-gw-users">6</span> personas</p>
+        </div>
+        <div class="border-2 border-accent rounded-2xl p-4 bg-bg-elev ">
+          <p class="text-xs text-fg-muted uppercase tracking-wide mb-1">MailMask</p>
+          <p id="calc-mm-price" class="text-2xl font-semibold text-accent-text">$49</p>
+          <p id="calc-mm-plan" class="text-xs text-fg-muted mt-1">Básico · 1 dominio</p>
+          <p id="calc-mm-envio" class="text-xs text-accent-text mt-1">+$49 si además quieres iniciar correos</p>
+        </div>
+        <div class="border border-line rounded-2xl p-4 bg-bg-elev">
+          <p class="text-xs text-fg-muted uppercase tracking-wide mb-1">Ahorro al año</p>
+          <p id="calc-savings" class="text-2xl font-semibold text-accent-text">$6,600</p>
+          <p id="calc-badge" class="text-xs text-fg-muted mt-1">85% menos</p>
+        </div>
+      </div>
+
+      <p class="text-center text-xs text-fg-muted mt-5 max-w-2xl mx-auto">
+        En MailMask el precio no cambia con el tamaño del equipo: los miembros no cuestan extra.
+        En Workspace, cada persona que necesita buzón es otra licencia.
+      </p>
+    </div>
+    <!-- Comparison -->
+    <div class="max-w-3xl mx-auto mt-16">
+      <h3 class="text-2xl font-semibold tracking-tight text-center mb-8">MailMask vs Google Workspace</h3>
+      <div
+        class="bg-bg-elev rounded-2xl border border-line overflow-hidden"
+      >
+        <div
+          class="grid grid-cols-3 text-sm font-semibold bg-bg-inset px-4 py-3"
+        >
+          <div></div>
+          <div class="text-center text-fg-muted">Google Workspace</div>
+          <div class="text-center text-fg">MailMask</div>
+        </div>
+        <div
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
+        >
+          <div class="text-fg-muted">1 dominio</div>
+          <div class="text-center">$120 MXN/mes</div>
+          <div class="text-center text-accent-text font-semibold">$49 MXN/mes</div>
+        </div>
+        <div
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
+        >
+          <div class="text-fg-muted">5 dominios</div>
+          <div class="text-center">$600 MXN/mes</div>
+          <div class="text-center text-accent-text font-semibold">$449 MXN/mes</div>
+        </div>
+        <div
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
+        >
+          <div class="text-fg-muted">15+ dominios</div>
+          <div class="text-center">$1,800+ MXN/mes</div>
+          <div class="text-center text-accent-text font-semibold">$999 MXN/mes</div>
+        </div>
+        <div
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
+        >
+          <div class="text-fg-muted">Máscaras (alias)</div>
+          <div class="text-center text-fg-muted">1 por usuario</div>
+          <div class="text-center text-fg font-semibold">
+            0 — 50 por dominio
+          </div>
+        </div>
+        <div
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
+        >
+          <div class="text-fg-muted">Configuración</div>
+          <div class="text-center text-fg-muted">30+ minutos</div>
+          <div class="text-center text-fg font-semibold">2 minutos</div>
+        </div>
+        <div
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
+        >
+          <div class="text-fg-muted">Reglas de routing</div>
+          <div class="text-center text-fg-muted">Limitadas</div>
+          <div class="text-center text-fg font-semibold">
+            0 — 50 por dominio
+          </div>
+        </div>
+        <div
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
+        >
+          <div class="text-fg-muted">Envío desde tu dominio</div>
+          <div class="text-center text-fg-muted">Solo con licencia</div>
+          <div class="text-center text-fg font-semibold">Desde Freelancer o add-on</div>
+        </div>
+        <div
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
+        >
+          <div class="text-fg-muted">DKIM + SPF</div>
+          <div class="text-center text-fg-muted">Manual</div>
+          <div class="text-center text-fg font-semibold">Automático</div>
+        </div>
+        <div
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
+        >
+          <div class="text-fg-muted">Dominio extra</div>
+          <div class="text-center text-fg-muted">Licencia completa por usuario</div>
+          <div class="text-center text-fg font-semibold">+$99 MXN/mes</div>
+        </div>
+        <div
+          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
+        >
+          <div class="text-fg-muted">Bandeja / helpdesk</div>
+          <div class="text-center text-fg-muted">Complemento extra</div>
+          <div class="text-center text-fg font-semibold">Integrado</div>
+        </div>
+      </div>
+    </div>
+    </section>
     <!-- FAQ -->
-    <section class="max-w-3xl mx-auto px-4 py-16">
-      <h2 class="text-2xl font-bold text-center mb-12">Preguntas frecuentes</h2>
-      <div class="space-y-6">
-        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl" open>
-          <summary
-            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
-          >
+    <section class="max-w-6xl mx-auto px-5 py-20 border-t border-line">
+      <p class="eyebrow mb-3">06 — Preguntas</p>
+      <div class="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 lg:gap-16">
+      <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight">Preguntas frecuentes</h2>
+      <div class="faq border-b border-line">
+        <details class="group" open>
+          <summary>
             ¿Qué es una máscara de email?
-            <span
-              class="text-zinc-400 group-open:rotate-45 transition-transform text-xl"
-              >+</span
-            >
+            <span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span>
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">
+          <p>
             Una máscara (alias) es una dirección como ventas@tudominio.com que
             reenvía los emails a tu inbox personal (Gmail, Outlook, etc.). No
             necesitas crear cuentas de correo nuevas.
           </p>
         </details>
-        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary
-            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
-          >
+        <details class="group">
+          <summary>
             ¿Necesito un servidor de correo?
-            <span
-              class="text-zinc-400 group-open:rotate-45 transition-transform text-xl"
-              >+</span
-            >
+            <span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span>
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">
+          <p>
             No. MailMask se encarga de todo. Solo necesitas configurar unos
             registros DNS en tu proveedor de dominio y listo. No hay servidores
             que mantener.
           </p>
         </details>
-        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary
-            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
-          >
+        <details class="group">
+          <summary>
             ¿Puedo enviar emails desde mi dominio?
-            <span
-              class="text-zinc-400 group-open:rotate-45 transition-transform text-xl"
-              >+</span
-            >
+            <span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span>
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">
+          <p>
             Sí, y sale firmado con tu dominio. Responder desde la Bandeja está incluido en todos los planes; para iniciar un correo nuevo, Básico necesita el add-on de envíos (+$49 o +$99 al mes) y Freelancer y Developer ya lo traen.
             Al agregar tu dominio, MailMask configura DKIM y SPF automáticamente —
             Gmail y Outlook muestran "firmado por tudominio.com" junto al remitente,
             lo que mejora la entregabilidad y evita que tus emails caigan en spam.
           </p>
         </details>
-        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary
-            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
-          >
+        <details class="group">
+          <summary>
             ¿Qué pasa con mis emails si cancelo?
-            <span
-              class="text-zinc-400 group-open:rotate-45 transition-transform text-xl"
-              >+</span
-            >
+            <span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span>
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">
+          <p>
             Al cancelar, mantienes acceso hasta el fin del periodo pagado.
             Después, el reenvío se detiene pero no pierdes emails anteriores (ya
             están en tu inbox).
           </p>
         </details>
-        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary
-            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
-          >
+        <details class="group">
+          <summary>
             ¿Es seguro? ¿Leen mis emails?
-            <span
-              class="text-zinc-400 group-open:rotate-45 transition-transform text-xl"
-              >+</span
-            >
+            <span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span>
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">
+          <p>
             No leemos tus emails. Se procesan automáticamente para reenviarlos
             a tu destino. Si usas la Bandeja, el contenido se almacena de forma
             segura con retención limitada según tu plan. Usamos Amazon SES, la
             misma infraestructura que usan miles de empresas.
           </p>
         </details>
-        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary
-            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
-          >
+        <details class="group">
+          <summary>
             ¿Cuánto tarda la configuración?
-            <span
-              class="text-zinc-400 group-open:rotate-45 transition-transform text-xl"
-              >+</span
-            >
+            <span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span>
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">
+          <p>
             Crear tu cuenta toma 1 minuto. Configurar los registros DNS depende
             de tu proveedor, pero generalmente toma entre 2 y 10 minutos. La
             propagación DNS puede tardar hasta 48 horas, aunque normalmente es
             mucho menos.
           </p>
         </details>
-        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary
-            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
-          >
+        <details class="group">
+          <summary>
             ¿MailMask reemplaza a Gmail o Outlook?
-            <span
-              class="text-zinc-400 group-open:rotate-45 transition-transform text-xl"
-              >+</span
-            >
+            <span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span>
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">
-            <strong class="text-zinc-300">Sí, si tú quieres.</strong> La
-            <a href="#bandeja" class="text-mask-400 hover:underline">Bandeja</a> es un lugar
+          <p>
+            <strong class="text-fg">Sí, si tú quieres.</strong> La
+            <a href="#bandeja" class="text-accent-text hover:underline">Bandeja</a> es un lugar
             completo de trabajo: ahí llega el correo de tu dominio, guarda el historial de
             cada conversación, respondes y escribes correos nuevos. Nada de eso pasa por
             Gmail.
           </p>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">
+          <p>
             Y si prefieres no cambiar tu rutina, tampoco tienes que hacerlo: MailMask reenvía
             a donde ya lees tu correo y sigues igual que siempre. Muchos usan las dos cosas
             —el equipo atiende clientes en la Bandeja y lo personal se reenvía a Gmail.
           </p>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">
+          <p>
             Lo único que todavía no reemplaza es tu app de escritorio para
-            <strong class="text-zinc-300">recibir</strong>: eso necesita IMAP, que está en
+            <strong class="text-fg">recibir</strong>: eso necesita IMAP, que está en
             camino.
           </p>
         </details>
-        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary
-            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
-          >
+        <details class="group">
+          <summary>
             ¿En qué se diferencia de Google Workspace?
-            <span
-              class="text-zinc-400 group-open:rotate-45 transition-transform text-xl"
-              >+</span
-            >
+            <span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span>
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">
+          <p>
             Google Workspace cobra por usuario (~$7 USD/mes cada uno). Si
             necesitas 5 direcciones de correo para tu negocio, pagas 5
             licencias. Con MailMask creas todas las direcciones que tu plan
@@ -1138,127 +975,104 @@
             Developer. Pagas por dominio, no por usuario.
           </p>
         </details>
-        <details class="group bg-zinc-900 border border-zinc-800 rounded-xl">
-          <summary
-            class="cursor-pointer px-6 py-4 font-semibold text-zinc-200 flex justify-between items-center"
-          >
+        <details class="group">
+          <summary>
             ¿Puedo enviar emails desde mi dominio con un cliente de correo?
-            <span
-              class="text-zinc-400 group-open:rotate-45 transition-transform text-xl"
-              >+</span
-            >
+            <span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span>
           </summary>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">
-            <strong class="text-zinc-300">Sí, y sin configurar nada: desde el navegador.</strong>
-            En la <a href="#bandeja" class="text-mask-400 hover:underline">Bandeja</a> recibes,
-            respondes y <strong class="text-zinc-300">escribes correos nuevos</strong> con el
-            botón Redactar, saliendo como <code class="text-zinc-300">ventas@tudominio.com</code>.
+          <p>
+            <strong class="text-fg">Sí, y sin configurar nada: desde el navegador.</strong>
+            En la <a href="#bandeja" class="text-accent-text hover:underline">Bandeja</a> recibes,
+            respondes y <strong class="text-fg">escribes correos nuevos</strong> con el
+            botón Redactar, saliendo como <code class="text-fg">ventas@tudominio.com</code>.
           </p>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">
-            ¿Y si prefieres Outlook, Thunderbird o Apple Mail? Para <strong class="text-zinc-300">enviar</strong>
+          <p>
+            ¿Y si prefieres Outlook, Thunderbird o Apple Mail? Para <strong class="text-fg">enviar</strong>
             desde ahí, también: el plan Developer incluye credenciales SMTP que pones como
             servidor de salida, con DKIM y SPF.
           </p>
-          <p class="px-6 pb-4 text-zinc-400 text-sm">
-            Para <strong class="text-zinc-300">recibir</strong> en esos clientes hace falta IMAP
-            o POP, y esos <span class="text-zinc-500">están en camino</span>. Mientras tanto el
+          <p>
+            Para <strong class="text-fg">recibir</strong> en esos clientes hace falta IMAP
+            o POP, y esos <span class="text-fg-subtle">están en camino</span>. Mientras tanto el
             correo entrante llega al buzón al que lo reenvías.
           </p>
         </details>
       </div>
+      </div>
     </section>
-
     <!-- Blog -->
-    <section class="max-w-3xl mx-auto px-4 py-16 text-center">
-      <h2 class="text-2xl font-bold mb-3">Aprende más en el blog</h2>
-      <p class="text-zinc-400 text-sm mb-8">Guías prácticas para sacarle el máximo a tu dominio sin complicarte.</p>
-      <div class="grid sm:grid-cols-3 gap-6 text-left mb-8">
-        <a href="/blog/email-profesional-sin-google-workspace" class="group block bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-600 transition-colors">
-          <div class="w-full h-40 flex items-center justify-center group-hover:scale-105 transition-transform duration-300" style="background:linear-gradient(135deg,#6d28d9 0%,#7c3aed 40%,#a78bfa 100%)">
+    <section class="max-w-6xl mx-auto px-5 py-20 border-t border-line">
+      <p class="eyebrow mb-3">Blog</p>
+      <div class="flex flex-wrap items-end justify-between gap-4 mb-10">
+        <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight">Aprende más en el blog</h2>
+        <p class="text-fg-muted">Guías prácticas para sacarle el máximo a tu dominio sin complicarte.</p>
+      </div>
+      <div class="grid sm:grid-cols-3 gap-6 text-left mb-10">
+        <a href="/blog/email-profesional-sin-google-workspace" class="group block bg-bg-elev border border-line rounded-2xl overflow-hidden hover:border-fg-subtle transition-colors">
+          <div class="w-full h-40 flex items-center justify-center bg-bg-inset border-b border-line">
             <svg width="80" height="80" viewBox="0 0 80 80" fill="none"><rect x="12" y="24" width="56" height="36" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/><path d="M12 30l28 18 28-18" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"/><circle cx="62" cy="20" r="10" fill="#fbbf24"/><path d="M62 15v6m0 3v0" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
           </div>
           <div class="p-5">
-            <div class="text-sm font-semibold text-zinc-200 mb-1">Email profesional sin Google Workspace</div>
-            <div class="text-xs text-zinc-400">Configura direcciones con tu dominio en minutos, sin pagar por usuario.</div>
+            <div class="text-sm font-semibold text-fg mb-1">Email profesional sin Google Workspace</div>
+            <div class="text-xs text-fg-muted">Configura direcciones con tu dominio en minutos, sin pagar por usuario.</div>
           </div>
         </a>
-        <a href="/blog/reenviar-emails-dominio-propio-gmail" class="group block bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-600 transition-colors">
-          <div class="w-full h-40 flex items-center justify-center group-hover:scale-105 transition-transform duration-300" style="background:linear-gradient(135deg,#0369a1 0%,#0ea5e9 40%,#7dd3fc 100%)">
+        <a href="/blog/reenviar-emails-dominio-propio-gmail" class="group block bg-bg-elev border border-line rounded-2xl overflow-hidden hover:border-fg-subtle transition-colors">
+          <div class="w-full h-40 flex items-center justify-center bg-bg-inset border-b border-line">
             <svg width="80" height="80" viewBox="0 0 80 80" fill="none"><path d="M16 44c0-13.3 10.7-24 24-24h0c13.3 0 24 10.7 24 24" stroke="#e0f2fe" stroke-width="3" fill="none"/><ellipse cx="40" cy="44" rx="28" ry="14" fill="#e0f2fe" opacity=".6"/><ellipse cx="26" cy="48" rx="14" ry="10" fill="#fff" opacity=".8"/><ellipse cx="54" cy="48" rx="14" ry="10" fill="#fff" opacity=".8"/><ellipse cx="40" cy="46" rx="18" ry="12" fill="#fff"/><rect x="30" y="50" width="20" height="14" rx="3" fill="#0ea5e9"/><path d="M30 53l10 6 10-6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><path d="M36 30l4-8 4 8" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="40" cy="18" r="4" fill="#fbbf24"/></svg>
           </div>
           <div class="p-5">
-            <div class="text-sm font-semibold text-zinc-200 mb-1">Reenviar emails de dominio propio a Gmail</div>
-            <div class="text-xs text-zinc-400">Recibe correo de tu dominio directo en tu Gmail personal o de trabajo.</div>
+            <div class="text-sm font-semibold text-fg mb-1">Reenviar emails de dominio propio a Gmail</div>
+            <div class="text-xs text-fg-muted">Recibe correo de tu dominio directo en tu Gmail personal o de trabajo.</div>
           </div>
         </a>
-        <a href="/blog/gestionar-emails-dominio-equipo" class="group block bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-600 transition-colors">
-          <div class="w-full h-40 flex items-center justify-center group-hover:scale-105 transition-transform duration-300" style="background:linear-gradient(135deg,#065f46 0%,#059669 40%,#6ee7b7 100%)">
+        <a href="/blog/gestionar-emails-dominio-equipo" class="group block bg-bg-elev border border-line rounded-2xl overflow-hidden hover:border-fg-subtle transition-colors">
+          <div class="w-full h-40 flex items-center justify-center bg-bg-inset border-b border-line">
             <svg width="80" height="80" viewBox="0 0 80 80" fill="none"><circle cx="30" cy="36" r="10" fill="#d1fae5" stroke="#059669" stroke-width="2"/><circle cx="50" cy="36" r="10" fill="#d1fae5" stroke="#059669" stroke-width="2"/><circle cx="40" cy="50" r="10" fill="#d1fae5" stroke="#059669" stroke-width="2"/><rect x="20" y="56" width="40" height="14" rx="4" fill="#059669"/><path d="M20 60l20 8 20-8" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>
           </div>
           <div class="p-5">
-            <div class="text-sm font-semibold text-zinc-200 mb-1">Gestionar emails de dominio en equipo</div>
-            <div class="text-xs text-zinc-400">Aliases + bandeja compartida para que tu equipo no pierda ningún email.</div>
+            <div class="text-sm font-semibold text-fg mb-1">Gestionar emails de dominio en equipo</div>
+            <div class="text-xs text-fg-muted">Aliases + bandeja compartida para que tu equipo no pierda ningún email.</div>
           </div>
         </a>
       </div>
-      <a href="/blog" class="inline-block px-6 py-2.5 text-sm font-medium rounded-lg border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500 transition-colors">
+      <a href="/blog" class="inline-block px-6 py-2.5 text-sm font-medium rounded-lg border border-line text-fg hover:text-fg hover:border-fg-subtle transition-colors">
         Ver todos los artículos &rarr;
       </a>
     </section>
-
     <!-- Footer -->
-    <footer class="border-t border-zinc-800 py-8 mt-8">
-      <div
-        class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4"
-      >
-        <div class="flex items-center gap-2 text-zinc-400 text-sm">
-          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
-            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
-            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
-            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
-          </svg>
-          MailMask · mailmask.studio
+    <footer class="border-t border-line py-10 mt-8">
+      <div class="max-w-6xl mx-auto px-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-fg text-sm font-semibold">
+          <svg class="w-6 h-6" viewBox="0 0 80 80" fill="none" aria-hidden="true"><ellipse cx="40" cy="42" rx="28" ry="24" fill="rgb(var(--mascara-sombra))"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mascara))"/><ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="30.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="26.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><circle cx="50.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><path d="M40 18 L40 26" stroke="rgb(var(--gold))" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="rgb(var(--gold))" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+          MailMask <span class="text-fg-subtle font-normal">· mailmask.studio</span>
         </div>
-        <div class="text-zinc-400 text-sm flex gap-4">
-          <a href="/terms" class="hover:text-zinc-300 transition-colors"
-            >Términos</a
-          >
-          <a href="/privacy" class="hover:text-zinc-300 transition-colors"
-            >Privacidad</a
-          >
-          <a href="/blog" class="hover:text-zinc-300 transition-colors"
-            >Blog</a
-          >
-          <a href="/login" class="hover:text-zinc-300 transition-colors"
-            >Iniciar sesión</a
-          >
+        <div class="text-fg-muted text-sm flex gap-5">
+          <a href="/terms" class="hover:text-fg transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-fg transition-colors">Privacidad</a>
+          <a href="/docs" class="hover:text-fg transition-colors">Docs</a>
+          <a href="/blog" class="hover:text-fg transition-colors">Blog</a>
+          <a href="/login" class="hover:text-fg transition-colors">Iniciar sesión</a>
         </div>
       </div>
-      <p class="text-center text-zinc-500 text-xs mt-4">
-        © 2026 by <a href="https://fixter.org" target="_blank" rel="noopener" class="hover:text-zinc-400 underline decoration-dotted transition-colors">fixter.org</a>
+      <p class="text-center text-fg-subtle text-xs mt-6">
+        © 2026 by <a href="https://fixter.org" target="_blank" rel="noopener" class="hover:text-fg underline decoration-dotted transition-colors">fixter.org</a>
       </p>
     </footer>
     <!-- Email modal for guest checkout -->
-    <div id="email-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div class="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+    <div id="email-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div class="card p-6 w-full max-w-sm mx-4 shadow-2xl">
         <div class="flex justify-between items-center mb-4">
-          <h3 id="email-modal-title" class="text-lg font-semibold text-white">Tu email para continuar</h3>
-          <button id="email-modal-close" class="text-zinc-400 hover:text-white text-xl leading-none">&times;</button>
+          <h3 id="email-modal-title" class="text-lg font-semibold text-fg">Tu email para continuar</h3>
+          <button id="email-modal-close" class="text-fg-muted hover:text-fg text-xl leading-none">&times;</button>
         </div>
         <form id="email-modal-form">
-          <input
-            id="email-modal-input"
-            type="email"
-            placeholder="tu@email.com"
-            required
-            class="w-full px-4 py-3 bg-zinc-800 border border-zinc-600 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors"
-          />
-          <p id="email-modal-error" class="text-red-400 text-sm mt-1"></p>
-          <button type="submit" class="mt-4 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition-colors">
-            Continuar al pago
-          </button>
+          <input id="email-modal-input" type="email" placeholder="tu@email.com" required
+            class="w-full px-4 py-3 bg-bg border border-line rounded-lg text-fg placeholder-fg-subtle focus:outline-none focus:border-accent transition-colors" />
+          <p id="email-modal-error" class="text-red-500 text-sm mt-1"></p>
+          <button type="submit" class="btn-primary mt-4 w-full">Continuar al pago</button>
         </form>
-        <p id="email-modal-hint" class="text-zinc-400 text-xs mt-3 text-center">Usaremos este email para tu cuenta y recibos.</p>
+        <p id="email-modal-hint" class="text-fg-muted text-xs mt-3 text-center">Usaremos este email para tu cuenta y recibos.</p>
       </div>
     </div>
 

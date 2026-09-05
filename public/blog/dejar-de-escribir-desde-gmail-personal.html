@@ -27,7 +27,11 @@
     <meta name="twitter:title" content="Cómo dejar de escribirle a tus clientes desde tu Gmail personal" />
     <meta name="twitter:description" content="Recibes en tu dominio pero escribes desde tu Gmail. Así se rompe el hilo de la conversación y así se arregla, sin cambiar de correo." />
     <script src="/js/analytics.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
     <link rel="stylesheet" href="/css/styles.css" />
+    <script src="/js/theme.js"></script>
     <link rel="stylesheet" href="/blog/blog.css" />
     <script type="application/ld+json">
     {
@@ -103,10 +107,10 @@
     }
     </script>
   </head>
-  <body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen">
-    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4">
-      <a href="/" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">← MailMask</a>
-      <a href="/login" class="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Iniciar sesión</a>
+  <body class="site bg-bg text-fg antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4 border-b border-line/70 bg-bg/85 backdrop-blur">
+      <a href="/" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">Iniciar sesión</a>
     </nav>
 
     <article class="blog-article">
@@ -294,9 +298,9 @@
       <a href="https://www.mailmask.studio/register" class="cta-btn">Crear cuenta</a>
     </section>
 
-    <footer class="border-t border-zinc-800 py-8 mt-8">
+    <footer class="border-t border-line py-8 mt-8">
       <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div class="flex items-center gap-2 text-zinc-400 text-sm">
+        <div class="flex items-center gap-2 text-fg-muted text-sm">
           <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
             <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
             <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
@@ -304,14 +308,14 @@
           </svg>
           MailMask · mailmask.studio
         </div>
-        <div class="text-zinc-500 text-sm flex gap-4">
-          <a href="/terms" class="hover:text-zinc-300 transition-colors">Términos</a>
-          <a href="/privacy" class="hover:text-zinc-300 transition-colors">Privacidad</a>
-          <a href="/blog" class="hover:text-zinc-300 transition-colors">Blog</a>
-          <a href="/login" class="hover:text-zinc-300 transition-colors">Iniciar sesión</a>
+        <div class="text-fg-subtle text-sm flex gap-4">
+          <a href="/terms" class="hover:text-fg transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-fg transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-fg transition-colors">Blog</a>
+          <a href="/login" class="hover:text-fg transition-colors">Iniciar sesión</a>
         </div>
       </div>
-      <p class="text-center text-zinc-600 text-xs mt-4">© 2026 by fixter.org</p>
+      <p class="text-center text-fg-subtle text-xs mt-4">© 2026 by fixter.org</p>
     </footer>
 
     <style>

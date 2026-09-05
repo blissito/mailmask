@@ -22,89 +22,73 @@
   <meta name="twitter:title" content="Iniciar sesión | MailMask">
   <meta name="twitter:description" content="Entra a tu panel de MailMask para administrar dominios, máscaras de correo, reglas de reenvío y tu bandeja compartida.">
   <meta name="twitter:image" content="https://www.mailmask.studio/img/og-image.png">
-  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+    <link rel="stylesheet" href="/css/styles.css">
+  <script src="/js/theme.js"></script>
     <meta name="twitter:image:alt" content="MailMask — email profesional en tu dominio" />
     <meta property="og:image:secure_url" content="https://www.mailmask.studio/img/og-image.png" />
     <meta property="og:image:type" content="image/png" />
     <meta name="twitter:site" content="@HectorBlisS" />
     <meta name="twitter:creator" content="@HectorBlisS" />
 </head>
-<body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen flex items-center justify-center px-4">
-  <div class="auth-bg" aria-hidden="true"><div class="auth-bg-grid"></div></div>
-
-  <div class="w-full max-w-sm">
+<body class="site bg-bg text-fg antialiased min-h-screen flex items-center justify-center px-4 py-10">
+  <div class="w-full max-w-sm card p-7 sm:p-9">
     <div class="text-center mb-8">
       <a href="/" class="inline-block">
-        <svg class="w-16 h-16 mx-auto" viewBox="0 0 80 80" fill="none" aria-label="MailMask">
-          <ellipse cx="40" cy="42" rx="28" ry="24" fill="rgb(var(--mask-600))"/>
-          <ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mask-500))"/>
-          <!-- Aberturas de la máscara -->
-          <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="#facc15" stroke-width="1.8"/>
-          <ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="#facc15" stroke-width="1.8"/>
-          <!-- Iris y pupila -->
-          <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/>
-          <circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/>
-          <circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/>
-          <circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
-          <!-- Doble brillo: luz y rebote -->
-          <circle cx="30.2" cy="34.9" r="1.9" fill="#ffffff"/>
-          <circle cx="54.2" cy="34.9" r="1.9" fill="#ffffff"/>
-          <circle cx="26.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/>
-          <circle cx="50.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/>
-          <path d="M40 18 L40 26" stroke="#facc15" stroke-width="2" stroke-linecap="round"/>
-          <path d="M36 19 L40 26 L44 19" stroke="#facc15" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-        </svg>
+        <svg class="w-12 h-12 mx-auto" viewBox="0 0 80 80" fill="none" aria-hidden="true"><ellipse cx="40" cy="42" rx="28" ry="24" fill="rgb(var(--mascara-sombra))"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mascara))"/><ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="30.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="26.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><circle cx="50.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><path d="M40 18 L40 26" stroke="rgb(var(--gold))" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="rgb(var(--gold))" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
       </a>
-      <h1 class="text-2xl font-bold mt-4">Iniciar sesión</h1>
+      <h1 class="text-2xl font-semibold tracking-tight mt-4">Iniciar sesión</h1>
     </div>
 
     <a id="google-login" href="/api/auth/google"
-      class="flex items-center justify-center gap-3 w-full bg-white hover:bg-zinc-100 font-semibold py-3.5 rounded-lg transition-colors text-base" style="color:#18181b">
+      class="flex items-center justify-center gap-3 w-full rounded-full border border-line bg-bg-elev hover:border-fg-subtle font-semibold py-3 transition-colors text-[15px] text-fg">
       <svg class="w-5 h-5" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
       Continuar con Google
     </a>
 
 
     <div class="flex items-center gap-3 my-5">
-      <div class="flex-1 h-px bg-zinc-800"></div>
-      <span class="text-xs text-zinc-500">o</span>
-      <div class="flex-1 h-px bg-zinc-800"></div>
+      <div class="flex-1 h-px bg-line"></div>
+      <span class="text-xs text-fg-subtle">o</span>
+      <div class="flex-1 h-px bg-line"></div>
     </div>
     <button id="show-password-form" type="button"
-      class="w-full text-sm text-zinc-400 hover:text-zinc-200 transition-colors py-2">
+      class="w-full text-sm text-fg-muted hover:text-fg transition-colors py-2">
       Entrar con correo y contraseña
     </button>
     <form id="login-form" class="space-y-4 hidden mt-2">
       <div>
-        <label class="block text-sm text-zinc-400 mb-1">Email</label>
+        <label class="block text-sm text-fg-muted mb-1">Email</label>
         <input type="email" name="email" required
-          class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-mask-500 focus:outline-none transition-colors"
+          class="w-full bg-bg border border-line rounded-lg px-4 py-3 text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
           placeholder="tu@email.com">
       </div>
       <div>
-        <label class="block text-sm text-zinc-400 mb-1">Contraseña</label>
+        <label class="block text-sm text-fg-muted mb-1">Contraseña</label>
         <div class="relative">
           <input type="password" name="password" required minlength="8"
-            class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 pr-12 text-zinc-100 placeholder-zinc-500 focus:border-mask-500 focus:outline-none transition-colors"
+            class="w-full bg-bg border border-line rounded-lg px-4 py-3 pr-12 text-fg placeholder-fg-subtle focus:border-accent focus:outline-none transition-colors"
             placeholder="••••••••">
-          <button type="button" class="absolute inset-y-0 right-0 flex items-center px-3 text-mask-500 hover:text-mask-400 transition-colors" data-toggle-password>
+          <button type="button" class="absolute inset-y-0 right-0 flex items-center px-3 text-accent-text hover:text-mask-500 transition-colors" data-toggle-password>
             <svg class="eye-open w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
             <svg class="eye-closed w-5 h-5 hidden" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
           </button>
         </div>
       </div>
-      <div id="error" class="text-red-400 text-sm hidden"></div>
+      <div id="error" class="text-red-500 text-sm hidden"></div>
       <button type="submit"
-        class="w-full bg-mask-600 hover:bg-mask-700 text-white font-semibold py-3 rounded-lg transition-colors">
+        class="btn-primary w-full">
         Entrar
       </button>
     </form>
 
-    <p class="text-center text-sm text-zinc-500 mt-4">
-      <a href="/forgot-password" class="text-zinc-400 hover:text-zinc-300">¿Olvidaste tu contraseña?</a>
+    <p class="text-center text-sm text-fg-subtle mt-4">
+      <a href="/forgot-password" class="text-fg-muted hover:text-fg">¿Olvidaste tu contraseña?</a>
     </p>
-    <p class="text-center text-sm text-zinc-500 mt-2">
-      ¿No tienes cuenta? <a href="/register" class="text-mask-500 hover:text-mask-400">Crear cuenta</a>
+    <p class="text-center text-sm text-fg-subtle mt-2">
+      ¿No tienes cuenta? <a href="/register" class="text-accent-text hover:text-mask-500">Crear cuenta</a>
     </p>
   </div>
 
