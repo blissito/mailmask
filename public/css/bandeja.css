@@ -1132,9 +1132,15 @@ body.mm-composer-locked { overflow: hidden; }
   .mesa-search { flex: 1 1 100%; width: auto; font-size: 16px; padding: 9px 10px 9px 32px; }
   .mesa-action-btn .kbd { display: none; }
 
-  /* Lista o detalle, nunca los dos */
+  /* Lista o detalle, nunca los dos. min-width: 0 en los hijos flex: sin eso una
+     URL larga sin espacios ensancha el detalle más que la pantalla y arrastra
+     consigo la toolbar y los botones. */
+  body { overflow-x: hidden; }
+  .mesa-main { width: 100%; min-width: 0; }
   .mesa-list { width: 100%; min-width: 0; border-right: none; }
-  .mesa-detail { display: none; }
+  .mesa-detail { display: none; min-width: 0; width: 100%; }
+  .mesa-detail-loaded, .mesa-messages, .mesa-msg, .mesa-msg-body { min-width: 0; max-width: 100%; }
+  .mesa-msg-body, .mesa-detail-subject, .mesa-detail-meta { overflow-wrap: anywhere; word-break: break-word; }
   body.mesa-mobile-detail .mesa-list { display: none; }
   body.mesa-mobile-detail .mesa-detail { display: flex; }
   .mesa-back-btn { display: inline-flex; }
