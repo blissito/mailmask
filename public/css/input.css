@@ -73,6 +73,7 @@
 .site { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; font-feature-settings: "cv11", "ss01"; }
 .site h1, .site h2 { font-family: "Bricolage Grotesque", "Inter", system-ui, sans-serif; font-weight: 800; letter-spacing: -0.03em; text-wrap: balance; font-variation-settings: "wdth" 96, "opsz" 48; }
 .site h3 { letter-spacing: -0.015em; text-wrap: balance; }
+.eyebrow .ico { width: 18px; height: 18px; color: rgb(var(--accent)); flex: none; }
 .eyebrow { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(var(--fg-subtle)); }
 .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-[rgb(var(--accent-text))]; }
 .btn-secondary { @apply inline-flex items-center justify-center gap-2 rounded-full border border-line bg-bg-elev px-6 py-3 text-[15px] font-semibold text-fg transition-colors hover:border-fg-subtle; }
