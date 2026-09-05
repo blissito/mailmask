@@ -94,3 +94,142 @@
   }
   .icon-draw [fill="currentColor"] { animation: none; opacity: 1; }
 }
+
+/* Fondo animado de login y registro: dos manchas del verde de marca que derivan
+   despacio detrás de la tarjeta, más una rejilla tenue. Nada parpadea ni compite con
+   el formulario; con prefers-reduced-motion se queda quieto. */
+.auth-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 0%, rgb(var(--mask-500) / 0.06), transparent 60%),
+    rgb(9 9 11);
+}
+.auth-bg::before,
+.auth-bg::after {
+  content: "";
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.16;
+  will-change: transform;
+}
+.auth-bg::before {
+  top: -30vmax;
+  left: -20vmax;
+  background: radial-gradient(circle, rgb(var(--mask-500)), transparent 62%);
+  animation: auth-drift-a 26s ease-in-out infinite alternate;
+}
+.auth-bg::after {
+  bottom: -32vmax;
+  right: -22vmax;
+  background: radial-gradient(circle, rgb(var(--mask-400)), transparent 62%);
+  animation: auth-drift-b 32s ease-in-out infinite alternate;
+}
+.auth-bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+@keyframes auth-drift-a {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(14vmax, 10vmax) scale(1.12); }
+}
+@keyframes auth-drift-b {
+  from { transform: translate(0, 0) scale(1.08); }
+  to   { transform: translate(-12vmax, -9vmax) scale(0.96); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-bg::before, .auth-bg::after { animation: none; }
+}
+
+/* ====== Dashboard (/app): pantalla inicial ======
+   Componentes con @apply porque los pinta app.js en plantillas de texto y se repiten
+   (filas de dominio, medidores). Tokens de Tailwind, nada de valores sueltos. */
+@layer components {
+  .app-shell { overflow-x: clip; font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
+  /* iOS Safari ignora overflow-x en body si html no lo tiene; clip no crea contenedor de scroll */
+  html:has(> body.app-shell) { overflow-x: clip; }
+  .app-shell h1, .app-shell h2, .app-shell h3, .app-brand, .plan-card .price, .dom .k b { font-family: "Sora", "Avenir Next", "Segoe UI", sans-serif; letter-spacing: -0.01em; }
+  .app-shell .num { @apply tabular-nums; }
+  .font-mono-app { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; }
+
+  .app-top { @apply sticky top-0 z-30 border-b border-white/[0.07] bg-zinc-950/70 backdrop-blur; }
+  .app-top-in { @apply mx-auto flex w-full max-w-[1040px] items-center gap-2.5 px-4 py-2.5; }
+  .app-brand { @apply flex flex-none items-center gap-2 text-[17px] font-bold; }
+  .app-brand svg { @apply h-7 w-7; }
+  .app-nav { @apply ml-1.5 flex flex-none gap-0.5; }
+  .app-nav a { @apply whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm text-zinc-400 hover:text-zinc-100; }
+  .app-nav a.on { @apply bg-white/[0.06] text-zinc-100; }
+  .app-nav a.admin { @apply text-mask-400; }
+  .app-me { @apply ml-auto flex min-w-0 flex-none items-center gap-2.5; }
+  .app-pill { @apply whitespace-nowrap rounded-full border border-mask-500/25 bg-mask-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.12em] text-mask-400; }
+  .app-mail { @apply max-w-[34vw] truncate text-[13px] text-zinc-400; }
+  .app-out { @apply flex-none px-1.5 py-1 text-[13px] text-zinc-500 hover:text-zinc-100; }
+  @media (max-width: 640px) {
+    .app-nav a:not(.on) { @apply hidden; }
+    .app-mail { @apply hidden; }
+    .app-me { @apply flex-none; }
+    .app-hello h1 { @apply text-[22px]; }
+  }
+
+  .app-page { @apply mx-auto grid w-full max-w-[1040px] grid-cols-[minmax(0,1fr)] gap-[18px] px-4 pb-16 pt-6; }
+  .app-page > * { @apply min-w-0; }
+  .app-page > div:empty { @apply hidden; }
+  .app-hello { @apply flex flex-wrap items-end justify-between gap-4; }
+  .app-hello h1 { @apply m-0 text-[26px] font-semibold; text-wrap: balance; }
+  .app-hello p { @apply mb-0 mt-1 text-zinc-400; }
+  .app-hello .today { @apply font-mono-app text-xs tracking-wide text-zinc-500; }
+
+  .app-grid { @apply grid grid-cols-[minmax(0,1fr)] items-start gap-5 md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_320px]; }
+  .app-grid > * { @apply min-w-0; }
+  .app-section-h { @apply mb-2.5 flex items-baseline justify-between; }
+  .app-section-h h2 { @apply m-0 text-xs font-semibold uppercase tracking-[.1em] text-zinc-500; }
+  .app-link { @apply text-sm font-medium text-mask-400 hover:text-mask-100; }
+  .app-card { @apply rounded-[14px] border border-white/[0.08] bg-zinc-900/60 p-[18px]; }
+
+  .dom-list { @apply overflow-hidden rounded-[14px] border border-white/[0.12] bg-zinc-900/70 backdrop-blur-sm; }
+  .dom { @apply grid cursor-pointer grid-cols-[14px_minmax(0,1fr)_auto_18px] items-center gap-3.5 border-t border-white/[0.07] px-[18px] py-[15px] transition-colors first:border-t-0 hover:bg-white/[0.03]; }
+  .dom .st { @apply h-2 w-2 rounded-full bg-mask-400 ring-4 ring-mask-500/15; }
+  .dom .st.pend { @apply bg-amber-500 ring-amber-500/15; }
+  .dom .name { @apply font-mono-app truncate text-[15px] font-medium; }
+  .dom .name .tag { @apply ml-1.5 rounded-full bg-mask-500/15 px-1.5 py-px align-middle font-sans text-[10px] text-mask-400; }
+  .dom .sub { @apply mt-0.5 text-[12.5px] text-zinc-500; }
+  .dom .sub em { @apply not-italic text-zinc-400; }
+  .dom .k { @apply text-right; }
+  .dom .k b { @apply block text-base font-semibold; }
+  .dom .k span { @apply text-[11px] uppercase tracking-[.06em] text-zinc-500; }
+  .dom .chev { @apply text-zinc-500; }
+
+  .plan-card .plan-h { @apply flex items-baseline justify-between gap-2; }
+  .plan-card .plan-h h3 { @apply m-0 text-lg font-semibold; }
+  .plan-card .price { @apply whitespace-nowrap text-[15px] font-semibold text-zinc-400; }
+  .plan-card .price small { @apply text-xs font-normal text-zinc-500; }
+  .plan-card .next { @apply mt-1 text-[13px] text-zinc-500; }
+  .plan-card .next b { @apply font-medium text-zinc-400; }
+  .plan-card .meters { @apply mt-4 grid gap-3; }
+  .meter .l { @apply flex justify-between text-[13px]; }
+  .meter .l span:last-child { @apply text-zinc-500; }
+  .meter .bar { @apply mt-1.5 h-[5px] overflow-hidden rounded-full bg-white/[0.07]; }
+  .meter .bar i { @apply block h-full rounded-full bg-mask-500 transition-[width] duration-300; }
+  .meter .bar i.full { @apply bg-amber-500; }
+  .meter .note { @apply mt-1 text-xs text-zinc-500; }
+  .plan-card .lines { @apply mt-3.5 grid gap-1.5 border-t border-white/[0.07] pt-3 text-[13px]; }
+  .plan-card .lines div { @apply flex justify-between gap-2.5 text-zinc-400; }
+  .plan-card .lines div span:last-child { @apply font-mono-app whitespace-nowrap text-xs text-zinc-500; }
+  .plan-card .lines div.gift span { @apply text-mask-400; }
+  .plan-card .lines div.total { @apply border-t border-white/[0.07] pt-1.5 font-semibold text-zinc-100; }
+  .plan-card .lines div.total span:last-child { @apply font-sans text-[13px] text-zinc-100; }
+  .plan-card .foot { @apply mt-3.5 flex flex-wrap gap-3.5 text-[13px]; }
+  .plan-card .foot .danger { @apply text-zinc-500 hover:text-red-400; }
+}

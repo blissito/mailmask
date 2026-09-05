@@ -33,11 +33,112 @@ let selectedDomain = null;
 // facturación viejo en pantalla — con el resumen de cobro eso ya no es cosmético: el
 // total se quedaría en un número que no es.
 function renderAccountUI() {
+  renderHello();
   renderBillingBanner();
-  renderBillingSummary();
-  renderStats();
+  renderPlanCard();
   renderReferralBanner();
   renderReferrals();
+}
+
+// --- Saludo y estado ---
+function renderHello() {
+  const el = document.getElementById("home-hello");
+  if (!el || !currentUser) return;
+  const h = new Date().getHours();
+  const saludo = h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches";
+  const nombre = (currentUser.email || "").split("@")[0].split(/[._+-]/)[0];
+  const quien = nombre ? nombre.charAt(0).toUpperCase() + nombre.slice(1) : "";
+  const sub = currentUser.subscription;
+  const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
+  const activo = sub && (sub.status === "active" || sub.status === "cancelled") && periodEnd && periodEnd >= new Date();
+  const pendientes = domains.filter(d => !d.verified).length;
+  let estado;
+  if (!activo) estado = "Tu cuenta no tiene plan activo: el correo no se está reenviando.";
+  else if (domains.length === 0) estado = "Agrega tu primer dominio para empezar a recibir correo.";
+  else if (pendientes > 0) estado = `${pendientes === 1 ? "Un dominio espera" : `${pendientes} dominios esperan`} configuración DNS.`;
+  else estado = `${domains.length === 1 ? "Tu dominio recibe" : "Tus dominios reciben"} con normalidad. Nada pendiente.`;
+  const hoy = new Date().toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
+  el.innerHTML = `
+    <div>
+      <h1>${esc(saludo)}${quien ? `, ${esc(quien)}` : ""}</h1>
+      <p>${esc(estado)}</p>
+    </div>
+    <span class="today num">${esc(hoy)}</span>`;
+}
+
+// --- Tarjeta de plan: precio, próximo cargo, uso y add-ons, todo en un lugar ---
+function renderPlanCard() {
+  const el = document.getElementById("plan-card");
+  if (!el || !currentUser) return;
+  const sub = currentUser.subscription;
+  const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
+  const usable = sub && (sub.status === "active" || sub.status === "cancelled") && periodEnd && periodEnd >= new Date();
+  if (!usable) {
+    el.innerHTML = `
+      <div class="app-card plan-card">
+        <div class="plan-h"><h3>Sin plan activo</h3></div>
+        <div class="next">Elige un plan para reenviar correo desde tu dominio.</div>
+        <div class="foot"><a href="/pricing" class="app-link">Ver planes</a></div>
+      </div>`;
+    return;
+  }
+
+  const now = new Date();
+  const catalog = currentUser.addonCatalog ?? {};
+  const effective = (currentUser.addons ?? []).filter(a =>
+    a.status === "active" || (a.status === "cancelled" && a.currentPeriodEnd && new Date(a.currentPeriodEnd) >= now));
+  const money = (c) => `$${(c / 100).toLocaleString("es-MX")}`;
+  const fecha = (d) => d.toLocaleDateString("es-MX", { day: "numeric", month: "long" });
+  const total = (currentUser.planPriceCents ?? 0) + effective.reduce((s, a) => s + (a.isCourtesy ? 0 : (a.priceCents ?? 0)), 0);
+
+  const u = currentUser.usage;
+  const totalAliases = u ? u.aliasesPerDomain.reduce((s, a) => s + a.current, 0) : 0;
+  const sendsToday = u ? (u.sendsPerDomain ?? []).reduce((s, d) => s + d.current, 0) : 0;
+  const sendsLimit = currentUser.limits?.sends ?? 0;
+  const sendsUnlocked = currentUser.limits?.sendsUnlocked ?? false;
+  const totalForwards = domains.reduce((s, d) => s + (d.monthlyForwards ?? 0), 0);
+  const pct = (a, b) => b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0;
+  const meter = (label, cur, lim, note) => `
+    <div class="meter">
+      <div class="l"><span>${label}</span><span class="num">${cur.toLocaleString("es-MX")} de ${lim.toLocaleString("es-MX")}</span></div>
+      <div class="bar"><i class="${cur >= lim ? "full" : ""}" style="width:${pct(cur, lim)}%"></i></div>
+      ${note ? `<div class="note">${note}</div>` : ""}
+    </div>`;
+
+  const lines = effective.map(a => {
+    const label = catalog[a.kind]?.label ?? a.kind;
+    const right = a.isCourtesy ? "cortesía" : (a.currentPeriodEnd ? `cobra ${new Date(a.currentPeriodEnd).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}` : money(a.priceCents ?? 0));
+    return `<div class="${a.isCourtesy ? "gift" : ""}"><span>${esc(label)}</span><span>${esc(right)}</span></div>`;
+  }).join("");
+
+  el.innerHTML = `
+    <div class="app-card plan-card">
+      <div class="plan-h">
+        <h3>Plan ${esc(sub.planLabel ?? sub.plan)}</h3>
+        <span class="price num">${money(currentUser.planPriceCents ?? 0)} <small>MXN / mes</small></span>
+      </div>
+      <div class="next">${sub.status === "cancelled"
+        ? `Cancelado · el servicio termina el <b>${fecha(periodEnd)}</b>`
+        : `Cubierto hasta el <b>${fecha(periodEnd)}</b> · MercadoPago`}</div>
+      <div class="meters">
+        ${u ? meter("Dominios", u.domains.current, u.domains.limit) : ""}
+        ${u ? meter("Alias", totalAliases, (currentUser.limits?.aliases ?? 0) * Math.max(1, u.domains.limit), "por dominio") : ""}
+        ${sendsUnlocked
+          ? meter("Envíos hoy", sendsToday, sendsLimit, "por dominio, al día")
+          : `<div class="meter"><div class="l"><span>Envíos</span><span>no incluidos</span></div><div class="note"><button id="usage-addon-cta" class="app-link" style="font-size:12px">Activar envíos →</button></div></div>`}
+        <div class="meter"><div class="l"><span>Reenvíos este mes</span><span class="num">${totalForwards.toLocaleString("es-MX")}</span></div><div class="note">límite ${(currentUser.limits?.forwardPerHour ?? 0).toLocaleString("es-MX")} por hora y dominio</div></div>
+      </div>
+      ${lines || total !== (currentUser.planPriceCents ?? 0) ? `<div class="lines">${lines}<div class="total"><span>Total al mes</span><span>${money(total)} MXN</span></div></div>` : ""}
+      <div class="foot">
+        <button data-action="show-orders" class="app-link">Historial de pagos</button>
+        <button id="btn-addons" class="app-link">Add-ons</button>
+        <a href="/pricing" class="app-link">Cambiar plan</a>
+        ${sub.status === "active" ? `<button id="btn-cancel-sub" class="danger">Cancelar</button>` : ""}
+      </div>
+    </div>`;
+  document.getElementById("usage-addon-cta")?.addEventListener("click", showAddonsModal);
+  document.getElementById("btn-addons")?.addEventListener("click", showAddonsModal);
+  document.getElementById("btn-cancel-sub")?.addEventListener("click", cancelSubscription);
 }
 
 async function refreshUsage() {
@@ -140,6 +241,9 @@ function renderBillingBanner() {
   const isCancelledWithAccess = sub && sub.status === "cancelled" && periodEnd && !isExpired;
 
   if (isActive) {
+    // Con plan activo no hay nada que atender: el plan vive en la tarjeta lateral.
+    container.innerHTML = "";
+  } else if (false) {
     container.innerHTML = `
       <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 flex items-center justify-between">
         <div class="flex items-center gap-3">
@@ -613,77 +717,60 @@ function renderReferrals() {
 
   const slug = stats.slug || "";
   const link = slug ? `www.mailmask.studio/register?ref=${esc(slug)}` : "";
-  const progressPct = Math.min(100, Math.round((stats.converted / 2) * 100));
   const clicks = stats.clicks || { total: 0, last30Days: 0, byWeek: [] };
+  const goal = 2;
+  const done = Math.min(goal, stats.converted);
+  // Dos puntos en vez de una barra al 0%: una barra vacía sólo dice "no has hecho nada".
+  const dots = Array.from({ length: goal }, (_, i) =>
+    `<span class="w-2.5 h-2.5 rounded-full ${i < done ? "bg-mask-400" : "bg-zinc-700"}"></span>`).join("");
+  const hasActivity = clicks.last30Days > 0 || stats.total > 0;
 
   container.innerHTML = `
-    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5">
-      <span class="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Referidos</span>
-
-      <div class="mt-3 space-y-3">
-        ${slug ? `
+    <div class="border border-zinc-800/80 rounded-xl px-5 py-4">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div class="min-w-0 sm:w-64 shrink-0">
           <div class="flex items-center gap-2">
-            <code class="text-sm text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 flex-1 select-all">${link}</code>
-            <button data-action="copy-referral" data-value="${esc(link)}" class="text-sm text-zinc-500 hover:text-zinc-300 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-2 rounded-lg transition-colors">Copiar</button>
-            <button data-action="edit-slug" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Editar</button>
+            <span class="text-sm font-semibold text-zinc-200">Invita y gana un mes gratis</span>
+            <span class="flex items-center gap-1" title="${done} de ${goal} referidos activos">${dots}</span>
+          </div>
+          <p class="text-xs text-zinc-500 mt-0.5">${done}/${goal} referidos activos${hasActivity ? ` · ${clicks.last30Days} clics · ${stats.total} registros` : ""}</p>
+        </div>
+        ${slug ? `
+          <div class="flex items-center gap-2 flex-1 min-w-0">
+            <code class="text-xs sm:text-sm text-zinc-300 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 flex-1 min-w-0 truncate select-all">${link}</code>
+            <button data-action="copy-referral" data-value="${esc(link)}" class="text-sm text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-2 rounded-lg transition-colors shrink-0">Copiar</button>
+            <button data-action="edit-slug" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors shrink-0" title="Cambiar el nombre del enlace">Editar</button>
           </div>
         ` : `
-          <div class="flex items-center gap-2">
-            <span class="text-sm text-zinc-500">Configura tu link de referido</span>
-            <button data-action="edit-slug" class="text-sm text-mask-400 hover:text-mask-300 transition-colors">Crear slug</button>
+          <div class="flex items-center gap-3 flex-1">
+            <span class="text-sm text-zinc-500">Aún no tienes enlace de referido.</span>
+            <button data-action="edit-slug" class="text-sm text-mask-400 hover:text-mask-300 transition-colors">Crear enlace</button>
           </div>
         `}
-
-        <!-- Funnel cards -->
-        <div class="grid grid-cols-3 gap-2 mt-2">
-          <div class="bg-zinc-800/50 rounded-lg p-3 text-center">
-            <div class="text-lg font-bold text-zinc-200">${clicks.last30Days}</div>
-            <div class="text-[10px] text-zinc-500 uppercase tracking-wide">Clics</div>
-          </div>
-          <div class="bg-zinc-800/50 rounded-lg p-3 text-center">
-            <div class="text-lg font-bold text-zinc-200">${stats.total}</div>
-            <div class="text-[10px] text-zinc-500 uppercase tracking-wide">Registros</div>
-          </div>
-          <div class="bg-zinc-800/50 rounded-lg p-3 text-center">
-            <div class="text-lg font-bold text-zinc-200">${stats.converted}</div>
-            <div class="text-[10px] text-zinc-500 uppercase tracking-wide">Activos</div>
-          </div>
-        </div>
-
-        <!-- Sparkline -->
-        ${clicks.byWeek.length > 0 ? `
-          <div class="mt-2">
-            <div class="text-[10px] text-zinc-500 mb-1">Clics por semana</div>
-            ${buildSparklineSvg(clicks.byWeek)}
-          </div>
-        ` : ""}
-
-        ${stats.total > 0 ? `
-          <div class="space-y-2 mt-2">
-            ${currentUser._referralsList ? currentUser._referralsList.map(r => {
-              const isConverted = r.status === "converted" || r.status === "credited";
-              const masked = r.referredEmail.replace(/^(.{2}).*(@.*)$/, "$1***$2");
-              return `
-                <div class="flex items-center gap-3 text-sm">
-                  <span class="w-2 h-2 rounded-full ${isConverted ? 'bg-green-400' : 'bg-zinc-600'}"></span>
-                  <span class="text-zinc-400 font-mono text-xs">${esc(masked)}</span>
-                  <span class="text-xs ${isConverted ? 'text-green-400' : 'text-zinc-500'}">${isConverted ? 'Activo' : 'Pendiente'}</span>
-                  <span class="text-xs text-zinc-600 ml-auto">${relativeTime(r.createdAt)}</span>
-                </div>`;
-            }).join("") : ""}
-          </div>
-        ` : ""}
-
-        <div class="mt-3">
-          <div class="flex items-center justify-between text-xs text-zinc-500 mb-1">
-            <span>${stats.converted}/2 referidos para mes gratis</span>
-            <span>${progressPct}%</span>
-          </div>
-          <div class="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-            <div class="h-full bg-mask-500 rounded-full transition-all duration-500" style="width: ${progressPct}%"></div>
-          </div>
-        </div>
       </div>
+
+      ${clicks.byWeek.length > 0 && clicks.total > 0 ? `
+        <div class="mt-3 flex items-center gap-3">
+          <span class="text-[10px] uppercase tracking-widest text-zinc-500">Clics por semana</span>
+          ${buildSparklineSvg(clicks.byWeek)}
+        </div>
+      ` : ""}
+
+      ${stats.total > 0 && currentUser._referralsList ? `
+        <div class="mt-3 pt-3 border-t border-zinc-800/80 space-y-1.5">
+          ${currentUser._referralsList.map(r => {
+            const isConverted = r.status === "converted" || r.status === "credited";
+            const masked = r.referredEmail.replace(/^(.{2}).*(@.*)$/, "$1***$2");
+            return `
+              <div class="flex items-center gap-3 text-sm">
+                <span class="w-2 h-2 rounded-full ${isConverted ? 'bg-mask-400' : 'bg-zinc-600'}"></span>
+                <span class="text-zinc-400 font-mono text-xs">${esc(masked)}</span>
+                <span class="text-xs ${isConverted ? 'text-mask-400' : 'text-zinc-500'}">${isConverted ? 'Activo' : 'Pendiente'}</span>
+                <span class="text-xs text-zinc-600 ml-auto">${relativeTime(r.createdAt)}</span>
+              </div>`;
+          }).join("")}
+        </div>
+      ` : ""}
     </div>`;
 }
 
@@ -881,7 +968,8 @@ async function loadDomains() {
   if (!res.ok) return;
   domains = await res.json();
   renderDomains();
-  renderStats(); // update after domains loaded (for forward counts)
+  renderHello();
+  renderPlanCard(); // los reenvíos del mes salen de los dominios
 
   // Load referrals list
   try {
@@ -918,30 +1006,27 @@ function renderDomains() {
   empty.classList.add("hidden");
   if (header) header.classList.remove("hidden");
 
-  list.innerHTML = domains.map(d => {
+  const aliasCount = (id) => (currentUser?.usage?.aliasesPerDomain ?? []).find(a => a.domainId === id)?.current;
+  list.innerHTML = `<div class="dom-list">${domains.map(d => {
     const verified = d.verified;
-    const dotClass = verified ? 'bg-green-400' : 'bg-yellow-400';
-    const statusText = verified ? 'Verificado' : 'Pendiente';
     const fwds = d.monthlyForwards ?? 0;
+    const n = aliasCount(d.id);
+    const detalle = verified
+      ? `${n != null ? `<em>${n} alias</em> · ` : ""}verificado`
+      : `<em>Falta configurar DNS</em>`;
     return `
-    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl px-5 py-4 cursor-pointer hover:border-zinc-700 transition-all"
-         data-action="select-domain" data-domain-id="${esc(d.id)}">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <span class="w-2 h-2 rounded-full ${dotClass}"></span>
-          <span class="font-semibold">${esc(d.domain)}</span>
-          <span class="text-xs text-zinc-500">${statusText}</span>
-          ${d.registeredViaMailmask ? '<span class="text-[10px] bg-mask-600/20 text-mask-400 px-1.5 py-0.5 rounded-full">MailMask</span>' : ''}
-        </div>
-        <div class="flex items-center gap-4 text-xs text-zinc-500">
-          <span>${fwds} fwd${fwds === 1 ? '' : 's'}</span>
-          <svg class="w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-          </svg>
-        </div>
+    <div class="dom" data-action="select-domain" data-domain-id="${esc(d.id)}">
+      <span class="st ${verified ? "" : "pend"}"></span>
+      <div class="min-w-0">
+        <div class="name">${esc(d.domain)}${d.registeredViaMailmask ? '<span class="tag">MailMask</span>' : ''}</div>
+        <div class="sub">${detalle}</div>
       </div>
+      <div class="k num">${verified
+        ? `<b>${fwds.toLocaleString("es-MX")}</b><span>este mes</span>`
+        : `<span class="app-link" style="font-size:13px;text-transform:none;letter-spacing:0">Ver DNS</span>`}</div>
+      <span class="chev">›</span>
     </div>`;
-  }).join("");
+  }).join("")}</div>`;
 }
 
 async function selectDomain(id) {
@@ -952,7 +1037,8 @@ async function selectDomain(id) {
   document.getElementById("empty-state").classList.add("hidden");
   document.getElementById("domain-detail").classList.remove("hidden");
   document.getElementById("domains-header")?.classList.add("hidden");
-  document.getElementById("stats-row")?.classList.add("hidden");
+  document.getElementById("home-aside")?.classList.add("hidden");
+  document.getElementById("home-hello")?.classList.add("hidden");
   document.getElementById("referrals-section")?.classList.add("hidden");
   document.getElementById("referral-credit-banner")?.classList.add("hidden");
 
@@ -983,7 +1069,8 @@ function goBack() {
   document.getElementById("domain-detail").classList.add("hidden");
   document.getElementById("domains-list").classList.remove("hidden");
   document.getElementById("domains-header")?.classList.remove("hidden");
-  document.getElementById("stats-row")?.classList.remove("hidden");
+  document.getElementById("home-aside")?.classList.remove("hidden");
+  document.getElementById("home-hello")?.classList.remove("hidden");
   document.getElementById("referrals-section")?.classList.remove("hidden");
   document.getElementById("referral-credit-banner")?.classList.remove("hidden");
   renderDomains();
@@ -1215,16 +1302,16 @@ function renderAliases(aliases) {
 
   empty.classList.add("hidden");
   list.innerHTML = aliases.map(a => `
-    <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg px-5 py-4 flex items-center justify-between">
-      <div>
-        <span class="font-mono text-sm ${a.enabled ? 'text-zinc-100' : 'text-zinc-500 line-through'}">
-          ${a.alias === '*' ? '*' : esc(a.alias)}@${esc(selectedDomain.domain)}
-        </span>
-        <span class="text-zinc-500 mx-2">→</span>
-        <span class="text-sm text-zinc-400">${esc(a.destinations.join(", "))}</span>
-        ${a.forwardCount ? `<span class="text-xs text-zinc-500 ml-2">${a.forwardCount} reenviado${a.forwardCount === 1 ? '' : 's'}${a.lastFrom ? ` · último de ${esc(a.lastFrom)}` : ''}</span>` : ''}
+    <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span class="font-mono text-sm break-all ${a.enabled ? 'text-zinc-100' : 'text-zinc-500 line-through'}">${a.alias === '*' ? '*' : esc(a.alias)}@${esc(selectedDomain.domain)}</span>
+          <span class="text-zinc-500">→</span>
+          ${a.destinations.map(d => `<span class="text-sm text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-0.5 break-all">${esc(d)}</span>`).join("")}
+        </div>
+        ${a.forwardCount ? `<div class="text-xs text-zinc-500 mt-1">${a.forwardCount} reenviado${a.forwardCount === 1 ? '' : 's'}${a.lastFrom ? ` · último de ${esc(a.lastFrom)}` : ''}</div>` : ''}
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-3 sm:gap-2 shrink-0">
         <button data-action="edit-alias" data-alias="${esc(a.alias)}" data-destinations="${esc(a.destinations.join(', '))}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Editar</button>
         <button data-action="toggle-alias" data-alias="${esc(a.alias)}" data-enabled="${!a.enabled}" class="text-xs px-2 py-1 rounded ${a.enabled ? 'bg-green-900/30 text-green-400' : 'bg-zinc-700 text-zinc-400'}">${a.enabled ? 'Activo' : 'Inactivo'}</button>
         <button data-action="remove-alias" data-alias="${esc(a.alias)}" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
@@ -1570,9 +1657,22 @@ function renderDnsRecords() {
       type: "TXT",
       name: "@",
       value: "v=spf1 include:amazonses.com ~all",
+      level: "recomendado",
+      benefit: "Algunos receptores revisan SPF además de DKIM. Con este registro, tus correos llegan a más bandejas y menos a spam.",
       hints: [
         `Este registro <strong>SPF</strong> autoriza a Amazon SES a enviar emails en nombre de tu dominio.`,
         `Si ya tienes un registro SPF, agrega <strong>include:amazonses.com</strong> antes del <strong>~all</strong> existente en vez de crear uno nuevo.`,
+      ],
+    },
+    {
+      type: "TXT",
+      name: "_dmarc",
+      value: `v=DMARC1; p=none; rua=mailto:dmarc@${d}`,
+      level: "opcional",
+      benefit: "Gmail y Yahoo tratan mejor a los dominios con política DMARC, y te llegan reportes de quién envía en tu nombre. Tu firma DKIM ya cumple, así que se activa sin riesgo.",
+      hints: [
+        `<strong>p=none</strong> solo observa: nada se bloquea. Cuando veas que todo pasa, súbelo a <strong>p=quarantine</strong> para que los receptores rechacen a quien se haga pasar por ti.`,
+        `Los reportes llegan a <strong>dmarc@${esc(d)}</strong>. Crea ese alias en MailMask, o cambia la dirección por otra tuya.`,
       ],
     },
   ];
@@ -1580,36 +1680,51 @@ function renderDnsRecords() {
   const sharedDkimHint = `Los 3 registros CNAME son para <strong>DKIM</strong> — la firma digital que evita que tus emails caigan en spam.`;
   if (dnsItems.length > 2) dnsItems[2].hints.unshift(sharedDkimHint);
 
-  const copyBtn = (val) => `<button data-action="copy" data-copy-value="${esc(val)}" class="text-zinc-600 hover:text-white transition-colors shrink-0 p-1 rounded hover:bg-zinc-700" title="Copiar"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>`;
+  const copyBtn = (val) => `<button data-action="copy" data-copy-value="${esc(val)}" class="text-zinc-500 hover:text-white transition-colors shrink-0 p-1 rounded hover:bg-zinc-700" title="Copiar"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>`;
 
-  const hintIcon = `<svg class="w-3.5 h-3.5 text-zinc-600 shrink-0 mt-px" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+  const levelPill = (r) => r.level === "opcional"
+    ? `<span class="text-[10px] uppercase tracking-widest font-semibold px-1.5 py-px rounded-full text-zinc-400 border border-zinc-700">opcional</span>`
+    : r.level === "recomendado"
+      ? `<span class="text-[10px] uppercase tracking-widest font-semibold px-1.5 py-px rounded-full text-mask-400 border border-mask-500/30">recomendado</span>`
+      : "";
 
-  const field = (label, val) => `
-    <div class="mb-2">
-      <div class="text-xs text-zinc-500 mb-1">${label}</div>
-      <div class="flex items-center gap-2 bg-zinc-900 rounded-lg border border-zinc-800 px-3 py-2">
-        <code class="text-xs text-zinc-300 font-mono break-all flex-1 select-all">${esc(val)}</code>
+  // Una fila por registro: tipo · nombre · valor · copiar. En móvil nombre y valor se
+  // apilan; la ayuda va plegada en <details> para que la tabla no mida dos pantallas.
+  const cell = (label, val) => `
+    <div class="min-w-0">
+      <div class="sm:hidden text-[10px] uppercase tracking-widest text-zinc-500 mb-0.5">${label}</div>
+      <div class="flex items-center gap-1 min-w-0">
+        <code class="text-xs font-mono text-zinc-200 break-all select-all">${esc(val)}</code>
         ${copyBtn(val)}
       </div>
     </div>`;
 
   records.innerHTML = `
+    <div class="hidden sm:grid grid-cols-[64px_minmax(0,1fr)_minmax(0,1.6fr)] gap-4 px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500 bg-zinc-900/60 border-b border-zinc-800">
+      <span>Tipo</span><span>Nombre</span><span>Valor</span>
+    </div>
     <div class="divide-y divide-zinc-800/60">
       ${dnsItems.map(r => `
-        <div class="px-4 py-4">
-          <span class="inline-block font-mono font-bold text-xs text-zinc-100 bg-zinc-800 px-2 py-0.5 rounded mb-3">${r.type}</span>
-          ${field("Nombre", r.name)}
-          ${field("Valor", r.value)}
-          ${r.hints.length ? `
-            <div class="mt-3 space-y-1.5">
-              ${r.hints.map(h => `
-                <div class="flex items-start gap-2">
-                  ${hintIcon}
-                  <p class="text-xs text-zinc-500 leading-relaxed">${h}</p>
-                </div>
-              `).join("")}
+        <div class="px-4 py-3">
+          <div class="grid grid-cols-1 sm:grid-cols-[64px_minmax(0,1fr)_minmax(0,1.6fr)] gap-2 sm:gap-4 sm:items-start">
+            <div class="flex items-center gap-2 sm:block">
+              <span class="inline-block font-mono font-bold text-xs text-zinc-100 bg-zinc-800 px-2 py-0.5 rounded">${r.type}</span>
+              <span class="sm:hidden">${levelPill(r)}</span>
             </div>
-          ` : ""}
+            ${cell("Nombre", r.name)}
+            ${cell("Valor", r.value)}
+          </div>
+          <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 sm:pl-[80px]">
+            <span class="hidden sm:inline">${levelPill(r)}</span>
+            ${r.benefit ? `<span class="text-xs text-zinc-400">${r.benefit}</span>` : ""}
+            ${r.hints.length ? `
+              <details class="text-xs">
+                <summary class="cursor-pointer text-zinc-500 hover:text-zinc-300 select-none">Ayuda</summary>
+                <ul class="mt-1.5 space-y-1 text-zinc-500 leading-relaxed list-disc pl-4">
+                  ${r.hints.map(h => `<li>${h}</li>`).join("")}
+                </ul>
+              </details>` : ""}
+          </div>
         </div>
       `).join("")}
     </div>`;
@@ -2032,6 +2147,56 @@ function showAddDomainModal() {
 
 // --- Event listeners ---
 
+// --- Destinos como chips ---
+// Un correo por etiqueta, con su ×. El input oculto `destinations` conserva la lista
+// separada por comas, así que el envío al servidor no cambia.
+function initChips(box) {
+  if (!box || box._chips) return box?._chips;
+  const input = box.querySelector(".chips-input");
+  const hidden = box.querySelector("input[name=destinations]");
+  const emailRe = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  let items = [];
+  const sync = () => { hidden.value = items.join(","); };
+  const render = () => {
+    box.querySelectorAll(".chip").forEach(c => c.remove());
+    items.forEach((v, i) => {
+      const chip = document.createElement("span");
+      chip.className = "chip inline-flex items-center gap-1 rounded-md bg-zinc-700/70 border border-zinc-600 pl-2 pr-1 py-0.5 text-sm text-zinc-100";
+      chip.innerHTML = `<span>${esc(v)}</span><button type="button" class="text-zinc-400 hover:text-red-400 leading-none px-1" aria-label="Quitar ${esc(v)}">&times;</button>`;
+      chip.querySelector("button").addEventListener("click", () => { items.splice(i, 1); render(); input.focus(); });
+      box.insertBefore(chip, input);
+    });
+    sync();
+  };
+  const commit = () => {
+    const raw = input.value.split(/[,\s;]+/).map(v => v.trim().toLowerCase()).filter(Boolean);
+    let bad = false;
+    for (const v of raw) {
+      if (!emailRe.test(v)) { bad = true; continue; }
+      if (!items.includes(v)) items.push(v);
+    }
+    input.value = bad ? raw.filter(v => !emailRe.test(v)).join(", ") : "";
+    input.classList.toggle("text-red-400", bad);
+    render();
+    return !bad;
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === "," || e.key === "Tab" && input.value.trim()) { e.preventDefault(); commit(); }
+    else if (e.key === "Backspace" && !input.value && items.length) { items.pop(); render(); }
+  });
+  input.addEventListener("blur", commit);
+  input.addEventListener("paste", () => setTimeout(commit, 0));
+  box.addEventListener("click", (e) => { if (e.target === box) input.focus(); });
+  const api = {
+    set(list) { items = (Array.isArray(list) ? list : String(list || "").split(",")).map(v => v.trim().toLowerCase()).filter(Boolean); input.value = ""; input.classList.remove("text-red-400"); render(); },
+    get() { commit(); return items.slice(); },
+    commit,
+  };
+  box._chips = api;
+  render();
+  return api;
+}
+
 function setupEventListeners() {
   // Logout
   document.getElementById("btn-logout").addEventListener("click", async () => {
@@ -2065,7 +2230,11 @@ function setupEventListeners() {
   });
 
   // Add alias button
-  document.getElementById("btn-add-alias").addEventListener("click", () => showModal("modal-add-alias"));
+  document.getElementById("btn-add-alias").addEventListener("click", () => {
+    const form = document.getElementById("form-add-alias");
+    initChips(form.querySelector("[data-chips]")).set([]);
+    showModal("modal-add-alias");
+  });
 
   // Add rule button
   document.getElementById("btn-add-rule").addEventListener("click", () => showModal("modal-add-rule"));
@@ -2166,6 +2335,7 @@ function setupEventListeners() {
     const errEl = document.getElementById("add-alias-error");
     errEl.classList.add("hidden");
 
+    initChips(form.querySelector("[data-chips]")).commit();
     const destinations = form.destinations.value.split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
     if (destinations.length === 0) {
       errEl.textContent = "Agrega al menos un destino";
@@ -2206,6 +2376,7 @@ function setupEventListeners() {
     const errEl = document.getElementById("edit-alias-error");
     errEl.classList.add("hidden");
 
+    initChips(form.querySelector("[data-chips]")).commit();
     const destinations = form.destinations.value.split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
     if (destinations.length === 0) {
       errEl.textContent = "Agrega al menos un destino";
@@ -2326,7 +2497,7 @@ function setupEventListeners() {
       document.getElementById("edit-alias-name").textContent = `${alias}@${selectedDomain.domain}`;
       const form = document.getElementById("form-edit-alias");
       form.alias.value = alias;
-      form.destinations.value = edit.dataset.destinations;
+      initChips(form.querySelector("[data-chips]")).set(edit.dataset.destinations);
       document.getElementById("edit-alias-error").classList.add("hidden");
       showModal("modal-edit-alias");
     }

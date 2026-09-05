@@ -44,3 +44,29 @@ document.getElementById("register-form").addEventListener("submit", async (e) =>
     errEl.classList.remove("hidden");
   }
 });
+
+// Registro con Google: lleva el referido y el cupón en la URL; el servidor los guarda
+// en el state y los aplica al crear la cuenta.
+(() => {
+  const a = document.getElementById("google-login");
+  if (!a) return;
+  const q = new URLSearchParams();
+  const ref = localStorage.getItem("mailmask_ref") || new URLSearchParams(location.search).get("ref");
+  const coupon = new URLSearchParams(location.search).get("coupon");
+  if (ref) q.set("ref", ref);
+  if (coupon) q.set("coupon", coupon);
+  const qs = q.toString();
+  if (qs) a.href = "/api/auth/google?" + qs;
+})();
+
+// Google es el camino principal; el formulario de contraseña se muestra a petición.
+(() => {
+  const btn = document.getElementById("show-password-form");
+  const form = document.getElementById("register-form");
+  if (!btn || !form) return;
+  btn.addEventListener("click", () => {
+    form.classList.remove("hidden");
+    btn.classList.add("hidden");
+    form.email.focus();
+  });
+})();
