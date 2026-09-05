@@ -334,7 +334,7 @@ console.<span class="fn">log</span>(status.sent, status.failed, status.skippedSu
 <span class="kw">await</span> mm.suppressions.<span class="fn">remove</span>(<span class="str">"domain-id"</span>, <span class="str">"persona@example.com"</span>);</code></pre>
       <!-- Webhooks -->
       <h2 id="webhooks" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Webhooks</h2>
-      <p class="text-fg-muted mb-4">Recibe un <code class="text-fg">POST</code> en tu servidor cada vez que pasa algo en el dominio. Disponible en plan <strong class="text-fg">Developer</strong>. La URL debe ser <code class="text-fg">https</code> y p&uacute;blica; m&aacute;ximo 10 webhooks por dominio.</p>
+      <p class="text-fg-muted mb-4">Recibe un <code class="text-fg">POST</code> en tu servidor cada vez que pasa algo en el dominio. Disponible en plan <strong class="text-fg">Equipo</strong>. La URL debe ser <code class="text-fg">https</code> y p&uacute;blica; m&aacute;ximo 10 webhooks por dominio.</p>
       <ul class="text-fg-muted mb-4 list-disc pl-6 space-y-1 text-sm"><li><code class="text-fg">email.received</code>: lleg&oacute; correo a un alias. <code class="text-fg-subtle">data: { from, to, subject, alias, forwardedTo[], messageId }</code></li><li><code class="text-fg">email.sent</code>: saliste por <code class="text-fg">send</code> o <code class="text-fg">bulkSend</code>. <code class="text-fg-subtle">data: { to, cc?, subject, from, messageId, bulkJobId? }</code></li><li><code class="text-fg">email.delivered</code>: el servidor del destinatario acept&oacute; el correo. <code class="text-fg-subtle">data: { recipient, messageId, subject, smtpResponse, processingTimeMillis }</code></li><li><code class="text-fg">email.bounced</code>: rebote permanente; el destinatario entr&oacute; a la lista de supresi&oacute;n. <code class="text-fg-subtle">data: { recipient, reason, messageId, subject }</code></li><li><code class="text-fg">email.complained</code>: el destinatario marc&oacute; spam. Mismo <code class="text-fg">data</code> que el rebote.</li></ul>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Crear. El secret se muestra una sola vez: gu&aacute;rdalo.</span>
 <span class="kw">const</span> wh = <span class="kw">await</span> mm.webhooks.<span class="fn">create</span>(<span class="str">"domain-id"</span>, {
@@ -372,7 +372,7 @@ app.<span class="fn">post</span>(<span class="str">"/webhooks/mailmask"</span>, 
 
       <!-- SMTP -->
       <h2 id="smtp" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Credenciales SMTP</h2>
-      <p class="text-fg-muted mb-4">Crea credenciales SMTP para enviar emails desde tu c&oacute;digo o aplicaciones SaaS. Disponible solo en plan <strong class="text-fg">Developer</strong>.</p>
+      <p class="text-fg-muted mb-4">Crea credenciales SMTP para enviar emails desde tu c&oacute;digo o aplicaciones SaaS. Disponible en plan <strong class="text-fg">Equipo</strong>.</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Listar credenciales</span>
 <span class="kw">const</span> creds = <span class="kw">await</span> mm.smtp.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
 

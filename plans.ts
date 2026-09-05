@@ -17,13 +17,26 @@
 // `sends` es solo correo saliente que el usuario origina (panel, API, SMTP relay).
 // El reenvío entrante — el caso de uso principal — va por `forwardPerHour` y es un orden
 // de magnitud mayor, así que el límite de envíos no lo toca quien solo reenvía.
+// Dos planes a la venta desde sep-2026 (ver "Precios" en CLAUDE.md): Básico y Equipo.
+// El reenvío puro lo regala la competencia (ImprovMX, ForwardEmail); lo que se cobra es
+// la Bandeja compartida por dominio en vez de por persona (Workspace $140/usuario,
+// Help Scout $25 USD/asiento). `aliases: 1000` en Equipo se muestra como "ilimitadas".
+//
+// Freelancer, Developer, Pro y Agencia son legado: sin suscriptores al momento del cambio,
+// pero cupones, correos y tests los nombran. LEGACY_PLANS los saca de páginas y checkout.
 export const PLANS = {
-  basico:     { label: "Básico",     price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 5,   rules: 0,   logDays: 15, sends: 0,     api: true,  webhooks: false, forwardPerHour: 100,  smtpRelay: false },
+  basico:     { label: "Básico",     price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 10,   rules: 0,   logDays: 15, sends: 0,     api: true,  webhooks: false, forwardPerHour: 100,  smtpRelay: false },
+  equipo:     { label: "Equipo",     price: 249_00, yearlyPrice: 2490_00, domains: 5,  aliases: 1000, rules: 25,  logDays: 90, sends: 200,   api: true,  webhooks: true,  forwardPerHour: 1000, smtpRelay: true },
   freelancer: { label: "Freelancer", price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 200,   api: true,  webhooks: false, forwardPerHour: 500,  smtpRelay: false },
   developer:  { label: "Developer",  price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 1000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
   pro:     { label: "Pro",     price: 299_00, yearlyPrice: 2990_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500,  smtpRelay: true },
   agencia: { label: "Agencia", price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
 } as const;
+
+export const LEGACY_PLANS: ReadonlySet<string> = new Set(["freelancer", "developer", "pro", "agencia"]);
+export function isLegacyPlan(plan?: string | null): boolean { return LEGACY_PLANS.has(plan ?? ""); }
+/** Planes que se pueden comprar hoy. */
+export const PLANS_FOR_SALE = ["basico", "equipo"] as const;
 
 // --- Add-ons ---
 
@@ -33,7 +46,7 @@ export const PLANS = {
 export const ADDONS = {
   sends25:  { price: 49_00, sends: 25,  label: "Envíos 25/día" },
   sends100: { price: 99_00, sends: 100, label: "Envíos 100/día" },
-  domain:   { price: 99_00, domains: 1, label: "Dominio extra" },
+  domain:   { price: 59_00, domains: 1, label: "Dominio extra" },
 } as const;
 
 export type AddonKind = keyof typeof ADDONS;

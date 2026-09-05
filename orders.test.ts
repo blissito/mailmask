@@ -121,12 +121,12 @@ describe("Cortesías", () => {
     assert.equal(addon.source, "courtesy");
     assert.equal(addon.isCourtesy, true);
     assert.equal(addon.status, "active");
-    // El precio de la fila es 0 porque de ahí sale el "+$99/mes" del dashboard...
+    // El precio de la fila es 0 porque de ahí sale el "+$59/mes" del dashboard...
     assert.equal(addon.priceCents, 0);
     // ...pero el valor del regalo no se pierde: vive en el asiento.
     assert.equal(order?.kind, "courtesy");
     assert.equal(order?.amountCents, 0);
-    assert.equal(order?.listPriceCents, 9900);
+    assert.equal(order?.listPriceCents, 5900); // ADDONS.domain.price
     assert.equal(order?.grantedBy, "test");
   });
 

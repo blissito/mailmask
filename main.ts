@@ -145,6 +145,8 @@ import {
   setLogDelivery,
   setMessageDelivery,
   addLog,
+  isLegacyPlan,
+  PLANS_FOR_SALE,
 } from "./db.js";
 import { emitEvent, listWebhooks, getWebhook, createWebhook, updateWebhook, deleteWebhook, enqueuePing, listDeliveries, WEBHOOK_EVENTS, MAX_WEBHOOKS_PER_DOMAIN } from "./webhooks.js";
 import type { AddonKind } from "./db.js";
@@ -203,7 +205,7 @@ import {
 import "./cron.js";
 
 // --- Coupons (dynamic, from DB) ---
-type PlanKeyTop = "basico" | "freelancer" | "developer" | "pro" | "agencia";
+type PlanKeyTop = keyof typeof PLANS;
 
 // --- Fail-fast env validation (deferred for Deno Deploy compatibility) ---
 let envChecked = false;
@@ -2366,7 +2368,7 @@ const app = new Elysia({ adapter: node() })
     }
 
     const planKey = plan as keyof typeof PLANS;
-    if (!PLANS[planKey]) {
+    if (!PLANS[planKey] || isLegacyPlan(planKey)) {
       return new Response(JSON.stringify({ error: "Plan inválido" }), {
         status: 400,
       });
@@ -2480,7 +2482,7 @@ const app = new Elysia({ adapter: node() })
     }
 
     const planKey = plan as keyof typeof PLANS;
-    if (!PLANS[planKey]) {
+    if (!PLANS[planKey] || isLegacyPlan(planKey)) {
       return new Response(JSON.stringify({ error: "Plan inválido" }), {
         status: 400,
       });
@@ -2857,7 +2859,7 @@ const app = new Elysia({ adapter: node() })
               log("info", "webhook", "Subscription renewed", { email, bufferDays });
             } else {
               // First activation — determine plan
-              type PlanKey = "basico" | "freelancer" | "developer" | "pro" | "agencia";
+              type PlanKey = keyof typeof PLANS;
               let plan: PlanKey | undefined;
 
               if (isGuestCheckout) {
@@ -2876,7 +2878,7 @@ const app = new Elysia({ adapter: node() })
                 const reasonMatch = sub.reason?.match(/Plan (\w+)/i);
                 if (reasonMatch) {
                   const parsed = reasonMatch[1].toLowerCase() as PlanKey;
-                  if (["basico", "freelancer", "developer", "pro", "agencia"].includes(parsed)) {
+                  if (parsed in PLANS) {
                     plan = parsed;
                   }
                 }
@@ -2885,10 +2887,14 @@ const app = new Elysia({ adapter: node() })
               // Fallback to amount-based lookup for backwards compat
               if (!plan) {
                 const amount = sub.auto_recurring?.transaction_amount ?? 0;
+                // Legado: montos viejos por compatibilidad. Los nuevos se derivan de PLANS.
                 const amountToPlan: Record<number, PlanKey> = {
-                  49: "basico", 449: "freelancer", 999: "developer", 299: "pro",
-                  490: "basico", 4490: "freelancer", 9990: "developer",
+                  449: "freelancer", 999: "developer", 4490: "freelancer", 9990: "developer",
                 };
+                for (const key of PLANS_FOR_SALE) {
+                  amountToPlan[PLANS[key].price / 100] = key;
+                  amountToPlan[PLANS[key].yearlyPrice / 100] = key;
+                }
                 plan = amountToPlan[amount];
               }
 
@@ -3461,7 +3467,10 @@ const app = new Elysia({ adapter: node() })
     }
 
     if (addonKind.startsWith("sends")) {
-      if (user.subscription?.plan !== "basico") {
+      // Se mira el plan base, no `limits.sends`: ese ya suma los add-ons y un Básico
+      // con envíos activos parecería "incluirlos" y recibiría 400 en vez del 409.
+      const basePlanKey = user.subscription?.plan as keyof typeof PLANS | undefined;
+      if (basePlanKey && PLANS[basePlanKey] && PLANS[basePlanKey].sends > 0) {
         return new Response(JSON.stringify({ error: "Tu plan ya incluye envío de emails" }), { status: 400 });
       }
       const existing = listEffectiveAddons(auth.email).find((a) => a.kind.startsWith("sends"));
@@ -3831,7 +3840,7 @@ const app = new Elysia({ adapter: node() })
     if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     const owner = await getUser(access.domain.ownerEmail);
     if (!owner || !getUserPlanLimits(owner).webhooks) {
-      return new Response(JSON.stringify({ error: "Los webhooks requieren plan Developer" }), { status: 403 });
+      return new Response(JSON.stringify({ error: "Los webhooks requieren plan Equipo" }), { status: 403 });
     }
     const bad = validateWebhookInput(whBody.url, whBody.events);
     if (bad) return new Response(JSON.stringify({ error: bad }), { status: 400 });
@@ -4636,7 +4645,7 @@ const app = new Elysia({ adapter: node() })
     const plan = user.subscription?.plan ?? "basico";
     const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
     if (!mesaLimits.mesaActions) {
-      return new Response(JSON.stringify({ error: "Tu plan no permite responder desde Mesa. Actualiza a Freelancer o superior." }), { status: 403 });
+      return new Response(JSON.stringify({ error: "Tu plan no permite responder desde la Bandeja. Actualiza a Equipo." }), { status: 403 });
     }
 
     const isOwner = domain.ownerEmail === auth.email;
@@ -5099,7 +5108,7 @@ const app = new Elysia({ adapter: node() })
     if (!owner) return new Response(JSON.stringify({ error: "Cuenta no encontrada" }), { status: 404 });
     const limits = getUserPlanLimits(owner);
     if (!limits.smtpRelay) {
-      return new Response(JSON.stringify({ error: "SMTP relay no disponible en tu plan. Actualiza a Developer." }), { status: 403 });
+      return new Response(JSON.stringify({ error: "SMTP relay no disponible en tu plan. Actualiza a Equipo." }), { status: 403 });
     }
 
     const label = (smtpBody.label ?? "").trim();
@@ -5432,7 +5441,7 @@ const app = new Elysia({ adapter: node() })
     if (!target)
       return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
 
-    const validPlans = ["basico", "freelancer", "developer", "pro", "agencia"];
+    const validPlans = Object.keys(PLANS);
     const validStatuses = ["active", "past_due", "cancelled", "none"];
 
     // Update subscription fields
@@ -5505,7 +5514,7 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Campos requeridos: code, plan, fixedPrice, description" }), { status: 400, headers: { "content-type": "application/json" } });
     }
 
-    const validPlans = ["basico", "freelancer", "developer", "pro", "agencia"];
+    const validPlans = Object.keys(PLANS);
     if (!validPlans.includes(body.plan)) {
       return new Response(JSON.stringify({ error: "Plan inválido" }), { status: 400, headers: { "content-type": "application/json" } });
     }

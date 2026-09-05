@@ -788,8 +788,8 @@ async function loadCoupon() {
 // El único lugar que no puede tomar la etiqueta del servidor: el cupón se lee antes de
 // iniciar sesión, así que no hay /api/auth/me del cual sacarla.
 const PLAN_LABELS = {
-  basico: "Básico", freelancer: "Freelancer", developer: "Developer",
-  pro: "Pro", agencia: "Agencia",
+  basico: "Básico", equipo: "Equipo",
+  freelancer: "Freelancer", developer: "Developer", pro: "Pro", agencia: "Agencia",
 };
 
 function getCheckoutLabel() {
@@ -1877,7 +1877,7 @@ async function loadSmtpCredentials() {
   const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
   const isExpired = periodEnd && periodEnd < new Date();
   const plan = sub && (sub.status === "active" || sub.status === "cancelled") && !isExpired ? sub.plan : null;
-  const smtpAllowed = plan && ["developer", "pro", "agencia"].includes(plan);
+  const smtpAllowed = plan && ["equipo", "developer", "pro", "agencia"].includes(plan);
 
   if (!smtpAllowed) {
     list.innerHTML = "";
@@ -2162,7 +2162,7 @@ async function loadWebhooks() {
   const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
   const isExpired = periodEnd && periodEnd < new Date();
   const plan = sub && (sub.status === "active" || sub.status === "cancelled") && !isExpired ? sub.plan : null;
-  if (!plan || !["developer", "agencia"].includes(plan)) {
+  if (!plan || !["equipo", "developer", "agencia"].includes(plan)) {
     list.innerHTML = "";
     empty.classList.add("hidden");
     upgrade.classList.remove("hidden");

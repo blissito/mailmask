@@ -53,7 +53,7 @@ await mm.send.send(domainId, {
 await mm.suppressions.list(domainId);
 await mm.suppressions.remove(domainId, "fixed@example.com");
 
-// Webhooks (Developer plan) — secret is shown once
+// Webhooks (Equipo plan) — secret is shown once
 const wh = await mm.webhooks.create(domainId, { url: "https://app.example.com/hooks/mailmask", events: ["email.received", "email.delivered", "email.bounced"] });
 
 // On your server: verify the signature with the raw body

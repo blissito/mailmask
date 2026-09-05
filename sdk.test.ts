@@ -101,8 +101,8 @@ describe("SDK ↔ servidor: contrato", () => {
     const otro = `sdk-noenvios-${suffix}@example.com`;
     sinEnvios = await alta(otro, false);
 
-    // Básico no tiene reglas ni SMTP: para probar esos recursos hace falta Developer.
-    dev = await alta(devEmail, false, "developer");
+    // Básico no tiene reglas ni SMTP: para probar esos recursos hace falta Equipo.
+    dev = await alta(devEmail, false, "equipo");
     const devDom = dbmod.createDomain(devEmail, `sdk-dev-${suffix}.com`, ["dk"], "vf");
     devDomainId = devDom.id;
     sqlite.prepare("UPDATE domains SET verified = 1 WHERE id = ?").run(devDomainId);
@@ -291,7 +291,7 @@ describe("SDK ↔ servidor: contrato", () => {
     // Básico no tiene SMTP relay: 403, no un error opaco
     await assert.rejects(
       () => mm.smtp.create(domainId, "x"),
-      (err: MailMaskError) => err.status === 403 && /Developer/.test(err.message)
+      (err: MailMaskError) => err.status === 403 && /Equipo/.test(err.message)
     );
   });
 
@@ -378,7 +378,7 @@ describe("SDK ↔ servidor: contrato", () => {
     await assert.rejects(() => mm.suppressions.remove(domainId, victima), (err: MailMaskError) => err.status === 404);
   });
 
-  it("webhooks: Developer crea, Básico recibe 403, URL privada 400", async () => {
+  it("webhooks: Equipo crea, Básico recibe 403, URL privada 400", async () => {
     await assert.rejects(
       () => mm.webhooks.create(domainId, { url: "https://example.com/hook", events: ["email.sent"] }),
       (err: MailMaskError) => err.status === 403
@@ -431,7 +431,7 @@ describe("SDK ↔ servidor: contrato", () => {
     const wh = await dev.webhooks.create(devDomainId, { url: "https://receptor.example.com/mailmask", events: ["email.sent"] });
     const webhooks = await import("./webhooks.ts");
 
-    // email.sent lo emite la ruta /send. Developer no tiene add-on pero su plan trae sends.
+    // email.sent lo emite la ruta /send. Equipo no tiene add-on pero su plan trae sends.
     await dev.send.send(devDomainId, { to: "a@example.com", subject: "evento", body: "x" });
     // ping explícito
     const t = await dev.webhooks.test(devDomainId, wh.id);

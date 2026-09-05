@@ -747,7 +747,7 @@ export const TEMPLATE_FIXTURES: Record<string, () => Email> = {
     accessUntil: "2026-09-02T00:00:00.000Z", reason: "Fondos insuficientes",
   }),
   guestWelcome: () => guestWelcome({
-    plan: "freelancer", setPasswordUrl: "https://www.mailmask.studio/set-password?token=abc",
+    plan: "equipo", setPasswordUrl: "https://www.mailmask.studio/set-password?token=abc",
     order: {
       number: "MM-2608-9911", amountCents: 44900, currency: "MXN",
       periodEnd: "2026-09-12T00:00:00.000Z", occurredAt: "2026-08-13T00:00:00.000Z",

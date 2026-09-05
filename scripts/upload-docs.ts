@@ -67,46 +67,49 @@ function extractSections(html: string): { title: string; content: string }[] {
 const EXTRA_DOCS = [
   {
     title: "Planes y Precios de MailMask",
-    content: `MailMask ofrece 3 planes. Todos los precios están en pesos mexicanos (MXN),
-no en dólares. Ningún plan es gratuito y ningún límite es ilimitado.
+    content: `MailMask ofrece 2 planes desde septiembre de 2026. Todos los precios están en pesos
+mexicanos (MXN), no en dólares. Ningún plan es gratuito.
 
-- Básico — $49 MXN/mes o $490 MXN/año: 1 dominio, 5 máscaras (alias), sin reglas,
-  historial de 15 días, reenvío de entrada 100/hora. **No incluye envío de correo nuevo**:
-  requiere el add-on de envíos (ver abajo). Sí puede responder conversaciones desde la
-  Bandeja, que viene incluida.
-- Freelancer — $449 MXN/mes o $4,490 MXN/año: 15 dominios, 50 máscaras por dominio,
-  10 reglas por dominio, historial de 30 días, 200 envíos/día por dominio,
-  reenvío de entrada 500/hora por dominio, 3 miembros de equipo por dominio.
-- Developer — $999 MXN/mes o $9,990 MXN/año: 20 dominios, 100 máscaras por dominio,
-  50 reglas por dominio, historial de 90 días, 1,000 envíos/día por dominio,
-  reenvío de entrada 2,000/hora por dominio, 10 miembros por dominio, SMTP relay,
-  webhooks y soporte prioritario.
+- Básico — $49 MXN/mes o $490 MXN/año: 1 dominio, 10 máscaras (alias), sin reglas,
+  historial de 15 días, reenvío de entrada 100/hora, API y SDK. **No incluye envío de
+  correo nuevo**: requiere el add-on de envíos (ver abajo). Sí puede responder
+  conversaciones desde la Bandeja, que viene incluida para una persona.
+- Equipo — $249 MXN/mes o $2,490 MXN/año: 5 dominios, máscaras ilimitadas, reglas,
+  historial de 90 días, 200 envíos/día por dominio, reenvío de entrada 1,000/hora por
+  dominio, Bandeja compartida con 5 miembros de equipo por dominio (asignación y notas),
+  API, SDK, webhooks y SMTP relay.
+
+Los planes Freelancer ($449), Developer ($999), Pro y Agencia ya no se venden; quien los
+tuviera conserva sus condiciones.
 
 Add-ons: se compran encima de cualquier plan activo y se cobran aparte, mes a mes.
 - Envíos 25/día — +$49 MXN/mes: desbloquea el envío desde tu dominio, tope 25 al día por dominio.
 - Envíos 100/día — +$99 MXN/mes: igual, tope 100 al día por dominio.
-- Dominio extra — +$99 MXN/mes cada uno: un dominio más de cupo, acumulable. No incluye envío.
+- Dominio extra — +$59 MXN/mes cada uno: un dominio más de cupo, acumulable, en Básico o
+  en Equipo. No incluye envío.
 
-Los dos add-ons de envíos son mutuamente excluyentes. Se compran una vez y aplican a todos
-los dominios de la cuenta; el tope sigue contando por dominio y por día. A partir del quinto
-dominio conviene pasar a Freelancer: cuesta casi lo mismo y trae 15 dominios, envíos y equipo.
+Los dos add-ons de envíos son mutuamente excluyentes y sólo aplican a Básico (Equipo ya
+incluye envío). Se compran una vez y aplican a todos los dominios de la cuenta; el tope
+sigue contando por dominio y por día. Desde el tercer dominio conviene pasar a Equipo:
+Básico con dos dominios extra y envíos cuesta $266 y Equipo $249 con más incluido.
+Si alguien necesita más de 200 envíos al día o más de 20 dominios, debe escribir a
+hola@mailmask.studio.
 
 Importante sobre los límites: se cuentan **por dominio**, no por cuenta. Un plan
-Freelancer con 15 dominios dispone de 15 x 200 = 3,000 envíos al día en total.
+Equipo con 5 dominios dispone de 5 x 200 = 1,000 envíos al día en total.
 
 Hay dos límites distintos y conviene no confundirlos:
 - Envíos ("sends"): correo saliente que el usuario origina desde el panel, la API o el
   SMTP relay. Es el límite diario por dominio.
 - Reenvío de entrada ("forwarding"): el correo que llega a una máscara y se reenvía al
   buzón destino. Es el caso de uso principal, se mide por hora y es un orden de magnitud
-  mayor (100/500/2,000 por hora, o sea unos 2,400/12,000/48,000 al día). Quien solo usa
+  mayor (100/1,000 por hora, o sea unos 2,400/24,000 al día). Quien solo usa
   MailMask para reenviar nunca toca el límite de envíos.
 
-Todos los planes incluyen API, bandeja compartida y DKIM + SPF automáticos.
+Todos los planes incluyen API, Bandeja y DKIM + SPF automáticos. La Bandeja compartida
+(varias personas por dominio) es de Equipo.
 
-Los planes legacy (Pro y Agencia) ya no están disponibles para nuevos usuarios.
-
-SMTP relay y webhooks solo están disponibles en plan Developer.
+SMTP relay y webhooks están disponibles en plan Equipo.
 Las API keys y el SDK están habilitados en todos los planes, incluido Básico.
 El paquete npm del SDK es @easybits.cloud/mailmask.
 El dominio del servicio es mailmask.studio.`,
@@ -130,7 +133,7 @@ MailMask usa AWS SES para envío y recepción de email.`,
     title: "Configuración SMTP Relay",
     content: `SMTP relay permite enviar emails desde código o aplicaciones SaaS usando credenciales SMTP estándar.
 
-Solo disponible en plan Developer.
+Disponible en plan Equipo.
 
 Crear credencial:
 const cred = await mm.smtp.create("domain-id", "Mi app");
@@ -175,11 +178,11 @@ Herramientas planificadas:
 - Listar dominios y su estado de verificación
 - Consultar bandeja de entrada
 
-Estado: próximamente. El paquete aún no está publicado en npm. Se requiere plan Developer para usar el servidor MCP (necesita API key).`,
+Estado: próximamente. El paquete aún no está publicado en npm. Se requiere una API key, disponible en todos los planes.`,
   },
   {
     title: "Bandeja de Entrada (Inbox)",
-    content: `La Bandeja de Entrada es una interfaz de inbox colaborativa para gestionar emails recibidos en tus dominios. Incluida en todos los planes, también en Básico: responder conversaciones desde la Bandeja no requiere el add-on de envíos. Lo que varía por plan es cuántos miembros de equipo puedes invitar (Básico 0, Freelancer 3, Developer 10).
+    content: `La Bandeja de Entrada es una interfaz de inbox colaborativa para gestionar emails recibidos en tus dominios. Incluida en todos los planes, también en Básico: responder conversaciones desde la Bandeja no requiere el add-on de envíos. Lo que varía por plan es cuántos miembros de equipo puedes invitar (Básico 0, Equipo 5 por dominio).
 
 Endpoints de la API:
 
@@ -226,7 +229,7 @@ Permisos: el owner del dominio tiene acceso completo. Los agentes invitados tien
   },
   {
     title: "Envío Masivo (Bulk Send)",
-    content: `El envío masivo permite enviar un email a múltiples destinatarios en una sola operación. Requiere dominio verificado y plan Freelancer o superior.
+    content: `El envío masivo permite enviar un email a múltiples destinatarios en una sola operación. Requiere dominio verificado y envío habilitado (plan Equipo o add-on de envíos en Básico).
 
 Endpoint para crear envío masivo:
 POST /api/domains/:id/send-bulk
@@ -284,7 +287,7 @@ Eliminar un agente:
 DELETE /api/domains/:id/agents/:agentId
 Solo el owner o admin puede eliminar agentes.
 
-Los planes tienen límites en el número de agentes por dominio. El plan Developer permite más agentes que Freelancer.
+Los planes tienen límites en el número de agentes por dominio: Básico no admite agentes adicionales; Equipo admite 5 por dominio.
 
 Todos los endpoints de dominio verifican permisos usando el sistema RBAC interno (checkDomainAccess). Si un usuario no tiene el rol necesario, recibe un error 403.`,
   },

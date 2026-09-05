@@ -32,7 +32,7 @@ export { db };
 // --- Types ---
 
 export interface Subscription {
-  plan: "basico" | "freelancer" | "developer" | "pro" | "agencia";
+  plan: keyof typeof PLANS;
   status: "active" | "past_due" | "cancelled" | "none";
   mpSubscriptionId?: string;
   currentPeriodEnd?: string; // ISO date
@@ -108,6 +108,9 @@ export interface EmailLog {
 // re-exportan para no romper a quien ya las importaba desde `db.ts`.
 import {
   PLANS,
+  LEGACY_PLANS,
+  isLegacyPlan,
+  PLANS_FOR_SALE,
   ADDONS,
   planLabel,
   planPriceCents,
@@ -116,7 +119,7 @@ import {
 } from "./plans.js";
 import type { AddonKind, PlanKey } from "./plans.js";
 
-export { PLANS, ADDONS, planLabel, planPriceCents, addonLabel, addonPriceCents };
+export { PLANS, ADDONS, planLabel, planPriceCents, addonLabel, addonPriceCents, LEGACY_PLANS, isLegacyPlan, PLANS_FOR_SALE };
 export type { AddonKind, PlanKey };
 
 export interface Addon {
@@ -1559,6 +1562,7 @@ export function deleteAgentInvite(token: string): void {
 
 export const PLAN_MESA_LIMITS = {
   basico:     { mesaActions: true,  agents: 0 },
+  equipo:     { mesaActions: true,  agents: 5 },
   freelancer: { mesaActions: true,  agents: 3 },
   developer:  { mesaActions: true,  agents: 10 },
   pro:        { mesaActions: true,  agents: 3 },

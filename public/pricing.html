@@ -68,17 +68,8 @@
           },
           {
             "@type": "Offer",
-            "name": "Freelancer",
-            "price": "449",
-            "priceCurrency": "MXN",
-            "priceValidUntil": "2026-12-31",
-            "availability": "https://schema.org/InStock",
-            "url": "https://www.mailmask.studio/pricing"
-          },
-          {
-            "@type": "Offer",
-            "name": "Developer",
-            "price": "999",
+            "name": "Equipo",
+            "price": "249",
             "priceCurrency": "MXN",
             "priceValidUntil": "2026-12-31",
             "availability": "https://schema.org/InStock",
@@ -105,7 +96,7 @@
           {
             "@type": "Offer",
             "name": "Add-on: Dominio extra",
-            "price": "99",
+            "price": "59",
             "priceCurrency": "MXN",
             "priceValidUntil": "2026-12-31",
             "availability": "https://schema.org/InStock",
@@ -164,24 +155,24 @@
           <div class="text-center text-fg">MailMask</div>
         </div>
         <div class="grid grid-cols-3 px-4 py-3 border-t border-line">
-          <div class="text-fg-muted">1 dominio</div>
-          <div class="text-center">$120 MXN/mes</div>
+          <div class="text-fg-muted">1 dominio, 1 persona</div>
+          <div class="text-center">$140 MXN/mes</div>
           <div class="text-center text-accent-text font-semibold">$49 MXN/mes</div>
         </div>
         <div class="grid grid-cols-3 px-4 py-3 border-t border-line">
-          <div class="text-fg-muted">5 dominios</div>
-          <div class="text-center">$600 MXN/mes</div>
-          <div class="text-center text-accent-text font-semibold">$449 MXN/mes</div>
+          <div class="text-fg-muted">1 dominio, 5 personas</div>
+          <div class="text-center">$700 MXN/mes</div>
+          <div class="text-center text-accent-text font-semibold">$249 MXN/mes</div>
         </div>
         <div class="grid grid-cols-3 px-4 py-3 border-t border-line">
-          <div class="text-fg-muted">15+ dominios</div>
-          <div class="text-center">$1,800+ MXN/mes</div>
-          <div class="text-center text-accent-text font-semibold">$999 MXN/mes</div>
+          <div class="text-fg-muted">5 dominios, 5 personas c/u</div>
+          <div class="text-center">$3,500 MXN/mes</div>
+          <div class="text-center text-accent-text font-semibold">$249 MXN/mes</div>
         </div>
         <div class="grid grid-cols-3 px-4 py-3 border-t border-line">
           <div class="text-fg-muted">Máscaras (alias)</div>
           <div class="text-center text-fg-subtle">1 por usuario</div>
-          <div class="text-center text-fg font-semibold">5 — 100 por dominio</div>
+          <div class="text-center text-fg font-semibold">10 o ilimitadas</div>
         </div>
         <div class="grid grid-cols-3 px-4 py-3 border-t border-line">
           <div class="text-fg-muted">Configuración</div>
@@ -191,12 +182,12 @@
         <div class="grid grid-cols-3 px-4 py-3 border-t border-line">
           <div class="text-fg-muted">Reglas de routing</div>
           <div class="text-center text-fg-subtle">Limitadas</div>
-          <div class="text-center text-fg font-semibold">5 — 100 por dominio</div>
+          <div class="text-center text-fg font-semibold">Incluidas en Equipo</div>
         </div>
         <div class="grid grid-cols-3 px-4 py-3 border-t border-line">
           <div class="text-fg-muted">Envío desde tu dominio</div>
           <div class="text-center text-fg-subtle">Solo con licencia</div>
-          <div class="text-center text-fg font-semibold">Desde Freelancer o add-on</div>
+          <div class="text-center text-fg font-semibold">Incluido en Equipo o add-on</div>
         </div>
         <div class="grid grid-cols-3 px-4 py-3 border-t border-line">
           <div class="text-fg-muted">DKIM + SPF</div>
@@ -204,9 +195,9 @@
           <div class="text-center text-fg font-semibold">Automático</div>
         </div>
         <div class="grid grid-cols-3 px-4 py-3 border-t border-line">
-          <div class="text-fg-muted">Bandeja / helpdesk</div>
-          <div class="text-center text-fg-subtle">Complemento extra</div>
-          <div class="text-center text-fg font-semibold">Integrado</div>
+          <div class="text-fg-muted">Bandeja compartida</div>
+          <div class="text-center text-fg-subtle">Help Scout: $450 MXN/persona</div>
+          <div class="text-center text-fg font-semibold">Incluida, por dominio</div>
         </div>
       </div>
     </section>
@@ -223,28 +214,28 @@
         <span id="promo-badge" class="text-xs bg-accent/10 text-accent-text font-bold px-2 py-1 rounded-full">Primer mes gratis</span>
       </div>
 
-      <div class="grid md:grid-cols-3 gap-6">
+      <div class="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
         <!-- Básico -->
         <div
           class="pricing-card card p-8 flex flex-col"
           data-plan="basico" data-monthly="49" data-yearly="490" data-savings="98"
         >
           <h3 class="font-semibold text-lg">Básico</h3>
-          <p class="text-sm text-fg-subtle mt-1">Reenvío + envío — 1 dominio</p>
+          <p class="text-sm text-fg-muted mt-1">Tu dominio, tú solo. Recibe en el buzón que ya usas.</p>
           <div class="mt-4">
             <span class="plan-price text-4xl font-semibold tracking-tight">$49</span>
             <span class="plan-period text-fg-muted">/mes</span>
           </div>
           <p class="plan-savings text-xs text-accent-text mt-1 hidden"></p>
+          <p class="plan-per-domain text-xs text-fg-muted mt-1">1 dominio</p>
           <ul class="mt-6 space-y-3 text-sm text-fg">
-            <li>✓ 5 máscaras (alias)</li>
-            <li class="text-fg-subtle">✗ Envío desde tu dominio — <a href="#addons" class="text-accent-text hover:underline">add-on desde $49</a></li>
-            <li>✓ Reenvío de entrada — 100/hora (~2,400/día)</li>
-            <li class="text-fg-subtle">✗ Sin reglas</li>
-            <li>✓ Historial 15 días</li>
-            <li>✓ Entrega fuera de spam (DKIM + SPF)</li>
-            <li>✓ Bandeja — helpdesk integrado</li>
-            <li class="text-fg-subtle">✗ Sin miembros de equipo</li>
+            <li>✓ 10 máscaras: hola@, ventas@, facturas@… al buzón que elijas</li>
+            <li>✓ Bandeja web para leer y responder desde tu dominio</li>
+            <li>✓ Entrega fuera de spam (DKIM + SPF automáticos)</li>
+            <li>✓ Historial de 15 días</li>
+            <li>✓ API REST + SDK</li>
+            <li class="text-fg-muted">+ Iniciar correos nuevos: <a href="#addons" class="text-accent-text hover:underline">add-on desde $49</a></li>
+            <li class="text-fg-muted">+ Dominio extra: $59/mes c/u</li>
           </ul>
           <button
             class="checkout-btn mt-auto block w-full text-center btn-secondary w-full disabled:opacity-50"
@@ -253,73 +244,31 @@
           </button>
         </div>
 
-        <!-- Freelancer (FEATURED) -->
+        <!-- Equipo (FEATURED) -->
         <div
           class="pricing-card card !border-accent p-8 relative flex flex-col"
-          data-plan="freelancer" data-monthly="449" data-yearly="4,490" data-savings="898"
+          data-plan="equipo" data-monthly="249" data-yearly="2,490" data-savings="498"
         >
           <span
             class="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-white text-xs font-bold px-3 py-1 rounded-full"
-            >POPULAR</span
+            >PARA EQUIPOS</span
           >
-          <h3 class="font-semibold text-lg">Freelancer</h3>
-          <p class="text-sm text-fg-muted mt-1">Ideal para agencias y diseñadores web</p>
+          <h3 class="font-semibold text-lg">Equipo</h3>
+          <p class="text-sm text-fg-muted mt-1">Agencias y negocios con varios dominios y gente que atiende.</p>
           <div class="mt-4">
-            <span class="plan-price text-4xl font-semibold tracking-tight">$449</span>
+            <span class="plan-price text-4xl font-semibold tracking-tight">$249</span>
             <span class="plan-period text-fg-muted">/mes</span>
           </div>
           <p class="plan-savings text-xs text-accent-text mt-1 hidden"></p>
-          <p class="plan-per-domain text-xs text-accent-text mt-1">15 dominios — $30/dominio</p>
+          <p class="plan-per-domain text-xs text-accent-text mt-1">5 dominios incluidos — extra $59 c/u</p>
           <ul class="mt-6 space-y-3 text-sm text-fg">
-            <li>✓ 50 máscaras por dominio</li>
-            <li>✓ Enviar como tu@dominio (200/día por dominio)</li>
-            <li>✓ Reenvío de entrada — 500/hora por dominio (~12,000/día)</li>
-            <li>✓ 10 reglas por dominio</li>
-            <li>✓ Historial 30 días</li>
-            <li>✓ Entrega fuera de spam (DKIM + SPF)</li>
-            <li>✓ Bandeja — helpdesk integrado</li>
-            <li>✓ 3 miembros de equipo por dominio</li>
-            <li>✓ Marca blanca <span class="text-xs text-fg-subtle">(próximamente)</span></li>
-
-            <li>✓ API/SDK <span class="text-xs text-fg-subtle">(próximamente)</span></li>
-            <li>✓ Webhooks <span class="text-xs text-fg-subtle">(próximamente)</span></li>
-            <li>✓ Soporte por email</li>
-          </ul>
-          <button
-            class="checkout-btn mt-auto block w-full text-center btn-primary w-full disabled:opacity-50"
-          >
-            Empezar
-          </button>
-        </div>
-
-        <!-- Developer -->
-        <div
-          class="pricing-card card p-8 flex flex-col"
-          data-plan="developer" data-monthly="999" data-yearly="9,990" data-savings="1,998"
-        >
-          <h3 class="font-semibold text-lg">Developer</h3>
-          <p class="text-sm text-fg-muted mt-1">API & SDK para tu SaaS</p>
-          <div class="mt-4">
-            <span class="plan-price text-4xl font-semibold tracking-tight">$999</span>
-            <span class="plan-period text-fg-muted">/mes</span>
-          </div>
-          <p class="plan-savings text-xs text-accent-text mt-1 hidden"></p>
-          <p class="plan-per-domain text-xs text-accent-text mt-1">20 dominios — $50/dominio</p>
-          <ul class="mt-6 space-y-3 text-sm text-fg">
-            <li>✓ 100 máscaras por dominio</li>
-            <li>✓ Enviar como tu@dominio (1,000/día por dominio)</li>
-            <li>✓ Reenvío de entrada — 2,000/hora por dominio (~48,000/día)</li>
-            <li>✓ 50 reglas por dominio</li>
-            <li>✓ Historial 90 días</li>
-            <li>✓ Entrega fuera de spam (DKIM + SPF)</li>
-            <li>✓ API/SDK <span class="text-xs text-fg-subtle">(próximamente)</span></li>
-            <li>✓ Webhooks <span class="text-xs text-fg-subtle">(próximamente)</span></li>
-            <li>✓ Marca blanca <span class="text-xs text-fg-subtle">(próximamente)</span></li>
-            <li>✓ IPs dedicadas <span class="text-xs text-fg-subtle">(próximamente)</span></li>
-            <li>✓ Bandeja — helpdesk integrado</li>
-            <li>✓ 10 miembros de equipo por dominio</li>
-            <li>✓ SMTP — envía desde cualquier cliente <span class="text-xs text-fg-subtle">(próximamente)</span></li>
-            <li>✓ Soporte prioritario</li>
+            <li>✓ Bandeja compartida: 5 personas por dominio, asignación y notas</li>
+            <li>✓ Envía como tu@dominio: 200 correos al día por dominio</li>
+            <li>✓ Máscaras ilimitadas</li>
+            <li>✓ Reglas de enrutado y webhooks</li>
+            <li>✓ SMTP relay para tu SaaS o sistema</li>
+            <li>✓ Historial de 90 días</li>
+            <li>✓ API REST + SDK y soporte por email</li>
           </ul>
           <button
             class="checkout-btn mt-auto block w-full text-center btn-primary w-full disabled:opacity-50"
@@ -331,7 +280,8 @@
 
       <p class="text-center text-sm text-fg-subtle mt-8">
         Todos los precios en MXN. Pago con MercadoPago.<br/>
-        Anual: Básico $490/año (ahorras $98) · Freelancer $4,490/año (ahorras $898) · Developer $9,990/año (ahorras $1,998)
+        Anual: Básico $490/año (ahorras $98) · Equipo $2,490/año (ahorras $498)<br/>
+        ¿Más de 200 correos al día o más de 20 dominios? <a href="mailto:hola@mailmask.studio" class="text-accent-text hover:underline">Escríbenos</a>.
       </p>
     </section>
 
@@ -374,10 +324,10 @@
 
         <div class="card p-6 flex flex-col">
           <h3 class="font-bold text-lg">Dominio extra</h3>
-          <div class="mt-2"><span class="text-3xl font-semibold tracking-tight">+$99</span><span class="text-fg-subtle text-sm"> MXN/mes c/u</span></div>
+          <div class="mt-2"><span class="text-3xl font-semibold tracking-tight">+$59</span><span class="text-fg-subtle text-sm"> MXN/mes c/u</span></div>
           <p class="text-sm text-fg-muted mt-4 flex-1">
-            Un dominio más en tu cuenta, con sus máscaras y su bandeja. Puedes agregar varios.
-            No incluye envío.
+            Un dominio más en tu cuenta, con sus máscaras y su bandeja. Puedes agregar varios,
+            en Básico o en Equipo. No incluye envío.
           </p>
           <a href="/app" class="mt-5 block w-full text-center btn-secondary w-full !py-2.5">
             Agregar desde tu panel
@@ -387,8 +337,8 @@
 
       <p class="text-center text-sm text-fg-subtle mt-8 max-w-2xl mx-auto">
         Los add-ons se compran desde tu panel, con un plan activo.
-        A partir del quinto dominio te conviene <a href="#pricing" class="text-accent-text hover:underline">Freelancer</a>:
-        cuesta casi lo mismo y trae 15 dominios, envíos y equipo.
+        Desde el tercer dominio te conviene <a href="#pricing" class="text-accent-text hover:underline">Equipo</a>:
+        Básico con dos dominios extra y envíos cuesta $266; Equipo son $249 con cinco dominios, envíos, reglas y cinco personas.
       </p>
     </section>
 

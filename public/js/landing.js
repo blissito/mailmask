@@ -250,7 +250,7 @@ async function doCheckout(plan, billing, btn, email) {
   if (!usersSlider || !domainsSlider || !chart) return;
 
   const $ = (id) => document.getElementById(id);
-  const GW_POR_PERSONA = 108;
+  const GW_POR_PERSONA = 140; // Business Starter, precio oficial en México (sep-2026)
   const ENVIOS = 49;      // add-on de envíos, para comparar equivalente con Workspace
   const MAX_U = 20;
 
@@ -260,16 +260,18 @@ async function doCheckout(plan, billing, btn, email) {
   const money = (n) => "$" + n.toLocaleString("es-MX");
 
   // `base` es lo que cuesta recibir y responder — el "desde $49" del encabezado.
-  // `conEnvio` suma el add-on solo donde hace falta: Freelancer y Developer ya incluyen
-  // iniciar correos, así que ahí las dos cifras coinciden.
+  // `conEnvio` suma el add-on solo donde hace falta: Equipo ya incluye iniciar
+  // correos, así que ahí las dos cifras coinciden. Dominio extra: $59 en ambos planes.
+  const DOMINIO_EXTRA = 59;
   function precioMailMask(d) {
     if (d === 1) return { base: 49, conEnvio: 49 + ENVIOS, plan: "Básico · 1 dominio" };
-    if (d <= 4) {
-      const b = 49 + (d - 1) * 99;
-      return { base: b, conEnvio: b + ENVIOS, plan: `Básico + ${d - 1} dominio${d - 1 > 1 ? "s" : ""} extra` };
+    if (d === 2) {
+      const b = 49 + DOMINIO_EXTRA;
+      return { base: b, conEnvio: b + ENVIOS, plan: "Básico + 1 dominio extra" };
     }
-    if (d <= 15) return { base: 449, conEnvio: 449, plan: "Freelancer · hasta 15 dominios" };
-    return { base: 999, conEnvio: 999, plan: "Developer · hasta 20 dominios" };
+    if (d <= 5) return { base: 249, conEnvio: 249, plan: "Equipo · hasta 5 dominios" };
+    const b = 249 + (d - 5) * DOMINIO_EXTRA;
+    return { base: b, conEnvio: b, plan: `Equipo + ${d - 5} dominio${d - 5 > 1 ? "s" : ""} extra` };
   }
 
   function dibujarGrid(maxY) {
