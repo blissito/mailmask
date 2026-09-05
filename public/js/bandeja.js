@@ -375,8 +375,15 @@ function renderList() {
 }
 
 // --- Open conversation detail ---
+// En pantallas angostas la lista y el detalle no caben lado a lado: la clase en
+// <body> decide cuál se ve. En escritorio no tiene efecto.
+function showMobileDetail(on) {
+  document.body.classList.toggle("mesa-mobile-detail", on);
+}
+
 async function openConversation(conv) {
   activeConv = conv;
+  showMobileDetail(true);
   if (newConvIds.has(conv.id)) {
     newConvIds.delete(conv.id);
     unreadCount = Math.max(0, unreadCount - 1);
@@ -837,6 +844,10 @@ function setupListeners() {
   });
 
   // Ctrl+Enter to send
+  document.getElementById("btn-back")?.addEventListener("click", () => {
+    showMobileDetail(false);
+  });
+
   document.getElementById("composer-textarea").addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();

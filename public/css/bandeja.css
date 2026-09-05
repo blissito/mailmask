@@ -1089,3 +1089,104 @@ body.mm-composer-locked { overflow: hidden; }
 }
 .mm-copy-toggle:hover { color: var(--mesa-accent); }
 .mm-copy-row[hidden] { display: none; }
+
+
+/* --- Botón volver (sólo móvil) --- */
+.mesa-back-btn {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  margin: -4px 0 8px -6px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: rgb(var(--mask-400));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.mesa-back-btn:active { background: var(--mesa-surface-2); }
+
+/* =========================================================================
+   Móvil (< 768px). La Bandeja nació para escritorio: lista de 380px fija más
+   detalle a la derecha, barra de atajos de teclado y botones de 12px. En un
+   teléfono eso dejaba el detalle con ancho cero y la barra de herramientas
+   recortada. Aquí se apila: primero la lista, y al abrir una conversación
+   ocupa toda la pantalla con un botón para volver.
+   ========================================================================= */
+@media (max-width: 767px) {
+  body { height: 100dvh; }
+
+  /* Nav: sólo lo esencial */
+  .mesa-nav { padding: 0 12px; height: 44px; }
+  .mesa-nav-right { gap: 12px; }
+  .mesa-user-email { display: none; }
+
+  /* Toolbar en dos filas: filtros arriba, acciones y búsqueda abajo */
+  .mesa-toolbar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .mesa-toolbar .mesa-select { flex: 1 1 30%; min-width: 0; font-size: 14px; padding: 9px 26px 9px 10px; }
+  .mesa-toolbar-spacer { display: none; }
+  .mesa-toolbar .mesa-action-btn { flex: 0 0 auto; min-height: 38px; padding: 8px 12px; font-size: 13px; }
+  .mesa-search { flex: 1 1 100%; width: auto; font-size: 16px; padding: 9px 10px 9px 32px; }
+  .mesa-action-btn .kbd { display: none; }
+
+  /* Lista o detalle, nunca los dos */
+  .mesa-list { width: 100%; min-width: 0; border-right: none; }
+  .mesa-detail { display: none; }
+  body.mesa-mobile-detail .mesa-list { display: none; }
+  body.mesa-mobile-detail .mesa-detail { display: flex; }
+  .mesa-back-btn { display: inline-flex; }
+
+  /* Filas de conversación: más aire y área de toque de 56px */
+  .mesa-conv { padding: 12px 14px; min-height: 56px; }
+  .mesa-conv-subject { font-size: 14px; }
+
+  /* Detalle */
+  .mesa-detail-header { padding: 10px 14px; }
+  .mesa-detail-subject { font-size: 16px; line-height: 1.3; }
+  .mesa-detail-meta { flex-wrap: wrap; gap: 6px 12px; }
+  .mesa-detail-actions { flex-wrap: wrap; gap: 8px; }
+  .mesa-detail-actions .mesa-action-btn { min-height: 40px; padding: 8px 12px; font-size: 13px; }
+  .mesa-messages { padding: 12px; }
+  .mesa-msg { max-width: 100%; }
+  .mesa-msg-body { font-size: 15px; overflow-wrap: anywhere; }
+  .mesa-msg-body img { max-width: 100%; height: auto; }
+  .mesa-note { max-width: 100%; }
+  .mesa-upgrade { margin: 8px 12px 0; }
+
+  /* Redactar respuesta: 16px evita el zoom automático de iOS al enfocar */
+  .mesa-composer { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+  .mesa-composer-textarea { font-size: 16px; min-height: 72px; }
+  .mesa-composer-footer { flex-wrap: wrap; gap: 8px; }
+  .mesa-mode-btn { min-height: 38px; padding: 8px 12px; font-size: 13px; }
+  .mesa-send-btn { min-height: 40px; padding: 8px 18px; font-size: 14px; }
+  .mesa-composer-hint { display: none; }
+
+  /* Atajos de teclado: no existen en el teléfono */
+  .mesa-shortcuts { display: none !important; }
+
+  /* Modales a lo ancho, con scroll interno y campos sin zoom */
+  .mesa-modal-overlay { align-items: flex-end; }
+  .mesa-modal, .mesa-modal-wide {
+    width: 100%;
+    max-width: 100%;
+    max-height: 92dvh;
+    overflow-y: auto;
+    border-radius: 14px 14px 0 0;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+  .mesa-modal .mesa-field, .mesa-modal input { font-size: 16px; padding: 10px 12px; }
+  .mesa-modal-actions { gap: 10px; }
+  .mesa-modal-actions button { min-height: 44px; flex: 1; }
+
+  .mesa-toast { bottom: 24px; max-width: calc(100vw - 32px); }
+}
+
+/* Tabletas: lado a lado pero con la lista más angosta */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .mesa-list { width: 300px; min-width: 300px; }
+  .mesa-search { width: 150px; }
+  .mesa-shortcuts { display: none !important; }
+}
