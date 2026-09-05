@@ -46,7 +46,7 @@ export const PLANS_FOR_SALE = ["basico", "equipo"] as const;
 export const ADDONS = {
   sends25:  { price: 49_00, sends: 25,  label: "Envíos 25/día" },
   sends100: { price: 99_00, sends: 100, label: "Envíos 100/día" },
-  domain:   { price: 59_00, domains: 1, label: "Dominio extra" },
+  domain:   { price: 79_00, domains: 1, label: "Dominio extra" },
 } as const;
 
 export type AddonKind = keyof typeof ADDONS;

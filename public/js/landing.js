@@ -261,8 +261,8 @@ async function doCheckout(plan, billing, btn, email) {
 
   // `base` es lo que cuesta recibir y responder — el "desde $49" del encabezado.
   // `conEnvio` suma el add-on solo donde hace falta: Equipo ya incluye iniciar
-  // correos, así que ahí las dos cifras coinciden. Dominio extra: $59 en ambos planes.
-  const DOMINIO_EXTRA = 59;
+  // correos, así que ahí las dos cifras coinciden. Dominio extra: $79 en ambos planes.
+  const DOMINIO_EXTRA = 79;
   function precioMailMask(d) {
     if (d === 1) return { base: 49, conEnvio: 49 + ENVIOS, plan: "Básico · 1 dominio" };
     if (d === 2) {

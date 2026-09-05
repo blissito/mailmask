@@ -85,13 +85,13 @@ tuviera conserva sus condiciones.
 Add-ons: se compran encima de cualquier plan activo y se cobran aparte, mes a mes.
 - Envíos 25/día — +$49 MXN/mes: desbloquea el envío desde tu dominio, tope 25 al día por dominio.
 - Envíos 100/día — +$99 MXN/mes: igual, tope 100 al día por dominio.
-- Dominio extra — +$59 MXN/mes cada uno: un dominio más de cupo, acumulable, en Básico o
+- Dominio extra — +$79 MXN/mes cada uno: un dominio más de cupo, acumulable, en Básico o
   en Equipo. No incluye envío.
 
 Los dos add-ons de envíos son mutuamente excluyentes y sólo aplican a Básico (Equipo ya
 incluye envío). Se compran una vez y aplican a todos los dominios de la cuenta; el tope
 sigue contando por dominio y por día. Desde el tercer dominio conviene pasar a Equipo:
-Básico con dos dominios extra y envíos cuesta $266 y Equipo $249 con más incluido.
+Básico con dos dominios extra cuesta $207 sin envíos ($306 con envíos) y Equipo $249 con todo incluido.
 Si alguien necesita más de 200 envíos al día o más de 20 dominios, debe escribir a
 hola@mailmask.studio.
 
