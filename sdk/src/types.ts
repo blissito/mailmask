@@ -14,7 +14,12 @@ export interface Domain {
   domain: string;
   verified: boolean;
   mxConfigured: boolean;
+  registeredViaMailmask: boolean;
   createdAt: string;
+  /** Sólo en `domains.list`: reenvíos del mes en curso. */
+  monthlyForwards?: number;
+  /** Sólo en `domains.list`: tope de reenvíos por hora del plan. */
+  forwardPerHour?: number;
 }
 
 /** Respuesta de `domains.verify`. */
@@ -33,6 +38,8 @@ export interface Alias {
   destinations: string[];
   enabled: boolean;
   forwardCount: number;
+  lastFrom?: string | null;
+  lastAt?: string | null;
   createdAt: string;
 }
 
@@ -47,13 +54,18 @@ export interface UpdateAliasInput {
   destinations?: string[];
 }
 
+export type RuleField = "to" | "from" | "subject";
+export type RuleMatch = "contains" | "equals" | "regex";
+/** `forward` y `webhook` requieren `target`; `discard` no. */
+export type RuleAction = "forward" | "webhook" | "discard";
+
 export interface Rule {
   id: string;
   domainId: string;
-  field: "to" | "from" | "subject";
-  match: string;
+  field: RuleField;
+  match: RuleMatch;
   value: string;
-  action: string;
+  action: RuleAction;
   target: string;
   priority: number;
   enabled: boolean;
@@ -61,19 +73,22 @@ export interface Rule {
 }
 
 export interface CreateRuleInput {
-  field: "to" | "from" | "subject";
-  match: string;
+  field: RuleField;
+  /** Los patrones `regex` se validan al guardar: uno peligroso responde 400. */
+  match: RuleMatch;
   value: string;
-  action: string;
-  target: string;
+  action: RuleAction;
+  /** Destino del `forward` o URL del `webhook`. Se ignora con `discard`. */
+  target?: string;
   priority?: number;
+  enabled?: boolean;
 }
 
 export interface UpdateRuleInput {
-  field?: "to" | "from" | "subject";
-  match?: string;
+  field?: RuleField;
+  match?: RuleMatch;
   value?: string;
-  action?: string;
+  action?: RuleAction;
   target?: string;
   priority?: number;
   enabled?: boolean;
@@ -86,17 +101,22 @@ export interface EmailLog {
   from: string;
   to: string;
   subject: string;
-  status: string;
+  /** Entrantes: forwarded, discarded, failed, rule_matched. Salientes: sent → delivered | bounced | complained. */
+  status: "forwarded" | "discarded" | "failed" | "rule_matched" | "sent" | "delivered" | "bounced" | "complained";
   forwardedTo: string;
+  sizeBytes: number;
   error?: string;
+  /** Id interno de SES; cruza el log con los eventos de entrega. Sólo en salientes. */
+  sesMessageId?: string;
 }
 
 export interface SendEmailInput {
   to: string;
   subject: string;
-  /** Al menos uno de `html` o `body`. Con los dos se manda multipart. */
+  /** Al menos uno de `html`, `body` o `markdown`. Con html y body se manda multipart. HTML máx. 100 KB. */
   html?: string;
   body?: string;
+  markdown?: string;
   replyTo?: string;
   /**
    * Parte local de un alias **activo** del dominio. Sin esto el correo sale
@@ -105,6 +125,99 @@ export interface SendEmailInput {
   from?: string;
   /** Nombre visible del remitente: `Libretas <hola@tudominio.com>`. */
   fromName?: string;
+  /** Copias visibles. Máx. 20; también pasan por la lista de supresión. */
+  cc?: string[];
+  /** Copias ocultas. Máx. 20. */
+  bcc?: string[];
+  /** `Message-ID` del correo al que se responde, para que el cliente lo enhebre. */
+  inReplyTo?: string;
+  /** Cadena `References` del hilo. */
+  references?: string;
+  /** Archivos subidos antes con `attachments.upload`. Se borran de S3 al enviarse. */
+  attachments?: AttachmentRef[];
+}
+
+/** Lo que devuelve `attachments.upload`; se pasa tal cual en `SendEmailInput.attachments`. */
+export interface AttachmentRef {
+  key: string;
+  filename: string;
+  contentType?: string;
+}
+
+export interface UploadAttachmentInput {
+  filename: string;
+  contentType: string;
+  data: Uint8Array | Blob;
+}
+
+export interface UploadedAttachment {
+  ok: boolean;
+  key: string;
+  filename: string;
+  size: number;
+}
+
+export interface SendOptions {
+  /**
+   * Reintentar con la misma clave (máx. 128 caracteres) devuelve la respuesta
+   * original sin volver a enviar ni consumir cuota, durante 24 h.
+   */
+  idempotencyKey?: string;
+}
+
+export interface Suppression {
+  email: string;
+  /** `bounce:Permanent`, `complaint` o `manual`. */
+  reason: string;
+  createdAt: string;
+}
+
+export type WebhookEvent = "email.received" | "email.sent" | "email.delivered" | "email.bounced" | "email.complained";
+
+export interface Webhook {
+  id: string;
+  domainId: string;
+  url: string;
+  events: WebhookEvent[];
+  enabled: boolean;
+  createdAt: string;
+}
+
+/** Lo que devuelve `webhooks.create`. El `secret` se muestra una sola vez. */
+export interface WebhookCreated extends Webhook {
+  secret: string;
+}
+
+export interface CreateWebhookInput {
+  /** Debe ser https y pública. */
+  url: string;
+  events: WebhookEvent[];
+}
+
+export interface UpdateWebhookInput {
+  url?: string;
+  events?: WebhookEvent[];
+  enabled?: boolean;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  webhookId: string;
+  event: WebhookEvent | "ping";
+  attempts: number;
+  status: "pending" | "delivered" | "failed";
+  nextAt: string;
+  lastError: string | null;
+  lastStatusCode: number | null;
+  createdAt: string;
+}
+
+/** Cuerpo que recibe tu endpoint. `data` depende del evento. */
+export interface WebhookPayload<T = Record<string, unknown>> {
+  event: WebhookEvent | "ping";
+  domainId: string;
+  timestamp: string;
+  data: T;
 }
 
 export interface BulkSendInput {
@@ -166,6 +279,8 @@ export interface SmtpCredentialCreated {
 export interface ApiKey {
   id: string;
   name: string;
+  /** Primeros caracteres de la llave, para identificarla en listados. */
+  keyPrefix: string;
   lastUsedAt?: string;
   createdAt: string;
 }

@@ -1309,7 +1309,7 @@ function renderAliases(aliases) {
           <span class="text-zinc-500">→</span>
           ${a.destinations.map(d => `<span class="text-sm text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-0.5 break-all">${esc(d)}</span>`).join("")}
         </div>
-        ${a.forwardCount ? `<div class="text-xs text-zinc-500 mt-1">${a.forwardCount} reenviado${a.forwardCount === 1 ? '' : 's'}${a.lastFrom ? ` · último de ${esc(a.lastFrom)}` : ''}</div>` : ''}
+        ${a.forwardCount ? `<div class="text-xs text-zinc-500 mt-1">${a.forwardCount} reenviado${a.forwardCount === 1 ? '' : 's'}${a.lastFrom ? ` · último de ${esc(a.lastFrom)}` : ''}${a.lastAt ? ` · ${relativeTime(a.lastAt)}` : ''}</div>` : ''}
       </div>
       <div class="flex items-center gap-3 sm:gap-2 shrink-0">
         <button data-action="edit-alias" data-alias="${esc(a.alias)}" data-destinations="${esc(a.destinations.join(', '))}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Editar</button>
@@ -1476,13 +1476,76 @@ async function removeMember(agentId, name) {
 
 // --- Logs ---
 
+let logsFilter = "all";
+let lastLogs = [];
+const OUTBOUND_STATUSES = new Set(["sent", "delivered", "bounced", "complained"]);
+
 async function loadLogs() {
   if (!selectedDomain) return;
-  const res = await fetch(`/api/domains/${selectedDomain.id}/logs?limit=50`);
+  const res = await fetch(`/api/domains/${selectedDomain.id}/logs?limit=100`);
   if (!res.ok) return;
-  const logs = await res.json();
-  renderLogs(logs);
+  lastLogs = await res.json();
+  renderLogs(applyLogsFilter(lastLogs));
+  loadSuppressions();
 }
+
+function applyLogsFilter(logs) {
+  if (logsFilter === "in") return logs.filter(l => !OUTBOUND_STATUSES.has(l.status));
+  if (logsFilter === "out") return logs.filter(l => OUTBOUND_STATUSES.has(l.status));
+  return logs;
+}
+
+document.getElementById("logs-filter")?.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-filter]");
+  if (!btn) return;
+  logsFilter = btn.dataset.filter;
+  document.querySelectorAll("#logs-filter [data-filter]").forEach(b => {
+    const on = b === btn;
+    b.classList.toggle("bg-zinc-800", on);
+    b.classList.toggle("text-zinc-100", on);
+    b.classList.toggle("text-zinc-500", !on);
+  });
+  playSound("click");
+  renderLogs(applyLogsFilter(lastLogs));
+});
+
+// --- Lista de supresión ---
+
+async function loadSuppressions() {
+  const list = document.getElementById("suppression-list");
+  const empty = document.getElementById("suppression-empty");
+  if (!list || !selectedDomain) return;
+  const res = await fetch(`/api/domains/${selectedDomain.id}/suppressions`);
+  if (!res.ok) return;
+  const rows = await res.json();
+  if (!rows.length) { list.innerHTML = ""; empty.classList.remove("hidden"); return; }
+  empty.classList.add("hidden");
+  const reasonLabel = { complaint: "marcó spam", manual: "bloqueado a mano" };
+  list.innerHTML = rows.map(r => `
+    <div class="flex items-center gap-3 text-xs bg-zinc-800/40 border border-zinc-800 rounded-md px-3 py-1.5">
+      <code class="font-mono text-zinc-200 truncate">${esc(r.email)}</code>
+      <span class="text-zinc-500">${esc(reasonLabel[r.reason] || (r.reason.startsWith("bounce") ? "rebote permanente" : r.reason))}</span>
+      <span class="text-zinc-600 ml-auto whitespace-nowrap">${relativeTime(r.createdAt)}</span>
+      <button data-unsuppress="${esc(r.email)}" class="text-zinc-400 hover:text-zinc-100 transition-colors">Quitar</button>
+    </div>`).join("");
+  list.querySelectorAll("[data-unsuppress]").forEach(btn => btn.addEventListener("click", async () => {
+    const r = await fetch(`/api/domains/${selectedDomain.id}/suppressions/${encodeURIComponent(btn.dataset.unsuppress)}`, { method: "DELETE" });
+    if (r.ok) { playSound("delete"); showToast("Dirección liberada"); loadSuppressions(); }
+    else showToast("No se pudo quitar", true);
+  }));
+}
+
+document.getElementById("suppression-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("suppression-email");
+  const email = input.value.trim();
+  if (!email || !selectedDomain) return;
+  const r = await fetch(`/api/domains/${selectedDomain.id}/suppressions`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }),
+  });
+  if (r.ok) { playSound("success"); input.value = ""; loadSuppressions(); }
+  else showToast((await r.json().catch(() => ({}))).error || "No se pudo bloquear", true);
+});
 
 function renderLogs(logs) {
   const list = document.getElementById("logs-list");
@@ -1500,12 +1563,20 @@ function renderLogs(logs) {
     discarded: "text-zinc-500",
     failed: "text-red-400",
     rule_matched: "text-yellow-400",
+    sent: "text-zinc-400",
+    delivered: "text-green-400",
+    bounced: "text-red-400",
+    complained: "text-red-400",
   };
   const statusIcons = {
-    forwarded: "✓",
-    discarded: "—",
-    failed: "✗",
-    rule_matched: "⚡",
+    forwarded: "✓ reenviado",
+    discarded: "— descartado",
+    failed: "✗ falló",
+    rule_matched: "⚡ regla",
+    sent: "⏱ enviado",
+    delivered: "✓ entregado",
+    bounced: "✗ rebotó",
+    complained: "⚠ spam",
   };
 
   const rows = logs.map(l => {
@@ -1517,7 +1588,7 @@ function renderLogs(logs) {
         <td class="py-2 pr-3 text-zinc-300 truncate max-w-[200px]" title="${esc(l.from)}">${esc(l.from)}</td>
         <td class="py-2 pr-3 text-zinc-400 truncate max-w-[200px]" title="${esc(l.subject)}">${esc(l.subject)}</td>
         <td class="py-2 pr-3 text-zinc-500 truncate max-w-[120px]">${l.forwardedTo ? esc(l.forwardedTo) : '—'}</td>
-        <td class="py-2 ${statusColors[l.status]}">${statusIcons[l.status]}</td>
+        <td class="py-2 whitespace-nowrap ${statusColors[l.status] || "text-zinc-400"}"${l.error ? ` title="${esc(l.error)}"` : ""}>${statusIcons[l.status] || esc(l.status)}</td>
       </tr>`;
   }).join("");
 
@@ -2006,7 +2077,7 @@ function renderApiKeys(keys) {
         ${keys.map(k => `
           <tr class="border-b border-zinc-800/50 hover:bg-zinc-800/30">
             <td class="py-2.5 font-medium">${k.name}</td>
-            <td class="py-2.5 text-zinc-400 font-mono text-xs">mk_...${k.id.slice(-6)}</td>
+            <td class="py-2.5 text-zinc-400 font-mono text-xs">${k.keyPrefix ? esc(k.keyPrefix) + "…" : "mk_…" + k.id.slice(-6)}</td>
             <td class="py-2.5 text-zinc-500">${k.createdAt ? new Date(k.createdAt).toLocaleDateString() : "—"}</td>
             <td class="py-2.5 text-zinc-500">${k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString() : "Nunca"}</td>
             <td class="py-2.5 text-right">
@@ -2050,7 +2121,109 @@ function switchTab(tab) {
   else if (tab === "dns") { renderDnsRecords(); renderHealthPanel(); }
   else if (tab === "members") loadMembers();
   else if (tab === "smtp") loadSmtpCredentials();
+  else if (tab === "webhooks") loadWebhooks();
   else if (tab === "apikeys") loadApiKeys();
+}
+
+// --- Webhooks (sólo lectura + probar/pausar/borrar; se crean con el SDK) ---
+
+function webhooksSnippet() {
+  return `import { MailMask } from "@easybits.cloud/mailmask";
+
+const mm = new MailMask({ apiKey: process.env.MAILMASK_API_KEY });
+const wh = await mm.webhooks.create("${selectedDomain.id}", {
+  url: "https://tu-app.com/webhooks/mailmask",
+  events: ["email.received", "email.delivered", "email.bounced"],
+});
+console.log(wh.secret); // se muestra una sola vez: guárdalo en tu .env`;
+}
+
+async function loadWebhooks() {
+  const list = document.getElementById("webhooks-list");
+  const empty = document.getElementById("webhooks-empty");
+  const upgrade = document.getElementById("webhooks-upgrade");
+  if (!selectedDomain) return;
+
+  const sub = currentUser?.subscription;
+  const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
+  const isExpired = periodEnd && periodEnd < new Date();
+  const plan = sub && (sub.status === "active" || sub.status === "cancelled") && !isExpired ? sub.plan : null;
+  if (!plan || !["developer", "agencia"].includes(plan)) {
+    list.innerHTML = "";
+    empty.classList.add("hidden");
+    upgrade.classList.remove("hidden");
+    return;
+  }
+  upgrade.classList.add("hidden");
+
+  const res = await fetch(`/api/domains/${selectedDomain.id}/webhooks`);
+  if (!res.ok) return;
+  const hooks = await res.json();
+  if (!hooks.length) {
+    list.innerHTML = "";
+    document.getElementById("webhooks-snippet").textContent = webhooksSnippet();
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+
+  const deliveries = await Promise.all(hooks.map(async (h) => {
+    const r = await fetch(`/api/domains/${selectedDomain.id}/webhooks/${h.id}/deliveries`);
+    return r.ok ? (await r.json()).slice(0, 5) : [];
+  }));
+
+  const badge = (d) => d.status === "delivered"
+    ? `<span class="text-green-400">${d.lastStatusCode ?? "ok"}</span>`
+    : d.status === "failed"
+      ? `<span class="text-red-400">falló</span>`
+      : `<span class="text-yellow-400">reintento ${d.attempts}</span>`;
+
+  list.innerHTML = hooks.map((h, i) => `
+    <div class="bg-zinc-800/50 border border-zinc-800 rounded-lg px-5 py-4">
+      <div class="flex items-center justify-between gap-3 mb-2">
+        <code class="text-sm font-mono text-zinc-200 truncate">${esc(h.url)}</code>
+        <div class="flex items-center gap-3 shrink-0">
+          <span class="inline-flex items-center gap-1 ${h.enabled ? "bg-green-900/30 text-green-400 border-green-800/40" : "bg-zinc-800 text-zinc-500 border-zinc-700"} border rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+            <span class="w-1.5 h-1.5 ${h.enabled ? "bg-green-400" : "bg-zinc-500"} rounded-full"></span>${h.enabled ? "Activo" : "Pausado"}
+          </span>
+          <button data-wh-test="${esc(h.id)}" class="text-xs text-zinc-400 hover:text-zinc-200 transition-colors">Probar</button>
+          <button data-wh-toggle="${esc(h.id)}" data-enabled="${h.enabled ? 1 : 0}" class="text-xs text-zinc-400 hover:text-zinc-200 transition-colors">${h.enabled ? "Pausar" : "Reanudar"}</button>
+          <button data-wh-delete="${esc(h.id)}" class="text-xs text-red-400 hover:text-red-300 transition-colors">Eliminar</button>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-1.5 mb-3">
+        ${h.events.map(e => `<span class="text-[11px] font-mono bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-zinc-300">${esc(e)}</span>`).join("")}
+      </div>
+      ${deliveries[i].length ? `
+        <div class="text-xs text-zinc-500 mb-1">Últimas entregas</div>
+        <div class="space-y-1">
+          ${deliveries[i].map(d => `
+            <div class="flex items-center gap-3 text-xs text-zinc-400">
+              <span class="font-mono text-zinc-300 w-32 truncate">${esc(d.event)}</span>
+              ${badge(d)}
+              <span class="text-zinc-500">${relativeTime(d.createdAt)}</span>
+              ${d.lastError ? `<span class="text-zinc-500 truncate" title="${esc(d.lastError)}">${esc(d.lastError)}</span>` : ""}
+            </div>`).join("")}
+        </div>` : `<div class="text-xs text-zinc-500">Sin entregas todavía. "Probar" encola un ping que sale en el siguiente minuto.</div>`}
+    </div>
+  `).join("");
+
+  list.querySelectorAll("[data-wh-test]").forEach(btn => btn.addEventListener("click", async () => {
+    const r = await fetch(`/api/domains/${selectedDomain.id}/webhooks/${btn.dataset.whTest}/test`, { method: "POST"  });
+    if (r.ok) { playSound("success"); showToast("Ping encolado: llega en el siguiente minuto"); }
+    else showToast((await r.json().catch(() => ({}))).error || "No se pudo encolar", true);
+  }));
+  list.querySelectorAll("[data-wh-toggle]").forEach(btn => btn.addEventListener("click", async () => {
+    const enabled = btn.dataset.enabled !== "1";
+    const r = await fetch(`/api/domains/${selectedDomain.id}/webhooks/${btn.dataset.whToggle}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }),
+    });
+    if (r.ok) { playSound("click"); loadWebhooks(); } else showToast("No se pudo actualizar", true);
+  }));
+  list.querySelectorAll("[data-wh-delete]").forEach(btn => btn.addEventListener("click", async () => {
+    const r = await fetch(`/api/domains/${selectedDomain.id}/webhooks/${btn.dataset.whDelete}`, { method: "DELETE"  });
+    if (r.ok) { playSound("delete"); showToast("Webhook eliminado"); loadWebhooks(); } else showToast("No se pudo eliminar", true);
+  }));
 }
 
 // --- Modals ---

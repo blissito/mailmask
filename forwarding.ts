@@ -6,6 +6,7 @@ import { log } from "./logger.js";
 import { programar } from "./scheduler.js";
 import { acotarTexto } from "./regex-guard.js";
 import { notifyBandeja } from "./sse-hub.js";
+import { emitEvent } from "./webhooks.js";
 
 // --- SNS notification types ---
 
@@ -564,6 +565,12 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
         forwarded++;
       }
       bumpAliasStats(domain.id, matched.alias, from); // fire-and-forget
+      emitEvent(domain.id, "email.received", {
+        from, to: recipient, subject,
+        alias: matched.alias,
+        forwardedTo: matched.destinations,
+        messageId: notification.mail.messageId ?? null,
+      });
 
       // Notify owner on first email to this alias
       if (!matched.forwardCount && owner) {

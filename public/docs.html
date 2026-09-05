@@ -313,7 +313,7 @@ console.<span class="fn">log</span>(status.sent, status.failed, status.skippedSu
 
       <!-- Logs -->
       <h2 id="logs" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Logs</h2>
-      <p class="text-fg-muted mb-4">Consulta el historial de emails procesados por un dominio.</p>
+      <p class="text-fg-muted mb-4">Consulta el historial de emails procesados por un dominio. Los reenv&iacute;os entrantes llevan <code class="text-zinc-300">forwarded</code>, <code class="text-zinc-300">discarded</code>, <code class="text-zinc-300">failed</code> o <code class="text-zinc-300">rule_matched</code>. Los env&iacute;os que haces por API nacen en <code class="text-zinc-300">sent</code> y, cuando SES avisa, pasan a <code class="text-zinc-300">delivered</code>, <code class="text-zinc-300">bounced</code> o <code class="text-zinc-300">complained</code>; el motivo del rebote va en <code class="text-zinc-300">error</code>.</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// &Uacute;ltimos 50 por omisi&oacute;n</span>
 <span class="kw">const</span> logs = <span class="kw">await</span> mm.logs.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
 

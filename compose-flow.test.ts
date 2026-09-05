@@ -5,7 +5,7 @@ import { describe, it, before, mock } from "node:test";
 import assert from "node:assert/strict";
 
 const suffix = Date.now();
-const sent: { from: string; to: string; subject: string; body: string; opts?: Record<string, unknown> }[] = [];
+const sent: { from: string; to: string; subject: string; body: string; opts?: Record<string, unknown>; sesMessageId?: string }[] = [];
 
 describe("Bandeja: redactar — camino feliz", () => {
   // deno-lint-ignore no-explicit-any
@@ -27,8 +27,9 @@ describe("Bandeja: redactar — camino feliz", () => {
         // `(textBody ?? html)`: al mandar sólo HTML, el marcado crudo viajaba como
         // texto plano y quien leyera en modo texto veía etiquetas.
         sendFromDomain: async (from: string, to: string, subject: string, body: string, opts?: Record<string, unknown>) => {
-          sent.push({ from, to, subject, body, opts });
-          return `<stub-${crypto.randomUUID()}@test>`;
+          const sesMessageId = `ses-${crypto.randomUUID()}`;
+          sent.push({ from, to, subject, body, opts, sesMessageId });
+          return { messageId: `<stub-${crypto.randomUUID()}@test>`, sesMessageId };
         },
       },
     });
@@ -136,6 +137,38 @@ describe("Bandeja: redactar — camino feliz", () => {
     assert.equal(last.to, "cliente@example.com");
     assert.match(last.subject, /^Re: /);
     assert.ok(last.opts?.inReplyTo, "el reply sí debe referenciar el mensaje anterior");
+  });
+
+  it("un evento delivery de SES marca el reply como entregado; un rebote, como rebotado", async () => {
+    const res = await compose({ subject: "Con acuse" });
+    const { conversationId } = await res.json();
+    const headers = { "content-type": "application/json", "x-forwarded-for": "10.9.9.78", cookie: `${cookie}; csrf_token=${csrf}`, "x-csrf-token": csrf };
+    const replyRes = await app.fetch(new Request(`http://localhost/api/bandeja/conversations/${conversationId}/reply`, {
+      method: "POST", headers, body: JSON.stringify({ domainId, body: "¿llegó?" }),
+    }));
+    assert.equal(replyRes.status, 200);
+    await replyRes.body?.cancel();
+    const sesId = sent[sent.length - 1].sesMessageId;
+
+    const leer = async () => {
+      const r = await app.fetch(new Request(`http://localhost/api/bandeja/conversations/${conversationId}?domainId=${domainId}`, { headers }));
+      const data = await r.json();
+      return data.messages.filter((m: { direction: string }) => m.direction === "outbound").pop();
+    };
+    assert.equal((await leer()).deliveryStatus, "sent", "recién enviado debe estar en `sent`");
+
+    const { registrarEventoSes } = await import("./main.ts");
+    await registrarEventoSes({ eventType: "Delivery", mail: { messageId: sesId, source: `hola@composeok-${suffix}.com` }, delivery: { recipients: ["cliente@example.com"], smtpResponse: "250 OK" } });
+    const entregado = await leer();
+    assert.equal(entregado.deliveryStatus, "delivered");
+    assert.equal(entregado.deliveryDetail, "250 OK");
+
+    await registrarEventoSes({ eventType: "Bounce", mail: { messageId: sesId, source: `hola@composeok-${suffix}.com` }, bounce: { bounceType: "Permanent", bounceSubType: "General", bouncedRecipients: [{ emailAddress: "cliente@example.com", diagnosticCode: "550 no such user" }] } });
+    const rebotado = await leer();
+    assert.equal(rebotado.deliveryStatus, "bounced");
+    assert.match(rebotado.deliveryDetail, /550 no such user/);
+    // El rebote suprimió al contacto: liberarlo para que los tests siguientes puedan escribirle.
+    dbmod.removeSuppression(domainId, "cliente@example.com");
   });
 
   it("con markdown, la parte de texto es texto y la de HTML es HTML", async () => {

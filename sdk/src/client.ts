@@ -2,7 +2,8 @@ import type {
   MailMaskConfig, Domain, DomainVerification, Alias, CreateAliasInput, UpdateAliasInput,
   Rule, CreateRuleInput, UpdateRuleInput, EmailLog, SendEmailInput,
   BulkSendInput, BulkJob, BulkJobCreated, SmtpCredential, SmtpCredentialCreated,
-  ApiKey,
+  ApiKey, SendOptions, UploadAttachmentInput, UploadedAttachment, Suppression,
+  Webhook, WebhookCreated, CreateWebhookInput, UpdateWebhookInput, WebhookDelivery,
 } from "./types.js";
 
 class MailMaskError extends Error {
@@ -13,14 +14,10 @@ class MailMaskError extends Error {
 }
 
 async function request<T>(baseUrl: string, apiKey: string, path: string, opts?: RequestInit, doFetch: typeof fetch = fetch): Promise<T> {
-  const res = await doFetch(`${baseUrl}${path}`, {
-    ...opts,
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      ...opts?.headers,
-    },
-  });
+  // Con FormData el runtime pone el boundary; forzar el Content-Type lo rompe.
+  const headers: Record<string, string> = { "Authorization": `Bearer ${apiKey}`, ...(opts?.headers as Record<string, string> | undefined) };
+  if (!(opts?.body instanceof FormData) && !("Content-Type" in headers)) headers["Content-Type"] = "application/json";
+  const res = await doFetch(`${baseUrl}${path}`, { ...opts, headers });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new MailMaskError(res.status, body.error || res.statusText);
@@ -37,6 +34,9 @@ export class MailMask {
   rules: RulesResource;
   logs: LogsResource;
   send: SendResource;
+  attachments: AttachmentsResource;
+  suppressions: SuppressionsResource;
+  webhooks: WebhooksResource;
   smtp: SmtpResource;
   apiKeys: ApiKeysResource;
 
@@ -53,6 +53,9 @@ export class MailMask {
     this.rules = new RulesResource(req);
     this.logs = new LogsResource(req);
     this.send = new SendResource(req);
+    this.attachments = new AttachmentsResource(req);
+    this.suppressions = new SuppressionsResource(req);
+    this.webhooks = new WebhooksResource(req);
     this.smtp = new SmtpResource(req);
     this.apiKeys = new ApiKeysResource(req);
   }
@@ -88,14 +91,51 @@ class RulesResource {
 
 class LogsResource {
   constructor(private req: Req) {}
-  list(domainId: string) { return this.req<EmailLog[]>(`/api/domains/${domainId}/logs`); }
+  /** `limit` por omisión 50, máximo 100. */
+  list(domainId: string, opts?: { limit?: number }) {
+    const qs = opts?.limit ? `?limit=${encodeURIComponent(opts.limit)}` : "";
+    return this.req<EmailLog[]>(`/api/domains/${domainId}/logs${qs}`);
+  }
 }
 
 class SendResource {
   constructor(private req: Req) {}
-  send(domainId: string, input: SendEmailInput) { return this.req<{ messageId: string }>(`/api/domains/${domainId}/send`, { method: "POST", body: JSON.stringify(input) }); }
+  send(domainId: string, input: SendEmailInput, opts?: SendOptions) {
+    const headers: Record<string, string> = {};
+    if (opts?.idempotencyKey) headers["Idempotency-Key"] = opts.idempotencyKey;
+    return this.req<{ ok: boolean; messageId: string; sesMessageId: string }>(`/api/domains/${domainId}/send`, { method: "POST", body: JSON.stringify(input), headers });
+  }
   bulkSend(domainId: string, input: BulkSendInput) { return this.req<BulkJobCreated>(`/api/domains/${domainId}/send-bulk`, { method: "POST", body: JSON.stringify(input) }); }
   bulkStatus(domainId: string, jobId: string) { return this.req<BulkJob>(`/api/domains/${domainId}/bulk/${jobId}`); }
+}
+
+class AttachmentsResource {
+  constructor(private req: Req) {}
+  /** Máx. 5 MB. Ejecutables bloqueados (415). La llave vale hasta que se envía. */
+  upload(domainId: string, input: UploadAttachmentInput) {
+    const form = new FormData();
+    const blob = input.data instanceof Blob ? input.data : new Blob([input.data as BlobPart], { type: input.contentType });
+    form.append("file", blob, input.filename);
+    return this.req<UploadedAttachment>(`/api/domains/${domainId}/attachments`, { method: "POST", body: form });
+  }
+}
+
+class SuppressionsResource {
+  constructor(private req: Req) {}
+  list(domainId: string) { return this.req<Suppression[]>(`/api/domains/${domainId}/suppressions`); }
+  add(domainId: string, email: string) { return this.req<Suppression>(`/api/domains/${domainId}/suppressions`, { method: "POST", body: JSON.stringify({ email }) }); }
+  remove(domainId: string, email: string) { return this.req<{ ok: boolean }>(`/api/domains/${domainId}/suppressions/${encodeURIComponent(email)}`, { method: "DELETE" }); }
+}
+
+class WebhooksResource {
+  constructor(private req: Req) {}
+  list(domainId: string) { return this.req<Webhook[]>(`/api/domains/${domainId}/webhooks`); }
+  create(domainId: string, input: CreateWebhookInput) { return this.req<WebhookCreated>(`/api/domains/${domainId}/webhooks`, { method: "POST", body: JSON.stringify(input) }); }
+  update(domainId: string, webhookId: string, input: UpdateWebhookInput) { return this.req<Webhook>(`/api/domains/${domainId}/webhooks/${webhookId}`, { method: "PUT", body: JSON.stringify(input) }); }
+  delete(domainId: string, webhookId: string) { return this.req<{ ok: boolean }>(`/api/domains/${domainId}/webhooks/${webhookId}`, { method: "DELETE" }); }
+  /** Encola un `ping`; llega en el siguiente minuto. */
+  test(domainId: string, webhookId: string) { return this.req<{ ok: boolean; deliveryId: string }>(`/api/domains/${domainId}/webhooks/${webhookId}/test`, { method: "POST" }); }
+  deliveries(domainId: string, webhookId: string) { return this.req<WebhookDelivery[]>(`/api/domains/${domainId}/webhooks/${webhookId}/deliveries`); }
 }
 
 class SmtpResource {

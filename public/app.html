@@ -117,6 +117,7 @@
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="dns">DNS</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="members">Miembros</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="smtp">SMTP</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="webhooks">Webhooks</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500 hidden" data-tab="apikeys" id="tab-btn-apikeys">API Keys</button>
       </div>
 
@@ -146,12 +147,32 @@
 
       <!-- Tab: Logs -->
       <div id="tab-logs" class="tab-content hidden">
-        <h3 class="font-semibold mb-4">Últimos emails</h3>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold">Últimos emails</h3>
+          <div id="logs-filter" class="flex gap-1 text-xs">
+            <button data-filter="all" class="px-2.5 py-1 rounded-md bg-zinc-800 text-zinc-100">Todos</button>
+            <button data-filter="in" class="px-2.5 py-1 rounded-md text-zinc-500 hover:text-zinc-300">Entrantes</button>
+            <button data-filter="out" class="px-2.5 py-1 rounded-md text-zinc-500 hover:text-zinc-300">Salientes</button>
+          </div>
+        </div>
         <div class="overflow-x-auto">
           <table id="logs-list" class="w-full text-xs text-left"></table>
         </div>
         <div id="logs-empty" class="hidden text-center py-8 text-zinc-500">
-          No hay logs aún. Cuando recibas emails, aparecerán aquí.
+          No hay logs aún. Cuando recibas o envíes emails, aparecerán aquí.
+        </div>
+
+        <div class="mt-10 border-t border-zinc-800 pt-6">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-semibold">Lista de supresión</h3>
+            <form id="suppression-form" class="flex gap-2">
+              <input id="suppression-email" type="email" placeholder="correo@ejemplo.com" class="bg-zinc-900 border border-zinc-700 rounded-md px-2.5 py-1 text-xs w-56 focus:outline-none focus:border-mask-400" required>
+              <button class="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1 rounded-md transition-colors">Bloquear</button>
+            </form>
+          </div>
+          <p class="text-xs text-zinc-500 mb-3">Direcciones que rebotaron o marcaron spam. MailMask no les vuelve a enviar ni reenviar: insistir daña la reputación del dominio. Quita una sólo si corregiste la dirección.</p>
+          <div id="suppression-list" class="space-y-1"></div>
+          <div id="suppression-empty" class="hidden text-xs text-zinc-500 py-3">Nadie en la lista. Buena señal.</div>
         </div>
       </div>
 
@@ -199,6 +220,24 @@
         <div id="apikeys-list" class="space-y-2"></div>
         <div id="apikeys-empty" class="hidden text-center py-8 text-zinc-500">
           No hay API keys. Crea una para comenzar.
+        </div>
+      </div>
+
+      <!-- Tab: Webhooks (sólo lectura; se crean desde el SDK) -->
+      <div id="tab-webhooks" class="tab-content hidden">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold">Webhooks</h3>
+          <a href="/docs#webhooks" target="_blank" class="text-sm text-mask-400 hover:text-mask-300 underline">Ver docs</a>
+        </div>
+        <p class="text-sm text-zinc-400 mb-4">Recibe un POST en tu servidor cuando llega, sale, se entrega o rebota un correo. Los webhooks se crean desde el SDK, porque el secreto tiene que quedar en tu código, no en una pantalla.</p>
+        <div id="webhooks-list" class="space-y-3"></div>
+        <div id="webhooks-empty" class="hidden">
+          <p class="text-zinc-500 text-sm mb-3">Este dominio no tiene webhooks. Crea uno con el SDK:</p>
+          <pre id="webhooks-snippet" class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-xs font-mono text-zinc-300"></pre>
+        </div>
+        <div id="webhooks-upgrade" class="hidden text-center py-8">
+          <p class="text-zinc-500 mb-3">Los webhooks requieren plan Developer.</p>
+          <a href="/#pricing" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Actualiza a Developer</a>
         </div>
       </div>
 

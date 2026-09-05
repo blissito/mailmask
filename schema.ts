@@ -90,9 +90,15 @@ export const messages = sqliteTable("messages", {
   s3Key: text("s3_key"),
   direction: text("direction").notNull(),
   messageId: text("message_id"),
+  // Estado de entrega de los salientes, cruzado por el id interno de SES.
+  sesMessageId: text("ses_message_id"),
+  deliveryStatus: text("delivery_status"), // sent | delivered | bounced | complained
+  deliveryDetail: text("delivery_detail"),
+  deliveredAt: text("delivered_at"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
 }, (table) => [
   index("idx_messages_conversation").on(table.conversationId),
+  index("idx_messages_ses_id").on(table.sesMessageId),
 ]);
 
 export const notes = sqliteTable("notes", {
@@ -143,8 +149,10 @@ export const emailLogs = sqliteTable("email_logs", {
   forwardedTo: text("forwarded_to").notNull(),
   sizeBytes: integer("size_bytes").notNull().default(0),
   error: text("error"),
+  sesMessageId: text("ses_message_id"),
   expiresAt: text("expires_at").notNull(),
 }, (table) => [
+  index("idx_email_logs_ses_id").on(table.sesMessageId),
   index("idx_email_logs_domain_ts").on(table.domainId, table.timestamp),
 ]);
 
@@ -402,4 +410,33 @@ export const cannedResponses = sqliteTable("canned_responses", {
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
 }, (table) => [
   index("idx_canned_domain").on(table.domainId),
+]);
+
+// --- Webhooks de eventos (email.received / email.sent / email.bounced / email.complained) ---
+export const webhooks = sqliteTable("webhooks", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  domainId: text("domain_id").notNull().references(() => domains.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  secret: text("secret").notNull(),
+  events: text("events", { mode: "json" }).$type<string[]>().notNull().default([]),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
+}, (table) => [
+  index("idx_webhooks_domain").on(table.domainId),
+]);
+
+export const webhookDeliveries = sqliteTable("webhook_deliveries", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  webhookId: text("webhook_id").notNull().references(() => webhooks.id, { onDelete: "cascade" }),
+  event: text("event").notNull(),
+  payload: text("payload", { mode: "json" }).notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  nextAt: text("next_at").notNull(),
+  status: text("status").notNull().default("pending"), // pending | delivered | failed
+  lastError: text("last_error"),
+  lastStatusCode: integer("last_status_code"),
+  createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
+}, (table) => [
+  index("idx_webhook_deliveries_pending").on(table.status, table.nextAt),
+  index("idx_webhook_deliveries_webhook").on(table.webhookId, table.createdAt),
 ]);

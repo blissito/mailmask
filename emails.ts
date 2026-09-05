@@ -678,11 +678,12 @@ export function firstEmailReceived(d: { alias: string; domain: string; from: str
 export async function sendTemplate(to: string, email: Email, opts?: { from?: string }): Promise<string> {
   const { sendFromDomain, sendAlert } = await import("./ses.js");
   try {
-    return await sendFromDomain(opts?.from ?? FROM_HEADER, to, email.subject, email.text, {
+    const sent = await sendFromDomain(opts?.from ?? FROM_HEADER, to, email.subject, email.text, {
       html: email.html,
       replyTo: SUPPORT_EMAIL,
       ...(process.env.SES_CONFIG_SET ? { configSet: process.env.SES_CONFIG_SET } : {}),
     });
+    return sent.messageId;
   } catch (err) {
     // El aviso va aquí y no en cada llamador porque varios se tragan el error: el
     // registro, por ejemplo, loguea y devuelve 201 igual. Un From mal formado dejó

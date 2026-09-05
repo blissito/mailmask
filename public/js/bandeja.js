@@ -443,6 +443,21 @@ async function openConversation(conv) {
   renderList(); // re-render to highlight active
 }
 
+// Estado de entrega de un saliente. Lo alimenta el webhook de eventos de SES
+// (delivery / bounce / complaint) cruzado por el id interno del mensaje.
+const DELIVERY_LABELS = {
+  sent: ["enviado", "⏱"],
+  delivered: ["entregado", "✓"],
+  bounced: ["rebotó", "✗"],
+  complained: ["marcado como spam", "⚠"],
+};
+function deliveryBadge(msg) {
+  const status = msg.deliveryStatus || "sent";
+  const [label, icon] = DELIVERY_LABELS[status] || DELIVERY_LABELS.sent;
+  const title = msg.deliveryDetail ? ` title="${esc(msg.deliveryDetail)}"` : "";
+  return `<span class="mesa-msg-dir outbound delivery-${status}" data-msg-id="${esc(msg.id)}"${title}>${icon} ${label}</span>`;
+}
+
 function renderMessages(messages, notes) {
   const container = document.getElementById("messages-container");
 
@@ -468,7 +483,7 @@ function renderMessages(messages, notes) {
     return `<div class="mesa-msg ${dir}">
       <div class="mesa-msg-header">
         <span class="mesa-msg-from">${esc(item.from)}</span>
-        <span class="mesa-msg-dir ${dir}">${dir === "inbound" ? "recibido" : "enviado"}</span>
+        ${dir === "inbound" ? `<span class="mesa-msg-dir inbound">recibido</span>` : deliveryBadge(item)}
         <span class="mesa-msg-time">${formatTime(item.createdAt)}</span>
       </div>
       <div class="mesa-msg-body">${esc(item.body || item.html || "")}</div>
@@ -1177,6 +1192,25 @@ function connectSSE(domainId) {
     } catch (err) {
       console.error("SSE new_message error:", err);
       loadConversations();
+    }
+  });
+
+  // Estado de entrega: sólo se repinta el badge del mensaje si la conversación está abierta.
+  sseSource.addEventListener("delivery_status", (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (!activeConv || activeConv.id !== data.conversationId) return;
+      const badge = document.querySelector(`.mesa-msg-dir[data-msg-id="${data.messageId}"]`);
+      if (!badge) return;
+      const status = data.status || badge.className.match(/delivery-(\w+)/)?.[1] || "sent";
+      const [label, icon] = DELIVERY_LABELS[status] || DELIVERY_LABELS.sent;
+      badge.className = `mesa-msg-dir outbound delivery-${status}`;
+      badge.textContent = `${icon} ${label}`;
+      if (data.detail) badge.title = data.detail;
+      if (data.status === "delivered") playSound("pop");
+      else if (data.status === "bounced" || data.status === "complained") toast(`El correo a ${activeConv.from} ${label}`);
+    } catch (err) {
+      console.error("SSE delivery_status error:", err);
     }
   });
 

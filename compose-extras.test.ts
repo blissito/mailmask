@@ -25,7 +25,7 @@ describe("Bandeja: firma, cita, copias y adjuntos", () => {
         ...realSes,
         sendFromDomain: async (_f: string, to: string, _s: string, body: string, opts?: Record<string, any>) => {
           sent.push({ to, body, opts });
-          return `<stub-${crypto.randomUUID()}@test>`;
+          return { messageId: `<stub-${crypto.randomUUID()}@test>`, sesMessageId: `ses-${crypto.randomUUID()}` };
         },
         // Sin AWS: el adjunto se sirve desde memoria.
         getEmailFileFromS3: async () => ({ body: new Uint8Array([1, 2, 3]), contentType: "application/pdf" }),

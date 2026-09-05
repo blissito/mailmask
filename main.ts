@@ -6,7 +6,7 @@ import * as path from "node:path";
 import * as dns from "node:dns/promises";
 import { programar, esServidor } from "./scheduler.js";
 import { revisarPatron } from "./regex-guard.js";
-import { addSseClient } from "./sse-hub.js";
+import { addSseClient, notifyBandeja } from "./sse-hub.js";
 import { db } from "./pg.js";
 import { users as usersTable, tokens as tokensTable } from "./schema.js";
 import { eq } from "drizzle-orm";
@@ -140,6 +140,9 @@ import {
   deleteCannedResponse,
   listSuppressions,
   removeSuppression,
+  setLogDelivery,
+  setMessageDelivery,
+  addLog,
 } from "./db.js";
 import { emitEvent, listWebhooks, getWebhook, createWebhook, updateWebhook, deleteWebhook, enqueuePing, listDeliveries, WEBHOOK_EVENTS, MAX_WEBHOOKS_PER_DOMAIN } from "./webhooks.js";
 import type { AddonKind } from "./db.js";
@@ -375,6 +378,32 @@ async function discardSentFiles(keys: string[]): Promise<void> {
 }
 
 /** Normaliza y valida una lista de direcciones de Cc/Bcc. */
+/** Días de retención de logs del dueño del dominio (los agentes heredan el plan del dueño). */
+async function ownerLogDays(ownerEmail: string): Promise<number> {
+  const owner = await getUser(ownerEmail);
+  return owner ? getUserPlanLimits(owner).logDays : 30;
+}
+
+/**
+ * Registra un envío saliente en `email_logs` con status `sent`. El webhook de
+ * eventos de SES lo mueve a delivered/bounced/complained por `sesMessageId`.
+ * Antes los envíos por API y bulk no dejaban rastro: la pestaña Logs sólo
+ * mostraba reenvíos, y un envío que rebotaba era invisible.
+ */
+function logOutbound(domainId: string, from: string, to: string, subject: string, body: string, sesMessageId: string, logDays: number): void {
+  try {
+    addLog({
+      domainId, timestamp: new Date().toISOString(),
+      from, to, subject,
+      status: "sent", forwardedTo: to,
+      sizeBytes: Buffer.byteLength(body ?? "", "utf8"),
+      sesMessageId: sesMessageId || undefined,
+    }, logDays);
+  } catch (err) {
+    log("warn", "ses", "Could not log outbound send", { domainId, error: String(err) });
+  }
+}
+
 function parseCopyList(value: unknown, max = 20): string[] {
   if (!Array.isArray(value)) return [];
   const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -498,27 +527,63 @@ async function verifySnsSignature(
  * puede reconstruir. Sólo el rebote Permanent suprime; un buzón lleno
  * (Transient) no debe bloquear al contacto para siempre.
  */
+// Si SES reescribe nuestro Message-ID, el hilo no reengancha (VIGILAR-BRENDI.md).
+// El evento trae el header que salió de verdad: se compara una vez por dominio.
+const messageIdRewriteChecked = new Set<string>();
+
+/**
+ * Cruza un evento de SES con el mensaje de la Bandeja y el log que lo originaron,
+ * por `mail.messageId` (id interno de SES). `status` null sólo actualiza el detalle.
+ */
+function applyDeliveryStatus(message: any, status: "delivered" | "bounced" | "complained" | null, detail: string | null): void {
+  const sesId = String(message.mail?.messageId ?? "");
+  if (!sesId) return;
+  try {
+    setLogDelivery(sesId, status, status === "delivered" ? null : detail);
+    const hit = setMessageDelivery(sesId, status, detail);
+    if (hit) {
+      notifyBandeja(hit.domainId, "delivery_status", { conversationId: hit.conversationId, messageId: hit.id, status, detail });
+    }
+    const source = String(message.mail?.source ?? "");
+    const headerId = message.mail?.commonHeaders?.messageId;
+    if (headerId && source && !messageIdRewriteChecked.has(source)) {
+      messageIdRewriteChecked.add(source);
+      if (/amazonses\.com>?$/i.test(headerId)) {
+        log("warn", "ses", "SES rewrote our Message-ID header", { source, headerId, sesId });
+      }
+    }
+  } catch (err) {
+    log("warn", "ses", "Could not apply delivery status", { sesId, error: String(err) });
+  }
+}
+
 export async function registrarEventoSes(message: any): Promise<{ suppressed: number }> {
   const eventType = String(message.eventType ?? message.notificationType ?? "").toLowerCase();
   let recipients: { emailAddress?: string }[] = [];
   let reason = "";
   if (eventType === "bounce") {
     const bounce = message.bounce ?? message;
+    const bounceDetail = [bounce.bounceType, bounce.bounceSubType, bounce.bouncedRecipients?.[0]?.diagnosticCode].filter(Boolean).join(" · ");
     if (bounce.bounceType !== "Permanent") {
       log("info", "ses", "Transient bounce, not suppressing", { bounceType: bounce.bounceType, source: message.mail?.source });
+      // Sólo el detalle: el estado se queda en `sent` porque el proveedor sigue intentando.
+      applyDeliveryStatus(message, null, `Rebote temporal: ${bounceDetail}`);
       return { suppressed: 0 };
     }
     recipients = bounce.bouncedRecipients ?? [];
     reason = "bounce:Permanent";
+    applyDeliveryStatus(message, "bounced", bounceDetail || "Rebote permanente");
   } else if (eventType === "complaint") {
     recipients = (message.complaint ?? message).complainedRecipients ?? [];
     reason = "complaint";
+    applyDeliveryStatus(message, "complained", (message.complaint ?? message).complaintFeedbackType ?? "Marcado como spam");
   } else if (eventType === "delivery") {
-    // No suprime nada: sólo dispara el webhook `email.delivered`.
+    // No suprime nada: marca el mensaje/log como entregado y dispara `email.delivered`.
     const source = String(message.mail?.source ?? "");
     const domainName = source.includes("@") ? source.split("@").pop()!.replace(/>$/, "").toLowerCase() : "";
     const { getDomainByName } = await import("./db.js");
     const domainRecord = domainName ? await getDomainByName(domainName) : null;
+    applyDeliveryStatus(message, "delivered", message.delivery?.smtpResponse ?? null);
     if (domainRecord) {
       for (const recipient of (message.delivery?.recipients ?? []) as string[]) {
         emitEvent(domainRecord.id, "email.delivered", {
@@ -3624,7 +3689,7 @@ const app = new Elysia({ adapter: node() })
       // camino que la Bandeja; el archivo se borra de S3 una vez enviado.
       const files = await collectAttachments(sendBody.attachments);
       sentFileKeys = files.keys;
-      const messageId = await sendFromDomain(fromAddress, recipient, subject, rendered.text, {
+      const { messageId, sesMessageId } = await sendFromDomain(fromAddress, recipient, subject, rendered.text, {
         html: rendered.html,
         replyTo,
         cc: sendCc.length ? sendCc : undefined,
@@ -3635,7 +3700,8 @@ const app = new Elysia({ adapter: node() })
         configSet: getConfigSetName(domain.domain),
       });
       await discardSentFiles(sentFileKeys);
-      const result = { ok: true, messageId };
+      logOutbound(domain.id, bareFrom, recipient, subject, rendered.html ?? rendered.text, sesMessageId, limits.logDays);
+      const result = { ok: true, messageId, sesMessageId };
       if (idemToken) {
         db.insert(tokensTable).values({
           token: idemToken,
@@ -3644,7 +3710,7 @@ const app = new Elysia({ adapter: node() })
           expiresAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
         }).onConflictDoNothing().run();
       }
-      emitEvent(domain.id, "email.sent", { to: recipient, cc: sendCc, subject, from: bareFrom, messageId });
+      emitEvent(domain.id, "email.sent", { to: recipient, cc: sendCc, subject, from: bareFrom, messageId, sesMessageId });
       return new Response(JSON.stringify(result), {
         headers: { "content-type": "application/json" },
       });
@@ -4175,6 +4241,7 @@ const app = new Elysia({ adapter: node() })
 
     const fromAddress = `${match.alias}@${domain.domain}`;
     let messageId: string;
+    let composeSesId = "";
     // Fuera del try: hace falta después para borrar de S3 las imágenes ya enviadas y
     // para guardar en la Bandeja el HTML tal como salió.
     let withImages: { html?: string; inlineImages?: InlineImage[] } = {};
@@ -4188,14 +4255,15 @@ const app = new Elysia({ adapter: node() })
       withImages = await attachInlineImages(rendered.html);
       const files = await collectAttachments(attachRefs);
       sentFileKeys = files.keys;
-      messageId = await sendFromDomain(fromAddress, recipient, String(subject), rendered.text, {
+      ({ messageId, sesMessageId: composeSesId } = await sendFromDomain(fromAddress, recipient, String(subject), rendered.text, {
         html: withImages.html,
         inlineImages: withImages.inlineImages,
         attachments: files.attachments.length ? files.attachments : undefined,
         cc: cc.length ? cc : undefined,
         bcc: bcc.length ? bcc : undefined,
         configSet: getConfigSetName(domain.domain),
-      });
+      }));
+      logOutbound(domain.id, fromAddress, recipient, String(subject), withImages.html ?? rendered.text, composeSesId, limits.logDays);
     } catch (err) {
       decrementSendCount(domain.id);
       log("error", "ses", "Compose send failed", { error: String(err), domainId: domain.id });
@@ -4234,6 +4302,7 @@ const app = new Elysia({ adapter: node() })
         direction: "outbound",
         createdAt: new Date().toISOString(),
         messageId,
+        sesMessageId: composeSesId || undefined,
       });
 
       // El messageId queda en el log a propósito: es la referencia que debería aparecer
@@ -4596,7 +4665,7 @@ const app = new Elysia({ adapter: node() })
       const withImages = await attachInlineImages(rendered.html);
       const files = await collectAttachments(attachRefs);
       sentFileKeys = files.keys;
-      const messageId = await sendFromDomain(fromAddress, recipient, `Re: ${conv.subject}`, rendered.text, {
+      const { messageId, sesMessageId } = await sendFromDomain(fromAddress, recipient, `Re: ${conv.subject}`, rendered.text, {
         html: withImages.html,
         inlineImages: withImages.inlineImages,
         attachments: files.attachments.length ? files.attachments : undefined,
@@ -4606,6 +4675,7 @@ const app = new Elysia({ adapter: node() })
         inReplyTo: lastRef,
         references: conv.threadReferences.join(" "),
       });
+      logOutbound(domain.id, fromAddress, recipient, `Re: ${conv.subject}`, withImages.html ?? rendered.text, sesMessageId, (await ownerLogDays(domain.ownerEmail)));
 
       // Ya salió con imágenes y adjuntos dentro: las copias en S3 sobran.
       await discardSentImages(withImages.inlineImages);
@@ -4620,6 +4690,7 @@ const app = new Elysia({ adapter: node() })
         direction: "outbound",
         createdAt: new Date().toISOString(),
         messageId,
+        sesMessageId: sesMessageId || undefined,
       });
 
       await updateConversation(domainId, conv.id, {
@@ -5818,6 +5889,7 @@ programar("* * * * *", async () => {
     // por lote, no por destinatario: antes se mandaba `job.html` también como parte
     // text/plain y quien leyera en modo texto recibía el marcado.
     const bulkRendered = resolveEmailBody({ html: job.html });
+    const bulkLogDays = jobOwner ? getUserPlanLimits(jobOwner).logDays : 30;
 
     for (const recipient of batch) {
       // Check suppression
@@ -5836,12 +5908,13 @@ programar("* * * * *", async () => {
       }
 
       try {
-        const bulkMessageId = await sendFromDomain(job.from, recipient, job.subject, bulkRendered.text, {
+        const bulkSent = await sendFromDomain(job.from, recipient, job.subject, bulkRendered.text, {
           html: bulkRendered.html,
           configSet,
         });
         job.sent++;
-        emitEvent(job.domainId, "email.sent", { to: recipient, subject: job.subject, from: job.from, messageId: bulkMessageId, bulkJobId: job.id });
+        logOutbound(job.domainId, job.from, recipient, job.subject, bulkRendered.html ?? bulkRendered.text, bulkSent.sesMessageId, bulkLogDays);
+        emitEvent(job.domainId, "email.sent", { to: recipient, subject: job.subject, from: job.from, messageId: bulkSent.messageId, sesMessageId: bulkSent.sesMessageId, bulkJobId: job.id });
       } catch (err) {
         decrementSendCount(job.domainId); // devolver la cuota reservada
         job.failed++;

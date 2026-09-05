@@ -93,10 +93,12 @@ export interface EmailLog {
   from: string;
   to: string;
   subject: string;
-  status: "forwarded" | "discarded" | "failed" | "rule_matched";
+  /** Entrantes: forwarded/discarded/failed/rule_matched. Salientes: sent → delivered | bounced | complained. */
+  status: "forwarded" | "discarded" | "failed" | "rule_matched" | "sent" | "delivered" | "bounced" | "complained";
   forwardedTo: string;
   sizeBytes: number;
   error?: string;
+  sesMessageId?: string;
 }
 
 // --- Plans & add-ons ---
@@ -265,6 +267,7 @@ function rowToLog(r: typeof emailLogs.$inferSelect): EmailLog {
     forwardedTo: r.forwardedTo,
     sizeBytes: r.sizeBytes,
     error: r.error ?? undefined,
+    sesMessageId: r.sesMessageId ?? undefined,
   };
 }
 
@@ -298,6 +301,10 @@ function rowToMessage(r: typeof messages.$inferSelect): Message {
     direction: r.direction as any,
     createdAt: r.createdAt,
     messageId: r.messageId ?? undefined,
+    sesMessageId: r.sesMessageId ?? undefined,
+    deliveryStatus: (r.deliveryStatus as Message["deliveryStatus"]) ?? undefined,
+    deliveryDetail: r.deliveryDetail ?? undefined,
+    deliveredAt: r.deliveredAt ?? undefined,
   };
 }
 
@@ -570,6 +577,7 @@ export function addLog(log: Omit<EmailLog, "id">, logDays = 30): EmailLog {
     forwardedTo: log.forwardedTo,
     sizeBytes: log.sizeBytes,
     error: log.error ?? null,
+    sesMessageId: log.sesMessageId ?? null,
     expiresAt,
   }).returning().all();
   return rowToLog(rows[0]);
@@ -1135,6 +1143,10 @@ export interface Message {
   direction: "inbound" | "outbound";
   createdAt: string;
   messageId?: string;
+  sesMessageId?: string;
+  deliveryStatus?: "sent" | "delivered" | "bounced" | "complained";
+  deliveryDetail?: string;
+  deliveredAt?: string;
 }
 
 export interface Note {
@@ -1303,8 +1315,34 @@ export function addMessage(msg: Omit<Message, "id">): Message {
     s3Key: msg.s3Key ?? null,
     direction: msg.direction,
     messageId: msg.messageId ?? null,
+    sesMessageId: msg.sesMessageId ?? null,
+    deliveryStatus: msg.deliveryStatus ?? (msg.direction === "outbound" ? "sent" : null),
   }).returning().all();
   return rowToMessage(rows[0]);
+}
+
+/**
+ * Actualiza el estado de entrega del mensaje saliente con ese id de SES.
+ * `detail` guarda el smtpResponse o el motivo del rebote; un rebote transitorio
+ * sólo actualiza el detalle sin cambiar el estado (status = null).
+ */
+export function setMessageDelivery(sesMessageId: string, status: Message["deliveryStatus"] | null, detail: string | null): { id: string; conversationId: string; domainId: string } | null {
+  if (!sesMessageId) return null;
+  const row = db.select({ id: messages.id, conversationId: messages.conversationId, domainId: conversations.domainId })
+    .from(messages).innerJoin(conversations, eq(conversations.id, messages.conversationId))
+    .where(eq(messages.sesMessageId, sesMessageId)).get();
+  if (!row) return null;
+  const set: Partial<typeof messages.$inferInsert> = { deliveryDetail: detail };
+  if (status) { set.deliveryStatus = status; set.deliveredAt = new Date().toISOString(); }
+  db.update(messages).set(set).where(eq(messages.id, row.id)).run();
+  return row;
+}
+
+export function setLogDelivery(sesMessageId: string, status: EmailLog["status"] | null, error: string | null): boolean {
+  if (!sesMessageId) return false;
+  const set: Partial<typeof emailLogs.$inferInsert> = { error };
+  if (status) set.status = status;
+  return db.update(emailLogs).set(set).where(eq(emailLogs.sesMessageId, sesMessageId)).returning({ id: emailLogs.id }).all().length > 0;
 }
 
 export function listMessages(conversationId: string): Message[] {
@@ -1396,6 +1434,12 @@ export function isSuppressed(domainId: string, email: string): boolean {
     .where(and(eq(suppressions.domainId, domainId), eq(suppressions.email, key)))
     .all();
   return rows.length > 0;
+}
+
+export function listSuppressions(domainId: string): { email: string; reason: string; createdAt: string }[] {
+  return db.select({ email: suppressions.email, reason: suppressions.reason, createdAt: suppressions.createdAt })
+    .from(suppressions).where(eq(suppressions.domainId, domainId))
+    .orderBy(desc(suppressions.createdAt)).all();
 }
 
 export function removeSuppression(domainId: string, email: string): void {
@@ -1926,7 +1970,7 @@ export async function createApiKey(userEmail: string, name: string): Promise<{ a
   return { apiKey: { id, userEmail, keyPrefix: prefix, name, createdAt: now }, plaintextKey: key };
 }
 
-export function listApiKeys(userEmail: string): Omit<ApiKey, "keyPrefix">[] {
+export function listApiKeys(userEmail: string): ApiKey[] {
   return db.select({
     id: apiKeys.id,
     userEmail: apiKeys.userEmail,

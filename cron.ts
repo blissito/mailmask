@@ -7,6 +7,17 @@ import { lte, and, eq, inArray, isNotNull, gt, sql as rawSql } from "drizzle-orm
 import { purgeDeletedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, createDomain, listEffectiveAddons, updateAddon, recordOrder, addonLabel } from "./db.js";
 import { sendTemplate, expiryWarning, addonShutdown } from "./emails.js";
 import { reconcilePendingAddons } from "./addon-sync.js";
+import { deliverPending, purgeOldDeliveries } from "./webhooks.js";
+
+// Webhooks: entregas pendientes y reintentos vencidos.
+programar("* * * * *", async () => {
+  try {
+    const r = await deliverPending();
+    if (r.delivered || r.failed) log("info", "webhook", "Deliveries processed", r);
+  } catch (err) {
+    log("error", "webhook", "deliverPending crashed", { error: String(err) });
+  }
+});
 
 // Cada 5 minutos — activar add-ons ya pagados cuyo webhook nunca llegó.
 programar("*/5 * * * *", async () => {
@@ -107,6 +118,7 @@ programar("*/15 * * * *", async () => {
 // Sin esto MercadoPago sigue cobrando el add-on mientras getUserPlanLimits devuelve cero:
 // se le cobra al cliente por algo que no recibe.
 programar("0 4 * * *", async () => {
+  try { purgeOldDeliveries(7); } catch (err) { log("warn", "webhook", "purge failed", { error: String(err) }); }
   const mpToken = process.env.MP_ACCESS_TOKEN;
   try {
     const now = new Date().toISOString();

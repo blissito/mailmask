@@ -109,35 +109,56 @@ async function createConfigurationSet(domain: string): Promise<void> {
   await ensureConfigSetEventDestination(domain);
 }
 
+/** Eventos que SES publica al tópico. `delivery` alimenta el webhook `email.delivered`. */
+export const CONFIG_SET_EVENT_TYPES = ["bounce", "complaint", "delivery"] as const;
+
 /**
- * Engancha el config set al tópico de rebotes/quejas. Va aparte de la creación
- * del set porque los sets se crearon durante meses sin SNS_OUTBOUND_TOPIC_ARN y
- * hay que poder rellenarles el destino después (lo hace ensureDomainInbound).
- * Idempotente: AlreadyExists se ignora.
+ * Engancha el config set al tópico de rebotes/quejas/entregas. Va aparte de la
+ * creación del set porque los sets se crearon durante meses sin
+ * SNS_OUTBOUND_TOPIC_ARN y hay que poder rellenarles el destino después (lo hace
+ * ensureDomainInbound). Idempotente: si el destino ya existe, se actualiza para
+ * que suscriba la lista completa — los sets viejos sólo tenían bounce y complaint.
  */
-export async function ensureConfigSetEventDestination(domain: string): Promise<{ created: boolean }> {
+export async function ensureConfigSetEventDestination(domain: string): Promise<{ created: boolean; updated?: boolean }> {
   if (!SNS_OUTBOUND_TOPIC_ARN) return { created: false };
 
   const ses = await getSesOutbound();
-  const { CreateConfigurationSetEventDestinationCommand } = await import("@aws-sdk/client-ses");
+  const { CreateConfigurationSetEventDestinationCommand, UpdateConfigurationSetEventDestinationCommand, DescribeConfigurationSetCommand } = await import("@aws-sdk/client-ses");
   const name = configSetName(domain);
+  const destination = {
+    Name: `${name}-events`,
+    Enabled: true,
+    MatchingEventTypes: [...CONFIG_SET_EVENT_TYPES],
+    SNSDestination: { TopicARN: SNS_OUTBOUND_TOPIC_ARN },
+  };
 
   try {
-    await ses.send(new CreateConfigurationSetEventDestinationCommand({
-      ConfigurationSetName: name,
-      EventDestination: {
-        Name: `${name}-events`,
-        Enabled: true,
-        MatchingEventTypes: ["bounce", "complaint"],
-        SNSDestination: { TopicARN: SNS_OUTBOUND_TOPIC_ARN },
-      },
-    }));
+    await ses.send(new CreateConfigurationSetEventDestinationCommand({ ConfigurationSetName: name, EventDestination: destination }));
     log("info", "ses", "Event destination created", { domain, configSet: name });
     return { created: true };
   } catch (err: any) {
-    if (String(err).includes("AlreadyExists")) return { created: false };
-    log("warn", "ses", "Could not create event destination", { domain, error: String(err) });
-    return { created: false };
+    if (!String(err).includes("AlreadyExists")) {
+      log("warn", "ses", "Could not create event destination", { domain, error: String(err) });
+      return { created: false };
+    }
+  }
+
+  // Ya existe: comprobar que suscribe todos los tipos y, si no, actualizarlo.
+  try {
+    const desc = await ses.send(new DescribeConfigurationSetCommand({
+      ConfigurationSetName: name,
+      ConfigurationSetAttributeNames: ["eventDestinations"],
+    }));
+    const current = desc.EventDestinations?.find((d: { Name?: string }) => d.Name === destination.Name);
+    const have = new Set(current?.MatchingEventTypes ?? []);
+    const missing = CONFIG_SET_EVENT_TYPES.filter((t) => !have.has(t));
+    if (!current || !missing.length) return { created: false, updated: false };
+    await ses.send(new UpdateConfigurationSetEventDestinationCommand({ ConfigurationSetName: name, EventDestination: destination }));
+    log("info", "ses", "Event destination updated", { domain, configSet: name, added: missing });
+    return { created: false, updated: true };
+  } catch (err: any) {
+    log("warn", "ses", "Could not update event destination", { domain, error: String(err) });
+    return { created: false, updated: false };
   }
 }
 
@@ -521,7 +542,15 @@ export interface Attachment {
 // error entendible en vez de un rechazo del proveedor.
 export const MAX_RAW_MESSAGE_BYTES = 9 * 1024 * 1024;
 
-export async function sendFromDomain(from: string, to: string, subject: string, body: string, opts?: { html?: string; replyTo?: string; configSet?: string; inReplyTo?: string; references?: string; inlineImages?: InlineImage[]; attachments?: Attachment[]; cc?: string[]; bcc?: string[] }): Promise<string> {
+/**
+ * Devuelve dos ids: `messageId` es el header Message-ID que generamos (engancha
+ * hilos); `sesMessageId` es el id interno que SES asigna al aceptar el mensaje y
+ * el que viene en sus eventos de entrega, rebote y queja. Sólo con el segundo se
+ * puede cruzar un evento con el mensaje que lo originó.
+ */
+export interface SentEmail { messageId: string; sesMessageId: string }
+
+export async function sendFromDomain(from: string, to: string, subject: string, body: string, opts?: { html?: string; replyTo?: string; configSet?: string; inReplyTo?: string; references?: string; inlineImages?: InlineImage[]; attachments?: Attachment[]; cc?: string[]; bcc?: string[] }): Promise<SentEmail> {
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
 
@@ -657,20 +686,21 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
   };
   if (opts?.configSet) cmd.ConfigurationSetName = opts.configSet;
 
+  let res: { MessageId?: string } | undefined;
   try {
-    await ses.send(new SendRawEmailCommand(cmd));
+    res = await ses.send(new SendRawEmailCommand(cmd));
   } catch (err: any) {
     // Auto-create configuration set if it doesn't exist in this region
     if (opts?.configSet && String(err).includes("ConfigurationSetDoesNotExist")) {
       const domain = from.split("@")[1] ?? "";
       try { await createConfigurationSet(domain); } catch { /* best effort */ }
       delete cmd.ConfigurationSetName;
-      await ses.send(new SendRawEmailCommand(cmd));
+      res = await ses.send(new SendRawEmailCommand(cmd));
     } else {
       throw err;
     }
   }
-  return messageId;
+  return { messageId, sesMessageId: res?.MessageId ?? "" };
 }
 
 // --- Delete S3 object (for purge) ---
