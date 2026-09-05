@@ -98,6 +98,10 @@ hola@mailmask.studio.
 Importante sobre los límites: se cuentan **por dominio**, no por cuenta. Un plan
 Equipo con 5 dominios dispone de 5 x 200 = 1,000 envíos al día en total.
 
+Además hay un tope mensual de reenvíos por cuenta: 3,000 en Básico y 30,000 en Equipo.
+Al 80% se avisa por correo; al 100% el correo entrante sigue guardándose en la Bandeja
+pero deja de reenviarse al buzón externo hasta el día 1 del mes siguiente.
+
 Hay dos límites distintos y conviene no confundirlos:
 - Envíos ("sends"): correo saliente que el usuario origina desde el panel, la API o el
   SMTP relay. Es el límite diario por dominio.

@@ -551,6 +551,32 @@ describe("processInbound edge cases", () => {
     assert.equal(queued, undefined);
   });
 
+  it("monthly cap: at the limit the email is kept in Bandeja but not forwarded; owner warned once", async () => {
+    const capSuffix = `cap-${Date.now()}`;
+    const capDomain = `${capSuffix}.test`;
+    const capEmail = `owner-${capSuffix}@example.com`;
+    createUser(capEmail, await hashPassword("testpass123"));
+    updateUserSubscription(capEmail, { plan: "basico", status: "active", currentPeriodEnd: new Date(Date.now() + 365 * 86400000).toISOString() });
+    const d = createDomain(capEmail, capDomain, ["dkim1"], "verify1");
+    updateDomain(d.id, { verified: true });
+    createAlias(d.id, "info", ["dest@example.com"]);
+
+    const dbm = await import("./db.ts");
+    // Básico: 3,000 al mes. Se llena a mano el contador.
+    for (let i = 0; i < 3000; i++) dbm.incrementMonthlyForwards(capEmail);
+    assert.equal(dbm.getMonthlyForwards(capEmail), 3000);
+
+    const result = await processInbound(makeSnsNotification({
+      from: "sender@external.com", to: `info@${capDomain}`, subject: "Cap", messageId: `cap-${crypto.randomUUID()}`,
+    }));
+    assert.match(result.details, /discarded=1/);
+    assert.equal(dbm.getMonthlyForwards(capEmail), 3000, "al tope no se sigue contando");
+    const log = dbm.listLogs(d.id, 5).find((l: { error?: string }) => /Tope mensual/.test(l.error ?? ""));
+    assert.ok(log, "el log debe explicar que fue el tope mensual");
+    // El aviso de tope es de una sola vez por mes
+    assert.equal(dbm.claimOnce("fwd-cap-reached", `${capEmail}:${new Date().toISOString().slice(0, 7)}`), false);
+  });
+
   it("S3 fetch failure enqueues retry with S3 coords", async () => {
     // Build notification WITHOUT content field so it tries S3 fetch (which will fail)
     const msgId = `s3fail-${crypto.randomUUID()}`;

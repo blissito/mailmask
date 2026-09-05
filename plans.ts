@@ -17,6 +17,12 @@
 // `sends` es solo correo saliente que el usuario origina (panel, API, SMTP relay).
 // El reenvío entrante — el caso de uso principal — va por `forwardPerHour` y es un orden
 // de magnitud mayor, así que el límite de envíos no lo toca quien solo reenvía.
+// `monthlyForwards` es el tope de reenvíos **por cuenta y por mes**, el único que acota
+// el costo: a SES se le paga por correo y al cliente una cuota fija. El de por hora
+// (`forwardPerHour`) frena picos; sin este, 1,000/hora sostenidas eran ~13,000 MXN al mes
+// de un cliente que paga 249. Al llegar al tope el correo se guarda en la Bandeja pero
+// ya no se reenvía al buzón externo; al 80% se avisa al dueño por correo.
+//
 // Dos planes a la venta desde sep-2026 (ver "Precios" en CLAUDE.md): Básico y Equipo.
 // El reenvío puro lo regala la competencia (ImprovMX, ForwardEmail); lo que se cobra es
 // la Bandeja compartida por dominio en vez de por persona (Workspace $140/usuario,
@@ -25,12 +31,12 @@
 // Freelancer, Developer, Pro y Agencia son legado: sin suscriptores al momento del cambio,
 // pero cupones, correos y tests los nombran. LEGACY_PLANS los saca de páginas y checkout.
 export const PLANS = {
-  basico:     { label: "Básico",     price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 10,   rules: 0,   logDays: 15, sends: 0,     api: true,  webhooks: false, forwardPerHour: 100,  smtpRelay: false },
-  equipo:     { label: "Equipo",     price: 249_00, yearlyPrice: 2490_00, domains: 5,  aliases: 1000, rules: 25,  logDays: 90, sends: 200,   api: true,  webhooks: true,  forwardPerHour: 1000, smtpRelay: true },
-  freelancer: { label: "Freelancer", price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 200,   api: true,  webhooks: false, forwardPerHour: 500,  smtpRelay: false },
-  developer:  { label: "Developer",  price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 1000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
-  pro:     { label: "Pro",     price: 299_00, yearlyPrice: 2990_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500,  smtpRelay: true },
-  agencia: { label: "Agencia", price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true },
+  basico:     { label: "Básico",     price: 49_00,  yearlyPrice: 490_00,  domains: 1,  aliases: 10,   rules: 0,   logDays: 15, sends: 0,     api: true,  webhooks: false, forwardPerHour: 100,  smtpRelay: false, monthlyForwards: 3000 },
+  equipo:     { label: "Equipo",     price: 249_00, yearlyPrice: 2490_00, domains: 5,  aliases: 1000, rules: 25,  logDays: 90, sends: 200,   api: true,  webhooks: true,  forwardPerHour: 1000, smtpRelay: true, monthlyForwards: 30000 },
+  freelancer: { label: "Freelancer", price: 449_00, yearlyPrice: 4490_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 200,   api: true,  webhooks: false, forwardPerHour: 500,  smtpRelay: false, monthlyForwards: 30000 },
+  developer:  { label: "Developer",  price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 1000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true, monthlyForwards: 100000 },
+  pro:     { label: "Pro",     price: 299_00, yearlyPrice: 2990_00, domains: 15, aliases: 50,  rules: 10,  logDays: 30, sends: 500,   api: false, webhooks: false, forwardPerHour: 500,  smtpRelay: true, monthlyForwards: 30000 },
+  agencia: { label: "Agencia", price: 999_00, yearlyPrice: 9990_00, domains: 20, aliases: 100, rules: 50,  logDays: 90, sends: 2000,  api: true,  webhooks: true,  forwardPerHour: 2000, smtpRelay: true, monthlyForwards: 100000 },
 } as const;
 
 export const LEGACY_PLANS: ReadonlySet<string> = new Set(["freelancer", "developer", "pro", "agencia"]);

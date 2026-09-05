@@ -147,6 +147,7 @@ import {
   addLog,
   isLegacyPlan,
   PLANS_FOR_SALE,
+  getMonthlyForwards,
 } from "./db.js";
 import { emitEvent, listWebhooks, getWebhook, createWebhook, updateWebhook, deleteWebhook, enqueuePing, listDeliveries, WEBHOOK_EVENTS, MAX_WEBHOOKS_PER_DOMAIN } from "./webhooks.js";
 import type { AddonKind } from "./db.js";
@@ -1228,6 +1229,7 @@ const app = new Elysia({ adapter: node() })
     );
 
     const referralStats = getReferralStats(user.email);
+    const forwards = { current: getMonthlyForwards(user.email), limit: limits.monthlyForwards };
 
     // Issue CSRF cookie if user doesn't have one (e.g., existing session before CSRF was deployed)
     const cookies = parseCookies(request.headers.get("cookie"));
@@ -1241,6 +1243,7 @@ const app = new Elysia({ adapter: node() })
         email: user.email,
         isAdmin: isAdmin(user.email),
         domainsCount: domains.length,
+        forwards,
         subscription: {
           ...(user.subscription ?? { plan: "basico", status: "none" }),
           currentPeriodEnd: user.subscription?.currentPeriodEnd ?? null,

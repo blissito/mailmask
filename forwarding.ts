@@ -1,6 +1,6 @@
-import { getDomainByName, getAlias, isSuppressed, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, type Rule, type ForwardQueueItem } from "./db.js";
+import { getDomainByName, getAlias, isSuppressed, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, incrementMonthlyForwards, getMonthlyForwards, claimOnce, planLabel, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, type Rule, type ForwardQueueItem } from "./db.js";
 import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchEmailHeadersFromS3, sendFromDomain } from "./ses.js";
-import { sendTemplate, firstEmailReceived } from "./emails.js";
+import { sendTemplate, firstEmailReceived, forwardCapWarning, forwardCapReached } from "./emails.js";
 import { checkRateLimit } from "./rate-limit.js";
 import { log } from "./logger.js";
 import { programar } from "./scheduler.js";
@@ -560,6 +560,32 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     const matched = alias?.enabled ? alias : (catchAll?.enabled ? catchAll : null);
 
     if (matched) {
+      // Tope mensual por cuenta: el correo ya quedó en la Bandeja (arriba); lo que se
+      // frena es el reenvío al buzón externo, que es la mitad del costo y lo que un
+      // ataque a un catch-all infla sin límite.
+      if (owner) {
+        const cap = getUserPlanLimits(owner).monthlyForwards;
+        const used = getMonthlyForwards(owner.email);
+        const month = new Date().toISOString().slice(0, 7);
+        if (cap > 0 && used >= cap) {
+          if (claimOnce("fwd-cap-reached", `${owner.email}:${month}`)) {
+            sendTemplate(owner.email, forwardCapReached({ cap, plan: planLabel(owner.subscription?.plan) })).catch(() => {});
+            await sendAlert("fwd-monthly-cap", `Monthly forward cap reached: ${owner.email} (${cap}/mo)`);
+          }
+          await addLog({
+            domainId: domain.id, timestamp: new Date().toISOString(),
+            from, to: recipient, subject,
+            status: "discarded", forwardedTo: "", sizeBytes: rawContent.length,
+            error: `Tope mensual de reenvíos alcanzado (${cap}); guardado en la Bandeja`,
+          }, logDays);
+          discarded++;
+          continue;
+        }
+        const after = incrementMonthlyForwards(owner.email);
+        if (cap > 0 && after >= Math.ceil(cap * 0.8) && claimOnce("fwd-cap-warn", `${owner.email}:${month}`)) {
+          sendTemplate(owner.email, forwardCapWarning({ used: after, cap, plan: planLabel(owner.subscription?.plan) })).catch(() => {});
+        }
+      }
       for (const dest of matched.destinations) {
         await doForward(rawContent, from, dest, domain.id, domainName, recipient, subject, logDays, s3Bucket, s3Key);
         forwarded++;

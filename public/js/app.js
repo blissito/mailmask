@@ -484,6 +484,9 @@ function renderStats() {
   const sendsLimit = currentUser?.limits?.sends ?? 0;
   const sendsUnlocked = currentUser?.limits?.sendsUnlocked ?? false;
   const fwdPerHour = currentUser?.limits?.forwardPerHour ?? 0;
+  // Tope mensual por cuenta: es el que protege el margen (SES cobra por correo).
+  const fwdMes = currentUser?.forwards?.current ?? 0;
+  const fwdCap = currentUser?.forwards?.limit ?? 0;
 
   // Los envíos son el límite chico y el que se agota; el reenvío de entrada es un orden
   // de magnitud mayor y es lo que de verdad usa quien solo redirige correo. Se muestran
@@ -510,8 +513,8 @@ function renderStats() {
         </div>
         <div>
           <span class="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Reenvíos</span>
-          <div class="text-3xl font-light text-zinc-100 mt-1">${totalForwards.toLocaleString("es-MX")}</div>
-          <div class="text-[11px] text-zinc-600 mt-0.5">límite ${fwdPerHour.toLocaleString("es-MX")}/hora por dominio</div>
+          <div class="text-3xl font-light text-zinc-100 mt-1">${fwdMes.toLocaleString("es-MX")}<span class="text-lg text-zinc-600">/${fwdCap.toLocaleString("es-MX")}</span></div>
+          <div class="text-[11px] ${fwdMes >= fwdCap * 0.8 ? "text-yellow-400" : "text-zinc-600"} mt-0.5">este mes · ${totalForwards.toLocaleString("es-MX")} en total · ${fwdPerHour.toLocaleString("es-MX")}/hora por dominio</div>
         </div>
       </div>
     </div>`;

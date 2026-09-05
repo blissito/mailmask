@@ -265,7 +265,9 @@ Objetivo: solidificar el tronco del servicio. Blindar seguridad, rendimiento y r
 - [ ] **Guías de automatización con IA + aliases**: Blog posts y/o sección educativa enseñando a usuarios a automatizar workflows usando aliases específicos de MailMask + herramientas de IA. Ejemplos: alias dedicado para recibir notificaciones de n8n/Make/Zapier, alias como trigger de workflows AI, alias para clasificación automática de leads, alias temporal para campañas con análisis automático. Doble propósito: educar usuarios existentes y atraer audiencia técnica vía SEO. Investigar y documentar patrones concretos antes de escribir.
 
 ### Backlog (priorizado)
-0. [ ] **`monthlyForwards` — tope mensual para proteger margen. ⚠️ REVISITAR PARA ENTENDERLO MEJOR ANTES DE IMPLEMENTAR.**
+0. [x] ~~**`monthlyForwards`**~~ **Implementado 5-sep-2026**: tope **por cuenta y por mes** en `PLANS` (Básico 3,000; Equipo 30,000; legado 30k/100k). Contador en `send_counts` con llave `fwd:<correo>` y mes `YYYY-MM` (`incrementMonthlyForwards`/`getMonthlyForwards`). En `forwarding.ts`, al cruzar un alias: al 80% se manda `forwardCapWarning` una vez por mes (`claimOnce` en `tokens`), al 100% se manda `forwardCapReached`, se alerta al admin y el correo se **guarda en la Bandeja pero no se reenvía** (log `discarded` con "Tope mensual"). Peor caso Equipo: ~30k correos ≈ $110 MXN de SES contra $249 de ingreso; antes era ilimitado (~$13,000 MXN/mes teóricos). El dashboard muestra `forwards.current/limit` de `/api/auth/me`. Las tarjetas dicen "Hasta N correos reenviados al mes". Lo de abajo queda como historia del análisis.
+
+   ~~**`monthlyForwards` — tope mensual para proteger margen. ⚠️ REVISITAR PARA ENTENDERLO MEJOR ANTES DE IMPLEMENTAR.**~~
 
    No implementar todavía. Primero hay que sentarse a entender el modelo de costo con números reales; lo de abajo es el planteamiento, no una decisión.
 

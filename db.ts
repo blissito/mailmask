@@ -879,11 +879,11 @@ export function createCourtesyAddon(input: {
   return run();
 }
 
-export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; sendsUnlocked: boolean; api: boolean; webhooks: boolean; forwardPerHour: number; smtpRelay: boolean } {
+export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; sendsUnlocked: boolean; api: boolean; webhooks: boolean; forwardPerHour: number; smtpRelay: boolean; monthlyForwards: number } {
   const sub = user.subscription;
   if (sub && (sub.status === "active" || sub.status === "cancelled")) {
     if (sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) < new Date()) {
-      return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, sendsUnlocked: false, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false };
+      return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, sendsUnlocked: false, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false, monthlyForwards: 0 };
     }
     const plan = PLANS[sub.plan];
     const active = listEffectiveAddons(user.email);
@@ -903,9 +903,39 @@ export function getUserPlanLimits(user: User): { domains: number; aliases: numbe
       webhooks: plan.webhooks,
       forwardPerHour: plan.forwardPerHour,
       smtpRelay: plan.smtpRelay,
+      monthlyForwards: plan.monthlyForwards,
     };
   }
-  return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, sendsUnlocked: false, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false };
+  return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, sendsUnlocked: false, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false, monthlyForwards: 0 };
+}
+
+// --- Reenvíos por mes, por cuenta ---
+//
+// Reusa `send_counts` con una llave sintética: domain_id = "fwd:<correo>" y month = YYYY-MM.
+// Un correo entrante cuenta una vez aunque el alias tenga varios destinos.
+const fwdKey = (email: string) => `fwd:${email.toLowerCase()}`;
+const monthKey = () => new Date().toISOString().slice(0, 7);
+
+export function incrementMonthlyForwards(userEmail: string): number {
+  const expiresAt = new Date(Date.now() + 45 * 86400_000).toISOString();
+  const rows = db.insert(sendCounts).values({ domainId: fwdKey(userEmail), month: monthKey(), count: 1, expiresAt })
+    .onConflictDoUpdate({ target: [sendCounts.domainId, sendCounts.month], set: { count: rawSql`${sendCounts.count} + 1` } })
+    .returning().all();
+  return rows[0].count;
+}
+
+export function getMonthlyForwards(userEmail: string): number {
+  const row = db.select().from(sendCounts)
+    .where(and(eq(sendCounts.domainId, fwdKey(userEmail)), eq(sendCounts.month, monthKey()))).get();
+  return row?.count ?? 0;
+}
+
+/** true la primera vez que se llama con ese token en la ventana; false después. Para avisos de una sola vez. */
+export function claimOnce(kind: string, token: string, ttlDays = 45): boolean {
+  const expiresAt = new Date(Date.now() + ttlDays * 86400_000).toISOString();
+  const rows = db.insert(tokens).values({ token: `${kind}:${token}`, kind, value: {}, expiresAt })
+    .onConflictDoNothing().returning().all();
+  return rows.length > 0;
 }
 
 // --- Pending checkout (guest flow) ---

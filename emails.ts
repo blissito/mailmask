@@ -667,6 +667,45 @@ export function firstEmailReceived(d: { alias: string; domain: string; from: str
   };
 }
 
+export function forwardCapWarning(d: { used: number; cap: number; plan: string }): Email {
+  const pct = Math.round((d.used / d.cap) * 100);
+  return {
+    subject: cleanSubject(`Vas en ${pct}% de tus reenvíos del mes`),
+    html: layout({
+      preheader: `${d.used.toLocaleString("es-MX")} de ${d.cap.toLocaleString("es-MX")} correos reenviados este mes.`,
+      heading: "Tus reenvíos del mes van altos",
+      body: p(`Tu plan ${d.plan} incluye ${d.cap.toLocaleString("es-MX")} correos reenviados al mes y ya llevas ${d.used.toLocaleString("es-MX")}.`)
+        + p("Si llegas al tope, el correo seguirá llegando a tu Bandeja de MailMask pero dejará de reenviarse a tu buzón externo hasta el día 1 del mes siguiente."),
+      cta: { label: "Ver mi uso", url: `${baseUrl()}/app` },
+      footerNote: "Si recibes volumen de verdad, escríbenos y lo ajustamos. Si es spam a un catch-all, desactívalo desde el panel.",
+    }),
+    text: textBlock([
+      `Tu plan ${d.plan} incluye ${d.cap} correos reenviados al mes y ya llevas ${d.used}.`,
+      "Si llegas al tope, el correo seguirá llegando a tu Bandeja de MailMask pero dejará de reenviarse a tu buzón externo hasta el día 1 del mes siguiente.",
+      `Ver mi uso: ${baseUrl()}/app`,
+    ]),
+  };
+}
+
+export function forwardCapReached(d: { cap: number; plan: string }): Email {
+  return {
+    subject: cleanSubject("Llegaste al tope de reenvíos del mes"),
+    html: layout({
+      preheader: "Tu correo sigue llegando a la Bandeja; el reenvío externo se reanuda el día 1.",
+      heading: "Tope de reenvíos alcanzado",
+      body: p(`Tu plan ${d.plan} incluye ${d.cap.toLocaleString("es-MX")} correos reenviados al mes y ya los usaste.`)
+        + p("Desde ahora el correo entrante se guarda en tu Bandeja de MailMask, donde puedes leerlo y responderlo, pero no se reenvía a tu buzón externo. El reenvío se reanuda solo el día 1 del mes siguiente."),
+      cta: { label: "Abrir la Bandeja", url: `${baseUrl()}/bandeja` },
+      footerNote: "¿Necesitas más? Contesta este correo y lo resolvemos.",
+    }),
+    text: textBlock([
+      `Tu plan ${d.plan} incluye ${d.cap} correos reenviados al mes y ya los usaste.`,
+      "El correo entrante se guarda en tu Bandeja de MailMask pero no se reenvía a tu buzón externo. Se reanuda el día 1 del mes siguiente.",
+      `Abrir la Bandeja: ${baseUrl()}/bandeja`,
+    ]),
+  };
+}
+
 // --- Envío ---
 
 /**
