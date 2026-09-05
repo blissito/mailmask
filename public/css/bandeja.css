@@ -1126,7 +1126,10 @@ body.mm-composer-locked { overflow: hidden; }
 
   /* Toolbar en dos filas: filtros arriba, acciones y búsqueda abajo */
   .mesa-toolbar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
-  .mesa-toolbar .mesa-select { flex: 1 1 30%; min-width: 0; font-size: 14px; padding: 9px 26px 9px 10px; }
+  .mesa-toolbar .mesa-select { flex: 1 1 24%; min-width: 0; font-size: 14px; padding: 9px 26px 9px 10px; }
+  .mesa-toolbar #domain-select { flex: 1.6 1 34%; }
+  /* Dentro de una conversación la toolbar sobra: la pantalla es para leer y responder */
+  body.mesa-mobile-detail .mesa-toolbar { display: none; }
   .mesa-toolbar-spacer { display: none; }
   .mesa-toolbar .mesa-action-btn { flex: 0 0 auto; min-height: 38px; padding: 8px 12px; font-size: 13px; }
   .mesa-search { flex: 1 1 100%; width: auto; font-size: 16px; padding: 9px 10px 9px 32px; }
