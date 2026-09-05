@@ -499,3 +499,5 @@ img.post-card-img {
   display: block;
   margin-top: 0.25rem;
 }
+
+.blog-content h2 { scroll-margin-top: 5rem; }

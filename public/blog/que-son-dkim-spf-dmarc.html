@@ -134,7 +134,7 @@
 
         <p>Imagina que pudieras enviar una carta por correo postal con el remitente que quisieras — sin verificación. Eso es exactamente lo que pasa con el email sin autenticación. SPF, DKIM y DMARC son los protocolos que se crearon para cerrar esa brecha.</p>
 
-        <h2>SPF: la lista de invitados</h2>
+        <h2 id="spf">SPF: la lista de invitados</h2>
 
         <h3>¿Qué es?</h3>
 
@@ -152,7 +152,7 @@
 
         <p>Sin SPF, un spammer puede enviar emails "desde" <code>tu@tudominio.com</code> usando cualquier servidor del mundo. Los filtros de Gmail y Outlook no tienen forma de saber si el email es legítimo o falso, así que probablemente lo manden a spam.</p>
 
-        <h2>DKIM: la firma digital</h2>
+        <h2 id="dkim">DKIM: la firma digital</h2>
 
         <h3>¿Qué es?</h3>
 
@@ -177,7 +177,7 @@ mnopqr._domainkey.tudominio.com → dkim3.proveedor.com</code></pre>
 
         <p>La clave privada se queda en el servidor y firma cada email automáticamente. Nunca la ves ni la tocas.</p>
 
-        <h2>DMARC: el árbitro</h2>
+        <h2 id="dmarc">DMARC: el árbitro</h2>
 
         <h3>¿Qué es?</h3>
 
