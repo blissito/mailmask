@@ -6,6 +6,7 @@ import * as path from "node:path";
 import * as dns from "node:dns/promises";
 import { programar, esServidor } from "./scheduler.js";
 import { revisarPatron } from "./regex-guard.js";
+import { verificarTurnstile } from "./turnstile.js";
 import { addSseClient, notifyBandeja, setPresence, clearPresence, listPresence, notifyPresence } from "./sse-hub.js";
 import { ftsDisponible } from "./pg.js";
 import { backfillPendiente } from "./search-backfill.js";
@@ -914,7 +915,7 @@ const app = new Elysia({ adapter: node() })
       );
       response.headers.set(
         "content-security-policy",
-        "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.clarity.ms; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms; connect-src 'self' https://www.formmy.app https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms; frame-src 'self' https://www.googletagmanager.com https://www.youtube-nocookie.com",
+        "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.clarity.ms; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms https://challenges.cloudflare.com; connect-src 'self' https://www.formmy.app https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms; frame-src 'self' https://www.googletagmanager.com https://www.youtube-nocookie.com https://challenges.cloudflare.com",
       );
     }
     return response;
@@ -1025,6 +1026,18 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
 
+    // El captcha va antes que nada: es lo que evita el alta masiva de cuentas, que
+    // además dispara un correo de verificación por las nuestras y ensucia el
+    // programa de referidos.
+    const captcha = await verificarTurnstile((body as Record<string, unknown>).turnstileToken, ip);
+    if (!captcha.ok) {
+      log("warn", "auth", "Registro rechazado por Turnstile", { ip, codes: captcha.errores });
+      return new Response(
+        JSON.stringify({ error: "No pudimos verificar que eres humano. Recarga la página e inténtalo de nuevo." }),
+        { status: 400 },
+      );
+    }
+
     const email = (body.email ?? "").toLowerCase().trim();
     const password = body.password;
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
@@ -1075,6 +1088,7 @@ const app = new Elysia({ adapter: node() })
       email: t.String(),
       password: t.String({ minLength: 8 }),
       ref: t.Optional(t.String()),
+      turnstileToken: t.Optional(t.String()),
     }),
     detail: { tags: ["Auth"], summary: "Register a new user account" },
   })

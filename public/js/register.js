@@ -32,6 +32,16 @@ document.getElementById("register-form").addEventListener("submit", async (e) =>
   errEl.classList.add("hidden");
 
   const ref = localStorage.getItem("mailmask_ref") || new URLSearchParams(location.search).get("ref") || undefined;
+
+  // Turnstile deja el token en un input oculto que inyecta el widget. Si el reto
+  // aún no terminó, el campo está vacío y el servidor lo rechaza: mejor decirlo
+  // aquí que mandar una alta que va a fallar.
+  const turnstileToken = form.querySelector('[name="cf-turnstile-response"]')?.value || "";
+  if (window.turnstile && !turnstileToken) {
+    errEl.textContent = "Espera a que termine la verificación de seguridad.";
+    errEl.classList.remove("hidden");
+    return;
+  }
   const res = await fetch("/api/auth/register", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -39,6 +49,7 @@ document.getElementById("register-form").addEventListener("submit", async (e) =>
       email: form.email.value,
       password: form.password.value,
       ref,
+      turnstileToken,
     }),
   });
 
@@ -50,6 +61,9 @@ document.getElementById("register-form").addEventListener("submit", async (e) =>
     const data = await res.json();
     errEl.textContent = data.error || "Error al crear cuenta";
     errEl.classList.remove("hidden");
+    // Cada token de Turnstile sirve una sola vez: sin reiniciarlo, el segundo
+    // intento fallaría siempre aunque el usuario corrija el correo.
+    window.turnstile?.reset();
   }
 });
 

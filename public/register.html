@@ -105,6 +105,9 @@
           </button>
         </div>
       </div>
+      <!-- Turnstile: la clave del sitio es pública por diseño; la secreta vive en
+           las variables de entorno del servidor y nunca sale al navegador. -->
+      <div class="cf-turnstile" data-sitekey="0x4AAAAAAEqYFUaX3gF7FJ26" data-theme="auto" data-language="es"></div>
       <div id="error" class="text-red-500 text-sm hidden"></div>
       <button type="submit"
         class="btn-primary w-full">
@@ -117,6 +120,7 @@
     </p>
   </div>
 
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <script src="/js/toggle-password.js"></script>
   <script src="/js/register.js"></script>
 </body>
