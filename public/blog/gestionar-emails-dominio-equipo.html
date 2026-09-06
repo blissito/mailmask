@@ -22,6 +22,7 @@
     <meta property="og:image:type" content="image/jpeg" />
     <meta name="twitter:image" content="https://www.mailmask.studio/blog/img/equipo-og.jpg" />
     <meta property="article:published_time" content="2026-02-21" />
+    <meta property="article:modified_time" content="2026-09-06" />
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@HectorBlisS" />
@@ -42,7 +43,7 @@
       "headline": "Cómo gestionar emails de tu dominio en equipo sin Gmail",
       "description": "Aliases por área, múltiples destinatarios y bandeja compartida desde $49 MXN/mes.",
       "datePublished": "2026-02-21",
-      "dateModified": "2026-08-12",
+      "dateModified": "2026-09-06",
       "image": "https://www.mailmask.studio/blog/img/equipo.jpg",
       "author": { "@type": "Organization", "name": "MailMask" },
       "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
@@ -60,6 +61,54 @@
       ]
     }
     </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Cómo evito que dos personas respondan el mismo email?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Con una bandeja compartida que avise mientras pasa. La Bandeja de MailMask muestra si otra persona tiene abierta la misma conversación y, aparte, si está escribiendo una respuesta. En un Gmail con la contraseña repartida no hay forma de saberlo: por eso las respuestas duplicadas son el problema típico de ese arreglo."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Se puede compartir un buzón de Gmail con el equipo?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Se puede, compartiendo la contraseña, pero Gmail no fue diseñado para acceso simultáneo: pide verificación, bloquea sesiones y manda alertas. Además no hay asignación ni forma de ver quién se encarga de qué. La alternativa oficial es Google Workspace con delegación de buzón, que cuesta 140 MXN por usuario al mes."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cuánto cuesta una bandeja compartida para un equipo de 5 personas?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "En MailMask, 299 MXN al mes en total con el plan Equipo: 5 personas por dominio, sin cobro por agente. Google Workspace serían 700 MXN al mes (140 por usuario) y un helpdesk como Help Scout o Front ronda los 25 USD por asiento, unos 2,300 MXN para cinco personas."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cada persona del equipo tiene su propio estado de leído?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí. Que un compañero abra una conversación no te la marca leída a ti, y el estado sobrevive a recargar o cambiar de computadora. Es lo que permite usar la bandeja compartida como bandeja personal sin pisarse."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Puedo buscar dentro del texto de los correos del equipo?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí, con acentos o sin ellos, y muestra el fragmento donde apareció la palabra. Un servicio de reenvío puro no puede: no guarda el contenido del correo, así que no tiene dónde buscar."
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body class="site bg-bg text-fg antialiased min-h-screen">
     <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4 border-b border-line/70 bg-bg/85 backdrop-blur">
@@ -73,7 +122,7 @@
         <h1>Cómo gestionar emails de tu dominio en equipo sin Gmail</h1>
         <div class="meta">
           <span>📅 21 Feb 2026</span>
-          <span>⏱ 5 min de lectura</span>
+          <span>⏱ 9 min de lectura</span>
         </div>
       </header>
 
@@ -130,58 +179,144 @@
           <li><strong>Responder desde tu dominio:</strong> contestas como <code>soporte@tudominio.com</code> directamente desde la bandeja — el cliente nunca ve tu email personal.</li>
         </ul>
 
+        <h2>El problema que Gmail no puede resolver: dos personas a la vez</h2>
+
+        <p>Asignar reparte el trabajo, pero llega tarde para el caso más común. El email entra, tres personas lo ven, dos lo abren <em>al mismo tiempo</em> y las dos empiezan a escribir. Nadie hizo nada mal: nadie tenía cómo saberlo.</p>
+
+        <p>La Bandeja avisa mientras pasa. Si abres una conversación que otra persona ya tiene abierta, lo dice arriba del hilo; si esa persona empieza a escribir, también. Y en la lista, esas conversaciones llevan un punto, así que lo ves <em>antes</em> de entrar.</p>
+
+        <p>Esto es lo que un buzón compartido no puede darte por diseño. Gmail no sabe que ustedes son un equipo: sabe que alguien inició sesión.</p>
+
+        <figure style="margin:36px 0">
+          <svg viewBox="0 0 700 250" width="100%" height="auto" role="img"
+               aria-label="Comparación: en un Gmail compartido dos personas responden el mismo correo; en una bandeja compartida el sistema avisa"
+               style="max-width:700px;display:block;margin:0 auto">
+            <style>
+              .g-caja { fill: rgb(var(--bg-elev)); stroke: rgb(var(--line)); stroke-width: 1.5; rx: 10; }
+              .g-mal { stroke: rgb(var(--accent)); }
+              .g-bien { stroke: rgb(var(--mask-600)); fill: rgb(var(--mask-500) / .10); }
+              .g-tit { fill: rgb(var(--fg)); font: 700 13px Inter, system-ui, sans-serif; }
+              .g-rot { fill: rgb(var(--fg)); font: 600 12px Inter, system-ui, sans-serif; }
+              .g-sub { fill: rgb(var(--fg-muted)); font: 400 11px Inter, system-ui, sans-serif; }
+              .g-linea { stroke: rgb(var(--fg-subtle)); stroke-width: 1.4; fill: none; }
+            </style>
+
+            <text class="g-tit" x="10" y="18">Gmail compartido</text>
+            <rect class="g-caja" x="10" y="30" width="120" height="46" />
+            <text class="g-rot" x="70" y="50" text-anchor="middle">Llega a</text>
+            <text class="g-sub" x="70" y="66" text-anchor="middle">soporte@</text>
+            <path class="g-linea" d="M130,44 L190,44" />
+            <path class="g-linea" d="M130,62 L190,62" />
+            <rect class="g-caja g-mal" x="192" y="24" width="130" height="30" />
+            <text class="g-sub" x="257" y="44" text-anchor="middle">María responde</text>
+            <rect class="g-caja g-mal" x="192" y="60" width="130" height="30" />
+            <text class="g-sub" x="257" y="80" text-anchor="middle">Carlos responde</text>
+            <text class="g-sub" x="334" y="60">El cliente recibe dos respuestas distintas.</text>
+
+            <line x1="10" y1="112" x2="690" y2="112" stroke="rgb(var(--line))" stroke-width="1" />
+
+            <text class="g-tit" x="10" y="140">Bandeja compartida</text>
+            <rect class="g-caja" x="10" y="152" width="120" height="46" />
+            <text class="g-rot" x="70" y="172" text-anchor="middle">Llega a</text>
+            <text class="g-sub" x="70" y="188" text-anchor="middle">soporte@</text>
+            <path class="g-linea" d="M130,175 L190,175" />
+            <rect class="g-caja g-bien" x="192" y="152" width="150" height="46" />
+            <text class="g-rot" x="267" y="172" text-anchor="middle">María la abre</text>
+            <text class="g-sub" x="267" y="188" text-anchor="middle">y empieza a escribir</text>
+            <path class="g-linea" d="M342,175 L402,175" />
+            <rect class="g-caja g-bien" x="404" y="152" width="200" height="46" />
+            <text class="g-sub" x="504" y="172" text-anchor="middle">Carlos ve: “María está</text>
+            <text class="g-sub" x="504" y="188" text-anchor="middle">escribiendo…” y sigue con otro</text>
+
+            <text class="g-sub" x="10" y="232">La diferencia no es la función, es que el sistema sepa que ustedes son un equipo.</text>
+          </svg>
+          <figcaption style="text-align:center;color:rgb(var(--fg-muted));font-size:13px;margin-top:10px">El mismo correo, con y sin aviso de colisión.</figcaption>
+        </figure>
+
+        <h2>Cada quien con su propio “sin leer”</h2>
+
+        <p>En un buzón compartido, cuando alguien abre un correo queda leído <em>para todos</em>. El resto del equipo pierde su única señal de qué falta por revisar.</p>
+
+        <p>En la Bandeja, el no leído es de cada persona: que tu compañera ya lo haya visto no te lo marca leído a ti, y el estado sobrevive a recargar o a cambiar de computadora. Puedes filtrar por <strong>No leídas</strong> y usar la bandeja compartida como si fuera tu bandeja personal, sin pisarse con nadie.</p>
+
+        <h2>Y puedes buscar dentro de los correos</h2>
+
+        <p>Tres meses después alguien pregunta por «la cotización de ese proyecto». No recuerdas el asunto ni quién la mandó, solo una palabra que iba <em>dentro</em> del mensaje. En la Bandeja la escribes y aparece la conversación, con el fragmento resaltado — con acentos o sin ellos.</p>
+
+        <p>Un servicio de reenvío puro no puede hacerlo, y no por falta de ganas: no guarda el contenido del correo, así que no tiene dónde buscar. Es la misma razón por la que tampoco pueden ofrecer historial, notas internas ni asignación.</p>
+
         <h2>Comparativa rápida</h2>
 
         <table style="width:100%;border-collapse:collapse;margin:1.5rem 0">
           <thead>
-            <tr style="border-bottom:2px solid #3f3f46">
-              <th style="text-align:left;padding:0.75rem;color:#a1a1aa"></th>
-              <th style="text-align:left;padding:0.75rem;color:#a1a1aa">Gmail compartido</th>
-              <th style="text-align:left;padding:0.75rem;color:#a1a1aa">MailMask</th>
-              <th style="text-align:left;padding:0.75rem;color:#a1a1aa">Helpscout / Freshdesk</th>
+            <tr style="border-bottom:2px solid rgb(var(--fg-subtle))">
+              <th style="text-align:left;padding:0.75rem;color:rgb(var(--fg-muted))"></th>
+              <th style="text-align:left;padding:0.75rem;color:rgb(var(--fg-muted))">Gmail compartido</th>
+              <th style="text-align:left;padding:0.75rem;color:rgb(var(--fg-muted))">MailMask</th>
+              <th style="text-align:left;padding:0.75rem;color:rgb(var(--fg-muted))">Helpscout / Freshdesk</th>
             </tr>
           </thead>
           <tbody>
-            <tr style="border-bottom:1px solid #27272a">
+            <tr style="border-bottom:1px solid rgb(var(--line))">
               <td style="padding:0.75rem;font-weight:600">Costo mensual</td>
               <td style="padding:0.75rem">Gratis (con limitaciones)</td>
               <td style="padding:0.75rem">Desde $49 MXN</td>
               <td style="padding:0.75rem">$400+ MXN por agente</td>
             </tr>
-            <tr style="border-bottom:1px solid #27272a">
-              <td style="padding:0.75rem;font-weight:600">Aliases ilimitados</td>
-              <td style="padding:0.75rem">No</td>
-              <td style="padding:0.75rem">Sí</td>
+            <tr style="border-bottom:1px solid rgb(var(--line))">
+              <td style="padding:0.75rem;font-weight:600">Aliases</td>
+              <td style="padding:0.75rem">Uno solo</td>
+              <td style="padding:0.75rem">10 en Básico · ilimitados en Equipo</td>
               <td style="padding:0.75rem">Limitados</td>
             </tr>
-            <tr style="border-bottom:1px solid #27272a">
+            <tr style="border-bottom:1px solid rgb(var(--line))">
               <td style="padding:0.75rem;font-weight:600">Múltiples destinatarios</td>
               <td style="padding:0.75rem">No</td>
               <td style="padding:0.75rem">Sí</td>
               <td style="padding:0.75rem">Sí</td>
             </tr>
-            <tr style="border-bottom:1px solid #27272a">
+            <tr style="border-bottom:1px solid rgb(var(--line))">
               <td style="padding:0.75rem;font-weight:600">Asignación de emails</td>
               <td style="padding:0.75rem">No</td>
               <td style="padding:0.75rem">Sí</td>
               <td style="padding:0.75rem">Sí</td>
             </tr>
-            <tr style="border-bottom:1px solid #27272a">
+            <tr style="border-bottom:1px solid rgb(var(--line))">
               <td style="padding:0.75rem;font-weight:600">Bandeja compartida</td>
               <td style="padding:0.75rem">No</td>
               <td style="padding:0.75rem">Sí</td>
               <td style="padding:0.75rem">Sí</td>
             </tr>
-            <tr>
+            <tr style="border-bottom:1px solid rgb(var(--line))">
               <td style="padding:0.75rem;font-weight:600">Dominio propio</td>
               <td style="padding:0.75rem">Requiere Workspace</td>
               <td style="padding:0.75rem">Incluido</td>
               <td style="padding:0.75rem">Incluido</td>
             </tr>
+            <tr style="border-bottom:1px solid rgb(var(--line))">
+              <td style="padding:0.75rem;font-weight:600">Aviso si otro ya está contestando</td>
+              <td style="padding:0.75rem">No</td>
+              <td style="padding:0.75rem">Sí</td>
+              <td style="padding:0.75rem">Sí</td>
+            </tr>
+            <tr style="border-bottom:1px solid rgb(var(--line))">
+              <td style="padding:0.75rem;font-weight:600">Sin leer por persona</td>
+              <td style="padding:0.75rem">No: leído por uno, leído para todos</td>
+              <td style="padding:0.75rem">Sí</td>
+              <td style="padding:0.75rem">Sí</td>
+            </tr>
+            <tr>
+              <td style="padding:0.75rem;font-weight:600">Buscar dentro del correo</td>
+              <td style="padding:0.75rem">Sí</td>
+              <td style="padding:0.75rem">Sí</td>
+              <td style="padding:0.75rem">Sí</td>
+            </tr>
           </tbody>
         </table>
 
-        <p>MailMask te da las funciones clave de un helpdesk (bandeja compartida, asignación, respuesta desde dominio) al precio de un café, sin la complejidad de configurar Freshdesk o pagar $450 MXN por agente en Help Scout.</p>
+        <p>MailMask te da las funciones clave de un helpdesk —bandeja compartida, asignación, aviso de colisión, respuesta desde tu dominio— sin la complejidad de configurar Freshdesk ni el cobro por agente. Para un equipo de 5 personas: <strong>$299 MXN al mes en total</strong> con el plan Equipo, contra $700 de Google Workspace o unos $2,300 de un helpdesk a $25 USD por asiento.</p>
+
+        <p>Nótese la última fila: buscar dentro del correo lo hacen los tres. Lo que <em>no</em> lo hace es un servicio de reenvío puro, que es la otra alternativa barata que se suele considerar — y que además no da bandeja, ni asignación, ni historial.</p>
 
         <h2>Cómo empezar en 4 pasos</h2>
 
@@ -194,9 +329,28 @@
 
         <p>Todo el proceso toma menos de 5 minutos. Y tu equipo puede empezar a colaborar desde el primer email que llegue.</p>
 
+        <h2>Preguntas frecuentes</h2>
+
+        <h3>¿Cómo evito que dos personas respondan el mismo email?</h3>
+        <p>Con una bandeja que te avise mientras pasa: la Bandeja de MailMask muestra si otra persona tiene abierta la misma conversación y, aparte, si está escribiendo. En un Gmail con la contraseña repartida no hay forma de saberlo, y por eso las respuestas duplicadas son el problema típico de ese arreglo.</p>
+
+        <h3>¿Se puede compartir un buzón de Gmail con el equipo?</h3>
+        <p>Se puede compartiendo la contraseña, pero Gmail no fue diseñado para acceso simultáneo: pide verificación, bloquea sesiones y manda alertas de seguridad. Y no hay asignación ni forma de ver quién se encarga de qué. La alternativa oficial es Google Workspace con delegación de buzón, a $140 MXN por usuario al mes.</p>
+
+        <h3>¿Cuánto cuesta una bandeja compartida para 5 personas?</h3>
+        <p>$299 MXN al mes en total con el plan Equipo, sin cobro por agente. Google Workspace serían $700 (5 × $140) y un helpdesk como Help Scout o Front ronda los $25 USD por asiento: unos $2,300 MXN para el mismo equipo.</p>
+
+        <h3>¿Cada persona tiene su propio estado de leído?</h3>
+        <p>Sí. Que un compañero abra una conversación no te la marca leída a ti, y el estado sobrevive a recargar o cambiar de computadora.</p>
+
+        <h3>¿Puedo buscar dentro del texto de los correos del equipo?</h3>
+        <p>Sí, con acentos o sin ellos, y te muestra el fragmento donde apareció la palabra. Un servicio de reenvío puro no puede: no guarda el contenido, así que no tiene dónde buscar.</p>
+
         <h2>Conclusión</h2>
 
-        <p>Compartir un Gmail no escala. Las herramientas de helpdesk son caras para lo que necesitas. MailMask te da el punto medio perfecto: aliases profesionales con tu dominio, múltiples destinatarios para que todo el equipo reciba los emails, y una bandeja compartida para que nadie se pierda. Todo desde $49 MXN/mes.</p>
+        <p>Compartir un Gmail no escala, y no por falta de disciplina del equipo: la herramienta no sabe que ustedes son un equipo. Los helpdesks sí lo saben, pero cobran por cabeza justo cuando el equipo crece.</p>
+
+        <p>MailMask es el punto medio: aliases con tu dominio, la opción de reenviar a varias personas, y una bandeja compartida que reparte el trabajo, avisa cuando dos van sobre lo mismo, guarda cada quien su propio sin leer y deja buscar dentro de los correos. Desde $49 MXN al mes, y $299 para cinco personas — por dominio, no por persona.</p>
       </div>
     </article>
 
