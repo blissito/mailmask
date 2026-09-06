@@ -7,6 +7,8 @@ import * as dns from "node:dns/promises";
 import { programar, esServidor } from "./scheduler.js";
 import { revisarPatron } from "./regex-guard.js";
 import { addSseClient, notifyBandeja } from "./sse-hub.js";
+import { ftsDisponible } from "./pg.js";
+import { backfillPendiente } from "./search-backfill.js";
 import { db } from "./pg.js";
 import { users as usersTable, tokens as tokensTable } from "./schema.js";
 import { eq } from "drizzle-orm";
@@ -74,6 +76,11 @@ import {
   updateConversation,
   listMessages,
   addMessage,
+  indexMessage,
+  countMessages,
+  searchConversations,
+  listConversationsPage,
+  listConversationAliases,
   addNote,
   listNotes,
   createAgent,
@@ -4065,6 +4072,11 @@ const app = new Elysia({ adapter: node() })
     const domainId = url.searchParams.get("domainId");
     const status = url.searchParams.get("status") ?? undefined;
     const assignedTo = url.searchParams.get("assignedTo") ?? undefined;
+    const to = url.searchParams.get("to") ?? undefined;
+    const q = (url.searchParams.get("q") ?? "").trim();
+    const cursor = url.searchParams.get("cursor") ?? undefined;
+    const limitRaw = parseInt(url.searchParams.get("limit") ?? "", 10);
+    const limit = Number.isFinite(limitRaw) ? limitRaw : undefined;
 
     if (!domainId) {
       return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
@@ -4079,24 +4091,47 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Sin acceso a este dominio" }), { status: 403 });
     }
 
-    let convs = await listConversations(domainId, { status, assignedTo });
+    // Búsqueda: no pagina (no hay un orden estable por fecha cuando se ordena
+    // por relevancia), devuelve un tope duro de 50 y de ahí se refina la consulta.
+    if (q) {
+      const encontradas = searchConversations(domainId, q, { status, assignedTo, to });
+      return new Response(JSON.stringify({
+        items: encontradas,
+        nextCursor: null,
+        aliases: listConversationAliases(domainId),
+        mode: ftsDisponible ? "search" : "search-degraded",
+        backfillPendiente: backfillPendiente(),
+      }), { headers: { "content-type": "application/json" } });
+    }
 
-    // Auto-rebuild from S3 only if domain has zero conversations (including deleted)
-    const hasDeletedConvs = convs.length === 0 && listConversations(domainId, { status: "deleted" }).length > 0;
-    if (convs.length === 0 && !hasDeletedConvs && domain.domain) {
-      try {
-        const rebuilt = await rebuildConversationsFromS3(domainId, domain.domain);
-        if (rebuilt > 0) {
-          convs = await listConversations(domainId, { status, assignedTo });
+    const primeraPagina = !cursor;
+    let pagina = listConversationsPage(domainId, { status, assignedTo, to, limit, cursor });
+
+    // El rebuild desde S3 es una operación completa dentro del request, así que
+    // sólo se dispara en la vista sin filtros ni cursor: con paginación, una
+    // página vacía por filtro lo activaría espuriamente en cada búsqueda.
+    const sinFiltros = primeraPagina && !status && !assignedTo && !to;
+    if (sinFiltros && pagina.items.length === 0 && domain.domain) {
+      const hayBorradas = listConversations(domainId, { status: "deleted" }).length > 0;
+      if (!hayBorradas) {
+        try {
+          const rebuilt = await rebuildConversationsFromS3(domainId, domain.domain);
+          if (rebuilt > 0) pagina = listConversationsPage(domainId, { limit });
+        } catch (err) {
+          console.error("Mesa rebuild from S3 failed:", err);
         }
-      } catch (err) {
-        console.error("Mesa rebuild from S3 failed:", err);
       }
     }
 
-    return new Response(JSON.stringify(convs), {
-      headers: { "content-type": "application/json" },
-    });
+    return new Response(JSON.stringify({
+      items: pagina.items,
+      nextCursor: pagina.nextCursor,
+      // Los aliases sólo en la primera página: no cambian al paginar y el
+      // cliente ya no puede derivarlos, porque sólo ve la página que tiene.
+      aliases: primeraPagina ? listConversationAliases(domainId) : undefined,
+      mode: "list",
+      backfillPendiente: primeraPagina ? backfillPendiente() : undefined,
+    }), { headers: { "content-type": "application/json" } });
   }, {
     detail: { tags: ["Bandeja"], summary: "List conversations for a domain", security: [{ cookieAuth: [] }] },
   })
@@ -4121,9 +4156,14 @@ const app = new Elysia({ adapter: node() })
     const conv = await getConversation(domainId, params.id);
     if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
 
-    const [rawMessages, notes] = await Promise.all([
-      listMessages(conv.id),
+    // Sólo el tramo más reciente. Abajo se hace un GET a S3 por cada mensaje sin
+    // cuerpo, en Promise.all sin límite de concurrencia: un hilo de 200 mensajes
+    // eran 200 GET en paralelo dentro de un request, con su riesgo de throttling.
+    const before = url.searchParams.get("before") ?? undefined;
+    const [rawMessages, notes, total] = await Promise.all([
+      listMessages(conv.id, { limit: 30, before }),
       listNotes(conv.id),
+      countMessages(conv.id),
     ]);
 
     // Fetch body from S3 on demand for inbound messages
@@ -4141,7 +4181,14 @@ const app = new Elysia({ adapter: node() })
       return msg;
     }));
 
-    return new Response(JSON.stringify({ ...conv, messages, notes }), {
+    return new Response(JSON.stringify({
+      ...conv,
+      messages,
+      notes,
+      // total contra messages.length: dice si quedan mensajes anteriores por cargar.
+      totalMessages: total,
+      hasMore: messages.length < total,
+    }), {
       headers: { "content-type": "application/json" },
     });
   }, {
@@ -4332,7 +4379,7 @@ const app = new Elysia({ adapter: node() })
         threadReferences: [messageId],
       });
 
-      await addMessage({
+      const outMsg = await addMessage({
         conversationId: conv.id,
         from: fromAddress,
         body: rendered.text,
@@ -4344,6 +4391,14 @@ const app = new Elysia({ adapter: node() })
         createdAt: new Date().toISOString(),
         messageId,
         sesMessageId: composeSesId || undefined,
+      });
+      indexMessage({
+        messageId: outMsg.id,
+        conversationId: conv.id,
+        domainId: domain.id,
+        from: fromAddress,
+        subject: String(subject),
+        text: rendered.text ?? "",
       });
 
       // El messageId queda en el log a propósito: es la referencia que debería aparecer
@@ -4722,7 +4777,7 @@ const app = new Elysia({ adapter: node() })
       await discardSentImages(withImages.inlineImages);
       await discardSentFiles(sentFileKeys);
 
-      await addMessage({
+      const replyMsg = await addMessage({
         conversationId: conv.id,
         from: fromAddress,
         body: rendered.text,
@@ -4732,6 +4787,14 @@ const app = new Elysia({ adapter: node() })
         createdAt: new Date().toISOString(),
         messageId,
         sesMessageId: sesMessageId || undefined,
+      });
+      indexMessage({
+        messageId: replyMsg.id,
+        conversationId: conv.id,
+        domainId,
+        from: fromAddress,
+        subject: conv.subject,
+        text: rendered.text ?? "",
       });
 
       await updateConversation(domainId, conv.id, {

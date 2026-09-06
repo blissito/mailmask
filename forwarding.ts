@@ -1,4 +1,4 @@
-import { getDomainByName, getAlias, isSuppressed, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, incrementMonthlyForwards, getMonthlyForwards, claimOnce, planLabel, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, type Rule, type ForwardQueueItem } from "./db.js";
+import { getDomainByName, getAlias, isSuppressed, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, incrementMonthlyForwards, getMonthlyForwards, claimOnce, planLabel, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, indexMessage, type Rule, type ForwardQueueItem } from "./db.js";
 import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchEmailHeadersFromS3, sendFromDomain } from "./ses.js";
 import { sendTemplate, firstEmailReceived, forwardCapWarning, forwardCapReached } from "./emails.js";
 import { checkRateLimit } from "./rate-limit.js";
@@ -254,7 +254,7 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
 
   if (conv) {
     // Add message to existing conversation
-    await addMessage({
+    const msg = await addMessage({
       conversationId: conv.id,
       from,
       s3Bucket,
@@ -262,6 +262,16 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
       direction: "inbound",
       createdAt: new Date().toISOString(),
       messageId: messageIdHeader,
+    });
+    // El cuerpo del entrante NO se guarda en messages.body a propósito (ver el
+    // comentario en db.ts): su texto plano sólo vive en el índice de búsqueda.
+    indexMessage({
+      messageId: msg.id,
+      conversationId: conv.id,
+      domainId,
+      from,
+      subject: conv.subject,
+      text: rawContent ? extractPlainBody(rawContent) : "",
     });
     const newRefs = [...new Set([...conv.threadReferences, ...references])];
     await updateConversation(domainId, conv.id, {
@@ -297,7 +307,7 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
       tags: [],
       threadReferences: initialRefs,
     });
-    await addMessage({
+    const msg = await addMessage({
       conversationId: conv.id,
       from,
       s3Bucket,
@@ -305,6 +315,14 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
       direction: "inbound",
       createdAt: new Date().toISOString(),
       messageId: messageIdHeader,
+    });
+    indexMessage({
+      messageId: msg.id,
+      conversationId: conv.id,
+      domainId,
+      from,
+      subject,
+      text: rawContent ? extractPlainBody(rawContent) : "",
     });
     log("info", "mesa", "Inbound created new conversation", {
       conversationId: conv.id,

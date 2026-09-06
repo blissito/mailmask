@@ -1,4 +1,5 @@
-import { db, sqlite } from "./pg.js";
+import { db, sqlite, ftsDisponible } from "./pg.js";
+import { sanitizarConsultaFts, escaparLike } from "./search-query.js";
 import { eq, and, gt, lte, lt, sql as rawSql, inArray, isNull, isNotNull, desc, asc, count, sum } from "drizzle-orm";
 import {
   users,
@@ -1328,6 +1329,14 @@ export function purgeDeletedConversations(days: number): { s3Bucket: string; s3K
   `).all(cutoff) as any[];
   const s3Keys = s3Rows.map((r: any) => ({ s3Bucket: r.s3_bucket, s3Key: r.s3_key }));
 
+  // El índice de búsqueda no cae con el CASCADE: messages_fts es una tabla
+  // virtual sin claves foráneas. Se poda a mano o quedan huérfanos que harían
+  // aparecer en resultados hilos que ya no existen.
+  const convsAPurgar = sqlite.prepare(
+    `SELECT id FROM conversations WHERE deleted_at IS NOT NULL AND deleted_at < ?`
+  ).all(cutoff) as { id: string }[];
+  for (const c of convsAPurgar) deleteFtsForConversation(c.id);
+
   // Delete conversations (CASCADE handles messages + notes)
   db.delete(conversations)
     .where(and(isNotNull(conversations.deletedAt), lt(conversations.deletedAt, cutoff)))
@@ -1350,6 +1359,11 @@ export function addMessage(msg: Omit<Message, "id">): Message {
     messageId: msg.messageId ?? null,
     sesMessageId: msg.sesMessageId ?? null,
     deliveryStatus: msg.deliveryStatus ?? (msg.direction === "outbound" ? "sent" : null),
+    // El createdAt que manda el llamador se estaba descartando: la columna tiene
+    // un default de "ahora" y esta línea faltaba. Importa en
+    // rebuildConversationsFromS3, que pasa la fecha real del correo sacada de S3
+    // y hasta ahora veía todo el hilo fechado en el instante de la reconstrucción.
+    createdAt: msg.createdAt ?? new Date().toISOString(),
   }).returning().all();
   return rowToMessage(rows[0]);
 }
@@ -1378,12 +1392,45 @@ export function setLogDelivery(sesMessageId: string, status: EmailLog["status"] 
   return db.update(emailLogs).set(set).where(eq(emailLogs.sesMessageId, sesMessageId)).returning({ id: emailLogs.id }).all().length > 0;
 }
 
-export function listMessages(conversationId: string): Message[] {
+/**
+ * Mensajes de un hilo, en orden ascendente.
+ *
+ * `opts` es opcional a propósito: los llamadores que quieren el hilo entero no
+ * cambian. Con `limit` devuelve el TRAMO MÁS RECIENTE (no los primeros), que es
+ * lo que se quiere al abrir una conversación: el detalle hace un GET a S3 por
+ * cada mensaje sin cuerpo, así que un hilo de 200 mensajes eran 200 GET en
+ * paralelo dentro de un request.
+ */
+export function listMessages(conversationId: string, opts?: { limit?: number; before?: string }): Message[] {
+  // El desempate por id no es cosmético: dos mensajes de un mismo hilo caen
+  // en el mismo milisegundo con facilidad (una reconstrucción desde S3, o un
+  // envío con copias), y sin él SQLite devuelve el empate en un orden arbitrario
+  // que puede cambiar entre consultas — la ventana "los 30 más recientes"
+  // dejaría fuera mensajes al azar.
+  if (!opts?.limit && !opts?.before) {
+    const rows = db.select().from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(asc(messages.createdAt), asc(messages.id))
+      .all();
+    return rows.map(rowToMessage);
+  }
+
+  const conditions = [eq(messages.conversationId, conversationId)];
+  if (opts.before) conditions.push(lt(messages.createdAt, opts.before));
+
   const rows = db.select().from(messages)
-    .where(eq(messages.conversationId, conversationId))
-    .orderBy(asc(messages.createdAt))
+    .where(and(...conditions))
+    .orderBy(desc(messages.createdAt), desc(messages.id))
+    .limit(opts.limit ?? 30)
     .all();
-  return rows.map(rowToMessage);
+  return rows.map(rowToMessage).reverse();
+}
+
+export function countMessages(conversationId: string): number {
+  const row = sqlite
+    .prepare(`SELECT COUNT(*) AS n FROM messages WHERE conversation_id = ?`)
+    .get(conversationId) as { n: number };
+  return row.n;
 }
 
 // --- Notes ---
@@ -2093,4 +2140,321 @@ export function deleteCannedResponse(id: string, domainId: string): boolean {
   const res = db.delete(cannedResponses)
     .where(and(eq(cannedResponses.id, id), eq(cannedResponses.domainId, domainId))).run();
   return res.changes > 0;
+}
+
+// --- Búsqueda y paginación de la Bandeja ---
+//
+// El índice de texto completo (messages_fts) se crea en pg.ts, no en una
+// migración: ver el comentario ahí. Se mantiene con escrituras explícitas desde
+// aquí y no con triggers de SQLite, por tres razones concretas:
+//   1. El texto indexado no sale de ninguna columna de `messages`: viene de
+//      extractPlainBody(rawContent), que se calcula en JS. Un trigger no puede
+//      producirlo.
+//   2. Denormalizamos domain_id y subject, que viven en `conversations`.
+//   3. El repo ya usa SQL crudo explícito para esto (findConversationByThread).
+//
+// El texto plano de los entrantes vive SÓLO aquí dentro. No se rellena
+// messages.body: ese NULL es un invariante activo — main.ts decide con
+// `if (s3Bucket && s3Key && !body)` si baja el MIME de S3, que es lo único que
+// trae el HTML y los adjuntos. S3 sigue siendo la fuente de verdad; la FTS es un
+// índice derivado y reconstruible.
+
+/** Tope por mensaje. Lo que pasa de aquí son firmas y citas anidadas. */
+export const MAX_TEXTO_INDEXADO = 32 * 1024;
+
+export function indexMessage(args: {
+  messageId: string;
+  conversationId: string;
+  domainId: string;
+  from: string;
+  subject: string;
+  text: string;
+}): void {
+  if (!ftsDisponible) return;
+  // Indexar jamás debe tumbar la recepción de un correo.
+  try {
+    const texto = (args.text ?? "").slice(0, MAX_TEXTO_INDEXADO);
+    sqlite.transaction(() => {
+      sqlite.prepare(`DELETE FROM messages_fts WHERE message_id = ?`).run(args.messageId);
+      sqlite.prepare(
+        `INSERT INTO messages_fts (message_id, conversation_id, domain_id, sender, subject, body)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(args.messageId, args.conversationId, args.domainId, args.from ?? "", args.subject ?? "", texto);
+      sqlite.prepare(
+        `INSERT INTO search_index_state (message_id, indexed_at, status, error)
+         VALUES (?, ?, 'ok', NULL)
+         ON CONFLICT(message_id) DO UPDATE SET indexed_at = excluded.indexed_at, status = 'ok', error = NULL`
+      ).run(args.messageId, new Date().toISOString());
+    })();
+  } catch (err) {
+    console.error("indexMessage falló:", args.messageId, String(err));
+  }
+}
+
+export function markIndexState(messageId: string, status: "ok" | "error" | "skipped", error?: string): void {
+  try {
+    sqlite.prepare(
+      `INSERT INTO search_index_state (message_id, indexed_at, status, error)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(message_id) DO UPDATE SET indexed_at = excluded.indexed_at, status = excluded.status, error = excluded.error`
+    ).run(messageId, new Date().toISOString(), status, error ?? null);
+  } catch (err) {
+    console.error("markIndexState falló:", messageId, String(err));
+  }
+}
+
+export function deleteFtsForMessage(messageId: string): void {
+  if (!ftsDisponible) return;
+  sqlite.prepare(`DELETE FROM messages_fts WHERE message_id = ?`).run(messageId);
+  sqlite.prepare(`DELETE FROM search_index_state WHERE message_id = ?`).run(messageId);
+}
+
+export function deleteFtsForConversation(conversationId: string): void {
+  if (!ftsDisponible) return;
+  sqlite.prepare(
+    `DELETE FROM search_index_state WHERE message_id IN
+       (SELECT message_id FROM messages_fts WHERE conversation_id = ?)`
+  ).run(conversationId);
+  sqlite.prepare(`DELETE FROM messages_fts WHERE conversation_id = ?`).run(conversationId);
+}
+
+export interface MensajeSinIndexar {
+  id: string;
+  conversationId: string;
+  domainId: string;
+  from: string;
+  subject: string;
+  s3Bucket: string | null;
+  s3Key: string | null;
+  body: string | null;
+}
+
+/** Mensajes que aún no pasaron por el índice. El progreso vive en tabla, así que es reanudable. */
+export function listUnindexedMessages(limit: number): MensajeSinIndexar[] {
+  if (!ftsDisponible) return [];
+  const rows = sqlite.prepare(`
+    SELECT m.id, m.conversation_id, c.domain_id, m."from" AS sender, c.subject,
+           m.s3_bucket, m.s3_key, m.body
+    FROM messages m
+    JOIN conversations c ON c.id = m.conversation_id
+    LEFT JOIN search_index_state s ON s.message_id = m.id
+    WHERE s.message_id IS NULL
+    ORDER BY m.created_at DESC
+    LIMIT ?
+  `).all(limit) as any[];
+  return rows.map((r) => ({
+    id: r.id,
+    conversationId: r.conversation_id,
+    domainId: r.domain_id,
+    from: r.sender ?? "",
+    subject: r.subject ?? "",
+    s3Bucket: r.s3_bucket,
+    s3Key: r.s3_key,
+    body: r.body,
+  }));
+}
+
+export function contarSinIndexar(): number {
+  if (!ftsDisponible) return 0;
+  const row = sqlite.prepare(`
+    SELECT COUNT(*) AS n FROM messages m
+    LEFT JOIN search_index_state s ON s.message_id = m.id
+    WHERE s.message_id IS NULL
+  `).get() as { n: number };
+  return row.n;
+}
+
+export type ConversacionEncontrada = Conversation & { snippet: string; matchCount: number };
+
+/**
+ * Busca dentro del cuerpo de los correos de UN dominio.
+ *
+ * `domainId` es el primer parámetro posicional y obligatorio a propósito: si
+ * viviera dentro de `opts` sería posible olvidarlo en un llamador y mostrar
+ * correo de otro cliente. El filtro autoritativo es el JOIN contra
+ * `conversations`; la columna domain_id de la FTS es una copia denormalizada que
+ * podría quedar rancia, así que se usa ADEMÁS, como cinturón, nunca en su lugar.
+ */
+export function searchConversations(
+  domainId: string,
+  consulta: string,
+  opts?: { status?: string; assignedTo?: string; to?: string; limit?: number }
+): ConversacionEncontrada[] {
+  const limite = Math.min(opts?.limit ?? 50, 50);
+
+  const filtros: string[] = [];
+  const extra: any[] = [];
+  if (opts?.status) { filtros.push(`AND c.status = ?`); extra.push(opts.status); }
+  if (opts?.assignedTo) { filtros.push(`AND c.assigned_to = ?`); extra.push(opts.assignedTo); }
+  if (opts?.to) { filtros.push(`AND c."to" = ?`); extra.push(opts.to); }
+
+  if (ftsDisponible) {
+    const match = sanitizarConsultaFts(consulta);
+    if (!match) return [];
+    try {
+      // Dos pasos, no un solo JOIN. snippet() y bm25() sólo funcionan con el
+      // cursor de la FTS a la vista: dentro de una subconsulta unida, SQLite
+      // contesta "unable to use function snippet in the requested context", y
+      // aliasear la tabla da "no such column". Así que la FTS se consulta sola.
+      //
+      // El domain_id de la FTS acota aquí (es una columna UNINDEXED, sirve para
+      // filtrar), pero NO es la autoridad: es una copia denormalizada que podría
+      // quedar rancia. La autoridad es el segundo paso, que pregunta por
+      // conversations.domain_id, la tabla real.
+      const golpes = sqlite.prepare(`
+        SELECT message_id,
+               snippet(messages_fts, 5, '', '', '…', 12) AS snippet,
+               bm25(messages_fts, 0.0, 0.0, 0.0, 2.0, 4.0, 1.0) AS rank
+        FROM messages_fts
+        WHERE messages_fts MATCH ? AND domain_id = ?
+        ORDER BY rank
+        LIMIT 500
+      `).all(match, domainId) as { message_id: string; snippet: string; rank: number }[];
+
+      if (golpes.length === 0) return [];
+
+      const porMensaje = new Map(golpes.map((g) => [g.message_id, g]));
+      const marcadores = golpes.map(() => "?").join(",");
+
+      // Paso 2: el filtro autoritativo por dominio. Un mensaje cuyo domain_id de
+      // la FTS mienta se cae aquí y nunca llega al cliente.
+      const filas = sqlite.prepare(`
+        SELECT c.*, m.id AS hit_message_id
+        FROM messages m
+        JOIN conversations c ON c.id = m.conversation_id
+        WHERE m.id IN (${marcadores})
+          AND c.domain_id = ?
+          AND c.deleted_at IS NULL
+          ${filtros.join(" ")}
+      `).all(...golpes.map((g) => g.message_id), domainId, ...extra) as any[];
+
+      // Una conversación puede tener varios mensajes que coinciden: se agrupa y
+      // se queda con el mejor rank y su fragmento.
+      const porConversacion = new Map<string, { fila: any; rank: number; snippet: string; n: number }>();
+      for (const fila of filas) {
+        const golpe = porMensaje.get(fila.hit_message_id)!;
+        const previo = porConversacion.get(fila.id);
+        if (!previo) {
+          porConversacion.set(fila.id, { fila, rank: golpe.rank, snippet: golpe.snippet ?? "", n: 1 });
+        } else {
+          previo.n++;
+          if (golpe.rank < previo.rank) {
+            previo.rank = golpe.rank;
+            previo.snippet = golpe.snippet ?? "";
+          }
+        }
+      }
+
+      return [...porConversacion.values()]
+        .sort((a, b) => a.rank - b.rank || b.fila.last_message_at.localeCompare(a.fila.last_message_at))
+        .slice(0, limite)
+        .map((e) => ({ ...rowToConversation(e.fila), snippet: e.snippet, matchCount: e.n }));
+    } catch (err) {
+      // Sintaxis inesperada o índice corrupto: degradar, no devolver un 500.
+      console.error("searchConversations FTS falló, degradando a LIKE:", String(err));
+    }
+  }
+
+  // Camino degradado: sin FTS5 sólo se puede mirar remitente y asunto.
+  const patron = `%${escaparLike(consulta).toLowerCase()}%`;
+  const rows = sqlite.prepare(`
+    SELECT c.* FROM conversations c
+    WHERE c.domain_id = ? AND c.deleted_at IS NULL
+      AND (lower(c."from") LIKE ? ESCAPE '\\' OR lower(c.subject) LIKE ? ESCAPE '\\')
+      ${filtros.join(" ")}
+    ORDER BY c.last_message_at DESC
+    LIMIT ?
+  `).all(domainId, patron, patron, ...extra, limite) as any[];
+  return rows.map((r) => ({ ...rowToConversation(r), snippet: "", matchCount: 1 }));
+}
+
+// --- Paginación por keyset ---
+//
+// Keyset y no OFFSET: en una bandeja last_message_at cambia con cada correo que
+// entra, así que la página 2 con OFFSET se solapa o se salta filas mientras el
+// usuario baja. Además OFFSET escanea y descarta las N filas previas.
+//
+// El cursor es compuesto (lastMessageAt, id) porque last_message_at NO es único
+// —dos correos pueden caer en el mismo milisegundo— y va en base64 para que sea
+// opaco al cliente y podamos cambiarlo después sin romper nada.
+
+function codificarCursor(lastMessageAt: string, id: string): string {
+  return Buffer.from(`${lastMessageAt}|${id}`, "utf8").toString("base64url");
+}
+
+function decodificarCursor(cursor: string): { lastMessageAt: string; id: string } | null {
+  try {
+    const plano = Buffer.from(cursor, "base64url").toString("utf8");
+    const corte = plano.lastIndexOf("|");
+    if (corte < 1) return null;
+    return { lastMessageAt: plano.slice(0, corte), id: plano.slice(corte + 1) };
+  } catch {
+    return null;
+  }
+}
+
+export interface PaginaConversaciones {
+  items: Conversation[];
+  nextCursor: string | null;
+}
+
+export function listConversationsPage(
+  domainId: string,
+  opts?: { status?: string; assignedTo?: string; to?: string; limit?: number; cursor?: string }
+): PaginaConversaciones {
+  const limite = Math.min(Math.max(opts?.limit ?? 50, 1), 100);
+
+  const filtros: string[] = [];
+  const params: any[] = [domainId];
+
+  // status=deleted es un modo especial, igual que en listConversations.
+  if (opts?.status === "deleted") {
+    filtros.push(`AND c.deleted_at IS NOT NULL`);
+  } else {
+    filtros.push(`AND c.deleted_at IS NULL`);
+    if (opts?.status) { filtros.push(`AND c.status = ?`); params.push(opts.status); }
+  }
+  if (opts?.assignedTo) { filtros.push(`AND c.assigned_to = ?`); params.push(opts.assignedTo); }
+  if (opts?.to) { filtros.push(`AND c."to" = ?`); params.push(opts.to); }
+
+  if (opts?.cursor) {
+    const cur = decodificarCursor(opts.cursor);
+    if (cur) {
+      // Comparación de tuplas: SQLite la soporta directamente.
+      filtros.push(`AND (c.last_message_at, c.id) < (?, ?)`);
+      params.push(cur.lastMessageAt, cur.id);
+    }
+  }
+
+  // Se pide una fila de más para saber si hay página siguiente sin contar todo.
+  const rows = sqlite.prepare(`
+    SELECT c.* FROM conversations c
+    WHERE c.domain_id = ?
+      ${filtros.join(" ")}
+    ORDER BY c.last_message_at DESC, c.id DESC
+    LIMIT ?
+  `).all(...params, limite + 1) as any[];
+
+  const hayMas = rows.length > limite;
+  const pagina = hayMas ? rows.slice(0, limite) : rows;
+  const ultima = pagina[pagina.length - 1];
+
+  return {
+    items: pagina.map(rowToConversation),
+    nextCursor: hayMas && ultima ? codificarCursor(ultima.last_message_at, ultima.id) : null,
+  };
+}
+
+/**
+ * Aliases con actividad en el dominio, para el filtro de la barra.
+ * Se calcula en el servidor porque con paginación el cliente sólo vería
+ * los aliases de la primera página.
+ */
+export function listConversationAliases(domainId: string): string[] {
+  const rows = sqlite.prepare(`
+    SELECT DISTINCT c."to" AS alias FROM conversations c
+    WHERE c.domain_id = ? AND c.deleted_at IS NULL AND c."to" IS NOT NULL AND c."to" != ''
+    ORDER BY alias
+  `).all(domainId) as { alias: string }[];
+  return rows.map((r) => r.alias);
 }

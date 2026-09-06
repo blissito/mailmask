@@ -1,4 +1,5 @@
-import { programar } from "./scheduler.js";
+import { statSync } from "node:fs";
+import { programar, esServidor } from "./scheduler.js";
 import { deleteEmailFromS3, sendAlert } from "./ses.js";
 import { log } from "./logger.js";
 import { db } from "./pg.js";
@@ -8,6 +9,7 @@ import { purgeDeletedConversations, getDomainRegistrationsByStatus, updateDomain
 import { sendTemplate, expiryWarning, addonShutdown } from "./emails.js";
 import { reconcilePendingAddons } from "./addon-sync.js";
 import { deliverPending, purgeOldDeliveries } from "./webhooks.js";
+import { ejecutarBackfill, backfillPendiente } from "./search-backfill.js";
 
 // Webhooks: entregas pendientes y reintentos vencidos.
 programar("* * * * *", async () => {
@@ -316,5 +318,66 @@ programar("* * * * *", async () => {
       log("error", "cron", "Domain registration poll error", { domain: reg.domainName, error: String(err) });
       updateDomainRegistration(reg.id, { lastError: String(err) });
     }
+  }
+});
+
+// --- Índice de búsqueda de la Bandeja ---
+//
+// Arranque diferido: al levantar, el servidor tiene cosas más urgentes que hacer
+// (reconciliar SES, migraciones) y el backfill baja correo de S3.
+if (esServidor) {
+  setTimeout(() => {
+    ejecutarBackfill().catch((err) =>
+      log("error", "search", "Backfill inicial falló", { error: String(err) })
+    );
+  }, 30_000);
+}
+
+// Cada 10 minutos, mientras quede algo por indexar. Cuando termina, la consulta
+// devuelve 0 y no hace nada: es barata (un COUNT sobre un LEFT JOIN indexado).
+programar("*/10 * * * *", async () => {
+  try {
+    if (backfillPendiente() === 0) return;
+    await ejecutarBackfill({ maxMensajes: 500 });
+  } catch (err) {
+    log("error", "search", "Backfill periódico falló", { error: String(err) });
+  }
+});
+
+// --- Vigilancia del volumen ---
+//
+// El SQLite entero vive en el volumen de Fly, que hoy son 1 GB (fly.toml).
+// Cuando se llene, SQLite deja de escribir y el sitio se cae: no hay degradación
+// elegante. Guardar el texto de los entrantes para la búsqueda acelera el
+// llenado, así que esta alerta no es opcional.
+//
+// Si salta: `fly volumes extend <id> --size 10` (~$28 MXN/mes) se hace en caliente.
+const LIMITE_VOLUMEN_BYTES = 1024 * 1024 * 1024;
+const UMBRAL_AVISO = 0.7;
+
+programar("0 9 * * *", async () => {
+  try {
+    const ruta = process.env.DATABASE_PATH ?? "./data/mailmask.db";
+    // El WAL puede ser una fracción importante del total y también ocupa disco.
+    let bytes = 0;
+    for (const sufijo of ["", "-wal", "-shm"]) {
+      try { bytes += statSync(`${ruta}${sufijo}`).size; } catch { /* no existe: 0 */ }
+    }
+
+    const proporcion = bytes / LIMITE_VOLUMEN_BYTES;
+    const mb = Math.round(bytes / 1024 / 1024);
+    log("info", "cron", "Tamaño de la base", { mb, proporcion: proporcion.toFixed(2) });
+
+    if (proporcion >= UMBRAL_AVISO) {
+      log("error", "cron", "Volumen cerca del límite", { mb, proporcion });
+      await sendAlert(
+        "volumen-lleno",
+        `La base pesa ${mb} MB, el ${Math.round(proporcion * 100)}% del volumen de 1 GB. ` +
+        `Cuando se llene, SQLite deja de escribir y el sitio se cae. ` +
+        `Extiéndelo en caliente con: fly volumes extend <id> --size 10`
+      );
+    }
+  } catch (err) {
+    log("error", "cron", "Chequeo de volumen falló", { error: String(err) });
   }
 });

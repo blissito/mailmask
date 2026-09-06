@@ -276,51 +276,88 @@ async function sendNew() {
 }
 
 // --- Conversations ---
-async function loadConversations() {
-  if (!selectedDomainId) return;
-  const status = document.getElementById("status-filter").value;
-  let url = `/api/bandeja/conversations?domainId=${selectedDomainId}`;
-  if (status) url += `&status=${status}`;
+// El filtrado y la búsqueda viven en el servidor desde que la lista pagina: el
+// cliente ya no tiene todas las conversaciones, sólo la página que pidió, así
+// que filtrar aquí mostraría resultados incompletos sin avisar.
+let nextCursor = null;
+let cargandoPagina = false;
 
-  const res = await fetch(url);
-  if (!res.ok) {
-    conversations = [];
-    renderList();
-    return;
-  }
-  conversations = await res.json();
-  populateAliasFilter();
-  renderList();
+function paramsDeFiltros() {
+  const p = new URLSearchParams({ domainId: selectedDomainId });
+  const status = document.getElementById("status-filter").value;
+  const alias = document.getElementById("alias-filter").value;
+  const q = document.getElementById("search-input").value.trim();
+  if (status) p.set("status", status);
+  if (alias) p.set("to", alias);
+  if (q) p.set("q", q);
+  return p;
 }
 
-function populateAliasFilter() {
+async function loadConversations(opts = {}) {
+  if (!selectedDomainId) return;
+  const masPaginas = opts.append === true;
+  if (cargandoPagina) return;
+  if (masPaginas && !nextCursor) return;
+  cargandoPagina = true;
+
+  const params = paramsDeFiltros();
+  if (masPaginas) params.set("cursor", nextCursor);
+
+  try {
+    const res = await fetch(`/api/bandeja/conversations?${params}`);
+    if (!res.ok) {
+      if (!masPaginas) { conversations = []; nextCursor = null; renderList(); }
+      return;
+    }
+    const data = await res.json();
+    conversations = masPaginas ? conversations.concat(data.items) : data.items;
+    nextCursor = data.nextCursor ?? null;
+    if (Array.isArray(data.aliases)) populateAliasFilter(data.aliases);
+    mostrarAvisoIndexado(data);
+    renderList();
+  } finally {
+    cargandoPagina = false;
+  }
+}
+
+// Los aliases los calcula el servidor: derivarlos de `conversations` sólo vería
+// los de la página cargada, así que el filtro perdería opciones al paginar.
+function populateAliasFilter(aliases) {
   const sel = document.getElementById("alias-filter");
   const prev = sel.value;
-  const aliases = [...new Set(conversations.map(c => c.to).filter(Boolean))].sort();
   sel.innerHTML = '<option value="">Todos los alias</option>' +
     aliases.map(a => `<option value="${esc(a)}">${esc(a.split("@")[0])}</option>`).join("");
   if (prev && aliases.includes(prev)) sel.value = prev;
 }
 
+// Mientras el backfill del índice avanza, buscar puede no encontrar correo viejo.
+// Decirlo evita que parezca que la búsqueda está rota.
+function mostrarAvisoIndexado(data) {
+  const aviso = document.getElementById("search-notice");
+  if (!aviso) return;
+  const pendiente = data.backfillPendiente;
+  if (data.mode === "search-degraded") {
+    aviso.textContent = "Búsqueda limitada a remitente y asunto.";
+    aviso.classList.remove("mesa-hidden");
+  } else if (pendiente > 0) {
+    aviso.textContent = `Aún estamos indexando correos antiguos (${pendiente} pendientes).`;
+    aviso.classList.remove("mesa-hidden");
+  } else {
+    aviso.classList.add("mesa-hidden");
+  }
+}
+
 function renderList() {
   const container = document.getElementById("conv-list");
   const empty = document.getElementById("list-empty");
-  const search = document.getElementById("search-input").value.toLowerCase();
-  const aliasFilter = document.getElementById("alias-filter").value;
 
-  let filtered = conversations;
-  if (aliasFilter) {
-    filtered = filtered.filter(c => c.to === aliasFilter);
-  }
-  if (search) {
-    filtered = filtered.filter(c =>
-      c.from.toLowerCase().includes(search) ||
-      c.subject.toLowerCase().includes(search)
-    );
-  }
+  // Sin filtrado en cliente: lo que hay en `conversations` es exactamente lo que
+  // el servidor devolvió para los filtros activos.
+  const filtered = conversations;
 
+  const sufijo = nextCursor ? "+" : "";
   document.getElementById("conv-count").textContent =
-    `${filtered.length} ${filtered.length !== 1 ? "conversaciones" : "conversación"}`;
+    `${filtered.length}${sufijo} ${filtered.length !== 1 ? "conversaciones" : "conversación"}`;
 
   if (filtered.length === 0) {
     // Clear any rendered items but keep the empty state
@@ -355,6 +392,7 @@ function renderList() {
           <span class="mesa-conv-time">${esc(time)}</span>
         </div>
         <div class="mesa-conv-subject">${esc(c.subject)}</div>
+        ${c.snippet ? `<div class="mesa-conv-snippet">${resaltar(c.snippet)}</div>` : ""}
         <div class="mesa-conv-meta">${meta}</div>
       </div>
     </div>`;
@@ -363,6 +401,13 @@ function renderList() {
   // Replace only conversation items, preserve empty state element
   container.querySelectorAll(".mesa-conv").forEach(el => el.remove());
   container.insertAdjacentHTML("beforeend", html);
+
+  // El botón va siempre al final de la lista, después de las filas.
+  const btnMas = document.getElementById("btn-load-more");
+  if (btnMas) {
+    btnMas.classList.toggle("mesa-hidden", !nextCursor);
+    container.appendChild(btnMas);
+  }
 
   // Click handlers
   container.querySelectorAll(".mesa-conv").forEach(el => {
@@ -793,17 +838,26 @@ function setupListeners() {
     connectSSE(selectedDomainId);
   });
 
+  // Los tres filtros van al servidor: recargan la primera página en vez de
+  // recortar en cliente un array que ya no es la lista completa.
   document.getElementById("status-filter").addEventListener("change", () => {
     loadConversations();
   });
 
   document.getElementById("alias-filter").addEventListener("change", () => {
-    renderList();
+    loadConversations();
   });
 
+  // Debounce: sin esto, escribir "factura" son siete consultas con su búsqueda
+  // de texto completo cada una.
+  let temporizadorBusqueda = null;
   document.getElementById("search-input").addEventListener("input", () => {
-    renderList();
+    clearTimeout(temporizadorBusqueda);
+    temporizadorBusqueda = setTimeout(() => loadConversations(), 300);
   });
+
+  const btnMas = document.getElementById("btn-load-more");
+  if (btnMas) btnMas.addEventListener("click", () => loadConversations({ append: true }));
 
   document.getElementById("btn-reply").addEventListener("click", () => {
     composerMode = "reply";
@@ -974,6 +1028,16 @@ function setupKeyboard() {
         selectedIdx++;
         renderList();
         scrollToSelected();
+      } else if (nextCursor) {
+        // Al final de la página cargada: traer la siguiente sin que el usuario
+        // tenga que soltar el teclado para ir al botón.
+        loadConversations({ append: true }).then(() => {
+          if (selectedIdx < conversations.length - 1) {
+            selectedIdx++;
+            renderList();
+            scrollToSelected();
+          }
+        });
       }
     }
     if (e.key === "k") {
@@ -1027,20 +1091,27 @@ function setupKeyboard() {
   });
 }
 
+// Antes esto duplicaba la lógica de filtro de renderList, con el resultado de
+// que j/k podían recorrer una lista distinta de la que se veía en pantalla.
+// Ahora ambos leen el mismo array, que es lo que el servidor mandó.
+// El fragmento llega del servidor en TEXTO PLANO a propósito: insertar HTML
+// venido del servidor —aunque sea nuestro— dentro de contenido de un correo
+// ajeno es la vía corta a un XSS. Se escapa todo y el resaltado se arma aquí,
+// sobre los términos que el usuario tecleó.
+function resaltar(fragmento) {
+  const consulta = document.getElementById("search-input").value.trim();
+  let salida = esc(fragmento);
+  if (!consulta) return salida;
+  const terminos = consulta.split(/\s+/).filter(t => t.length > 1);
+  for (const t of terminos) {
+    const escapado = esc(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    salida = salida.replace(new RegExp(escapado, "gi"), m => `<mark>${m}</mark>`);
+  }
+  return salida;
+}
+
 function getFilteredConversations() {
-  const search = document.getElementById("search-input").value.toLowerCase();
-  const aliasFilter = document.getElementById("alias-filter").value;
-  let filtered = conversations;
-  if (aliasFilter) {
-    filtered = filtered.filter(c => c.to === aliasFilter);
-  }
-  if (search) {
-    filtered = filtered.filter(c =>
-      c.from.toLowerCase().includes(search) ||
-      c.subject.toLowerCase().includes(search)
-    );
-  }
-  return filtered;
+  return conversations;
 }
 
 function scrollToSelected() {

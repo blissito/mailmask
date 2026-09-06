@@ -18,6 +18,39 @@ export { sqlite };
 // Run migrations on startup
 migrate(db, { migrationsFolder: join(__dirname, "drizzle") });
 
+// Índice de texto completo de la Bandeja.
+//
+// Va en código y no en un .sql por la misma razón que la reparación de api_keys
+// de abajo: FTS5 es un módulo de compilación de SQLite y puede no estar. Un
+// CREATE VIRTUAL TABLE que falle dentro de una migración de drizzle deja el
+// journal a medias y tumba el arranque COMPLETO del servidor, no sólo la
+// búsqueda. Aquí, si falla, se degrada a LIKE y el correo sigue fluyendo.
+//
+// Tabla normal y autocontenida, no `content=''` (perdería snippet()) ni
+// `content='messages'` (el texto plano no es columna de messages, y el PK de
+// messages es un uuid TEXT: su rowid implícito no sobrevive a un VACUUM).
+//
+// remove_diacritics 2 es obligatorio: el producto es en español y "informacion"
+// tiene que encontrar "información".
+let ftsOk = false;
+try {
+  sqlite.exec(`
+    CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+      message_id UNINDEXED,
+      conversation_id UNINDEXED,
+      domain_id UNINDEXED,
+      sender,
+      subject,
+      body,
+      tokenize = "unicode61 remove_diacritics 2"
+    );
+  `);
+  ftsOk = true;
+} catch (err) {
+  console.error("FTS5 no disponible, la búsqueda se degrada a LIKE:", String(err));
+}
+export const ftsDisponible = ftsOk;
+
 // El paso de llaves en claro a SHA-256 se aplicó a producción con un script
 // suelto (scripts/migrate-api-keys-hash.ts) que nunca entró a las migraciones.
 // Resultado: toda base nueva —tests, dev, un despliegue limpio— nacía con la

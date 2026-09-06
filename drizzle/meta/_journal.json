@@ -85,6 +85,13 @@
       "when": 1788620000000,
       "tag": "0011_referral_name",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788630000000,
+      "tag": "0012_bandeja_busqueda",
+      "breakpoints": true
     }
   ]
 }
