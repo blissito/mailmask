@@ -5,7 +5,7 @@ import { app } from "./main.ts";
 import {
   createUser, createDomain, createAgent, createConversation, addMessage,
   markConversationRead, countUnread, listConversationsPage, updateConversation,
-  getConversation,
+  getConversation, wakeSnoozedConversations, getBandejaMetrics,
 } from "./db.ts";
 import { signJwt, generateCsrfToken } from "./auth.ts";
 import { setPresence, clearPresence, listPresence } from "./sse-hub.ts";
@@ -301,5 +301,138 @@ describe("Presencia", () => {
     await post(`/api/bandeja/presence`, { domainId: e.dom.id, conversationId: e.conv.id, state: "viewing" }, e.agente);
     await post(`/api/bandeja/presence`, { domainId: e.dom.id, conversationId: null }, e.agente);
     assert.equal(listPresence(e.dom.id).length, 0);
+  });
+});
+
+describe("Posponer (snooze)", () => {
+  it("rechaza posponer sin fecha", async () => {
+    const e = await escenario();
+    const res = await patch(`/api/bandeja/conversations/${e.conv.id}`, { domainId: e.dom.id, status: "snoozed" }, e.dueno);
+    assert.equal(res.status, 400);
+  });
+
+  it("rechaza una fecha en el pasado: el hilo se perdería para siempre", async () => {
+    const e = await escenario();
+    const ayer = new Date(Date.now() - 86400_000).toISOString();
+    const res = await patch(`/api/bandeja/conversations/${e.conv.id}`, { domainId: e.dom.id, status: "snoozed", snoozedUntil: ayer }, e.dueno);
+    assert.equal(res.status, 400);
+  });
+
+  it("rechaza una fecha inválida y más de 90 días", async () => {
+    const e = await escenario();
+    const mala = await patch(`/api/bandeja/conversations/${e.conv.id}`, { domainId: e.dom.id, status: "snoozed", snoozedUntil: "el jueves" }, e.dueno);
+    assert.equal(mala.status, 400);
+    const lejos = new Date(Date.now() + 200 * 86400_000).toISOString();
+    const res = await patch(`/api/bandeja/conversations/${e.conv.id}`, { domainId: e.dom.id, status: "snoozed", snoozedUntil: lejos }, e.dueno);
+    assert.equal(res.status, 400);
+  });
+
+  it("pospone con fecha futura y guarda el plazo", async () => {
+    const e = await escenario();
+    const manana = new Date(Date.now() + 86400_000).toISOString();
+    const res = await patch(`/api/bandeja/conversations/${e.conv.id}`, { domainId: e.dom.id, status: "snoozed", snoozedUntil: manana }, e.dueno);
+    assert.equal(res.status, 200);
+    const conv = await getConversation(e.dom.id, e.conv.id);
+    assert.equal(conv?.status, "snoozed");
+    assert.equal(conv?.snoozedUntil, manana);
+  });
+
+  it("el cron despierta sólo lo vencido, y una sola vez", async () => {
+    const e = await escenario();
+    const vencida = new Date(Date.now() + 1000).toISOString();
+    await updateConversation(e.dom.id, e.conv.id, { status: "snoozed", snoozedUntil: vencida });
+
+    const enFuturo = new Date(Date.now() + 86400_000).toISOString();
+    const despertadas = wakeSnoozedConversations(new Date(Date.now() + 5000).toISOString());
+    assert.ok(despertadas.some((c) => c.id === e.conv.id));
+
+    const conv = await getConversation(e.dom.id, e.conv.id);
+    assert.equal(conv?.status, "open");
+    assert.equal(conv?.snoozedUntil, undefined);
+
+    // Segunda pasada: ya no está pospuesta, no se avisa dos veces.
+    const otra = wakeSnoozedConversations(new Date(Date.now() + 5000).toISOString());
+    assert.equal(otra.some((c) => c.id === e.conv.id), false);
+    assert.ok(enFuturo);
+  });
+
+  it("volver a abrir o cerrar limpia el plazo: no queda una fecha colgando", async () => {
+    const e = await escenario();
+    await updateConversation(e.dom.id, e.conv.id, { status: "snoozed", snoozedUntil: new Date(Date.now() + 86400_000).toISOString() });
+    await updateConversation(e.dom.id, e.conv.id, { status: "open" });
+    const conv = await getConversation(e.dom.id, e.conv.id);
+    assert.equal(conv?.snoozedUntil, undefined);
+  });
+
+  it("un mensaje nuevo la despierta al instante (la reapertura del entrante)", async () => {
+    const e = await escenario();
+    await updateConversation(e.dom.id, e.conv.id, { status: "snoozed", snoozedUntil: new Date(Date.now() + 86400_000).toISOString() });
+    // Es lo que hace saveToMesa al llegar correo del contacto.
+    await updateConversation(e.dom.id, e.conv.id, { status: "open", lastMessageAt: new Date().toISOString() });
+    const conv = await getConversation(e.dom.id, e.conv.id);
+    assert.equal(conv?.status, "open");
+    assert.equal(conv?.snoozedUntil, undefined);
+  });
+});
+
+describe("Métricas de la Bandeja", () => {
+  it("un dominio vacío no produce NaN ni divisiones por cero", async () => {
+    const dueno = `m-${sufijo()}@ejemplo.com`;
+    await createUser(dueno, "hash");
+    const dom = await createDomain(dueno, `${sufijo()}.ejemplo.com`, ["dkim"], `v-${sufijo()}`);
+    const m = getBandejaMetrics(dom.id, 30);
+    assert.equal(m.totals.conversaciones, 0);
+    assert.equal(m.primeraRespuesta.medianaMin, null);
+    assert.equal(m.porAgente.length, 0);
+    assert.equal(JSON.stringify(m).includes("NaN"), false);
+  });
+
+  it("mide la primera respuesta y rellena los días sin correo", async () => {
+    const e = await escenario();
+    const base = Date.now() - 3600_000;
+    await addMessage({
+      conversationId: e.conv.id,
+      from: "cliente@fuera.com",
+      direction: "inbound",
+      createdAt: new Date(base).toISOString(),
+    });
+    await addMessage({
+      conversationId: e.conv.id,
+      from: `hola@${e.dom.domain}`,
+      direction: "outbound",
+      createdAt: new Date(base + 30 * 60_000).toISOString(),
+    });
+    const m = getBandejaMetrics(e.dom.id, 7);
+    assert.equal(m.primeraRespuesta.medianaMin, 30);
+    assert.equal(m.primeraRespuesta.contestadas, 1);
+    // Siete días, todos presentes aunque seis estén en cero.
+    assert.equal(m.porDia.length, 7);
+    assert.equal(m.porDia.every((d) => typeof d.entrantes === "number"), true);
+  });
+
+  it("cuenta como sin responder lo que entró y nadie contestó", async () => {
+    const e = await escenario();
+    await addMessage({
+      conversationId: e.conv.id,
+      from: "cliente@fuera.com",
+      direction: "inbound",
+      createdAt: new Date().toISOString(),
+    });
+    const m = getBandejaMetrics(e.dom.id, 7);
+    assert.equal(m.totals.sinResponder, 1);
+    assert.equal(m.primeraRespuesta.medianaMin, null);
+  });
+
+  it("el endpoint exige acceso al dominio", async () => {
+    const e = await escenario();
+    assert.equal((await get(`/api/bandeja/metrics?domainId=${e.dom.id}`, e.ajeno)).status, 403);
+    assert.equal((await get(`/api/bandeja/metrics?domainId=${e.dom.id}`, e.agente)).status, 200);
+  });
+
+  it("un rango raro cae al de 30 días en vez de romperse", async () => {
+    const e = await escenario();
+    const res = await get(`/api/bandeja/metrics?domainId=${e.dom.id}&days=999`, e.dueno);
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).days, 30);
   });
 });

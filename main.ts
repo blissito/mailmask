@@ -75,6 +75,7 @@ import {
   getConversation,
   updateConversation,
   countUnread,
+  getBandejaMetrics,
   markConversationRead,
   listMessages,
   addMessage,
@@ -913,7 +914,7 @@ const app = new Elysia({ adapter: node() })
       );
       response.headers.set(
         "content-security-policy",
-        "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.clarity.ms; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms; connect-src 'self' https://www.formmy.app https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms; frame-src https://www.googletagmanager.com https://www.youtube-nocookie.com",
+        "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.clarity.ms; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms; connect-src 'self' https://www.formmy.app https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms; frame-src 'self' https://www.googletagmanager.com https://www.youtube-nocookie.com",
       );
     }
     return response;
@@ -4962,6 +4963,27 @@ const app = new Elysia({ adapter: node() })
     if (tags && Array.isArray(tags)) updates.tags = tags;
     if (priority && ["normal", "urgent"].includes(priority)) updates.priority = priority;
 
+    // Posponer sin fecha válida y futura perdería el hilo para siempre: no lo
+    // despertaría ningún cron y ya no saldría en "Abiertas". Por eso se rechaza
+    // en vez de caer a un default.
+    if (newStatus === "snoozed") {
+      const hasta = (patchInput as Record<string, unknown>).snoozedUntil;
+      if (typeof hasta !== "string") {
+        return new Response(JSON.stringify({ error: "snoozedUntil requerido para posponer" }), { status: 400 });
+      }
+      const ts = Date.parse(hasta);
+      if (!Number.isFinite(ts)) {
+        return new Response(JSON.stringify({ error: "snoozedUntil no es una fecha válida" }), { status: 400 });
+      }
+      if (ts <= Date.now()) {
+        return new Response(JSON.stringify({ error: "snoozedUntil debe estar en el futuro" }), { status: 400 });
+      }
+      if (ts > Date.now() + 90 * 24 * 3600_000) {
+        return new Response(JSON.stringify({ error: "No se puede posponer más de 90 días" }), { status: 400 });
+      }
+      updates.snoozedUntil = new Date(ts).toISOString();
+    }
+
     const updated = await updateConversation(domainId, params.id, updates);
     if (!updated) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
 
@@ -4980,6 +5002,7 @@ const app = new Elysia({ adapter: node() })
     body: t.Object({
       domainId: t.String(),
       status: t.Optional(t.String()),
+      snoozedUntil: t.Optional(t.String()),
       tags: t.Optional(t.Array(t.String())),
       priority: t.Optional(t.String()),
     }),
@@ -5032,6 +5055,21 @@ const app = new Elysia({ adapter: node() })
       domainId: t.String(),
     }),
     detail: { tags: ["Bandeja"], summary: "Restore a soft-deleted conversation", security: [{ cookieAuth: [] }] },
+  })
+
+  .get("/api/bandeja/metrics", async ({ request }) => {
+    const url = new URL(request.url);
+    const domainId = url.searchParams.get("domainId");
+    const gate = await requireBandeja(request, domainId, "read");
+    if (!gate.ok) return gate.res;
+
+    const dias = parseInt(url.searchParams.get("days") ?? "30", 10);
+    // Un solo JSON en una sola llamada: toda la aritmética vive en db.ts.
+    return new Response(JSON.stringify(getBandejaMetrics(domainId!, dias)), {
+      headers: { "content-type": "application/json" },
+    });
+  }, {
+    detail: { tags: ["Bandeja"], summary: "Team metrics for the shared inbox", security: [{ cookieAuth: [] }] },
   })
 
   // --- Mesa: leído y presencia ---

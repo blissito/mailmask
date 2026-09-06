@@ -406,12 +406,17 @@ function renderList() {
     if (isActive) classes += " active";
     if (isSelected) classes += " selected";
     if (c.deletedAt) classes += " deleted";
+    if (c.status === "snoozed") classes += " mesa-conv--snoozed";
     if (unreadIds.has(c.id)) classes += " is-new mesa-conv--unread";
 
     let meta = `<span class="mesa-status-dot ${esc(c.status)}"></span>`;
     if (c.to) meta += `<span class="mesa-tag mesa-tag-alias">${esc(c.to.split("@")[0])}</span>`;
     if (c.deletedAt) meta += `<span class="mesa-tag mesa-tag-deleted">eliminado</span>`;
     if (c.priority === "urgent") meta += `<span class="mesa-tag mesa-tag-urgent">urgente</span>`;
+    if (c.status === "snoozed" && c.snoozedUntil) {
+      const hasta = new Date(c.snoozedUntil);
+      meta += `<span class="mesa-tag mesa-tag-snoozed">💤 ${esc(hasta.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }))}</span>`;
+    }
     if (c.assignedTo) meta += `<span class="mesa-tag mesa-tag-assigned">${esc(c.assignedTo.split("@")[0])}</span>`;
 
     const puntoPresencia = presencias.some(p => p.conversationId === c.id && p.email !== currentUser?.email)
@@ -544,6 +549,22 @@ function deliveryBadge(msg) {
   return `<span class="mesa-msg-dir outbound delivery-${status}" data-msg-id="${esc(msg.id)}"${title}>${icon} ${label}</span>`;
 }
 
+/**
+ * El cuerpo de un mensaje. Los entrantes sin texto plano sólo traen HTML, y antes
+ * se escapaba: el lector veía las etiquetas. Meterlo con innerHTML sería XSS con
+ * correo de desconocidos, así que va en un iframe con `sandbox` vacío —sin
+ * allow-scripts y en origen opaco—, que es lo que hacen Gmail y Front.
+ *
+ * El alto es fijo con scroll propio: ajustarlo al contenido exige un postMessage
+ * desde dentro, y dentro no corre JavaScript. Es el precio de no ejecutar nada.
+ */
+function cuerpoMensaje(item) {
+  if (item.body) return esc(item.body);
+  if (!item.html) return "";
+  // srcdoc escapado: el HTML del correo viaja como atributo, no como marcado.
+  return `<iframe class="mesa-msg-html" sandbox referrerpolicy="no-referrer" srcdoc="${esc(item.html)}"></iframe>`;
+}
+
 function renderMessages(messages, notes) {
   const container = document.getElementById("messages-container");
 
@@ -572,7 +593,7 @@ function renderMessages(messages, notes) {
         ${dir === "inbound" ? `<span class="mesa-msg-dir inbound">recibido</span>` : deliveryBadge(item)}
         <span class="mesa-msg-time">${formatTime(item.createdAt)}</span>
       </div>
-      <div class="mesa-msg-body">${esc(item.body || item.html || "")}</div>
+      <div class="mesa-msg-body">${cuerpoMensaje(item)}</div>
       ${attachmentsHtml}
     </div>`;
   }).join("");
@@ -776,6 +797,58 @@ async function assignConversation() {
   document.getElementById("assign-email").focus();
 }
 
+// --- Posponer ---
+//
+// Las fechas se calculan aquí, con la zona del navegador, y se mandan en ISO UTC:
+// "mañana a las 9" tiene que ser su mañana, no la del servidor.
+
+function fechaSnooze(clave) {
+  const d = new Date();
+  if (clave === "1h") { d.setHours(d.getHours() + 1); return d; }
+  if (clave === "tarde") {
+    d.setHours(18, 0, 0, 0);
+    // Si ya pasaron las seis, "esta tarde" es la de mañana.
+    if (d <= new Date()) d.setDate(d.getDate() + 1);
+    return d;
+  }
+  if (clave === "manana") { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d; }
+  if (clave === "lunes") {
+    const faltan = (8 - d.getDay()) % 7 || 7;
+    d.setDate(d.getDate() + faltan);
+    d.setHours(9, 0, 0, 0);
+    return d;
+  }
+  return null;
+}
+
+function toggleSnoozeMenu(mostrar) {
+  const menu = document.getElementById("snooze-menu");
+  if (!menu) return;
+  menu.classList.toggle("mesa-hidden", mostrar === false ? true : mostrar === true ? false : !menu.classList.contains("mesa-hidden"));
+}
+
+async function posponer(hasta) {
+  if (!activeConv || !canDoActions) return;
+  if (!(hasta instanceof Date) || !Number.isFinite(hasta.getTime())) return;
+  if (hasta <= new Date()) { toast("Elige una fecha futura"); return; }
+  const res = await fetch(`/api/bandeja/conversations/${activeConv.id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ domainId: selectedDomainId, status: "snoozed", snoozedUntil: hasta.toISOString() }),
+  });
+  toggleSnoozeMenu(false);
+  if (res.ok) {
+    toast(`Pospuesta hasta ${hasta.toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}`);
+    activeConv = null;
+    document.getElementById("detail-loaded").classList.add("mesa-hidden");
+    document.getElementById("detail-empty").classList.remove("mesa-hidden");
+    await loadConversations();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    toast(err.error || "No se pudo posponer");
+  }
+}
+
 async function closeConversation() {
   if (!activeConv || !canDoActions) return;
   const newStatus = activeConv.status === "closed" ? "open" : "closed";
@@ -900,7 +973,22 @@ function setupListeners() {
   });
 
   document.getElementById("btn-assign").addEventListener("click", assignConversation);
+  document.getElementById("tab-bandeja").addEventListener("click", () => mostrarPestana("bandeja"));
+  document.getElementById("tab-metrics").addEventListener("click", () => mostrarPestana("metrics"));
+  document.getElementById("metrics-range").addEventListener("change", cargarMetricas);
   document.getElementById("btn-close-conv").addEventListener("click", closeConversation);
+  const btnSnooze = document.getElementById("btn-snooze");
+  if (btnSnooze) {
+    btnSnooze.addEventListener("click", (ev) => { ev.stopPropagation(); toggleSnoozeMenu(); });
+    document.querySelectorAll("#snooze-menu [data-snooze]").forEach(b => {
+      b.addEventListener("click", () => posponer(fechaSnooze(b.dataset.snooze)));
+    });
+    const custom = document.getElementById("snooze-custom");
+    if (custom) custom.addEventListener("change", () => { if (custom.value) posponer(new Date(custom.value)); });
+    document.addEventListener("click", (ev) => {
+      if (!ev.target.closest(".mesa-snooze-wrap")) toggleSnoozeMenu(false);
+    });
+  }
   document.getElementById("btn-urgent").addEventListener("click", toggleUrgent);
   document.getElementById("btn-delete-conv").addEventListener("click", deleteConversation);
   document.getElementById("btn-restore-conv").addEventListener("click", restoreConversationAction);
@@ -1113,6 +1201,10 @@ function setupKeyboard() {
     if (e.key === "e" && canDoActions) {
       e.preventDefault();
       closeConversation();
+    }
+    if (e.key === "s" && canDoActions && activeConv) {
+      e.preventDefault();
+      toggleSnoozeMenu();
     }
     if (e.key === "#" && canDoActions) {
       e.preventDefault();
@@ -1354,6 +1446,69 @@ function renderPresence() {
   barra.classList.remove("mesa-hidden");
 }
 
+// --- Métricas del equipo ---
+//
+// Sin librería de gráficas: son barras con divs y un alto en porcentaje. Meter
+// una dependencia de 200 KB para treinta barras no se paga.
+
+function minutosLegibles(m) {
+  if (m === null || m === undefined) return "—";
+  if (m < 60) return `${m} min`;
+  if (m < 60 * 24) return `${(m / 60).toFixed(1)} h`;
+  return `${(m / 1440).toFixed(1)} días`;
+}
+
+function mostrarPestana(cual) {
+  const enMetricas = cual === "metrics";
+  document.querySelector(".mesa-main").classList.toggle("mesa-hidden", enMetricas);
+  document.getElementById("metrics-pane").classList.toggle("mesa-hidden", !enMetricas);
+  document.getElementById("tab-bandeja").classList.toggle("active", !enMetricas);
+  document.getElementById("tab-metrics").classList.toggle("active", enMetricas);
+  if (enMetricas) cargarMetricas();
+}
+
+async function cargarMetricas() {
+  if (!selectedDomainId) return;
+  const dias = document.getElementById("metrics-range").value;
+  const res = await fetch(`/api/bandeja/metrics?domainId=${encodeURIComponent(selectedDomainId)}&days=${dias}`);
+  if (!res.ok) { toast("No se pudieron cargar las métricas"); return; }
+  const m = await res.json();
+
+  const tarjeta = (valor, etiqueta, nota) =>
+    `<div class="mesa-metric-card"><div class="mesa-metric-value">${esc(valor)}</div>
+     <div class="mesa-metric-label">${esc(etiqueta)}</div>
+     ${nota ? `<div class="mesa-metric-note">${esc(nota)}</div>` : ""}</div>`;
+
+  document.getElementById("metrics-cards").innerHTML = [
+    tarjeta(minutosLegibles(m.primeraRespuesta.medianaMin), "Primera respuesta (mediana)", `${m.primeraRespuesta.contestadas} contestadas`),
+    tarjeta(minutosLegibles(m.primeraRespuesta.p90Min), "Primera respuesta (p90)", "9 de cada 10 por debajo"),
+    tarjeta(m.totals.sinResponder, "Sin responder", "entraron y nadie contestó"),
+    tarjeta(m.totals.abiertasSinAsignar, "Abiertas sin asignar", "de toda la bandeja"),
+    tarjeta(m.totals.entrantes, "Correos recibidos"),
+    tarjeta(m.totals.salientes, "Respuestas enviadas"),
+    tarjeta(minutosLegibles(m.duracionHilo.medianaMin), "Duración del hilo (mediana)", "del primer al último mensaje, no hasta el cierre"),
+  ].join("");
+
+  const tope = Math.max(1, ...m.porDia.map(d => d.entrantes + d.salientes));
+  document.getElementById("metrics-chart").innerHTML = m.porDia.map(d => {
+    const total = d.entrantes + d.salientes;
+    return `<div class="mesa-bar" title="${esc(d.dia)}: ${d.entrantes} recibidos, ${d.salientes} enviados">
+      <div class="mesa-bar-in" style="height:${(d.entrantes / tope) * 100}%"></div>
+      <div class="mesa-bar-out" style="height:${(d.salientes / tope) * 100}%"></div>
+      <span class="mesa-bar-total">${total || ""}</span>
+    </div>`;
+  }).join("");
+
+  const cont = document.getElementById("metrics-agents");
+  cont.innerHTML = m.porAgente.length === 0
+    ? `<p class="mesa-metric-note">Nadie tiene conversaciones asignadas en este periodo.</p>`
+    : `<table class="mesa-metrics-table">
+        <thead><tr><th>Persona</th><th>Conversaciones</th><th>Respuestas</th></tr></thead>
+        <tbody>${m.porAgente.map(a => `<tr><td>${esc(a.agente)}</td><td>${a.conversaciones}</td><td>${a.respuestas}</td></tr>`).join("")}</tbody>
+       </table>
+       <p class="mesa-metric-note">Se cuenta por conversación asignada: al responder, el remitente es el alias del dominio, no la persona.</p>`;
+}
+
 // --- SSE for real-time updates ---
 
 let sseSource = null;
@@ -1473,6 +1628,19 @@ function connectSSE(domainId) {
       if (mio(d)) return;
       loadConversations();
     } catch (err) { console.error("SSE conv_restored:", err); }
+  });
+
+  sseSource.addEventListener("conv_unsnoozed", (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      // No trae actor: el cron no es de nadie, así que le llega a todo el equipo.
+      if (patchConv(d.conversationId, { status: "open", snoozedUntil: undefined })) {
+        renderConvRow(d.conversationId);
+      } else {
+        loadConversations();
+      }
+      toast(`Volvió: ${(d.subject || "conversación").slice(0, 40)}`);
+    } catch (err) { console.error("SSE conv_unsnoozed:", err); }
   });
 
   sseSource.addEventListener("presence", (e) => {

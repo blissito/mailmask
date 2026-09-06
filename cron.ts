@@ -5,10 +5,11 @@ import { log } from "./logger.js";
 import { db } from "./pg.js";
 import { tokens, emailLogs, forwardQueue, rateLimits, sendCounts, bulkJobs, users, addons } from "./schema.js";
 import { lte, and, eq, inArray, isNotNull, gt, sql as rawSql } from "drizzle-orm";
-import { purgeDeletedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, createDomain, listEffectiveAddons, updateAddon, recordOrder, addonLabel } from "./db.js";
+import { purgeDeletedConversations, wakeSnoozedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, createDomain, listEffectiveAddons, updateAddon, recordOrder, addonLabel } from "./db.js";
 import { sendTemplate, expiryWarning, addonShutdown } from "./emails.js";
 import { reconcilePendingAddons } from "./addon-sync.js";
 import { deliverPending, purgeOldDeliveries } from "./webhooks.js";
+import { notifyBandeja } from "./sse-hub.js";
 import { ejecutarBackfill, backfillPendiente } from "./search-backfill.js";
 
 // Webhooks: entregas pendientes y reintentos vencidos.
@@ -341,6 +342,21 @@ programar("*/10 * * * *", async () => {
     await ejecutarBackfill({ maxMensajes: 500 });
   } catch (err) {
     log("error", "search", "Backfill periódico falló", { error: String(err) });
+  }
+});
+
+// Snooze: despertar los hilos cuyo plazo venció. Por minuto, que es la
+// granularidad que ofrece la UI; la consulta cae sobre idx_conversations_snoozed
+// y no devuelve nada el 99% de las veces.
+programar("* * * * *", async () => {
+  try {
+    const despertadas = wakeSnoozedConversations();
+    for (const c of despertadas) {
+      notifyBandeja(c.domainId, "conv_unsnoozed", { conversationId: c.id, subject: c.subject });
+    }
+    if (despertadas.length) log("info", "mesa", "Conversaciones despertadas", { count: despertadas.length });
+  } catch (err) {
+    log("error", "mesa", "wakeSnoozedConversations falló", { error: String(err) });
   }
 });
 

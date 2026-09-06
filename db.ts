@@ -1273,6 +1273,11 @@ export function updateConversation(domainId: string, id: string, updates: Partia
   const conv = getConversation(domainId, id);
   if (!conv) return null;
   const merged = { ...conv, ...updates };
+  // Invariante: status="snoozed" <=> snoozedUntil != null. Se fuerza aquí y no en
+  // cada llamador para que no haya forma de dejar un hilo pospuesto sin fecha
+  // (no despertaría nunca) ni una fecha colgando en un hilo ya abierto. El correo
+  // entrante reabre la conversación, y por esta línea la despierta de paso.
+  if (merged.status !== "snoozed") merged.snoozedUntil = undefined;
   const rows = db.update(conversations).set({
     status: merged.status,
     assignedTo: merged.assignedTo ?? null,
@@ -2481,6 +2486,152 @@ export function listConversationsPage(
   return {
     items: pagina.map((r) => ({ ...filaCrudaAConversacion(r), unread: !!r.unread })),
     nextCursor: hayMas && ultima ? codificarCursor(ultima.last_message_at, ultima.id) : null,
+  };
+}
+
+/**
+ * Despierta las conversaciones cuyo plazo venció. Devuelve las filas ANTES de
+ * actualizarlas y dentro de una transacción, para no avisar de lo que no se
+ * actualizó (o avisar dos veces si dos procesos corren el cron a la vez).
+ */
+export function wakeSnoozedConversations(now?: string): { id: string; domainId: string; subject: string }[] {
+  const ahora = now ?? new Date().toISOString();
+  const tx = sqlite.transaction(() => {
+    const filas = sqlite.prepare(`
+      SELECT id, domain_id, subject FROM conversations
+      WHERE status = 'snoozed' AND snoozed_until IS NOT NULL
+        AND snoozed_until <= ? AND deleted_at IS NULL
+      LIMIT 500
+    `).all(ahora) as { id: string; domain_id: string; subject: string }[];
+    if (filas.length === 0) return [];
+    const marcadores = filas.map(() => "?").join(",");
+    sqlite.prepare(`
+      UPDATE conversations SET status = 'open', snoozed_until = NULL
+      WHERE id IN (${marcadores})
+    `).run(...filas.map((f) => f.id));
+    return filas.map((f) => ({ id: f.id, domainId: f.domain_id, subject: f.subject }));
+  });
+  return tx();
+}
+
+// --- Métricas de la Bandeja ---
+
+export interface BandejaMetrics {
+  days: number;
+  totals: { conversaciones: number; entrantes: number; salientes: number; abiertasSinAsignar: number; sinResponder: number };
+  primeraRespuesta: { medianaMin: number | null; p90Min: number | null; contestadas: number };
+  porAgente: { agente: string; respuestas: number; conversaciones: number }[];
+  porDia: { dia: string; entrantes: number; salientes: number }[];
+  // Ojo: NO es tiempo hasta el cierre. No existe closed_at, así que esto mide
+  // cuánto duró el hilo de punta a punta. La UI lo etiqueta como tal.
+  duracionHilo: { medianaMin: number | null };
+}
+
+function percentil(ordenados: number[], p: number): number | null {
+  if (ordenados.length === 0) return null;
+  const i = Math.min(ordenados.length - 1, Math.floor(p * (ordenados.length - 1)));
+  return ordenados[i];
+}
+
+export function getBandejaMetrics(domainId: string, days: number): BandejaMetrics {
+  const dias = [7, 30, 90].includes(days) ? days : 30;
+  const desde = new Date(Date.now() - dias * 24 * 3600_000).toISOString();
+
+  // Un renglón por conversación con la fecha del primer entrante, la del primer
+  // saliente posterior y la del último mensaje. SQLite no tiene percentiles, así
+  // que el corte se hace en TS sobre esta lista.
+  const filas = sqlite.prepare(`
+    SELECT c.id,
+           MIN(CASE WHEN m.direction = 'inbound' THEN m.created_at END) AS primer_in,
+           MIN(CASE WHEN m.direction = 'outbound' THEN m.created_at END) AS primer_out,
+           MAX(m.created_at) AS ultimo
+    FROM conversations c
+    JOIN messages m ON m.conversation_id = c.id
+    WHERE c.domain_id = ? AND c.deleted_at IS NULL AND c.last_message_at >= ?
+    GROUP BY c.id
+  `).all(domainId, desde) as { id: string; primer_in: string | null; primer_out: string | null; ultimo: string }[];
+
+  const respuestas: number[] = [];
+  const duraciones: number[] = [];
+  let sinResponder = 0;
+  for (const f of filas) {
+    if (f.primer_in && f.primer_out && f.primer_out > f.primer_in) {
+      respuestas.push((Date.parse(f.primer_out) - Date.parse(f.primer_in)) / 60000);
+    } else if (f.primer_in && !f.primer_out) {
+      sinResponder++;
+    }
+    if (f.primer_in && f.ultimo > f.primer_in) {
+      duraciones.push((Date.parse(f.ultimo) - Date.parse(f.primer_in)) / 60000);
+    }
+  }
+  respuestas.sort((a, b) => a - b);
+  duraciones.sort((a, b) => a - b);
+
+  const dirs = sqlite.prepare(`
+    SELECT m.direction AS direction, COUNT(*) AS n
+    FROM messages m JOIN conversations c ON c.id = m.conversation_id
+    WHERE c.domain_id = ? AND c.deleted_at IS NULL AND m.created_at >= ?
+    GROUP BY m.direction
+  `).all(domainId, desde) as { direction: string; n: number }[];
+  const cuenta = (d: string) => dirs.find((x) => x.direction === d)?.n ?? 0;
+
+  // ⚠️ messages.from de un saliente es el ALIAS del dominio, no el correo de quien
+  // escribió: la ruta de respuesta manda desde el alias. Así que el reparto por
+  // persona se apoya en assignedTo, que sí es una persona. Se anota en la UI.
+  const porAgente = sqlite.prepare(`
+    SELECT c.assigned_to AS agente,
+           COUNT(DISTINCT c.id) AS conversaciones,
+           SUM(CASE WHEN m.direction = 'outbound' THEN 1 ELSE 0 END) AS respuestas
+    FROM conversations c JOIN messages m ON m.conversation_id = c.id
+    WHERE c.domain_id = ? AND c.deleted_at IS NULL AND c.assigned_to IS NOT NULL
+      AND m.created_at >= ?
+    GROUP BY c.assigned_to
+    ORDER BY respuestas DESC
+  `).all(domainId, desde) as { agente: string; conversaciones: number; respuestas: number }[];
+
+  const crudoPorDia = sqlite.prepare(`
+    SELECT substr(m.created_at, 1, 10) AS dia, m.direction AS direction, COUNT(*) AS n
+    FROM messages m JOIN conversations c ON c.id = m.conversation_id
+    WHERE c.domain_id = ? AND c.deleted_at IS NULL AND m.created_at >= ?
+    GROUP BY dia, m.direction
+  `).all(domainId, desde) as { dia: string; direction: string; n: number }[];
+
+  // Los días sin correo se rellenan con cero: una gráfica que se salta los días
+  // vacíos miente sobre el ritmo real.
+  const porDia: { dia: string; entrantes: number; salientes: number }[] = [];
+  for (let i = dias - 1; i >= 0; i--) {
+    const dia = new Date(Date.now() - i * 24 * 3600_000).toISOString().slice(0, 10);
+    porDia.push({
+      dia,
+      entrantes: crudoPorDia.find((r) => r.dia === dia && r.direction === "inbound")?.n ?? 0,
+      salientes: crudoPorDia.find((r) => r.dia === dia && r.direction === "outbound")?.n ?? 0,
+    });
+  }
+
+  const sinAsignar = sqlite.prepare(`
+    SELECT COUNT(*) AS n FROM conversations
+    WHERE domain_id = ? AND deleted_at IS NULL AND status = 'open' AND assigned_to IS NULL
+  `).get(domainId) as { n: number };
+
+  const redondear = (v: number | null) => (v === null ? null : Math.round(v));
+
+  return {
+    days: dias,
+    totals: {
+      conversaciones: filas.length,
+      entrantes: cuenta("inbound"),
+      salientes: cuenta("outbound"),
+      abiertasSinAsignar: sinAsignar?.n ?? 0,
+      sinResponder,
+    },
+    primeraRespuesta: {
+      medianaMin: redondear(percentil(respuestas, 0.5)),
+      p90Min: redondear(percentil(respuestas, 0.9)),
+      contestadas: respuestas.length,
+    },
+    porAgente: porAgente.map((a) => ({ agente: a.agente, respuestas: a.respuestas ?? 0, conversaciones: a.conversaciones })),
+    porDia,
+    duracionHilo: { medianaMin: redondear(percentil(duraciones, 0.5)) },
   };
 }
 

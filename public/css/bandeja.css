@@ -1312,3 +1312,170 @@ body.mm-composer-locked { overflow: hidden; }
   .mesa-dots i { animation: none; opacity: .7; }
   .mesa-conv--saliendo { transition: none; }
 }
+
+/* --- Posponer --- */
+
+.mesa-snooze-wrap { position: relative; display: inline-flex; }
+
+.mesa-snooze-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  min-width: 190px;
+  padding: 4px;
+  border: 1px solid var(--mesa-border-active);
+  border-radius: 8px;
+  background: var(--mesa-surface-2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+}
+
+.mesa-snooze-menu button {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mesa-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.mesa-snooze-menu button:hover { background: var(--mesa-surface); }
+
+.mesa-snooze-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 10px;
+  border-top: 1px solid var(--mesa-border);
+  margin-top: 4px;
+  color: var(--mesa-text-2);
+  font-size: 12px;
+}
+.mesa-snooze-custom input {
+  padding: 5px 6px;
+  border: 1px solid var(--mesa-border-active);
+  border-radius: 6px;
+  background: var(--mesa-surface);
+  color: var(--mesa-text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.mesa-tag-snoozed { background: rgba(113, 113, 122, .18); color: var(--mesa-text-2); }
+.mesa-conv--snoozed .mesa-conv-subject,
+.mesa-conv--snoozed .mesa-conv-from { opacity: .6; }
+
+/* --- HTML entrante en iframe aislado --- */
+/* Alto fijo: sin scripts dentro no hay forma de medir el contenido. */
+.mesa-msg-html {
+  display: block;
+  width: 100%;
+  height: 420px;
+  border: 1px solid var(--mesa-border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+/* --- Pestañas y métricas --- */
+
+.mesa-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--mesa-border);
+  background: var(--mesa-surface);
+}
+
+.mesa-tab {
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--mesa-text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.mesa-tab.active { color: var(--mesa-text); border-bottom-color: var(--mesa-accent); }
+
+.mesa-metrics {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px 40px;
+}
+
+.mesa-metrics-head { margin-bottom: 16px; }
+
+.mesa-metrics-title {
+  margin: 28px 0 10px;
+  color: var(--mesa-text-2);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.mesa-metrics-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.mesa-metric-card {
+  padding: 14px;
+  border: 1px solid var(--mesa-border);
+  border-radius: 8px;
+  background: var(--mesa-surface);
+}
+.mesa-metric-value { font-size: 22px; font-weight: 700; color: var(--mesa-text); }
+.mesa-metric-label { margin-top: 2px; font-size: 12px; color: var(--mesa-text-2); }
+.mesa-metric-note { margin-top: 4px; font-size: 11px; color: var(--mesa-text-3); }
+
+/* Barras apiladas hechas con divs: sin dependencias. */
+.mesa-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 140px;
+  padding: 10px;
+  border: 1px solid var(--mesa-border);
+  border-radius: 8px;
+  background: var(--mesa-surface);
+  overflow-x: auto;
+}
+.mesa-bar {
+  position: relative;
+  display: flex;
+  flex: 1 0 12px;
+  flex-direction: column-reverse;
+  height: 100%;
+  min-width: 8px;
+  justify-content: flex-start;
+}
+.mesa-bar-in { background: var(--mesa-accent); border-radius: 2px 2px 0 0; }
+.mesa-bar-out { background: var(--mesa-note); }
+.mesa-bar-total {
+  position: absolute;
+  top: -14px;
+  width: 100%;
+  color: var(--mesa-text-3);
+  font-size: 9px;
+  text-align: center;
+}
+
+.mesa-metrics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.mesa-metrics-table th,
+.mesa-metrics-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--mesa-border);
+  text-align: left;
+}
+.mesa-metrics-table th { color: var(--mesa-text-3); font-weight: 600; font-size: 11px; text-transform: uppercase; }

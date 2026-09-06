@@ -46,6 +46,7 @@
       <option value="">Todas</option>
       <option value="open">Abiertas</option>
       <option value="unread">No leídas</option>
+      <option value="snoozed">Pospuestas</option>
       <option value="closed">Cerradas</option>
       <option value="deleted">Eliminados</option>
     </select>
@@ -63,6 +64,12 @@
     <input type="text" id="search-input" class="mesa-search" placeholder="Buscar en asunto y contenido...">
   </div>
   <div id="search-notice" class="mesa-notice mesa-hidden"></div>
+
+  <!-- Cambiar de pestaña sólo alterna clases: el SSE no se desmonta. -->
+  <div class="mesa-tabs">
+    <button class="mesa-tab active" id="tab-bandeja" type="button">Bandeja</button>
+    <button class="mesa-tab" id="tab-metrics" type="button">Métricas</button>
+  </div>
 
   <!-- Main content -->
   <div class="mesa-main">
@@ -111,6 +118,19 @@
             <button class="mesa-action-btn" id="btn-assign" title="Asignar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Asignar <span class="kbd">A</span></button>
             <button class="mesa-action-btn" id="btn-close-conv" title="Cerrar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Cerrar <span class="kbd">E</span></button>
             <button class="mesa-action-btn mesa-action-urgent" id="btn-urgent" title="Urgente"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <span class="kbd">!</span></button>
+            <div class="mesa-snooze-wrap">
+              <button class="mesa-action-btn" id="btn-snooze" type="button" title="Posponer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg> Posponer <span class="kbd">S</span></button>
+              <div class="mesa-snooze-menu mesa-hidden" id="snooze-menu">
+                <button type="button" data-snooze="1h">En 1 hora</button>
+                <button type="button" data-snooze="tarde">Esta tarde, 18:00</button>
+                <button type="button" data-snooze="manana">Mañana, 9:00</button>
+                <button type="button" data-snooze="lunes">El lunes, 9:00</button>
+                <label class="mesa-snooze-custom">
+                  Fecha…
+                  <input type="datetime-local" id="snooze-custom">
+                </label>
+              </div>
+            </div>
             <button class="mesa-action-btn mesa-action-danger" id="btn-delete-conv" title="Eliminar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Eliminar</button>
             <button class="mesa-action-btn mesa-action-restore mesa-hidden" id="btn-restore-conv" title="Restaurar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Restaurar</button>
           </div>
@@ -227,12 +247,29 @@
     <div class="mesa-shortcut"><kbd>n</kbd> nota</div>
     <div class="mesa-shortcut"><kbd>a</kbd> asignar</div>
     <div class="mesa-shortcut"><kbd>e</kbd> cerrar</div>
+    <div class="mesa-shortcut"><kbd>s</kbd> posponer</div>
     <div class="mesa-shortcut"><kbd>#</kbd> eliminar</div>
     <div class="mesa-shortcut"><kbd>Esc</kbd> volver</div>
     <div class="mesa-shortcut mesa-shortcut-end"><kbd>/</kbd> buscar</div>
   </div>
 
   <!-- Toast -->
+  <!-- Métricas del equipo -->
+  <div class="mesa-metrics mesa-hidden" id="metrics-pane">
+    <div class="mesa-metrics-head">
+      <select id="metrics-range" class="mesa-select">
+        <option value="7">Últimos 7 días</option>
+        <option value="30" selected>Últimos 30 días</option>
+        <option value="90">Últimos 90 días</option>
+      </select>
+    </div>
+    <div class="mesa-metrics-cards" id="metrics-cards"></div>
+    <h3 class="mesa-metrics-title">Correo por día</h3>
+    <div class="mesa-chart" id="metrics-chart"></div>
+    <h3 class="mesa-metrics-title">Por persona</h3>
+    <div id="metrics-agents"></div>
+  </div>
+
   <div class="mesa-toast" id="toast"></div>
 
   <script src="/js/composer.js"></script>
