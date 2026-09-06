@@ -436,3 +436,83 @@ describe("Métricas de la Bandeja", () => {
     assert.equal((await res.json()).days, 30);
   });
 });
+
+describe("Borrado en lote", () => {
+  async function conVariasConversaciones() {
+    const e = await escenario();
+    const ids = [e.conv.id];
+    for (let i = 0; i < 3; i++) {
+      const c = await createConversation({
+        domainId: e.dom.id,
+        from: `c${i}@fuera.com`,
+        to: `hola@${e.dom.domain}`,
+        subject: `S${i}`,
+        status: "open",
+        priority: "normal",
+        lastMessageAt: new Date(Date.now() - i * 1000).toISOString(),
+        messageCount: 1,
+        tags: [],
+        threadReferences: [],
+      });
+      ids.push(c.id);
+    }
+    return { ...e, ids };
+  }
+
+  it("borra varias de una y devuelve cuántas", async () => {
+    const e = await conVariasConversaciones();
+    const res = await post(`/api/bandeja/conversations/bulk-delete`, { domainId: e.dom.id, ids: e.ids }, e.dueno);
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).deleted, 4);
+    for (const id of e.ids) {
+      const conv = await getConversation(e.dom.id, id);
+      assert.ok(conv?.deletedAt, "quedó en la papelera");
+    }
+  });
+
+  it("🔴 un id de otro dominio colado en la lista no borra nada", async () => {
+    const a = await conVariasConversaciones();
+    const b = await escenario();
+    const res = await post(
+      `/api/bandeja/conversations/bulk-delete`,
+      { domainId: a.dom.id, ids: [a.ids[0], b.conv.id] },
+      a.dueno,
+    );
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).deleted, 1, "sólo la propia");
+    const ajena = await getConversation(b.dom.id, b.conv.id);
+    assert.equal(ajena?.deletedAt, undefined, "la del otro dominio sigue intacta");
+  });
+
+  it("pide el mismo permiso que borrar de una: el agente no puede", async () => {
+    const e = await conVariasConversaciones();
+    const res = await post(`/api/bandeja/conversations/bulk-delete`, { domainId: e.dom.id, ids: e.ids }, e.agente);
+    assert.equal(res.status, 403);
+    const sigue = await getConversation(e.dom.id, e.ids[0]);
+    assert.equal(sigue?.deletedAt, undefined);
+  });
+
+  it("rechaza lista vacía y lotes de más de 200", async () => {
+    const e = await escenario();
+    assert.equal((await post(`/api/bandeja/conversations/bulk-delete`, { domainId: e.dom.id, ids: [] }, e.dueno)).status, 400);
+    const muchas = Array.from({ length: 201 }, (_, i) => `id-${i}`);
+    assert.equal((await post(`/api/bandeja/conversations/bulk-delete`, { domainId: e.dom.id, ids: muchas }, e.dueno)).status, 400);
+  });
+
+  it("ids inexistentes no rompen: se cuentan las que sí se borraron", async () => {
+    const e = await conVariasConversaciones();
+    const res = await post(
+      `/api/bandeja/conversations/bulk-delete`,
+      { domainId: e.dom.id, ids: [e.ids[0], "no-existe", "tampoco"] },
+      e.dueno,
+    );
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).deleted, 1);
+  });
+
+  it("un correo ajeno recibe 403", async () => {
+    const e = await conVariasConversaciones();
+    const res = await post(`/api/bandeja/conversations/bulk-delete`, { domainId: e.dom.id, ids: e.ids }, e.ajeno);
+    assert.equal(res.status, 403);
+  });
+});

@@ -65,6 +65,15 @@
   </div>
   <div id="search-notice" class="mesa-notice mesa-hidden"></div>
 
+  <!-- Barra de selección múltiple: sólo aparece cuando hay algo marcado. -->
+  <div id="bulk-bar" class="mesa-bulk mesa-hidden">
+    <span id="bulk-count"></span>
+    <button type="button" class="mesa-bulk-link" id="bulk-all">Seleccionar todas las visibles</button>
+    <button type="button" class="mesa-bulk-link" id="bulk-none">Quitar selección</button>
+    <div class="mesa-toolbar-spacer"></div>
+    <button type="button" class="mesa-action-btn mesa-action-danger" id="bulk-delete">Eliminar seleccionadas</button>
+  </div>
+
   <!-- Cambiar de pestaña sólo alterna clases: el SSE no se desmonta. -->
   <div class="mesa-tabs">
     <button class="mesa-tab active" id="tab-bandeja" type="button">Bandeja</button>
@@ -260,6 +269,7 @@
     <div class="mesa-shortcut"><kbd>a</kbd> asignar</div>
     <div class="mesa-shortcut"><kbd>e</kbd> cerrar</div>
     <div class="mesa-shortcut"><kbd>s</kbd> posponer</div>
+    <div class="mesa-shortcut"><kbd>x</kbd> marcar</div>
     <div class="mesa-shortcut"><kbd>#</kbd> eliminar</div>
     <div class="mesa-shortcut"><kbd>Esc</kbd> volver</div>
     <div class="mesa-shortcut mesa-shortcut-end"><kbd>/</kbd> buscar</div>

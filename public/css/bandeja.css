@@ -1531,3 +1531,47 @@ body.mm-composer-locked { overflow: hidden; }
   color: var(--mesa-text-3);
   font-size: 11px;
 }
+
+/* --- Selección múltiple --- */
+
+.mesa-bulk {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--mesa-border);
+  background: var(--mesa-accent-dim);
+  color: var(--mesa-text);
+  font-size: 13px;
+}
+
+.mesa-bulk-link {
+  border: 0;
+  background: none;
+  color: var(--mesa-text-2);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.mesa-bulk-link:hover { color: var(--mesa-text); }
+
+/* La casilla sólo aparece al pasar el cursor o cuando ya hay algo marcado: en
+   reposo la lista se lee sin una columna de cajitas. */
+.mesa-conv-check {
+  display: flex;
+  align-items: center;
+  padding-right: 8px;
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+.mesa-conv:hover .mesa-conv-check,
+.mesa-conv-check:focus-within,
+.mesa-conv--marcada .mesa-conv-check { opacity: 1; }
+.mesa-conv-check input { cursor: pointer; accent-color: var(--mesa-accent); }
+
+.mesa-conv--marcada { background: var(--mesa-accent-dim); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mesa-conv-check { transition: none; }
+}

@@ -132,6 +132,10 @@ let unreadIds = new Set();
 // a propósito: la animación de llegada sólo tiene sentido para lo que acaba de
 // llegar. Aplicársela a todo lo no leído dejaba la lista entera latiendo sola.
 let convsNuevasEnVivo = new Set();
+// Selección múltiple para borrar en lote. Vive sólo en la pestaña: no tiene
+// sentido recordar una selección entre recargas.
+let seleccionadas = new Set();
+let ultimaMarcada = -1;
 let unreadCount = 0;
 // Presencia de los compañeros en el dominio, tal como llega por SSE.
 let presencias = [];
@@ -447,7 +451,11 @@ function convRowHtml(c, i) {
 
     const puntoPresencia = presencias.some(p => p.conversationId === c.id && p.email !== currentUser?.email)
       ? `<span class="mesa-presence-dot" title="Alguien más está en este hilo"></span>` : "";
+    if (seleccionadas.has(c.id)) classes += " mesa-conv--marcada";
     return `<div class="${classes}" data-idx="${i}" data-id="${esc(c.id)}">
+      <label class="mesa-conv-check" title="Marcar (x)">
+        <input type="checkbox" ${seleccionadas.has(c.id) ? "checked" : ""} tabindex="-1">
+      </label>
       <div class="mesa-avatar">${esc(initials)}</div>
       <div class="mesa-conv-body">
         <div class="mesa-conv-header">
@@ -486,9 +494,87 @@ function engancharClicksLista() {
     if (!fila || !container.contains(fila)) return;
     const idx = parseInt(fila.dataset.idx);
     if (Number.isNaN(idx) || !conversations[idx]) return;
+
+    // Marcar no es abrir: la casilla se queda con el click.
+    if (ev.target.closest(".mesa-conv-check")) {
+      ev.preventDefault();
+      alternarMarcada(idx, ev.shiftKey);
+      return;
+    }
     selectedIdx = idx;
     openConversation(conversations[idx]);
   });
+}
+
+/**
+ * Marca o desmarca una fila. Con shift extiende desde la última marcada, que es
+ * lo que uno espera al limpiar una bandeja entera.
+ */
+function alternarMarcada(idx, conShift) {
+  const conv = conversations[idx];
+  if (!conv) return;
+
+  if (conShift && ultimaMarcada >= 0 && ultimaMarcada !== idx) {
+    const desde = Math.min(ultimaMarcada, idx);
+    const hasta = Math.max(ultimaMarcada, idx);
+    // El rango se marca entero, sin alternar una por una: si ya estaban marcadas
+    // se quedan, que es como se comporta cualquier lista con shift.
+    for (let i = desde; i <= hasta; i++) {
+      if (conversations[i]) seleccionadas.add(conversations[i].id);
+    }
+  } else if (seleccionadas.has(conv.id)) {
+    seleccionadas.delete(conv.id);
+  } else {
+    seleccionadas.add(conv.id);
+  }
+
+  ultimaMarcada = idx;
+  renderList();
+  renderBarraSeleccion();
+}
+
+function limpiarSeleccion() {
+  seleccionadas.clear();
+  ultimaMarcada = -1;
+  renderList();
+  renderBarraSeleccion();
+}
+
+function renderBarraSeleccion() {
+  const barra = document.getElementById("bulk-bar");
+  if (!barra) return;
+  const n = seleccionadas.size;
+  barra.classList.toggle("mesa-hidden", n === 0);
+  document.getElementById("bulk-count").textContent =
+    `${n} ${n === 1 ? "seleccionada" : "seleccionadas"}`;
+}
+
+async function borrarSeleccionadas() {
+  const ids = [...seleccionadas];
+  if (ids.length === 0) return;
+  if (!confirm(`¿Eliminar ${ids.length} conversación${ids.length === 1 ? "" : "es"}? Se mueven a la papelera por 15 días.`)) return;
+
+  const res = await fetch("/api/bandeja/conversations/bulk-delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ domainId: selectedDomainId, ids }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    toast(data.error || "No se pudieron eliminar");
+    return;
+  }
+  // Si la abierta iba en el lote, el detalle se queda mostrando algo que ya no está.
+  if (activeConv && seleccionadas.has(activeConv.id)) {
+    activeConv = null;
+    document.getElementById("detail-loaded").classList.add("mesa-hidden");
+    document.getElementById("detail-empty").classList.remove("mesa-hidden");
+  }
+  seleccionadas.clear();
+  ultimaMarcada = -1;
+  renderBarraSeleccion();
+  toast(`${data.deleted} eliminada${data.deleted === 1 ? "" : "s"}`);
+  await loadConversations();
 }
 
 // --- Open conversation detail ---
@@ -1037,6 +1123,9 @@ function setupListeners() {
     selectedIdx = -1;
     unreadIds.clear();
     convsNuevasEnVivo.clear();
+    seleccionadas.clear();
+    ultimaMarcada = -1;
+    renderBarraSeleccion();
     unreadCount = 0;
     updateTitle();
     document.getElementById("detail-empty").classList.remove("mesa-hidden");
@@ -1074,6 +1163,15 @@ function setupListeners() {
   });
 
   document.getElementById("btn-assign").addEventListener("click", assignConversation);
+  document.getElementById("bulk-all")?.addEventListener("click", () => {
+    // "Visibles" es literal: sólo la página cargada. Marcar lo que no se ha
+    // traído sería prometer un borrado que el tope de 200 no puede cumplir.
+    for (const c of conversations) seleccionadas.add(c.id);
+    renderList();
+    renderBarraSeleccion();
+  });
+  document.getElementById("bulk-none")?.addEventListener("click", limpiarSeleccion);
+  document.getElementById("bulk-delete")?.addEventListener("click", borrarSeleccionadas);
   document.getElementById("tab-bandeja").addEventListener("click", () => mostrarPestana("bandeja"));
   document.getElementById("tab-metrics").addEventListener("click", () => mostrarPestana("metrics"));
   document.getElementById("metrics-range").addEventListener("change", cargarMetricas);
@@ -1312,13 +1410,21 @@ function setupKeyboard() {
       e.preventDefault();
       closeConversation();
     }
+    if (e.key === "x" && canDoActions) {
+      e.preventDefault();
+      if (selectedIdx >= 0) alternarMarcada(selectedIdx, e.shiftKey);
+      return;
+    }
     if (e.key === "s" && canDoActions && activeConv) {
       e.preventDefault();
       toggleSnoozeMenu();
     }
     if (e.key === "#" && canDoActions) {
       e.preventDefault();
-      deleteConversation();
+      // Con filas marcadas, eliminar es eliminar esas: borrar sólo la abierta
+      // ignorando una selección visible sería obedecer a medias.
+      if (seleccionadas.size > 0) borrarSeleccionadas();
+      else deleteConversation();
     }
     if (e.key === "/") {
       e.preventDefault();
@@ -1749,6 +1855,22 @@ function connectSSE(domainId) {
       }
       removerFila(d.conversationId);
     } catch (err) { console.error("SSE conv_deleted:", err); }
+  });
+
+  sseSource.addEventListener("convs_deleted", (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (mio(d)) return;
+      for (const id of d.conversationIds ?? []) {
+        if (activeConv && activeConv.id === id) {
+          activeConv = null;
+          document.getElementById("detail-loaded").classList.add("mesa-hidden");
+          document.getElementById("detail-empty").classList.remove("mesa-hidden");
+          toast("Alguien eliminó esta conversación");
+        }
+        removerFila(id);
+      }
+    } catch (err) { console.error("SSE convs_deleted:", err); }
   });
 
   sseSource.addEventListener("conv_restored", (e) => {

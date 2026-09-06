@@ -5195,6 +5195,48 @@ const app = new Elysia({ adapter: node() })
     detail: { tags: ["Bandeja"], summary: "Soft-delete a conversation", security: [{ cookieAuth: [] }] },
   })
 
+  // Borrado en lote. Existe como ruta propia y no como N llamadas al DELETE
+  // porque limpiar cincuenta hilos serían cincuenta peticiones, cincuenta
+  // comprobaciones de permiso y cincuenta eventos SSE que harían saltar la lista
+  // de los compañeros cincuenta veces.
+  .post("/api/bandeja/conversations/bulk-delete", async ({ request, body: bulkBody }) => {
+    const { domainId, ids } = bulkBody;
+    const gate = await requireBandeja(request, domainId, "moderate", { mesaActions: true, accion: "eliminar conversaciones" });
+    if (!gate.ok) return gate.res;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return new Response(JSON.stringify({ error: "Selecciona al menos una conversación" }), { status: 400 });
+    }
+    // Tope duro: un lote sin límite es una transacción larga sobre el único
+    // volumen de SQLite, y la UI no ofrece seleccionar más que una página.
+    if (ids.length > 200) {
+      return new Response(JSON.stringify({ error: "Máximo 200 conversaciones por vez" }), { status: 400 });
+    }
+
+    const borradas: string[] = [];
+    for (const id of ids) {
+      if (typeof id !== "string") continue;
+      // softDeleteConversation ya filtra por dominio, así que un id de otro
+      // dominio colado en la lista no borra nada.
+      if (await softDeleteConversation(domainId, id)) borradas.push(id);
+    }
+
+    if (borradas.length) {
+      notifyBandeja(domainId, "convs_deleted", { conversationIds: borradas, actor: gate.auth.email });
+      log("info", "mesa", "Borrado en lote", { domainId, pedidas: ids.length, borradas: borradas.length, actor: gate.auth.email });
+    }
+
+    return new Response(JSON.stringify({ ok: true, deleted: borradas.length }), {
+      headers: { "content-type": "application/json" },
+    });
+  }, {
+    body: t.Object({
+      domainId: t.String(),
+      ids: t.Array(t.String()),
+    }),
+    detail: { tags: ["Bandeja"], summary: "Soft-delete several conversations at once", security: [{ cookieAuth: [] }] },
+  })
+
   .post("/api/bandeja/conversations/:id/restore", async ({ request, params, body: restoreBody }) => {
 
     const { domainId } = restoreBody;

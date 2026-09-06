@@ -1315,6 +1315,7 @@ function renderAliases(aliases) {
         ${a.forwardCount ? `<div class="text-xs text-zinc-500 mt-1">${a.forwardCount} reenviado${a.forwardCount === 1 ? '' : 's'}${a.lastFrom ? ` · último de ${esc(a.lastFrom)}` : ''}${a.lastAt ? ` · ${relativeTime(a.lastAt)}` : ''}</div>` : ''}
       </div>
       <div class="flex items-center gap-3 sm:gap-2 shrink-0">
+        <button data-action="copy-alias" data-value="${a.alias === '*' ? '' : esc(a.alias) + '@' + esc(selectedDomain.domain)}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors${a.alias === '*' ? ' hidden' : ''}" title="Copiar la dirección para compartirla">Copiar</button>
         <button data-action="edit-alias" data-alias="${esc(a.alias)}" data-destinations="${esc(a.destinations.join(', '))}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Editar</button>
         <button data-action="toggle-alias" data-alias="${esc(a.alias)}" data-enabled="${!a.enabled}" class="text-xs px-2 py-1 rounded ${a.enabled ? 'bg-green-900/30 text-green-400' : 'bg-zinc-700 text-zinc-400'}">${a.enabled ? 'Activo' : 'Inactivo'}</button>
         <button data-action="remove-alias" data-alias="${esc(a.alias)}" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
@@ -2678,6 +2679,18 @@ function setupEventListeners() {
     const toggle = e.target.closest("[data-action='toggle-alias']");
     if (toggle) {
       toggleAlias(toggle.dataset.alias, toggle.dataset.enabled === "true");
+      return;
+    }
+    // Copiar la dirección completa, que es lo que se comparte: el alias solo, sin
+    // el dominio, no le sirve a nadie.
+    const copiar = e.target.closest("[data-action='copy-alias']");
+    if (copiar) {
+      navigator.clipboard.writeText(copiar.dataset.value);
+      playSound("copy");
+      const antes = copiar.textContent;
+      copiar.textContent = "¡Copiado!";
+      copiar.classList.add("text-green-400");
+      setTimeout(() => { copiar.textContent = antes; copiar.classList.remove("text-green-400"); }, 1500);
       return;
     }
     const remove = e.target.closest("[data-action='remove-alias']");
