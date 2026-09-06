@@ -9,6 +9,13 @@ npm run dev       # Run dev server on :8000 (tsx --watch)
 npm test          # Run tests (tsx --test)
 ```
 
+## Deploy
+**Siempre desde un worktree limpio de HEAD, nunca desde `/Users/bliss/mailmask` con trabajo sin commit.** `fly deploy` empaqueta el árbol de trabajo tal cual: el 5-sep-2026 un deploy se llevó a producción un `main.ts` que importaba un módulo que estaba en un stash y tumbó el sitio; otro se llevó cambios de precios a medias. Con dos sesiones de Claude en el mismo repo esto pasa.
+```bash
+W=$SCRATCHPAD/deploy-wt; git worktree add --detach "$W" HEAD && (cd "$W" && fly deploy); git worktree remove --force "$W"
+```
+Y nunca `git stash`, `checkout` ni `reset` sobre archivos que otra sesión tiene abiertos; commitea sólo con `git add <tus archivos>`.
+
 ## SDK (`sdk/`)
 When any file inside `sdk/` is modified: bump the version (`npm version patch` in `sdk/`), build, and publish to npm:
 ```bash
