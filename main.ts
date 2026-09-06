@@ -7,6 +7,7 @@ import * as dns from "node:dns/promises";
 import { programar, esServidor } from "./scheduler.js";
 import { revisarPatron } from "./regex-guard.js";
 import { verificarTurnstile } from "./turnstile.js";
+import { generarPerfilApple, nombreArchivoPerfil } from "./apple-profile.js";
 import { addSseClient, notifyBandeja, setPresence, clearPresence, listPresence, notifyPresence } from "./sse-hub.js";
 import { ftsDisponible } from "./pg.js";
 import { backfillPendiente } from "./search-backfill.js";
@@ -5274,6 +5275,42 @@ const app = new Elysia({ adapter: node() })
     });
   }, {
     detail: { tags: ["Bandeja"], summary: "Team metrics for the shared inbox", security: [{ cookieAuth: [] }] },
+  })
+
+  // Perfil de Apple Mail. Se sirve como archivo y NO necesita ningún DNS del
+  // cliente: Apple Mail no soporta SRV (RFC 6186) ni el autoconfig de Mozilla, así
+  // que el perfil es el único camino automático que existe para macOS e iOS.
+  .get("/api/domains/:id/apple-profile", async ({ request }) => {
+    const url = new URL(request.url);
+    const alias = (url.searchParams.get("alias") ?? "").trim().toLowerCase();
+
+    const gate = await requireBandeja(request, url.searchParams.get("domainId") ?? undefined, "read");
+    if (!gate.ok) return gate.res;
+    const { domain } = gate;
+
+    if (!alias || !/^[a-z0-9._%+-]+$/.test(alias)) {
+      return new Response(JSON.stringify({ error: "alias requerido (sólo la parte antes de la arroba)" }), { status: 400 });
+    }
+    const direccion = `${alias}@${domain.domain}`;
+
+    const perfil = generarPerfilApple({
+      direccion,
+      nombre: alias,
+      dominio: domain.domain,
+    });
+
+    return new Response(perfil, {
+      headers: {
+        // Este tipo es lo que hace que macOS lo abra en Ajustes en vez de mostrarlo
+        // como texto. Con text/xml el usuario ve un plist en pantalla y no pasa nada.
+        "content-type": "application/x-apple-aspen-config",
+        "content-disposition": `attachment; filename="${nombreArchivoPerfil(direccion)}"`,
+        // Lleva la dirección del buzón: no debe quedar en ningún caché compartido.
+        "cache-control": "private, no-store",
+      },
+    });
+  }, {
+    detail: { tags: ["Domains"], summary: "Apple Mail configuration profile for a mailbox", security: [{ cookieAuth: [] }] },
   })
 
   // --- Mesa: leído y presencia ---
