@@ -1,18 +1,71 @@
+/*
+ * La Bandeja se pinta con los tokens del sitio (definidos en input.css y
+ * compilados en styles.css, que esta página ya carga). Antes tenía una paleta
+ * zinc propia y hardcodeada, así que /bandeja era oscura para siempre y no se
+ * parecía al resto del producto.
+ *
+ * El acento NO cambia: sigue siendo el verde `mask-*`. Es el color de "esto va
+ * bien" dentro de la app; el rojo de máscara es de la marca en el sitio público
+ * (ver CLAUDE.md). Pintar de rojo los estados de éxito sería otra cosa.
+ */
 :root {
-  --mesa-bg: #09090b;
-  --mesa-surface: #18181b;
-  --mesa-surface-2: #27272a;
-  --mesa-border: #27272a;
-  --mesa-border-active: #3f3f46;
-  --mesa-text: #f4f4f5;
-  --mesa-text-2: #a1a1aa;
-  --mesa-text-3: #71717a;
+  --mesa-bg: rgb(var(--bg));
+  --mesa-surface: rgb(var(--bg-elev));
+  --mesa-surface-2: rgb(var(--bg-inset));
+  --mesa-border: rgb(var(--line));
+  --mesa-border-active: rgb(var(--fg-subtle) / 0.55);
+  --mesa-text: rgb(var(--fg));
+  --mesa-text-2: rgb(var(--fg-muted));
+  --mesa-text-3: rgb(var(--fg-subtle));
   --mesa-accent: rgb(var(--mask-600));
   --mesa-accent-dim: rgb(var(--mask-600) / 0.15);
+
+  /* Colores de estado. Van aparte de los tokens porque significan algo —error,
+     nota, entregado— y no deben cambiar con el tema más que en luminosidad.
+     Estos son los valores para fondo CLARO: más oscuros, para que cumplan AA. */
   --mesa-note: #a16207;
-  --mesa-note-bg: rgba(161, 98, 7, 0.1);
-  --mesa-green: #16a34a;
-  --mesa-green-dim: rgba(22, 163, 74, 0.15);
+  --mesa-note-bg: rgba(161, 98, 7, 0.12);
+  --mesa-green: #15803d;
+  --mesa-green-dim: rgba(21, 128, 61, 0.15);
+  --mesa-danger: #b91c1c;
+  --mesa-danger-dim: rgba(185, 28, 28, 0.12);
+  --mesa-warn: #b45309;
+  --mesa-attention: #b45309;
+  --mesa-paper: #fff;
+  --mesa-indigo: #4f46e5;
+  --mesa-teal: #0d9488;
+  --mesa-amber: #b45309;
+}
+
+/* En oscuro los estados suben de luminosidad: los tonos de arriba no se leen
+   sobre fondo oscuro. Los tokens del sitio ya se invierten solos. */
+:root[data-theme="dark"] {
+  --mesa-note: #d99a2b;
+  --mesa-note-bg: rgba(217, 154, 43, 0.12);
+  --mesa-green: #4ade80;
+  --mesa-green-dim: rgba(74, 222, 128, 0.15);
+  --mesa-danger: #f87171;
+  --mesa-danger-dim: rgba(248, 113, 113, 0.15);
+  --mesa-warn: #fb923c;
+  --mesa-attention: #f0b429;
+  --mesa-indigo: #818cf8;
+  --mesa-teal: #2dd4bf;
+  --mesa-amber: #eab308;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --mesa-note: #d99a2b;
+    --mesa-note-bg: rgba(217, 154, 43, 0.12);
+    --mesa-green: #4ade80;
+    --mesa-green-dim: rgba(74, 222, 128, 0.15);
+    --mesa-danger: #f87171;
+    --mesa-danger-dim: rgba(248, 113, 113, 0.15);
+    --mesa-warn: #fb923c;
+    --mesa-attention: #f0b429;
+    --mesa-indigo: #818cf8;
+    --mesa-teal: #2dd4bf;
+    --mesa-amber: #eab308;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -229,7 +282,7 @@ body {
   flex-shrink: 0;
 }
 .mesa-status-dot.open { background: var(--mesa-green); }
-.mesa-status-dot.snoozed { background: #eab308; }
+.mesa-status-dot.snoozed { background: var(--mesa-amber); }
 .mesa-status-dot.closed { background: var(--mesa-text-3); }
 
 .mesa-tag {
@@ -240,49 +293,49 @@ body {
   font-weight: 500;
 }
 .mesa-tag-alias {
-  background: rgba(99, 102, 241, 0.10);
-  color: #6366f1;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--mesa-indigo);
 }
 .mesa-tag-assigned {
   background: rgba(20, 184, 166, 0.15);
-  color: #2dd4bf;
+  color: var(--mesa-teal);
 }
 .mesa-tag-urgent {
   background: rgba(249, 115, 22, 0.15);
-  color: #fb923c;
+  color: var(--mesa-warn);
 }
 .mesa-tag-deleted {
   background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  color: var(--mesa-danger);
 }
 .mesa-conv.deleted {
   opacity: 0.55;
 }
 .mesa-action-urgent.active {
-  color: #fb923c;
-  border-color: #f97316;
+  color: var(--mesa-warn);
+  border-color: var(--mesa-warn);
   background: rgba(249, 115, 22, 0.15);
 }
 .mesa-action-urgent:hover {
-  color: #fb923c;
-  border-color: #f97316;
+  color: var(--mesa-warn);
+  border-color: var(--mesa-warn);
   background: rgba(249, 115, 22, 0.15);
 }
 .mesa-action-danger {
-  color: #f87171;
+  color: var(--mesa-danger);
 }
 .mesa-action-danger:hover {
   background: rgba(239, 68, 68, 0.1);
-  border-color: #f87171;
-  color: #f87171;
+  border-color: var(--mesa-danger);
+  color: var(--mesa-danger);
 }
 .mesa-action-restore {
-  color: #34d399;
+  color: var(--mesa-green);
 }
 .mesa-action-restore:hover {
   background: rgba(52, 211, 153, 0.1);
-  border-color: #34d399;
-  color: #34d399;
+  border-color: var(--mesa-green);
+  color: var(--mesa-green);
 }
 
 /* --- Empty state --- */
@@ -397,16 +450,16 @@ body {
 }
 .mesa-msg-dir.inbound {
   background: var(--mesa-green-dim);
-  color: #4ade80;
+  color: var(--mesa-green);
 }
 .mesa-msg-dir.outbound {
   background: rgba(99, 102, 241, 0.15);
-  color: #818cf8;
+  color: var(--mesa-indigo);
 }
 .mesa-msg-dir.delivery-sent { color: var(--mesa-text-3); background: rgba(148, 163, 184, 0.12); }
-.mesa-msg-dir.delivery-delivered { color: #4ade80; background: var(--mesa-green-dim); }
+.mesa-msg-dir.delivery-delivered { color: var(--mesa-green); background: var(--mesa-green-dim); }
 .mesa-msg-dir.delivery-bounced,
-.mesa-msg-dir.delivery-complained { color: #f87171; background: rgba(248, 113, 113, 0.15); cursor: help; }
+.mesa-msg-dir.delivery-complained { color: var(--mesa-danger); background: var(--mesa-danger-dim); cursor: help; }
 .mesa-msg-body {
   font-size: 14px;
   line-height: 1.6;
@@ -489,7 +542,7 @@ body {
   color: var(--mesa-note);
   font-family: ui-monospace, 'SF Mono', monospace;
 }
-.mesa-note-body { color: #fbbf24; line-height: 1.5; }
+.mesa-note-body { color: var(--mesa-note); line-height: 1.5; }
 
 /* --- Composer --- */
 .mesa-composer {
@@ -544,7 +597,7 @@ body {
 }
 .mesa-mode-btn.note-mode.active {
   background: var(--mesa-note-bg);
-  color: #fbbf24;
+  color: var(--mesa-note);
 }
 .mesa-send-btn {
   font-size: 13px;
@@ -685,7 +738,7 @@ body {
 .mesa-modal-error {
   margin-top: 10px;
   font-size: 12px;
-  color: #f87171;
+  color: var(--mesa-danger);
   background: rgba(248, 113, 113, 0.1);
   border: 1px solid rgba(248, 113, 113, 0.25);
   border-radius: 6px;
@@ -1002,7 +1055,7 @@ body.mm-composer-locked { overflow: hidden; }
 .mm-composer-content .mm-callout-note { border-left-color: #3b82f6; }
 .mm-composer-content .mm-callout-tip { border-left-color: #22c55e; }
 .mm-composer-content .mm-callout-important { border-left-color: #a78bfa; }
-.mm-composer-content .mm-callout-warning { border-left-color: #f59e0b; }
+.mm-composer-content .mm-callout-warning { border-left-color: var(--mesa-note); }
 .mm-composer-content .mm-callout-caution { border-left-color: #ef4444; }
 
 .mm-composer-content table {
@@ -1303,7 +1356,7 @@ body.mm-composer-locked { overflow: hidden; }
   height: 7px;
   margin-right: 6px;
   border-radius: 50%;
-  background: #f0b429;
+  background: var(--mesa-attention);
   vertical-align: middle;
 }
 
@@ -1313,10 +1366,10 @@ body.mm-composer-locked { overflow: hidden; }
   gap: 6px;
   margin-top: 8px;
   padding: 6px 10px;
-  border: 1px solid rgba(240, 180, 41, .35);
+  border: 1px solid rgb(var(--fg-subtle) / .35);
   border-radius: 6px;
-  background: rgba(240, 180, 41, .08);
-  color: #f0b429;
+  background: rgb(var(--fg-subtle) / .08);
+  color: var(--mesa-attention);
   font-size: 12px;
 }
 
@@ -1407,7 +1460,7 @@ body.mm-composer-locked { overflow: hidden; }
   height: 420px;
   border: 1px solid var(--mesa-border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--mesa-paper);
 }
 
 /* --- Pestañas y métricas --- */
@@ -1465,36 +1518,76 @@ body.mm-composer-locked { overflow: hidden; }
 .mesa-metric-label { margin-top: 2px; font-size: 12px; color: var(--mesa-text-2); }
 .mesa-metric-note { margin-top: 4px; font-size: 11px; color: var(--mesa-text-3); }
 
-/* Barras apiladas hechas con divs: sin dependencias. */
+/* Área en SVG, sin dependencias. El SVG se estira con el contenedor. */
 .mesa-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 140px;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--mesa-border);
   border-radius: 8px;
   background: var(--mesa-surface);
-  overflow-x: auto;
 }
-.mesa-bar {
-  position: relative;
+
+.mesa-chart-legend {
   display: flex;
-  flex: 1 0 12px;
-  flex-direction: column-reverse;
-  height: 100%;
-  min-width: 8px;
-  justify-content: flex-start;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+  color: var(--mesa-text-2);
+  font-size: 11px;
 }
-.mesa-bar-in { background: var(--mesa-accent); border-radius: 2px 2px 0 0; }
-.mesa-bar-out { background: var(--mesa-note); }
-.mesa-bar-total {
-  position: absolute;
-  top: -14px;
+.mesa-chart-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.mesa-chart-max { margin-left: auto; color: var(--mesa-text-3); }
+
+.mesa-swatch { width: 9px; height: 9px; border-radius: 2px; }
+.mesa-swatch-in { background: var(--mesa-accent); }
+.mesa-swatch-out { background: var(--mesa-note); }
+
+.mesa-chart-svg {
+  display: block;
   width: 100%;
+  height: 140px;
+  overflow: visible;
+}
+
+/* vector-effect mantiene el trazo de 1px aunque el SVG se estire en horizontal:
+   sin él la línea se deforma con el ancho del contenedor. */
+.mesa-line-in,
+.mesa-line-out {
+  fill: none;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.mesa-line-in { stroke: var(--mesa-accent); }
+.mesa-line-out { stroke: var(--mesa-note); }
+.mesa-area-in { fill: var(--mesa-accent); opacity: .28; }
+.mesa-area-out { fill: var(--mesa-note); opacity: .22; }
+.mesa-chart-dot { fill: var(--mesa-accent); opacity: 0; }
+.mesa-chart-dot:hover { opacity: 1; }
+
+/* La crecida ocurre UNA vez al dibujar, no en bucle. */
+.mesa-line-in,
+.mesa-line-out {
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  animation: mesa-trazo 0.7s ease-out forwards;
+}
+.mesa-area-in,
+.mesa-area-out { animation: mesa-aparece 0.7s ease-out forwards; }
+
+@keyframes mesa-trazo { to { stroke-dashoffset: 0; } }
+@keyframes mesa-aparece { from { opacity: 0; } }
+
+.mesa-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
   color: var(--mesa-text-3);
-  font-size: 9px;
-  text-align: center;
+  font-size: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesa-line-in,
+  .mesa-line-out { stroke-dasharray: none; stroke-dashoffset: 0; animation: none; }
+  .mesa-area-in, .mesa-area-out { animation: none; }
 }
 
 .mesa-metrics-table {
@@ -1539,11 +1632,11 @@ body.mm-composer-locked { overflow: hidden; }
   padding: 6px;
   border: 1px dashed var(--mesa-border-active);
   border-radius: 8px;
-  background: #fff;
+  background: var(--mesa-paper);
   flex: 0 0 auto;
 }
 .mesa-logo-preview img { max-width: 100%; max-height: 100%; }
-.mesa-logo-empty { color: #9a9aa2; font-size: 11px; }
+.mesa-logo-empty { color: var(--mesa-text-3); font-size: 11px; }
 
 .mesa-logo-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .mesa-logo-btn { cursor: pointer; }
@@ -1597,3 +1690,26 @@ body.mm-composer-locked { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .mesa-conv-check { transition: none; }
 }
+
+/* --- Botón de tema --- */
+.mesa-theme-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+/* Se muestra el icono del tema al que vas a CAMBIAR, no el actual.
+   El estado base es claro, igual que en input.css: sin data-theme manda
+   prefers-color-scheme, y por eso la media query va después. */
+.mesa-ico-sol { display: none; }
+.mesa-ico-luna { display: inline; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .mesa-ico-sol { display: inline; }
+  :root:not([data-theme="light"]) .mesa-ico-luna { display: none; }
+}
+:root[data-theme="dark"] .mesa-ico-sol { display: inline; }
+:root[data-theme="dark"] .mesa-ico-luna { display: none; }
+:root[data-theme="light"] .mesa-ico-sol { display: none; }
+:root[data-theme="light"] .mesa-ico-luna { display: inline; }

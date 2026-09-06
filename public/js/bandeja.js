@@ -1740,6 +1740,73 @@ function renderPresence() {
 // Sin librería de gráficas: son barras con divs y un alto en porcentaje. Meter
 // una dependencia de 200 KB para treinta barras no se paga.
 
+/**
+ * Gráfica de área en SVG, sin librería.
+ *
+ * `viewBox` con `preserveAspectRatio="none"` deja que el SVG se estire con el
+ * contenedor: no hay que medir nada en JS ni recalcular al cambiar el tamaño de
+ * la ventana. El eje X va de 0 a 100 y el Y de 0 a 100 invertido.
+ */
+function graficaArea(porDia) {
+  if (!porDia || porDia.length === 0) return "";
+
+  const tope = Math.max(...porDia.map(d => d.entrantes + d.salientes));
+  if (tope === 0) {
+    // Una línea plana en cero parece un error de carga. Mejor decirlo.
+    return `<p class="mesa-metric-note">Sin correo en este periodo.</p>`;
+  }
+
+  const n = porDia.length;
+  // Con un solo día no hay pendiente que dibujar; se reparte igual y sale una
+  // banda plana, que es lo correcto.
+  const x = (i) => (n === 1 ? 50 : (i / (n - 1)) * 100);
+  const y = (v) => 100 - (v / tope) * 100;
+
+  const linea = (valor) => porDia.map((d, i) => `${x(i).toFixed(2)},${y(valor(d)).toFixed(2)}`).join(" ");
+  const area = (valor) => `M0,100 L${linea(valor)} L100,100 Z`;
+
+  // Apiladas: la de arriba es el total, la de abajo sólo los entrantes. Dibujar
+  // el total primero y los entrantes encima da el efecto de pila sin recortes.
+  const total = (d) => d.entrantes + d.salientes;
+  const entrantes = (d) => d.entrantes;
+
+  const puntos = porDia.map((d, i) => {
+    const t = total(d);
+    if (t === 0) return "";
+    return `<circle cx="${x(i).toFixed(2)}" cy="${y(t).toFixed(2)}" r="1.6" class="mesa-chart-dot">
+      <title>${esc(formatoDiaCorto(d.dia))}: ${d.entrantes} recibidos, ${d.salientes} enviados</title>
+    </circle>`;
+  }).join("");
+
+  return `
+    <div class="mesa-chart-legend">
+      <span><i class="mesa-swatch mesa-swatch-in"></i>Recibidos</span>
+      <span><i class="mesa-swatch mesa-swatch-out"></i>Enviados</span>
+      <span class="mesa-chart-max">máx. ${tope} al día</span>
+    </div>
+    <svg class="mesa-chart-svg" viewBox="0 0 100 100" preserveAspectRatio="none" role="img"
+         aria-label="Correo recibido y enviado por día">
+      <path class="mesa-area-out" d="${area(total)}"></path>
+      <path class="mesa-area-in" d="${area(entrantes)}"></path>
+      <polyline class="mesa-line-out" points="${linea(total)}"></polyline>
+      <polyline class="mesa-line-in" points="${linea(entrantes)}"></polyline>
+      ${puntos}
+    </svg>
+    <div class="mesa-chart-axis">
+      <span>${esc(formatoDiaCorto(porDia[0].dia))}</span>
+      <span>${esc(formatoDiaCorto(porDia[porDia.length - 1].dia))}</span>
+    </div>`;
+}
+
+/** "2026-09-06" → "6 sep". Con 90 días no caben 90 etiquetas, sólo los extremos. */
+function formatoDiaCorto(iso) {
+  const [a, m, d] = String(iso).split("-").map(Number);
+  if (!a || !m || !d) return iso;
+  // Se construye en local con el día ya partido: `new Date("2026-09-06")` se
+  // interpreta en UTC y en México mostraría el día anterior.
+  return new Date(a, m - 1, d).toLocaleDateString("es-MX", { day: "numeric", month: "short" });
+}
+
 function minutosLegibles(m) {
   if (m === null || m === undefined) return "—";
   if (m < 60) return `${m} min`;
@@ -1747,12 +1814,37 @@ function minutosLegibles(m) {
   return `${(m / 1440).toFixed(1)} días`;
 }
 
+// Lo que sólo sirve para la lista y estorba en Métricas. El selector de dominio
+// NO va aquí: las métricas son por dominio, así que ahí sigue haciendo falta.
+const SOLO_LISTA = [
+  "status-filter", "alias-filter", "conv-count",
+  "search-input", "search-clear", "bulk-bar", "search-notice",
+];
+
 function mostrarPestana(cual) {
   const enMetricas = cual === "metrics";
   document.querySelector(".mesa-main").classList.toggle("mesa-hidden", enMetricas);
   document.getElementById("metrics-pane").classList.toggle("mesa-hidden", !enMetricas);
   document.getElementById("tab-bandeja").classList.toggle("active", !enMetricas);
   document.getElementById("tab-metrics").classList.toggle("active", enMetricas);
+
+  // La barra de atajos se veía en Métricas y ninguno de esos atajos funciona ahí:
+  // anunciar teclas muertas es peor que no anunciarlas.
+  document.querySelector(".mesa-shortcuts")?.classList.toggle("mesa-hidden", enMetricas);
+  document.querySelector(".mesa-search-wrap")?.classList.toggle("mesa-hidden", enMetricas);
+  for (const id of SOLO_LISTA) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    if (enMetricas) {
+      // Se recuerda si ya estaba oculto por su cuenta (la barra de selección, el
+      // aviso del índice) para no revelarlo al volver.
+      el.dataset.ocultoAntes = el.classList.contains("mesa-hidden") ? "1" : "";
+      el.classList.add("mesa-hidden");
+    } else if (el.dataset.ocultoAntes !== "1") {
+      el.classList.remove("mesa-hidden");
+    }
+  }
+
   if (enMetricas) cargarMetricas();
 }
 
@@ -1778,15 +1870,7 @@ async function cargarMetricas() {
     tarjeta(minutosLegibles(m.duracionHilo.medianaMin), "Duración del hilo (mediana)", "del primer al último mensaje, no hasta el cierre"),
   ].join("");
 
-  const tope = Math.max(1, ...m.porDia.map(d => d.entrantes + d.salientes));
-  document.getElementById("metrics-chart").innerHTML = m.porDia.map(d => {
-    const total = d.entrantes + d.salientes;
-    return `<div class="mesa-bar" title="${esc(d.dia)}: ${d.entrantes} recibidos, ${d.salientes} enviados">
-      <div class="mesa-bar-in" style="height:${(d.entrantes / tope) * 100}%"></div>
-      <div class="mesa-bar-out" style="height:${(d.salientes / tope) * 100}%"></div>
-      <span class="mesa-bar-total">${total || ""}</span>
-    </div>`;
-  }).join("");
+  document.getElementById("metrics-chart").innerHTML = graficaArea(m.porDia);
 
   const cont = document.getElementById("metrics-agents");
   cont.innerHTML = m.porAgente.length === 0

@@ -186,7 +186,7 @@
             "name": "¿Es seguro? ¿Leen mis emails?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "No leemos tus emails. Se procesan automáticamente para reenviarlos a tu destino. Si usas la Bandeja, el contenido se almacena de forma segura con retención limitada según tu plan. Usamos Amazon SES, la misma infraestructura que usan miles de empresas."
+              "text": "No leemos tus emails. Se procesan automáticamente para reenviarlos a tu destino. Si usas la Bandeja, el contenido se guarda en nuestra infraestructura de AWS y conservamos el historial completo de tus conversaciones; puedes eliminar las que quieras cuando quieras. Usamos Amazon SES, la misma infraestructura que usan miles de empresas."
             }
           },
           {
@@ -428,14 +428,14 @@
           <p class="text-fg-muted mt-2 leading-relaxed">Botón <strong class="text-fg font-medium">Redactar</strong> o la tecla <kbd class="px-1.5 py-0.5 rounded border border-line bg-bg-inset text-xs font-mono">c</kbd>. Eliges el alias remitente y la respuesta cae en el mismo hilo. <a href="/blog/dejar-de-escribir-desde-gmail-personal" class="text-accent-text hover:underline">Ver cómo →</a></p>
         </div>
         <div class="border-t border-line pt-5">
-          <p class="eyebrow flex items-center gap-2"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5L3 10l5 5M3 10h9a8 8 0 018 8v1"/></svg>Remitente</p>
-          <h3 class="font-semibold text-lg mt-2">Responde desde tu dominio</h3>
-          <p class="text-fg-muted mt-2 leading-relaxed">Tus clientes ven <code class="font-mono text-[0.95em] text-fg">ventas@tuempresa.com</code>, nunca tu Gmail personal. Incluido en todos los planes.</p>
+          <p class="eyebrow flex items-center gap-2"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4.3-4.3"/></svg>Búsqueda</p>
+          <h3 class="font-semibold text-lg mt-2">Busca dentro del correo</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">No solo el asunto: el <strong class="text-fg font-medium">cuerpo del mensaje</strong>, con acentos o sin ellos. Un servicio de reenvío no guarda el contenido, así que no puede buscarlo.</p>
         </div>
         <div class="border-t border-line pt-5">
           <p class="eyebrow flex items-center gap-2"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4v16M6 7h13M6 12h9M6 17h13"/></svg>Historial</p>
-          <h3 class="font-semibold text-lg mt-2">El hilo entero, siempre</h3>
-          <p class="text-fg-muted mt-2 leading-relaxed">Cada conversación con su contexto. Es lo que separa una bandeja de trabajo de un simple reenvío.</p>
+          <h3 class="font-semibold text-lg mt-2">El hilo completo, con su contexto</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">Lo que llegó y lo que respondieron, en un solo lugar. Es lo que separa una bandeja de trabajo de un simple reenvío.</p>
         </div>
         <div class="border-t border-line pt-5">
           <p class="eyebrow flex items-center gap-2"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h10l4 4v14H5zM15 3v4h4M9 12h6M9 16h4"/></svg>Notas</p>
@@ -448,9 +448,9 @@
           <p class="text-fg-muted mt-2 leading-relaxed">Invita miembros por dominio y reparte los hilos. Nadie responde dos veces lo mismo.</p>
         </div>
         <div class="border-t border-line pt-5">
-          <p class="eyebrow flex items-center gap-2"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h5l2-5 4 10 2-5h7"/></svg>Tiempo real</p>
-          <h3 class="font-semibold text-lg mt-2">Sin recargar nada</h3>
-          <p class="text-fg-muted mt-2 leading-relaxed">Los correos nuevos aparecen solos, con aviso. Si alguien responde, lo ves al instante.</p>
+          <p class="eyebrow flex items-center gap-2"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.5"/></svg>Sin choques</p>
+          <h3 class="font-semibold text-lg mt-2">Ves quién está en el hilo</h3>
+          <p class="text-fg-muted mt-2 leading-relaxed">Si un compañero abre la misma conversación, te avisa; si empieza a escribir, también. Nadie contesta dos veces lo mismo. Todo en vivo, sin recargar.</p>
         </div>
       </div>
     </section>
@@ -603,7 +603,7 @@
             <li>✓ 10 máscaras: hola@, ventas@, facturas@… al buzón que elijas</li>
             <li>✓ Bandeja web para leer y responder desde tu dominio</li>
             <li>✓ Entrega fuera de spam (DKIM + SPF automáticos)</li>
-            <li>✓ Historial de 15 días</li>
+            <li>✓ Bandeja con el historial completo · registro de reenvíos 15 días</li>
             <li>✓ API REST + SDK</li>
             <li class="text-fg-muted">+ Iniciar correos nuevos: <a href="/pricing#addons" class="text-accent-text hover:underline">add-on desde $49</a></li>
             <li class="text-fg-muted">+ Dominio extra: $79/mes c/u</li>
@@ -638,7 +638,7 @@
             <li>✓ Máscaras ilimitadas</li>
             <li>✓ Reglas de enrutado y webhooks</li>
             <li>✓ SMTP relay para tu SaaS o sistema</li>
-            <li>✓ Historial de 90 días</li>
+            <li>✓ Bandeja con el historial completo · registro de reenvíos 90 días</li>
             <li>✓ API REST + SDK y soporte por email</li>
           </ul>
           <button
@@ -869,8 +869,9 @@
           </summary>
           <p>
             No leemos tus emails. Se procesan automáticamente para reenviarlos
-            a tu destino. Si usas la Bandeja, el contenido se almacena de forma
-            segura con retención limitada según tu plan. Usamos Amazon SES, la
+            a tu destino. Si usas la Bandeja, el contenido se guarda en nuestra
+            infraestructura de AWS y conservamos el historial completo de tus
+            conversaciones; puedes eliminar las que quieras cuando quieras. Usamos Amazon SES, la
             misma infraestructura que usan miles de empresas.
           </p>
         </details>
