@@ -92,6 +92,13 @@
       "when": 1788630000000,
       "tag": "0012_bandeja_busqueda",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1788716400000,
+      "tag": "0013_bandeja_equipo",
+      "breakpoints": true
     }
   ]
 }

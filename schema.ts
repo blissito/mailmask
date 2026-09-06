@@ -77,8 +77,24 @@ export const conversations = sqliteTable("conversations", {
   tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
   threadRefs: text("thread_refs", { mode: "json" }).$type<string[]>().notNull().default([]),
   deletedAt: text("deleted_at"),
+  // Invariante: status="snoozed" <=> snoozedUntil != null. Lo fuerza el PATCH.
+  snoozedUntil: text("snoozed_until"),
 }, (table) => [
   index("idx_conversations_domain_status").on(table.domainId, table.status, table.deletedAt),
+  index("idx_conversations_snoozed").on(table.status, table.snoozedUntil),
+]);
+
+// Leído por persona: no leído <=> no hay fila, o lastReadAt < lastMessageAt.
+// La ausencia de fila ya significa "nunca leído", así que no hay que sembrar nada
+// al invitar a un agente.
+export const conversationReads = sqliteTable("conversation_reads", {
+  domainId: text("domain_id").notNull(),
+  conversationId: text("conversation_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+  agentEmail: text("agent_email").notNull(),
+  lastReadAt: text("last_read_at").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.conversationId, table.agentEmail] }),
+  index("idx_reads_domain_agent").on(table.domainId, table.agentEmail),
 ]);
 
 export const messages = sqliteTable("messages", {

@@ -45,6 +45,7 @@
     <select id="status-filter" class="mesa-select">
       <option value="">Todas</option>
       <option value="open">Abiertas</option>
+      <option value="unread">No leídas</option>
       <option value="closed">Cerradas</option>
       <option value="deleted">Eliminados</option>
     </select>
@@ -113,6 +114,7 @@
             <button class="mesa-action-btn mesa-action-danger" id="btn-delete-conv" title="Eliminar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Eliminar</button>
             <button class="mesa-action-btn mesa-action-restore mesa-hidden" id="btn-restore-conv" title="Restaurar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Restaurar</button>
           </div>
+          <div class="mesa-presence mesa-hidden" id="presence-bar"></div>
         </div>
 
         <!-- Upgrade banner (shown for basico plan) -->

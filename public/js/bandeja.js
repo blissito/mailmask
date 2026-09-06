@@ -95,6 +95,13 @@ async function uploadComposerImage(file) {
 function mountComposers() {
   if (!window.MailMaskComposer) return; // sin el bundle, se sigue usando el textarea
   const replyArea = document.getElementById("composer-textarea");
+  // El aviso de "escribiendo" se engancha al contenedor del compositor y no al
+  // editor: Tiptap reemplaza el textarea por un div contenteditable.
+  const zonaCompositor = document.getElementById("composer");
+  if (zonaCompositor && !zonaCompositor.dataset.presencia) {
+    zonaCompositor.dataset.presencia = "1";
+    zonaCompositor.addEventListener("keydown", marcarEscribiendo);
+  }
   if (replyArea && !replyEditor) {
     replyEditor = window.MailMaskComposer.create({
       textarea: replyArea,
@@ -118,8 +125,12 @@ function mountComposers() {
 
 // Los toast del compositor viajan por evento para no acoplarlo a este archivo.
 window.addEventListener("mm:toast", (e) => toast(e.detail));
-let newConvIds = new Set();
+// El no-leído lo manda el servidor por conversación: antes vivía sólo en esta
+// pestaña, así que se perdía al recargar y era el mismo para todo el equipo.
+let unreadIds = new Set();
 let unreadCount = 0;
+// Presencia de los compañeros en el dominio, tal como llega por SSE.
+let presencias = [];
 
 // --- Init ---
 document.addEventListener("DOMContentLoaded", async () => {
@@ -128,6 +139,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupListeners();
   setupKeyboard();
   mountComposers();
+  iniciarLatidoPresencia();
+
+  // Cerrar la pestaña siempre aborta el SSE y el servidor limpia la presencia ahí;
+  // el beacon sólo adelanta el aviso para que el compañero no espere 35 segundos.
+  const soltarPresencia = () => {
+    if (!selectedDomainId) return;
+    const carga = JSON.stringify({ domainId: selectedDomainId, conversationId: null });
+    navigator.sendBeacon?.("/api/bandeja/presence", new Blob([carga], { type: "application/json" }));
+  };
+  window.addEventListener("pagehide", soltarPresencia);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") soltarPresencia();
+    else if (activeConv) enviarPresencia(activeConv.id, "viewing");
+  });
 });
 
 // --- Auth ---
@@ -313,6 +338,11 @@ async function loadConversations(opts = {}) {
     conversations = masPaginas ? conversations.concat(data.items) : data.items;
     nextCursor = data.nextCursor ?? null;
     if (Array.isArray(data.aliases)) populateAliasFilter(data.aliases);
+    for (const c of data.items) {
+      if (c.unread) unreadIds.add(c.id); else unreadIds.delete(c.id);
+    }
+    if (typeof data.unreadCount === "number") { unreadCount = data.unreadCount; updateTitle(); }
+    if (Array.isArray(data.presence)) { presencias = data.presence; renderPresence(); }
     mostrarAvisoIndexado(data);
     renderList();
   } finally {
@@ -376,7 +406,7 @@ function renderList() {
     if (isActive) classes += " active";
     if (isSelected) classes += " selected";
     if (c.deletedAt) classes += " deleted";
-    if (newConvIds.has(c.id)) classes += " is-new";
+    if (unreadIds.has(c.id)) classes += " is-new mesa-conv--unread";
 
     let meta = `<span class="mesa-status-dot ${esc(c.status)}"></span>`;
     if (c.to) meta += `<span class="mesa-tag mesa-tag-alias">${esc(c.to.split("@")[0])}</span>`;
@@ -384,12 +414,14 @@ function renderList() {
     if (c.priority === "urgent") meta += `<span class="mesa-tag mesa-tag-urgent">urgente</span>`;
     if (c.assignedTo) meta += `<span class="mesa-tag mesa-tag-assigned">${esc(c.assignedTo.split("@")[0])}</span>`;
 
-    return `<div class="${classes}" data-idx="${i}">
+    const puntoPresencia = presencias.some(p => p.conversationId === c.id && p.email !== currentUser?.email)
+      ? `<span class="mesa-presence-dot" title="Alguien más está en este hilo"></span>` : "";
+    return `<div class="${classes}" data-idx="${i}" data-id="${esc(c.id)}">
       <div class="mesa-avatar">${esc(initials)}</div>
       <div class="mesa-conv-body">
         <div class="mesa-conv-header">
           <span class="mesa-conv-from">${esc(c.from)}</span>
-          <span class="mesa-conv-time">${esc(time)}</span>
+          <span class="mesa-conv-time">${puntoPresencia}${esc(time)}</span>
         </div>
         <div class="mesa-conv-subject">${esc(c.subject)}</div>
         ${c.snippet ? `<div class="mesa-conv-snippet">${resaltar(c.snippet)}</div>` : ""}
@@ -429,11 +461,13 @@ function showMobileDetail(on) {
 async function openConversation(conv) {
   activeConv = conv;
   showMobileDetail(true);
-  if (newConvIds.has(conv.id)) {
-    newConvIds.delete(conv.id);
+  if (unreadIds.has(conv.id)) {
+    // El GET del detalle la marca leída en el servidor; aquí sólo se adelanta la UI.
+    unreadIds.delete(conv.id);
     unreadCount = Math.max(0, unreadCount - 1);
     updateTitle();
   }
+  enviarPresencia(conv.id, "viewing");
   document.getElementById("detail-empty").classList.add("mesa-hidden");
   const loaded = document.getElementById("detail-loaded");
   loaded.classList.remove("mesa-hidden");
@@ -828,7 +862,7 @@ function setupListeners() {
     selectedDomainId = e.target.value;
     activeConv = null;
     selectedIdx = -1;
-    newConvIds.clear();
+    unreadIds.clear();
     unreadCount = 0;
     updateTitle();
     document.getElementById("detail-empty").classList.remove("mesa-hidden");
@@ -1226,6 +1260,100 @@ function playSound(type) {
   }
 }
 
+// --- Parche puntual de una fila ---
+//
+// Ninguna mutación que llega por SSE recarga la lista: recargar reordena, pierde
+// la posición del cursor de teclado y desperdicia una consulta. Se parchea el
+// objeto local y se repinta su fila.
+
+function patchConv(id, fields) {
+  const c = conversations.find(x => x.id === id);
+  if (!c) return null;
+  Object.assign(c, fields);
+  if (activeConv && activeConv.id === id) Object.assign(activeConv, fields);
+  return c;
+}
+
+/** Quita una fila con transición, sin recargar la lista. */
+function removerFila(id) {
+  const idx = conversations.findIndex(c => c.id === id);
+  if (idx < 0) return;
+  conversations.splice(idx, 1);
+  const el = document.querySelector(`.mesa-conv[data-id="${CSS.escape(id)}"]`);
+  if (el) {
+    el.classList.add("mesa-conv--saliendo");
+    setTimeout(() => renderList(), 200);
+  } else {
+    renderList();
+  }
+}
+
+/**
+ * Repinta una sola fila. Si la conversación ya no pasa el filtro activo —cerraste
+ * un hilo mientras alguien mira "Abiertas"— se quita en vez de recargar.
+ */
+function renderConvRow(id) {
+  const c = conversations.find(x => x.id === id);
+  if (!c) return;
+  const filtroEstado = document.getElementById("status-filter")?.value || "";
+  const fuera = filtroEstado && filtroEstado !== "unread" && filtroEstado !== "deleted" && c.status !== filtroEstado;
+  if (fuera) { removerFila(id); return; }
+  // renderList reconstruye la lista completa a partir del array local, que es
+  // barato (una página) y mantiene data-idx coherente con el cursor de teclado.
+  renderList();
+}
+
+// --- Presencia (detección de colisión) ---
+
+let ultimoTyping = 0;
+let latidoPresencia = null;
+
+function enviarPresencia(conversationId, state) {
+  if (!selectedDomainId) return;
+  fetch("/api/bandeja/presence", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ domainId: selectedDomainId, conversationId, state }),
+  }).catch(() => {});
+}
+
+/** El typing se manda con acelerador de 5s, no por tecla. */
+function marcarEscribiendo() {
+  const ahora = Date.now();
+  if (ahora - ultimoTyping < 5000) return;
+  ultimoTyping = ahora;
+  if (activeConv) enviarPresencia(activeConv.id, "typing");
+}
+
+function iniciarLatidoPresencia() {
+  if (latidoPresencia) clearInterval(latidoPresencia);
+  // 15s contra un TTL de 35s: aguanta que se pierda un latido sin parpadear.
+  latidoPresencia = setInterval(() => {
+    if (activeConv && document.visibilityState === "visible") {
+      enviarPresencia(activeConv.id, "viewing");
+    }
+  }, 15000);
+}
+
+function renderPresence() {
+  const barra = document.getElementById("presence-bar");
+  if (!barra) return;
+  const otros = presencias.filter(p =>
+    p.email !== currentUser?.email && activeConv && p.conversationId === activeConv.id);
+  if (otros.length === 0) {
+    barra.classList.add("mesa-hidden");
+    barra.textContent = "";
+    return;
+  }
+  // Escribiendo gana sobre viendo: es el aviso que de verdad evita la colisión.
+  const escribiendo = otros.filter(p => p.state === "typing");
+  const nombres = (lista) => lista.map(p => esc(p.name || p.email.split("@")[0])).join(", ");
+  barra.innerHTML = escribiendo.length
+    ? `<span class="mesa-presence-typing">✍️ ${nombres(escribiendo)} ${escribiendo.length > 1 ? "están" : "está"} escribiendo<span class="mesa-dots"><i></i><i></i><i></i></span></span>`
+    : `<span>👁 ${nombres(otros)} también ${otros.length > 1 ? "están viendo" : "está viendo"} este hilo</span>`;
+  barra.classList.remove("mesa-hidden");
+}
+
 // --- SSE for real-time updates ---
 
 let sseSource = null;
@@ -1240,7 +1368,7 @@ function connectSSE(domainId) {
     try {
       const data = e.data ? JSON.parse(e.data) : {};
       const convId = data.conversationId;
-      if (convId) newConvIds.add(convId);
+      if (convId) unreadIds.add(convId);
       unreadCount++;
       updateTitle();
       await loadConversations();
@@ -1263,7 +1391,7 @@ function connectSSE(domainId) {
         const updated = conversations.find(c => c.id === convId);
         if (updated) openConversation(updated);
       } else {
-        if (convId) newConvIds.add(convId);
+        if (convId) unreadIds.add(convId);
         unreadCount++;
         updateTitle();
         renderList();
@@ -1275,6 +1403,84 @@ function connectSSE(domainId) {
       console.error("SSE new_message error:", err);
       loadConversations();
     }
+  });
+
+  // Mutaciones de compañeros. Todas traen `actor`: la propia acción ya se reflejó
+  // en la UI de quien la hizo, repintarla otra vez sería parpadeo.
+  const mio = (d) => d.actor && currentUser && d.actor === currentUser.email;
+
+  sseSource.addEventListener("conv_updated", (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (mio(d)) return;
+      if (!patchConv(d.conversationId, { status: d.status, priority: d.priority, snoozedUntil: d.snoozedUntil })) return;
+      renderConvRow(d.conversationId);
+    } catch (err) { console.error("SSE conv_updated:", err); }
+  });
+
+  sseSource.addEventListener("conv_assigned", (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (mio(d)) return;
+      if (!patchConv(d.conversationId, { assignedTo: d.assignedTo || undefined })) return;
+      renderConvRow(d.conversationId);
+      if (d.assignedTo === currentUser?.email) toast("Te asignaron una conversación");
+    } catch (err) { console.error("SSE conv_assigned:", err); }
+  });
+
+  sseSource.addEventListener("conv_replied", (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (mio(d)) return;
+      if (patchConv(d.conversationId, { lastMessageAt: d.lastMessageAt, messageCount: d.messageCount })) {
+        // Un compañero contestó: para mí el hilo tiene algo nuevo que no he leído.
+        if (!activeConv || activeConv.id !== d.conversationId) {
+          unreadIds.add(d.conversationId);
+          unreadCount++;
+          updateTitle();
+        }
+        renderConvRow(d.conversationId);
+      }
+      if (activeConv && activeConv.id === d.conversationId) openConversation(activeConv);
+    } catch (err) { console.error("SSE conv_replied:", err); }
+  });
+
+  sseSource.addEventListener("conv_note", (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (mio(d)) return;
+      if (activeConv && activeConv.id === d.conversationId) openConversation(activeConv);
+    } catch (err) { console.error("SSE conv_note:", err); }
+  });
+
+  sseSource.addEventListener("conv_deleted", (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (mio(d)) return;
+      if (activeConv && activeConv.id === d.conversationId) {
+        activeConv = null;
+        document.getElementById("detail-loaded").classList.add("mesa-hidden");
+        document.getElementById("detail-empty").classList.remove("mesa-hidden");
+        toast("Alguien eliminó esta conversación");
+      }
+      removerFila(d.conversationId);
+    } catch (err) { console.error("SSE conv_deleted:", err); }
+  });
+
+  sseSource.addEventListener("conv_restored", (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (mio(d)) return;
+      loadConversations();
+    } catch (err) { console.error("SSE conv_restored:", err); }
+  });
+
+  sseSource.addEventListener("presence", (e) => {
+    try {
+      presencias = JSON.parse(e.data).agents || [];
+      renderPresence();
+      renderList();
+    } catch (err) { console.error("SSE presence:", err); }
   });
 
   // Estado de entrega: sólo se repinta el badge del mensaje si la conversación está abierta.

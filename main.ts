@@ -6,7 +6,7 @@ import * as path from "node:path";
 import * as dns from "node:dns/promises";
 import { programar, esServidor } from "./scheduler.js";
 import { revisarPatron } from "./regex-guard.js";
-import { addSseClient, notifyBandeja } from "./sse-hub.js";
+import { addSseClient, notifyBandeja, setPresence, clearPresence, listPresence, notifyPresence } from "./sse-hub.js";
 import { ftsDisponible } from "./pg.js";
 import { backfillPendiente } from "./search-backfill.js";
 import { db } from "./pg.js";
@@ -74,6 +74,8 @@ import {
   listConversations,
   getConversation,
   updateConversation,
+  countUnread,
+  markConversationRead,
   listMessages,
   addMessage,
   indexMessage,
@@ -701,12 +703,17 @@ function isPrivateUrl(url: string): boolean {
 
 // --- RBAC: domain-level permissions ---
 
-type Permission = "read" | "write" | "manage_members" | "admin";
+// "admin" es sólo del dueño: borrar el dominio, credenciales SMTP, verificar.
+// "moderate" es el escalón de la Bandeja — borrar y restaurar conversaciones —
+// que un admin del dominio sí debe tener sin darle las llaves de la infraestructura.
+type Permission = "read" | "write" | "moderate" | "manage_members" | "admin";
 
 const ROLE_PERMISSIONS: Record<string, Permission[]> = {
-  owner: ["read", "write", "manage_members", "admin"],
-  admin: ["read", "write", "manage_members"],
-  agent: ["read"],
+  owner: ["read", "write", "moderate", "manage_members", "admin"],
+  admin: ["read", "write", "moderate", "manage_members"],
+  // El agente de soporte contesta, anota y cierra; lo que no debe es borrar,
+  // restaurar ni reasignar. Por eso write sí, admin y manage_members no.
+  agent: ["read", "write"],
 };
 
 interface AccessResult {
@@ -748,6 +755,52 @@ async function checkDomainAccess(
   if (!perms.includes(permission)) return null;
 
   return { domain, role: agent.role };
+}
+
+// Puerta única de la Bandeja: 401 / 400 / 404 / 403 de plan / 403 de rol, en ese
+// orden. Los endpoints repetían esto inline ignorando el rol, y por eso un agente
+// de sólo lectura podía borrar conversaciones.
+type BandejaGate =
+  | { ok: true; auth: { email: string }; domain: AccessResult["domain"]; role: string; plan: string }
+  | { ok: false; res: Response };
+
+function jsonErr(error: string, status: number): Response {
+  return new Response(JSON.stringify({ error }), { status, headers: { "content-type": "application/json" } });
+}
+
+async function requireBandeja(
+  request: Request,
+  domainId: string | null | undefined,
+  permission: Permission,
+  opts?: { mesaActions?: boolean; accion?: string },
+): Promise<BandejaGate> {
+  const auth = await getAuthUser(request);
+  if (!auth) return { ok: false, res: jsonErr("No autenticado", 401) };
+  if (!domainId) return { ok: false, res: jsonErr("domainId requerido", 400) };
+
+  const domain = await getDomain(domainId);
+  if (!domain) return { ok: false, res: jsonErr("Dominio no encontrado", 404) };
+
+  const user = (await getUser(auth.email))!;
+  const plan = user?.subscription?.plan ?? "basico";
+  if (opts?.mesaActions) {
+    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
+    if (!mesaLimits.mesaActions) {
+      return { ok: false, res: jsonErr(`Tu plan no permite ${opts.accion ?? "esta acción"}`, 403) };
+    }
+  }
+
+  const isOwner = domain.ownerEmail === auth.email;
+  let role = "owner";
+  if (!isOwner) {
+    const agent = await getAgentByEmail(domainId, auth.email);
+    if (!agent) return { ok: false, res: jsonErr("Sin acceso", 403) };
+    role = agent.role;
+    const perms = ROLE_PERMISSIONS[role] ?? [];
+    if (!perms.includes(permission)) return { ok: false, res: jsonErr("Sin permiso para esta acción", 403) };
+  }
+
+  return { ok: true, auth, domain, role, plan };
 }
 
 // --- App ---
@@ -820,6 +873,11 @@ const app = new Elysia({ adapter: node() })
     // La vista previa no muta nada y en desarrollo se usa desde la página de demo,
     // que no tiene sesión ni cookie CSRF. En producción el endpoint exige sesión.
     if (url.pathname === "/api/email-preview" && process.env.NODE_ENV !== "production") return;
+    // La baja de presencia se manda con navigator.sendBeacon al cerrar la pestaña,
+    // y sendBeacon no puede poner encabezados: no hay forma de mandarle el token.
+    // Es seguro exentarlo: no muta nada persistente, sólo un dato en memoria con
+    // TTL de 35 s, y sigue exigiendo sesión y permiso de lectura del dominio.
+    if (url.pathname === "/api/bandeja/presence") return;
     // Skip CSRF for Bearer token auth (inherently CSRF-safe)
     const authHeader = request.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) return;
@@ -4044,7 +4102,11 @@ const app = new Elysia({ adapter: node() })
         // Cleanup on abort
         request.signal.addEventListener("abort", () => {
           clearInterval(heartbeat);
+          // La presencia se limpia ANTES de soltar el cliente, y se avisa después,
+          // para que el propio que se va no reciba su propia baja.
+          clearPresence(domainId, auth.email);
           cleanup();
+          notifyPresence(domainId);
           try { controller.close(); } catch {}
         });
       },
@@ -4065,9 +4127,6 @@ const app = new Elysia({ adapter: node() })
   // --- Mesa: conversations ---
 
   .get("/api/bandeja/conversations", async ({ request }) => {
-    const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
-
     const url = new URL(request.url);
     const domainId = url.searchParams.get("domainId");
     const status = url.searchParams.get("status") ?? undefined;
@@ -4082,14 +4141,9 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
     }
 
-    const domain = await getDomain(domainId);
-    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
-
-    const isOwner = domain.ownerEmail === auth.email;
-    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
-    if (!isOwner && !agent) {
-      return new Response(JSON.stringify({ error: "Sin acceso a este dominio" }), { status: 403 });
-    }
+    const gate = await requireBandeja(request, domainId, "read");
+    if (!gate.ok) return gate.res;
+    const { auth, domain } = gate;
 
     // Búsqueda: no pagina (no hay un orden estable por fecha cuando se ordena
     // por relevancia), devuelve un tope duro de 50 y de ahí se refina la consulta.
@@ -4105,7 +4159,7 @@ const app = new Elysia({ adapter: node() })
     }
 
     const primeraPagina = !cursor;
-    let pagina = listConversationsPage(domainId, { status, assignedTo, to, limit, cursor });
+    let pagina = listConversationsPage(domainId, { status, assignedTo, to, limit, cursor, forAgent: auth.email });
 
     // El rebuild desde S3 es una operación completa dentro del request, así que
     // sólo se dispara en la vista sin filtros ni cursor: con paginación, una
@@ -4116,7 +4170,7 @@ const app = new Elysia({ adapter: node() })
       if (!hayBorradas) {
         try {
           const rebuilt = await rebuildConversationsFromS3(domainId, domain.domain);
-          if (rebuilt > 0) pagina = listConversationsPage(domainId, { limit });
+          if (rebuilt > 0) pagina = listConversationsPage(domainId, { limit, forAgent: auth.email });
         } catch (err) {
           console.error("Mesa rebuild from S3 failed:", err);
         }
@@ -4130,6 +4184,8 @@ const app = new Elysia({ adapter: node() })
       // cliente ya no puede derivarlos, porque sólo ve la página que tiene.
       aliases: primeraPagina ? listConversationAliases(domainId) : undefined,
       mode: "list",
+      unreadCount: primeraPagina ? countUnread(domainId, auth.email) : undefined,
+      presence: primeraPagina ? listPresence(domainId) : undefined,
       backfillPendiente: primeraPagina ? backfillPendiente() : undefined,
     }), { headers: { "content-type": "application/json" } });
   }, {
@@ -4137,24 +4193,21 @@ const app = new Elysia({ adapter: node() })
   })
 
   .get("/api/bandeja/conversations/:id", async ({ request, params }) => {
-    const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
     const url = new URL(request.url);
     const domainId = url.searchParams.get("domainId");
     if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
 
-    const domain = await getDomain(domainId);
-    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
-
-    const isOwner = domain.ownerEmail === auth.email;
-    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
-    if (!isOwner && !agent) {
-      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
-    }
+    const gate = await requireBandeja(request, domainId, "read");
+    if (!gate.ok) return gate.res;
+    const { auth, domain } = gate;
 
     const conv = await getConversation(domainId, params.id);
     if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    // Abrir el hilo es haberlo leído: se marca aquí y no en una llamada aparte del
+    // cliente, para que no haya un viaje extra ni una ventana donde se pierda.
+    markConversationRead(domainId, conv.id, auth.email);
 
     // Sólo el tramo más reciente. Abajo se hace un GET a S3 por cada mensaje sin
     // cuerpo, en Promise.all sin límite de concurrencia: un hilo de 200 mensajes
@@ -4676,8 +4729,6 @@ const app = new Elysia({ adapter: node() })
   })
 
   .post("/api/bandeja/conversations/:id/reply", async ({ request, params, body: replyBody }) => {
-    const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
     const ip = getIp(request);
     const limited = await rateLimitGuard(ip, 20, 60_000);
     if (limited) return limited;
@@ -4696,21 +4747,9 @@ const app = new Elysia({ adapter: node() })
     // hilo largo es lo que da contexto.
     const quote = (replyBody as Record<string, unknown>).quote !== false;
 
-    const domain = await getDomain(domainId);
-    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
-
-    const user = (await getUser(auth.email))!;
-    const plan = user.subscription?.plan ?? "basico";
-    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
-    if (!mesaLimits.mesaActions) {
-      return new Response(JSON.stringify({ error: "Tu plan no permite responder desde la Bandeja. Actualiza a Equipo." }), { status: 403 });
-    }
-
-    const isOwner = domain.ownerEmail === auth.email;
-    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
-    if (!isOwner && !agent) {
-      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
-    }
+    const gate = await requireBandeja(request, domainId, "write", { mesaActions: true, accion: "responder desde la Bandeja. Actualiza a Equipo." });
+    if (!gate.ok) return gate.res;
+    const { auth, domain, plan } = gate;
 
     const conv = await getConversation(domainId, params.id);
     if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
@@ -4797,10 +4836,23 @@ const app = new Elysia({ adapter: node() })
         text: rendered.text ?? "",
       });
 
+      const ahoraReply = new Date().toISOString();
       await updateConversation(domainId, conv.id, {
         threadReferences: [...conv.threadReferences, messageId],
-        lastMessageAt: new Date().toISOString(),
+        lastMessageAt: ahoraReply,
         messageCount: conv.messageCount + 1,
+      });
+
+      // Quien responde ya leyó el hilo: marcarlo evita que su propia respuesta se
+      // lo devuelva como no leído.
+      markConversationRead(domainId, conv.id, auth.email, ahoraReply);
+
+      notifyBandeja(domainId, "conv_replied", {
+        conversationId: conv.id,
+        messageId: replyMsg.id,
+        lastMessageAt: ahoraReply,
+        messageCount: conv.messageCount + 1,
+        actor: auth.email,
       });
 
       return new Response(JSON.stringify({ ok: true, messageId }), {
@@ -4829,26 +4881,14 @@ const app = new Elysia({ adapter: node() })
   })
 
   .post("/api/bandeja/conversations/:id/assign", async ({ request, params, body: assignBody }) => {
-    const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
     const { domainId, assignedTo } = assignBody;
     if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
 
-    const domain = await getDomain(domainId);
-    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
-
-    const user = (await getUser(auth.email))!;
-    const plan = user.subscription?.plan ?? "basico";
-    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
-    if (!mesaLimits.mesaActions) {
-      return new Response(JSON.stringify({ error: "Tu plan no permite asignar conversaciones" }), { status: 403 });
-    }
-
-    const isOwner = domain.ownerEmail === auth.email;
-    if (!isOwner) {
-      return new Response(JSON.stringify({ error: "Solo el dueño puede asignar conversaciones" }), { status: 403 });
-    }
+    // Asignar es repartir trabajo del equipo: manage_members, no write. Antes era
+    // sólo el dueño, así que un admin no podía repartir su propia bandeja.
+    const gate = await requireBandeja(request, domainId, "manage_members", { mesaActions: true, accion: "asignar conversaciones" });
+    if (!gate.ok) return gate.res;
 
     const convToAssign = await getConversation(domainId, params.id);
     if (!convToAssign) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
@@ -4856,6 +4896,8 @@ const app = new Elysia({ adapter: node() })
 
     const updated = await updateConversation(domainId, params.id, { assignedTo: assignedTo ?? undefined });
     if (!updated) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    notifyBandeja(domainId, "conv_assigned", { conversationId: updated.id, assignedTo: updated.assignedTo ?? null, actor: gate.auth.email });
 
     return new Response(JSON.stringify(updated), {
       headers: { "content-type": "application/json" },
@@ -4869,27 +4911,13 @@ const app = new Elysia({ adapter: node() })
   })
 
   .post("/api/bandeja/conversations/:id/note", async ({ request, params, body: noteBody }) => {
-    const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
     const { domainId, body: noteBodyText } = noteBody;
     if (!domainId || !noteBodyText) return new Response(JSON.stringify({ error: "domainId y body requeridos" }), { status: 400 });
 
-    const domain = await getDomain(domainId);
-    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
-
-    const user = (await getUser(auth.email))!;
-    const plan = user.subscription?.plan ?? "basico";
-    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
-    if (!mesaLimits.mesaActions) {
-      return new Response(JSON.stringify({ error: "Tu plan no permite agregar notas" }), { status: 403 });
-    }
-
-    const isOwner = domain.ownerEmail === auth.email;
-    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
-    if (!isOwner && !agent) {
-      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
-    }
+    const gate = await requireBandeja(request, domainId, "write", { mesaActions: true, accion: "agregar notas" });
+    if (!gate.ok) return gate.res;
+    const { auth } = gate;
 
     const conv = await getConversation(domainId, params.id);
     if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
@@ -4901,6 +4929,8 @@ const app = new Elysia({ adapter: node() })
       body: noteBodyText,
       createdAt: new Date().toISOString(),
     });
+
+    notifyBandeja(domainId, "conv_note", { conversationId: conv.id, noteId: note.id, author: auth.email, actor: auth.email });
 
     return new Response(JSON.stringify(note), {
       status: 201,
@@ -4915,27 +4945,13 @@ const app = new Elysia({ adapter: node() })
   })
 
   .patch("/api/bandeja/conversations/:id", async ({ request, params, body: patchInput }) => {
-    const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
     const { domainId, status: newStatus, tags, priority } = patchInput;
     if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
 
-    const domain = await getDomain(domainId);
-    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
-
-    const user = (await getUser(auth.email))!;
-    const plan = user.subscription?.plan ?? "basico";
-    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
-    if (!mesaLimits.mesaActions) {
-      return new Response(JSON.stringify({ error: "Tu plan no permite modificar conversaciones" }), { status: 403 });
-    }
-
-    const isOwner = domain.ownerEmail === auth.email;
-    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
-    if (!isOwner && !agent) {
-      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
-    }
+    const gate = await requireBandeja(request, domainId, "write", { mesaActions: true, accion: "modificar conversaciones" });
+    if (!gate.ok) return gate.res;
+    const { auth } = gate;
 
     const convToPatch = await getConversation(domainId, params.id);
     if (!convToPatch) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
@@ -4948,6 +4964,14 @@ const app = new Elysia({ adapter: node() })
 
     const updated = await updateConversation(domainId, params.id, updates);
     if (!updated) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    notifyBandeja(domainId, "conv_updated", {
+      conversationId: updated.id,
+      status: updated.status,
+      priority: updated.priority,
+      snoozedUntil: updated.snoozedUntil ?? null,
+      actor: auth.email,
+    });
 
     return new Response(JSON.stringify(updated), {
       headers: { "content-type": "application/json" },
@@ -4963,31 +4987,21 @@ const app = new Elysia({ adapter: node() })
   })
 
   .delete("/api/bandeja/conversations/:id", async ({ request, params }) => {
-    const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
     const url = new URL(request.url);
     const domainId = url.searchParams.get("domainId");
     if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
 
-    const domain = await getDomain(domainId);
-    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
-
-    const user = (await getUser(auth.email))!;
-    const plan = user.subscription?.plan ?? "basico";
-    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
-    if (!mesaLimits.mesaActions) {
-      return new Response(JSON.stringify({ error: "Tu plan no permite eliminar conversaciones" }), { status: 403 });
-    }
-
-    const isOwner = domain.ownerEmail === auth.email;
-    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
-    if (!isOwner && !agent) {
-      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
-    }
+    // 🔴 Aquí estaba el hueco: cualquier agente invitado podía borrar conversaciones
+    // del dominio. Borrar y restaurar piden admin.
+    const gate = await requireBandeja(request, domainId, "moderate", { mesaActions: true, accion: "eliminar conversaciones" });
+    if (!gate.ok) return gate.res;
+    const { auth } = gate;
 
     const deleted = await softDeleteConversation(domainId, params.id);
     if (!deleted) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    notifyBandeja(domainId, "conv_deleted", { conversationId: params.id, actor: auth.email });
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
@@ -4997,30 +5011,18 @@ const app = new Elysia({ adapter: node() })
   })
 
   .post("/api/bandeja/conversations/:id/restore", async ({ request, params, body: restoreBody }) => {
-    const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
     const { domainId } = restoreBody;
     if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
 
-    const domain = await getDomain(domainId);
-    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
-
-    const user = (await getUser(auth.email))!;
-    const plan = user.subscription?.plan ?? "basico";
-    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
-    if (!mesaLimits.mesaActions) {
-      return new Response(JSON.stringify({ error: "Tu plan no permite restaurar conversaciones" }), { status: 403 });
-    }
-
-    const isOwner = domain.ownerEmail === auth.email;
-    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
-    if (!isOwner && !agent) {
-      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
-    }
+    const gate = await requireBandeja(request, domainId, "moderate", { mesaActions: true, accion: "restaurar conversaciones" });
+    if (!gate.ok) return gate.res;
+    const { auth } = gate;
 
     const restored = await restoreConversation(domainId, params.id);
     if (!restored) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    notifyBandeja(domainId, "conv_restored", { conversationId: params.id, actor: auth.email });
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
@@ -5030,6 +5032,50 @@ const app = new Elysia({ adapter: node() })
       domainId: t.String(),
     }),
     detail: { tags: ["Bandeja"], summary: "Restore a soft-deleted conversation", security: [{ cookieAuth: [] }] },
+  })
+
+  // --- Mesa: leído y presencia ---
+
+  .post("/api/bandeja/conversations/:id/read", async ({ request, params, body: readBody }) => {
+    const { domainId } = readBody;
+    // No emite SSE: leer es privado de cada persona, a nadie más le importa.
+    const gate = await requireBandeja(request, domainId, "read");
+    if (!gate.ok) return gate.res;
+
+    const conv = await getConversation(domainId, params.id);
+    if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
+
+    markConversationRead(domainId, params.id, gate.auth.email);
+    return new Response(JSON.stringify({ ok: true, unreadCount: countUnread(domainId, gate.auth.email) }), {
+      headers: { "content-type": "application/json" },
+    });
+  }, {
+    body: t.Object({ domainId: t.String() }),
+    detail: { tags: ["Bandeja"], summary: "Mark a conversation as read", security: [{ cookieAuth: [] }] },
+  })
+
+  .post("/api/bandeja/presence", async ({ request, body: presBody }) => {
+    const { domainId, conversationId, state } = presBody;
+    const gate = await requireBandeja(request, domainId, "read");
+    if (!gate.ok) return gate.res;
+
+    const estado = state === "typing" ? "typing" : "viewing";
+    if (conversationId) {
+      setPresence(domainId, gate.auth.email, gate.auth.email, conversationId, estado);
+    } else {
+      // Sin conversación abierta no hay colisión que avisar: se borra en vez de
+      // publicar una presencia sin destino. Es lo que manda el sendBeacon al cerrar.
+      clearPresence(domainId, gate.auth.email);
+    }
+    notifyPresence(domainId);
+    return new Response(null, { status: 204 });
+  }, {
+    body: t.Object({
+      domainId: t.String(),
+      conversationId: t.Optional(t.Union([t.String(), t.Null()])),
+      state: t.Optional(t.String()),
+    }),
+    detail: { hide: true },
   })
 
   // --- Agents ---

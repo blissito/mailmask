@@ -290,6 +290,7 @@ function rowToConversation(r: typeof conversations.$inferSelect): Conversation {
     tags: r.tags ?? [],
     threadReferences: r.threadRefs ?? [],
     deletedAt: r.deletedAt ?? undefined,
+    snoozedUntil: r.snoozedUntil ?? undefined,
   };
 }
 
@@ -1164,6 +1165,9 @@ export interface Conversation {
   tags: string[];
   threadReferences: string[];
   deletedAt?: string;
+  snoozedUntil?: string;
+  // Sólo lo rellena listConversationsPage cuando se pide forAgent.
+  unread?: boolean;
 }
 
 export interface Message {
@@ -1265,7 +1269,7 @@ export function listConversations(domainId: string, opts?: { status?: string; as
   return rows.map(rowToConversation);
 }
 
-export function updateConversation(domainId: string, id: string, updates: Partial<Pick<Conversation, "status" | "assignedTo" | "priority" | "tags" | "lastMessageAt" | "messageCount" | "threadReferences">>): Conversation | null {
+export function updateConversation(domainId: string, id: string, updates: Partial<Pick<Conversation, "status" | "assignedTo" | "priority" | "tags" | "lastMessageAt" | "messageCount" | "threadReferences" | "snoozedUntil">>): Conversation | null {
   const conv = getConversation(domainId, id);
   if (!conv) return null;
   const merged = { ...conv, ...updates };
@@ -1277,6 +1281,7 @@ export function updateConversation(domainId: string, id: string, updates: Partia
     threadRefs: merged.threadReferences,
     lastMessageAt: merged.lastMessageAt,
     messageCount: merged.messageCount ?? 1,
+    snoozedUntil: merged.snoozedUntil ?? null,
   }).where(and(eq(conversations.domainId, domainId), eq(conversations.id, id))).returning().all();
   return rows.length ? rowToConversation(rows[0]) : null;
 }
@@ -1293,14 +1298,28 @@ export function findConversationByThread(domainId: string, _from: string, refere
   `).get(domainId, ...references) as any;
   if (!row) return null;
   // Raw SQL returns snake_case — map to camelCase for rowToConversation
+  return filaCrudaAConversacion(row);
+}
+
+// Las consultas en SQL crudo devuelven snake_case y los JSON sin parsear; drizzle
+// hace ambas cosas por su cuenta. Sin este puente, rowToConversation deja
+// lastMessageAt, assignedTo y domainId en undefined y la lista sale sin fecha.
+function filaCrudaAConversacion(r: any): Conversation {
+  const json = (v: any, def: any) => {
+    if (v == null) return def;
+    if (typeof v !== "string") return v;
+    try { return JSON.parse(v); } catch { return def; }
+  };
   return rowToConversation({
-    ...row,
-    domainId: row.domain_id,
-    assignedTo: row.assigned_to,
-    lastMessageAt: row.last_message_at,
-    messageCount: row.message_count,
-    threadRefs: row.thread_refs,
-    deletedAt: row.deleted_at,
+    ...r,
+    domainId: r.domain_id,
+    assignedTo: r.assigned_to,
+    lastMessageAt: r.last_message_at,
+    messageCount: r.message_count,
+    tags: json(r.tags, []),
+    threadRefs: json(r.thread_refs, []),
+    deletedAt: r.deleted_at,
+    snoozedUntil: r.snoozed_until,
   });
 }
 
@@ -2348,7 +2367,7 @@ export function searchConversations(
       return [...porConversacion.values()]
         .sort((a, b) => a.rank - b.rank || b.fila.last_message_at.localeCompare(a.fila.last_message_at))
         .slice(0, limite)
-        .map((e) => ({ ...rowToConversation(e.fila), snippet: e.snippet, matchCount: e.n }));
+        .map((e) => ({ ...filaCrudaAConversacion(e.fila), snippet: e.snippet, matchCount: e.n }));
     } catch (err) {
       // Sintaxis inesperada o índice corrupto: degradar, no devolver un 500.
       console.error("searchConversations FTS falló, degradando a LIKE:", String(err));
@@ -2365,7 +2384,7 @@ export function searchConversations(
     ORDER BY c.last_message_at DESC
     LIMIT ?
   `).all(domainId, patron, patron, ...extra, limite) as any[];
-  return rows.map((r) => ({ ...rowToConversation(r), snippet: "", matchCount: 1 }));
+  return rows.map((r) => ({ ...filaCrudaAConversacion(r), snippet: "", matchCount: 1 }));
 }
 
 // --- Paginación por keyset ---
@@ -2400,7 +2419,7 @@ export interface PaginaConversaciones {
 
 export function listConversationsPage(
   domainId: string,
-  opts?: { status?: string; assignedTo?: string; to?: string; limit?: number; cursor?: string }
+  opts?: { status?: string; assignedTo?: string; to?: string; limit?: number; cursor?: string; forAgent?: string }
 ): PaginaConversaciones {
   const limite = Math.min(Math.max(opts?.limit ?? 50, 1), 100);
 
@@ -2412,7 +2431,14 @@ export function listConversationsPage(
     filtros.push(`AND c.deleted_at IS NOT NULL`);
   } else {
     filtros.push(`AND c.deleted_at IS NULL`);
-    if (opts?.status) { filtros.push(`AND c.status = ?`); params.push(opts.status); }
+    // "unread" no es un status de la conversación sino del lector, así que se
+    // resuelve contra conversation_reads y no contra la columna status.
+    if (opts?.status === "unread") {
+      if (!opts.forAgent) return { items: [], nextCursor: null };
+      filtros.push(`AND (r.last_read_at IS NULL OR r.last_read_at < c.last_message_at)`);
+    } else if (opts?.status) {
+      filtros.push(`AND c.status = ?`); params.push(opts.status);
+    }
   }
   if (opts?.assignedTo) { filtros.push(`AND c.assigned_to = ?`); params.push(opts.assignedTo); }
   if (opts?.to) { filtros.push(`AND c."to" = ?`); params.push(opts.to); }
@@ -2427,22 +2453,55 @@ export function listConversationsPage(
   }
 
   // Se pide una fila de más para saber si hay página siguiente sin contar todo.
+  // El no-leído sale del mismo LEFT JOIN que la lista: así el contador y las
+  // filas no pueden discrepar, y no hay una consulta por conversación.
+  const selUnread = opts?.forAgent
+    ? `, (r.last_read_at IS NULL OR r.last_read_at < c.last_message_at) AS unread`
+    : `, 0 AS unread`;
+  const joinUnread = opts?.forAgent
+    ? `LEFT JOIN conversation_reads r ON r.conversation_id = c.id AND r.agent_email = ?`
+    : ``;
+  // El ? del JOIN aparece antes que el del WHERE en el texto de la consulta, así
+  // que el correo del agente va PRIMERO en los posicionales, no tras el dominio.
+  const paramsFinal = opts?.forAgent ? [opts.forAgent, ...params] : params;
+
   const rows = sqlite.prepare(`
-    SELECT c.* FROM conversations c
+    SELECT c.*${selUnread} FROM conversations c
+    ${joinUnread}
     WHERE c.domain_id = ?
       ${filtros.join(" ")}
     ORDER BY c.last_message_at DESC, c.id DESC
     LIMIT ?
-  `).all(...params, limite + 1) as any[];
+  `).all(...paramsFinal, limite + 1) as any[];
 
   const hayMas = rows.length > limite;
   const pagina = hayMas ? rows.slice(0, limite) : rows;
   const ultima = pagina[pagina.length - 1];
 
   return {
-    items: pagina.map(rowToConversation),
+    items: pagina.map((r) => ({ ...filaCrudaAConversacion(r), unread: !!r.unread })),
     nextCursor: hayMas && ultima ? codificarCursor(ultima.last_message_at, ultima.id) : null,
   };
+}
+
+// --- Leído / no leído por agente ---
+
+export function markConversationRead(domainId: string, conversationId: string, agentEmail: string, at?: string): void {
+  sqlite.prepare(`
+    INSERT INTO conversation_reads (domain_id, conversation_id, agent_email, last_read_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(conversation_id, agent_email) DO UPDATE SET last_read_at = excluded.last_read_at
+  `).run(domainId, conversationId, agentEmail, at ?? new Date().toISOString());
+}
+
+export function countUnread(domainId: string, agentEmail: string): number {
+  const row = sqlite.prepare(`
+    SELECT COUNT(*) AS n FROM conversations c
+    LEFT JOIN conversation_reads r ON r.conversation_id = c.id AND r.agent_email = ?
+    WHERE c.domain_id = ? AND c.deleted_at IS NULL AND c.status = 'open'
+      AND (r.last_read_at IS NULL OR r.last_read_at < c.last_message_at)
+  `).get(agentEmail, domainId) as { n: number };
+  return row?.n ?? 0;
 }
 
 /**
