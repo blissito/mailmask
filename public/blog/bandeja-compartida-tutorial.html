@@ -5,7 +5,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cómo usar la Bandeja compartida de MailMask para atender clientes — MailMask</title>
-    <meta name="description" content="Tutorial paso a paso para configurar y usar la Bandeja compartida de MailMask. Crea aliases de soporte, invita agentes, asigna conversaciones y responde desde tu dominio." />
+    <meta name="description" content="Tutorial paso a paso de la Bandeja compartida de MailMask: aliases, agentes, asignación, aviso de colisión, posponer, búsqueda dentro del correo y métricas de respuesta." />
     <link rel="canonical" href="https://www.mailmask.studio/blog/bandeja-compartida-tutorial" />
     <meta property="og:title" content="Cómo usar la Bandeja compartida de MailMask para atender clientes" />
     <meta property="og:description" content="Tutorial paso a paso para usar la Bandeja compartida de MailMask. Coordina soporte, ventas y facturación desde un solo lugar." />
@@ -21,6 +21,9 @@
     <meta property="og:image:type" content="image/jpeg" />
     <meta name="twitter:image" content="https://www.mailmask.studio/blog/img/bandeja-tutorial-og.jpg" />
     <meta property="article:published_time" content="2026-02-24" />
+    <meta property="article:modified_time" content="2026-09-06" />
+    <meta property="article:section" content="Tutoriales" />
+    <meta property="article:tag" content="bandeja compartida" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@HectorBlisS" />
     <meta name="twitter:creator" content="@HectorBlisS" />
@@ -40,7 +43,7 @@
       "headline": "Cómo usar la Bandeja compartida de MailMask para atender clientes",
       "description": "Tutorial paso a paso para configurar y usar la Bandeja compartida de MailMask.",
       "datePublished": "2026-02-24",
-      "dateModified": "2026-08-12",
+      "dateModified": "2026-09-06",
       "image": "https://www.mailmask.studio/blog/img/bandeja-tutorial-og.jpg",
       "author": { "@type": "Organization", "name": "MailMask" },
       "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
@@ -68,7 +71,7 @@
           "name": "¿Cuántos agentes puedo invitar a la Bandeja compartida?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "No hay límite de agentes. Puedes invitar a tantos miembros del equipo como necesites sin costo adicional. Cada agente accede con su propia cuenta de MailMask."
+            "text": "El plan Equipo incluye 5 personas por dominio, y no se cobra por agente: el precio es por dominio, no por asiento. Cada agente entra con su propia cuenta y su propio estado de leído. Si necesitas más de 5 personas en un mismo dominio, escríbenos."
           }
         },
         {
@@ -92,7 +95,39 @@
           "name": "¿La Bandeja funciona en tiempo real?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Sí. La Bandeja usa Server-Sent Events (SSE) para mostrar emails nuevos en tiempo real sin necesidad de recargar la página."
+            "text": "Sí. Los correos nuevos aparecen solos y también los cambios de tus compañeros: si alguien responde, asigna o cierra una conversación, lo ves sin recargar la página."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Puedo buscar dentro del texto de los correos?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí, y con acentos o sin ellos: buscar 'informacion' encuentra 'información'. La búsqueda entra al remitente, al asunto y al cuerpo del mensaje, y muestra el fragmento donde apareció la palabra. Un servicio de reenvío puro no puede hacerlo porque no guarda el contenido del correo."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué pasa si pospongo una conversación y el cliente responde antes?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Vuelve a la Bandeja al instante, sin esperar a la fecha que elegiste. Posponer no esconde el correo: lo quita de en medio hasta que haya algo nuevo que atender."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo sé si un compañero ya está contestando ese correo?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "La Bandeja avisa mientras pasa: dice si otra persona tiene abierta la misma conversación, y avisa aparte si está escribiendo una respuesta. En la lista, esas conversaciones llevan un punto para verlo antes de entrar."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué pasa si nadie asigna un email?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Se queda en la Bandeja como sin asignar y abierta, y a todo el equipo le aparece sin leer hasta que cada quien la abra. Cualquier agente puede tomarla en cualquier momento; el contador de abiertas sin asignar de la pestaña Métricas dice cuántas hay."
           }
         }
       ]
@@ -111,7 +146,7 @@
         <h1>Cómo usar la Bandeja compartida de MailMask para atender clientes</h1>
         <div class="meta">
           <span>📅 24 Feb 2026</span>
-          <span>⏱ 8 min de lectura</span>
+          <span>⏱ 11 min de lectura</span>
         </div>
       </header>
 
@@ -157,12 +192,15 @@
           <li><strong>Remitente</strong>: quién envió el email</li>
           <li><strong>Alias</strong>: a qué dirección escribieron (<code>soporte@</code>, <code>ventas@</code>, etc.)</li>
           <li><strong>Asunto</strong>: el subject del email</li>
-          <li><strong>Estado</strong>: abierto, en espera o resuelto</li>
+          <li><strong>Estado</strong>: abierta, pospuesta o cerrada</li>
           <li><strong>Asignado a</strong>: qué agente está encargado (o sin asignar)</li>
           <li><strong>Urgente</strong>: marcador de prioridad</li>
+          <li><strong>Sin leer</strong>: en negritas, y <em>es por persona</em>. Que tu compañera ya la haya leído no te la marca leída a ti, y sigue sin leer aunque recargues o cambies de computadora.</li>
         </ul>
 
-        <p>Los emails nuevos aparecen en tiempo real gracias a Server-Sent Events — no necesitas recargar la página para ver mensajes nuevos.</p>
+        <p>Todo se mueve en vivo: los correos nuevos aparecen solos, y también los cambios de tus compañeros. Si alguien responde, asigna o cierra una conversación, tú lo ves sin recargar nada.</p>
+
+        <p>Con el teclado se va más rápido: <code>j</code> y <code>k</code> para moverte, <code>o</code> para abrir, <code>r</code> para responder, <code>n</code> para una nota interna, <code>a</code> para asignar, <code>e</code> para cerrar, <code>s</code> para posponer y <code>/</code> para buscar. La lista de atajos está siempre visible debajo de la barra.</p>
 
         <h2>Paso 4: Asigna conversaciones</h2>
 
@@ -178,7 +216,24 @@
 
         <p><strong>Tip</strong>: Define una regla simple con tu equipo — por ejemplo, "si ves un email sin asignar que puedes responder, tómalo". Esto evita que todo el equipo espere a que alguien más actúe.</p>
 
-        <h2>Paso 5: Responde desde el alias</h2>
+        <h2>Paso 5: Nadie contesta dos veces lo mismo</h2>
+
+        <p>Asignar reparte el trabajo, pero no cubre el caso incómodo: dos personas abren la misma conversación al mismo tiempo, antes de que nadie la asigne. Es el momento exacto en que se generan las respuestas duplicadas.</p>
+
+        <p>La Bandeja te avisa. Cuando abres una conversación que otra persona ya tiene abierta, aparece un aviso arriba del hilo:</p>
+
+        <ul>
+          <li><strong>👁 Ana también está viendo este hilo</strong> — alguien más lo tiene abierto en este momento.</li>
+          <li><strong>✍️ Ana está escribiendo…</strong> — está redactando una respuesta ahora mismo. Aquí conviene esperar o escribirle antes de mandar la tuya.</li>
+        </ul>
+
+        <p>El aviso también se ve <em>antes</em> de abrir: en la lista, las conversaciones donde hay alguien más llevan un punto ámbar junto a la hora. Así decides sin necesidad de entrar.</p>
+
+        <p>Cuando la otra persona cierra la pestaña o deja de teclear, el aviso desaparece solo en unos segundos. No hay nada que marcar ni que limpiar.</p>
+
+        <p>Esto es lo que separa una bandeja compartida de un buzón compartido: en un Gmail con la contraseña repartida, nunca sabes quién más está adentro.</p>
+
+        <h2>Paso 6: Responde desde el alias</h2>
 
         <p>Cuando respondes desde la Bandeja, el email sale con la dirección del alias (<code>soporte@tudominio.com</code>), no con tu email personal. El cliente nunca ve quién del equipo respondió — solo ve la dirección profesional del equipo.</p>
 
@@ -190,17 +245,115 @@
 
         <p>La respuesta queda registrada en la conversación. Si otro agente necesita dar seguimiento después, puede ver todo el historial de la conversación sin pedirte que le reenvíes emails.</p>
 
-        <h2>Paso 6: Gestiona estados</h2>
+        <h2>Paso 7: Gestiona estados y pospón lo que aún no toca</h2>
 
         <p>Usa los estados para mantener tu Bandeja organizada:</p>
 
         <ul>
-          <li><strong>Abierto</strong>: el email necesita atención. Es el estado por defecto de todo email nuevo.</li>
-          <li><strong>En espera</strong>: respondiste y estás esperando respuesta del cliente, o necesitas información de alguien interno.</li>
-          <li><strong>Resuelto</strong>: la conversación se cerró. El problema se solucionó o la consulta se respondió.</li>
+          <li><strong>Abierta</strong>: necesita atención. Es el estado por defecto de toda conversación nueva.</li>
+          <li><strong>Pospuesta</strong>: desaparece de la vista hasta la fecha que elijas.</li>
+          <li><strong>Cerrada</strong>: se resolvió. Sigue en la Bandeja y se puede buscar, pero ya no estorba.</li>
         </ul>
 
         <p>Marca como <strong>urgente</strong> las conversaciones que necesitan respuesta inmediata. Esto las coloca visualmente por encima del resto.</p>
+
+        <h3>Posponer: la que hace el trabajo por ti</h3>
+
+        <p>Posponer (botón <strong>Posponer</strong> o la tecla <code>s</code>) es el estado que más ordena una bandeja de equipo. Elige cuándo quieres volver a verla: <em>en 1 hora</em>, <em>esta tarde</em>, <em>mañana a las 9</em>, <em>el lunes</em> o una fecha exacta. La conversación se va de la lista y vuelve sola cuando toca.</p>
+
+        <p>Y hay un detalle que ahorra el seguimiento manual: <strong>si el cliente contesta antes de la fecha, la conversación despierta al instante</strong>. No tienes que acordarte de revisar; si la respuesta llegó, ya está arriba.</p>
+
+        <p>Las horas se calculan con <em>tu</em> zona horaria. "Mañana a las 9" es tu mañana, no la del servidor — importante si tu equipo está repartido entre varios países.</p>
+
+        <figure style="margin:36px 0">
+          <svg viewBox="0 0 720 260" width="100%" height="auto" role="img"
+               aria-label="Ciclo de vida de una conversación: llega, se asigna, se pospone y despierta sola cuando el cliente responde"
+               style="max-width:720px;display:block;margin:0 auto">
+            <defs>
+              <marker id="flecha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="rgb(var(--fg-subtle))" />
+              </marker>
+            </defs>
+            <style>
+              .caja { fill: rgb(var(--bg-elev)); stroke: rgb(var(--line)); stroke-width: 1.5; rx: 10; }
+              .caja-ok { fill: rgb(var(--mask-500) / .12); stroke: rgb(var(--mask-600)); }
+              .rot { fill: rgb(var(--fg)); font: 600 13px Inter, system-ui, sans-serif; }
+              .sub { fill: rgb(var(--fg-muted)); font: 400 11px Inter, system-ui, sans-serif; }
+              .verbo { fill: rgb(var(--fg-subtle)); font: 500 11px Inter, system-ui, sans-serif; }
+              .flecha { stroke: rgb(var(--fg-subtle)); stroke-width: 1.5; fill: none; marker-end: url(#flecha); }
+            </style>
+
+            <rect class="caja" x="8" y="24" width="150" height="58" />
+            <text class="rot" x="83" y="48" text-anchor="middle">Llega el correo</text>
+            <text class="sub" x="83" y="66" text-anchor="middle">sin asignar · sin leer</text>
+
+            <path class="flecha" d="M158,53 L204,53" />
+            <text class="verbo" x="181" y="44" text-anchor="middle">asignas</text>
+
+            <rect class="caja" x="206" y="24" width="150" height="58" />
+            <text class="rot" x="281" y="48" text-anchor="middle">Abierta</text>
+            <text class="sub" x="281" y="66" text-anchor="middle">con dueño</text>
+
+            <path class="flecha" d="M356,53 L402,53" />
+            <text class="verbo" x="379" y="44" text-anchor="middle">respondes</text>
+
+            <rect class="caja" x="404" y="24" width="150" height="58" />
+            <text class="rot" x="479" y="48" text-anchor="middle">Pospuesta</text>
+            <text class="sub" x="479" y="66" text-anchor="middle">hasta el lunes 9:00</text>
+
+            <path class="flecha" d="M554,53 L600,53" />
+            <text class="verbo" x="577" y="44" text-anchor="middle">cierras</text>
+
+            <rect class="caja" x="602" y="24" width="110" height="58" />
+            <text class="rot" x="657" y="57" text-anchor="middle">Cerrada</text>
+
+            <path class="flecha" d="M479,82 L479,140" />
+            <text class="verbo" x="489" y="116" text-anchor="start">el cliente contesta</text>
+
+            <rect class="caja caja-ok" x="404" y="142" width="150" height="58" />
+            <text class="rot" x="479" y="166" text-anchor="middle">Despierta sola</text>
+            <text class="sub" x="479" y="184" text-anchor="middle">vuelve a Abierta</text>
+
+            <path class="flecha" d="M404,171 L296,171 L288,90" />
+            <text class="verbo" x="330" y="188" text-anchor="middle">sin que nadie la revise</text>
+
+            <text class="sub" x="8" y="232">El único estado que exige memoria es el que no existe: posponer no necesita recordatorio,</text>
+            <text class="sub" x="8" y="250">porque la respuesta del cliente es lo que la trae de vuelta.</text>
+          </svg>
+          <figcaption class="sub" style="text-align:center;color:rgb(var(--fg-muted));font-size:13px;margin-top:10px">Ciclo de vida de una conversación en la Bandeja.</figcaption>
+        </figure>
+
+        <h2>Busca dentro del correo, no solo en el asunto</h2>
+
+        <p>Tres meses después, un cliente pregunta por «la cotización del proyecto». No recuerdas el asunto, ni quién la mandó, ni de qué mes fue. Solo recuerdas una palabra que iba <em>dentro</em> del mensaje.</p>
+
+        <p>Escribe esa palabra en el buscador de la Bandeja (o pulsa <code>/</code>) y aparece la conversación, con el fragmento del cuerpo donde salió, resaltado. Busca en el remitente, en el asunto <strong>y en el texto del correo</strong>.</p>
+
+        <p>Funciona con acentos o sin ellos: buscar <code>informacion</code> encuentra <em>información</em>, y al revés. En un producto en español eso no es un detalle, es la diferencia entre que el buscador sirva o no.</p>
+
+        <h3>Por qué un servicio de reenvío no puede hacer esto</h3>
+
+        <p>Un servicio de reenvío puro recibe tu correo, lo empuja a tu Gmail y lo suelta. No guarda el contenido — de hecho lo presenta como una ventaja de privacidad, y para reenvío puro lo es.</p>
+
+        <p>Pero eso significa que <strong>no hay nada donde buscar</strong>. No es que no lo hayan construido todavía: su arquitectura se los impide. Para buscar dentro de tus correos hay que haberlos guardado, y un reenvío no los guarda.</p>
+
+        <p>Es la misma razón por la que tampoco pueden ofrecerte historial, notas internas ni asignación. Lo que se compara no son dos listas de funciones, sino dos arquitecturas distintas.</p>
+
+        <h2>Mide cómo responde tu equipo</h2>
+
+        <p>La pestaña <strong>Métricas</strong>, arriba de la lista, responde las preguntas que normalmente se contestan a ojo:</p>
+
+        <ul>
+          <li><strong>Primera respuesta</strong>, mediana y p90. La mediana dice cómo va un día normal; el p90 dice qué tan malo es un mal día, que es lo que recuerdan los clientes.</li>
+          <li><strong>Sin responder</strong>: entraron y nadie contestó. Si este número no es cero, empieza por ahí.</li>
+          <li><strong>Abiertas sin asignar</strong>: el trabajo que nadie ha tomado.</li>
+          <li><strong>Correo por día</strong>, recibido y enviado, para ver si el volumen sube o si fue una semana rara.</li>
+          <li><strong>Por persona</strong>: cuántas conversaciones lleva cada quien.</li>
+        </ul>
+
+        <p>Con dos rangos más, 7 y 90 días, para comparar la semana contra el trimestre.</p>
+
+        <p>Una aclaración honesta: el reparto por persona se cuenta por <em>conversación asignada</em>, no por quién escribió cada respuesta. Cuando alguien responde, el correo sale desde el alias del equipo —esa es la gracia— así que el mensaje no lleva el nombre de quien lo escribió. Y la duración se etiqueta «duración del hilo», del primer al último mensaje, no «tiempo hasta el cierre».</p>
 
         <h2>Casos de uso</h2>
 
@@ -237,8 +390,11 @@
         <h3>Define turno de "guardia"</h3>
         <p>En equipos de 3+ personas, rota quién es responsable de revisar la Bandeja y asignar emails nuevos cada día o semana. Esto evita que todos asuman que alguien más lo está haciendo.</p>
 
-        <h3>Usa "en espera" para no perder hilos</h3>
-        <p>Cuando respondes un email y esperas respuesta del cliente, márcalo como "en espera". Si pasan 48-72 horas sin respuesta, haz seguimiento. Los emails "en espera" son tu lista de pendientes de follow-up.</p>
+        <h3>Pospón en vez de dejar todo abierto</h3>
+        <p>Cuando respondes y quedas esperando al cliente, pospón la conversación al día en que harías el seguimiento. Se va de la lista y vuelve sola ese día — o antes, si el cliente contesta. Una Bandeja donde solo está lo que de verdad toca hoy es una Bandeja que el equipo revisa; una con cuarenta hilos abiertos «por si acaso» es una que nadie mira.</p>
+
+        <h3>Deja que el no leído sea tu lista</h3>
+        <p>El no leído es tuyo, no del equipo: lo que tu compañera ya leyó te sigue apareciendo sin leer. Úsalo como bandeja personal dentro de la compartida, y filtra por <strong>No leídas</strong> al empezar el día.</p>
 
         <h3>¿Cuándo escalar a un helpdesk?</h3>
         <p>La Bandeja compartida cubre bien a equipos que manejan hasta ~50 conversaciones diarias. Si tu volumen crece más allá de eso, o necesitas SLAs formales y métricas avanzadas, lee nuestra <a href="/blog/bandeja-compartida-vs-helpdesk">comparativa de bandeja compartida vs helpdesk</a> para decidir cuándo dar el salto.</p>
@@ -246,7 +402,7 @@
         <h2>Preguntas frecuentes</h2>
 
         <h3>¿Cuántos agentes puedo invitar?</h3>
-        <p>No hay límite. Invita a tantos miembros como necesite tu equipo, sin costo adicional por agente.</p>
+        <p>El plan Equipo incluye <strong>5 personas por dominio</strong>, y no se cobra por agente: el precio es por dominio, no por asiento. Cada persona entra con su propia cuenta y tiene su propio estado de leído. Si necesitas más de 5 en un mismo dominio, escríbenos.</p>
 
         <h3>¿Los clientes ven quién del equipo respondió?</h3>
         <p>No. Las respuestas salen desde el alias del equipo. El cliente ve <code>soporte@tudominio.com</code>, no el email personal del agente.</p>
@@ -255,10 +411,19 @@
         <p>La Bandeja viene en todos los planes. En el <a href="/pricing">plan Básico ($49 MXN/mes)</a> es para una persona; compartirla con tu equipo —5 personas por dominio, asignación y notas— es del plan Equipo ($299 MXN/mes), sin cobro por agente.</p>
 
         <h3>¿Los emails llegan en tiempo real?</h3>
-        <p>Sí. Usamos Server-Sent Events para que los emails nuevos aparezcan instantáneamente en la Bandeja sin recargar la página.</p>
+        <p>Sí. Los correos nuevos aparecen solos, y también los cambios de tus compañeros: si alguien responde, asigna o cierra una conversación, lo ves sin recargar la página.</p>
+
+        <h3>¿Puedo buscar dentro del texto de los correos?</h3>
+        <p>Sí, y con acentos o sin ellos. La búsqueda entra al remitente, al asunto y al cuerpo del mensaje, y te muestra el fragmento donde apareció. Un servicio de reenvío puro no puede hacerlo porque no guarda el contenido del correo.</p>
+
+        <h3>¿Qué pasa si pospongo una conversación y el cliente responde antes?</h3>
+        <p>Vuelve a la Bandeja al instante, sin esperar a la fecha. Posponer no esconde el correo: lo quita de en medio hasta que haya algo nuevo que atender.</p>
+
+        <h3>¿Cómo sé si un compañero ya está contestando ese correo?</h3>
+        <p>La Bandeja te lo dice mientras pasa: avisa si otra persona tiene abierta la misma conversación, y avisa aparte si está escribiendo una respuesta. En la lista, esas conversaciones llevan un punto para que lo veas antes de entrar.</p>
 
         <h3>¿Qué pasa si nadie asigna un email?</h3>
-        <p>Se queda en la Bandeja como "sin asignar" y "abierto". Cualquier agente puede tomarlo en cualquier momento. Te recomendamos revisar los emails sin asignar al inicio de cada jornada.</p>
+        <p>Se queda en la Bandeja como "sin asignar" y "abierta", y a todo el equipo le aparece sin leer hasta que cada quien la abra. Cualquier agente puede tomarla en cualquier momento; el contador de <strong>abiertas sin asignar</strong> de la pestaña Métricas te dice cuántas hay.</p>
 
         <h2>Conclusión</h2>
 
