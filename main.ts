@@ -76,6 +76,7 @@ import {
   getConversation,
   updateConversation,
   countUnread,
+  getIndexedBody,
   getBandejaMetrics,
   markConversationRead,
   listMessages,
@@ -193,10 +194,10 @@ import {
   deleteDomainIdentity,
 } from "./ses.js";
 import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, extractAttachmentByIndex, rebuildConversationsFromS3 } from "./forwarding.js";
-import { fetchEmailFromS3, repairReceiptRules, ensureDomainInbound, ensureSnsSubscription, AWS_REGION, getBackupBytesFromS3 } from "./ses.js";
+import { fetchEmailFromS3, S3FetchError, repairReceiptRules, ensureDomainInbound, ensureSnsSubscription, AWS_REGION, getBackupBytesFromS3 } from "./ses.js";
 import { runDbBackup, DB_BACKUP_SUFFIX } from "./backup.js";
 import { resolveEmailBody, extractInlineImages, appendSignature, quotePrevious, MAX_EMAIL_HTML_BYTES } from "./email-html.js";
-import { putEmailImageToS3, getEmailImageFromS3, deleteEmailImageFromS3, sweepOrphanEmailImages, putEmailFileToS3, getEmailFileFromS3, deleteEmailFileFromS3, ALLOWED_IMAGE_TYPES } from "./ses.js";
+import { putDomainAssetToS3, getDomainAssetFromS3, deleteDomainAssetFromS3, putEmailImageToS3, getEmailImageFromS3, deleteEmailImageFromS3, sweepOrphanEmailImages, putEmailFileToS3, getEmailFileFromS3, deleteEmailFileFromS3, ALLOWED_IMAGE_TYPES } from "./ses.js";
 import type { InlineImage, Attachment } from "./ses.js";
 import { sqlite } from "./pg.js";
 import { log } from "./logger.js";
@@ -338,6 +339,13 @@ async function attachInlineImages(html: string | undefined): Promise<{ html?: st
  * esfuerzo: si falla, el barrido diario las recoge. Nunca debe tumbar un envío que
  * ya salió bien.
  */
+/** URL pública del logo de la firma, o null si el dominio no tiene. */
+function logoUrlDeDominio(domain: { id: string; signatureLogoKey?: string | null }): string | null {
+  if (!domain.signatureLogoKey) return null;
+  const appUrl = process.env.APP_URL ?? "https://www.mailmask.studio";
+  return `${appUrl}/api/domain-logo/${domain.signatureLogoKey}`;
+}
+
 async function discardSentImages(images: InlineImage[] | undefined): Promise<void> {
   for (const img of images ?? []) {
     try {
@@ -557,6 +565,13 @@ function applyDeliveryStatus(message: any, status: "delivered" | "bounced" | "co
   try {
     setLogDelivery(sesId, status, status === "delivered" ? null : detail);
     const hit = setMessageDelivery(sesId, status, detail);
+    if (!hit) {
+      // Un evento que no cruza con ningún mensaje era invisible. Suele ser
+      // correo transaccional (que no vive en la Bandeja), pero si se vuelve
+      // constante para correo del usuario significa que el ses_message_id no se
+      // está guardando y la palomita nunca va a moverse.
+      log("info", "ses", "Evento de SES sin mensaje que le corresponda", { sesId, status });
+    }
     if (hit) {
       notifyBandeja(hit.domainId, "delivery_status", { conversationId: hit.conversationId, messageId: hit.id, status, detail });
     }
@@ -4254,8 +4269,27 @@ const app = new Elysia({ adapter: node() })
           const attachments = extractAttachments(raw);
           return { ...msg, body: extractPlainBody(raw), html: extractHtmlBody(raw), attachments };
         } catch (err) {
-          console.error("Failed to fetch message body from S3:", err);
-          return { ...msg, body: "(Error al cargar el mensaje)", html: "", attachments: [] };
+          // Tres desenlaces distintos, y el usuario merece saber cuál le tocó.
+          // Antes los tres decían "(Error al cargar el mensaje)", que para un
+          // correo que simplemente ya no existe es información equivocada.
+          const code = err instanceof S3FetchError ? err.code : "OTHER";
+          log("error", "mesa", "No se pudo leer el cuerpo del correo en S3", {
+            conversationId: conv.id,
+            messageId: msg.id,
+            s3Bucket: msg.s3Bucket,
+            s3Key: msg.s3Key,
+            code,
+            error: String(err),
+          });
+          if (code === "NOT_FOUND") {
+            // Plan B: el texto plano que quedó en el índice de búsqueda. Sin
+            // formato ni adjuntos, pero es el contenido del correo.
+            const rescatado = getIndexedBody(msg.id);
+            return rescatado
+              ? { ...msg, body: rescatado, html: "", attachments: [], bodyDegraded: "index" }
+              : { ...msg, body: "", html: "", attachments: [], bodyDegraded: "gone" };
+          }
+          return { ...msg, body: "", html: "", attachments: [], bodyDegraded: "error" };
         }
       }
       return msg;
@@ -4360,7 +4394,7 @@ const app = new Elysia({ adapter: node() })
     // La firma se pega al markdown y no al HTML: así sale también en la parte de
     // texto plano. Pegada al HTML, quien lea en texto vería un correo sin firmar.
     const rendered = resolveEmailBody({
-      markdown: markdown ? appendSignature(markdown, domain.signature) : undefined,
+      markdown: markdown ? appendSignature(markdown, domain.signature, logoUrlDeDominio(domain)) : undefined,
       html,
       body: textBody,
     });
@@ -4612,6 +4646,106 @@ const app = new Elysia({ adapter: node() })
     detail: { tags: ["Send"], summary: "Upload an image to embed in outgoing email", security: [{ cookieAuth: [] }] },
   })
 
+  // Logo de la firma. A diferencia de las imágenes de arriba, éste es PERMANENTE:
+  // cada correo enviado lo referencia por URL, así que borrarlo rompe la firma de
+  // todo lo ya entregado.
+  .post("/api/domains/:id/logo", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 10, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const form = await request.formData().catch(() => null);
+    const file = form?.get("file");
+    if (!(file instanceof File)) {
+      return new Response(JSON.stringify({ error: "Falta el archivo" }), { status: 400 });
+    }
+
+    // Sin GIF: un logo animado en cada correo del dominio es ruido, y varios
+    // clientes sólo muestran el primer fotograma. Sin SVG por lo mismo que arriba.
+    const ext = ALLOWED_IMAGE_TYPES[file.type];
+    if (!ext || ext === "gif") {
+      return new Response(JSON.stringify({ error: "Formato no permitido. Usa PNG, JPG o WebP" }), { status: 415 });
+    }
+    // 500 KB y no 2 MB: esta imagen la descarga cada persona que abre cualquier
+    // correo del dominio, no una sola vez.
+    if (file.size > 500 * 1024) {
+      return new Response(JSON.stringify({ error: "El logo no puede pesar más de 500 KB" }), { status: 413 });
+    }
+
+    // UUID nuevo en cada subida: el objeto se sirve con caché inmutable de un año,
+    // así que reusar la llave dejaría el logo viejo pegado para siempre.
+    const key = `${access.domain.id}/${crypto.randomUUID()}.${ext}`;
+    try {
+      await putDomainAssetToS3(key, new Uint8Array(await file.arrayBuffer()), file.type);
+    } catch (err) {
+      log("error", "ses", "Signature logo upload failed", { error: String(err), domainId: access.domain.id });
+      return new Response(JSON.stringify({ error: "No se pudo subir el logo" }), { status: 500 });
+    }
+
+    const anterior = access.domain.signatureLogoKey;
+    await updateDomain(access.domain.id, { signatureLogoKey: key });
+    // El anterior se borra después de apuntar el nuevo: si esto falla quedan unos
+    // KB huérfanos, que es mejor que quedarse sin logo por un borrado a destiempo.
+    if (anterior && anterior !== key) {
+      try { await deleteDomainAssetFromS3(anterior); } catch { /* mejor esfuerzo */ }
+    }
+
+    const appUrl = process.env.APP_URL ?? "https://www.mailmask.studio";
+    return new Response(JSON.stringify({ ok: true, logoUrl: `${appUrl}/api/domain-logo/${key}` }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  }, {
+    detail: { tags: ["Domains"], summary: "Upload the signature logo for a domain", security: [{ cookieAuth: [] }] },
+  })
+
+  .delete("/api/domains/:id/logo", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const access = await checkDomainAccess(auth.email, params.id, "write");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const anterior = access.domain.signatureLogoKey;
+    await updateDomain(access.domain.id, { signatureLogoKey: null });
+    if (anterior) {
+      try { await deleteDomainAssetFromS3(anterior); } catch { /* mejor esfuerzo */ }
+    }
+    return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Domains"], summary: "Remove the signature logo", security: [{ cookieAuth: [] }] },
+  })
+
+  // Público y cacheado: lo pide el cliente de correo de quien recibe, que no tiene
+  // sesión. La llave es un UUID bajo el id del dominio.
+  .get("/api/domain-logo/:domainId/:key", async ({ params }) => {
+    // Igual que /api/img/:key: el prefijo vive en el mismo bucket que el correo
+    // entrante, así que un `..` aquí leería correo ajeno.
+    if (!/^[0-9a-f-]{36}$/i.test(params.domainId) || !/^[0-9a-f-]{36}\.(png|jpg|webp)$/i.test(params.key)) {
+      return new Response("No encontrado", { status: 404 });
+    }
+    const asset = await getDomainAssetFromS3(`${params.domainId}/${params.key}`);
+    if (!asset) return new Response("No encontrado", { status: 404 });
+
+    const ext = params.key.split(".").pop()!.toLowerCase();
+    const tipo = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+    return new Response(Buffer.from(asset.body), {
+      headers: {
+        "content-type": tipo,
+        "content-disposition": "inline",
+        "x-content-type-options": "nosniff",
+        "cache-control": "public, max-age=31536000, immutable",
+      },
+    });
+  }, {
+    detail: { hide: true },
+  })
+
   // Adjuntos. A diferencia de las imágenes NO se sirven por HTTP: viajan dentro del
   // correo y se borran de S3 al enviarlo. Aquí sólo se guardan mientras se redacta.
   .post("/api/domains/:id/attachments", async ({ request, params }) => {
@@ -4807,9 +4941,11 @@ const app = new Elysia({ adapter: node() })
     // que se escribe, no debajo del texto citado.
     let cuerpoMarkdown = markdown;
     if (cuerpoMarkdown) {
-      cuerpoMarkdown = appendSignature(cuerpoMarkdown, domain.signature);
+      cuerpoMarkdown = appendSignature(cuerpoMarkdown, domain.signature, logoUrlDeDominio(domain));
       if (quote) {
-        const previos = listMessages(conv.id).filter((m) => m.direction === "inbound");
+        // Sólo hace falta el último entrante para citarlo. Traer el hilo entero
+        // para quedarse con uno era gratis con tres mensajes y caro con doscientos.
+        const previos = listMessages(conv.id, { limit: 30 }).filter((m) => m.direction === "inbound");
         const ultimo = previos[previos.length - 1];
         if (ultimo) {
           cuerpoMarkdown = quotePrevious(cuerpoMarkdown, {

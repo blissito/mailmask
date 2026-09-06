@@ -213,6 +213,18 @@
     <div class="mesa-modal mesa-modal-wide">
       <h3>Firma</h3>
       <p class="mesa-field-label">Se añade al final de cada correo que salga de este dominio. Acepta formato.</p>
+      <div class="mesa-logo-row">
+        <div class="mesa-logo-preview" id="signature-logo-preview">
+          <span class="mesa-logo-empty" id="signature-logo-empty">Sin logo</span>
+          <img id="signature-logo-img" alt="Logo de la firma" hidden>
+        </div>
+        <div class="mesa-logo-actions">
+          <label class="mesa-modal-cancel mesa-logo-btn" for="signature-logo-file">Subir logo</label>
+          <input type="file" id="signature-logo-file" accept="image/png,image/jpeg,image/webp" hidden>
+          <button type="button" class="mesa-modal-cancel mesa-logo-btn mesa-hidden" id="signature-logo-remove">Quitar</button>
+          <p class="mesa-logo-hint">PNG, JPG o WebP, máx. 500 KB. Va arriba de la firma en cada correo.</p>
+        </div>
+      </div>
       <textarea id="signature-body" class="mesa-field mesa-field-textarea" rows="6" placeholder="Brenda Ruiz&#10;Estudio Brenda · estudio-brenda.com"></textarea>
       <div id="signature-error" class="mesa-modal-error hidden"></div>
       <div class="mesa-modal-actions">

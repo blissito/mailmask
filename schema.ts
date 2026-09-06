@@ -34,6 +34,10 @@ export const domains = sqliteTable("domains", {
   registeredViaMailmask: integer("registered_via_mailmask", { mode: "boolean" }).notNull().default(false),
   /** Firma en markdown que se añade al final de lo que se envía desde este dominio. */
   signature: text("signature"),
+  // Llave del logo dentro de DOMAIN_ASSET_PREFIX. Se referencia por URL en la
+  // firma, no se incrusta: Microsoft 365 y Outlook.com muestran las imágenes
+  // incrustadas como adjuntos, y eso pondría un clip en cada correo del dominio.
+  signatureLogoKey: text("signature_logo_key"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
 });
 

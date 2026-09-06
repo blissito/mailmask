@@ -120,7 +120,13 @@ export const CONFIG_SET_EVENT_TYPES = ["bounce", "complaint", "delivery"] as con
  * que suscriba la lista completa — los sets viejos sólo tenían bounce y complaint.
  */
 export async function ensureConfigSetEventDestination(domain: string): Promise<{ created: boolean; updated?: boolean }> {
-  if (!SNS_OUTBOUND_TOPIC_ARN) return { created: false };
+  if (!SNS_OUTBOUND_TOPIC_ARN) {
+    // Salir callado de aquí deja el config set sin destino, y entonces ningún
+    // correo saliente vuelve a dar señales: se quedan todos en "enviado" para
+    // siempre. Es la clase de fallo que sólo se nota meses después.
+    log("warn", "ses", "SNS_OUTBOUND_TOPIC_ARN ausente: el config set no emitirá eventos de entrega", { domain });
+    return { created: false };
+  }
 
   const ses = await getSesOutbound();
   const { CreateConfigurationSetEventDestinationCommand, UpdateConfigurationSetEventDestinationCommand, DescribeConfigurationSetCommand } = await import("@aws-sdk/client-ses");
@@ -152,7 +158,19 @@ export async function ensureConfigSetEventDestination(domain: string): Promise<{
     const current = desc.EventDestinations?.find((d: { Name?: string }) => d.Name === destination.Name);
     const have = new Set(current?.MatchingEventTypes ?? []);
     const missing = CONFIG_SET_EVENT_TYPES.filter((t) => !have.has(t));
-    if (!current || !missing.length) return { created: false, updated: false };
+    if (!current) {
+      // El destino existe con otro nombre (creado a mano en la consola). No lo
+      // tocamos, pero hay que decirlo: si ese destino sólo suscribe rebotes,
+      // las entregas no llegan nunca y nada lo repara.
+      log("warn", "ses", "El config set tiene un destino con otro nombre; no se reparará solo", {
+        domain,
+        configSet: name,
+        esperado: destination.Name,
+        encontrados: desc.EventDestinations?.map((d: { Name?: string }) => d.Name) ?? [],
+      });
+      return { created: false, updated: false };
+    }
+    if (!missing.length) return { created: false, updated: false };
     await ses.send(new UpdateConfigurationSetEventDestinationCommand({ ConfigurationSetName: name, EventDestination: destination }));
     log("info", "ses", "Event destination updated", { domain, configSet: name, added: missing });
     return { created: false, updated: true };
@@ -258,7 +276,19 @@ export async function ensureDomainInbound(domain: string): Promise<{ ruleCreated
 
   let ruleCreated = false;
   try {
-    await ses.send(new DescribeReceiptRuleCommand({ RuleSetName: RECEIPT_RULE_SET, RuleName: ruleName }));
+    const desc = await ses.send(new DescribeReceiptRuleCommand({ RuleSetName: RECEIPT_RULE_SET, RuleName: ruleName }));
+    // El bucket donde SES deposita el correo tiene que ser el mismo que leemos.
+    // Si no coinciden, cada cuerpo de entrante falla con NoSuchKey y en la
+    // Bandeja se ve como "el correo ya no está disponible" — un síntoma que no
+    // apunta para nada a su causa. Barato de descartar, caro de diagnosticar.
+    const bucketDeSes = desc.Rule?.Actions?.find((a: any) => a.S3Action)?.S3Action?.BucketName;
+    if (bucketDeSes && bucketDeSes !== S3_BUCKET) {
+      log("error", "ses", "El bucket de la regla de recepción no es el que leemos", {
+        domain,
+        bucketDeSes,
+        bucketConfigurado: S3_BUCKET,
+      });
+    }
   } catch (err) {
     if (!String(err).includes("RuleDoesNotExist")) throw err;
     await createReceiptRule(domain);
@@ -393,11 +423,42 @@ export async function fetchEmailHeadersFromS3(bucketName: string, objectKey: str
 
 // --- Fetch raw email from S3 ---
 
+/**
+ * Por qué falló una lectura de S3. Sin esto, "el objeto ya no existe" y "no
+ * tenemos permiso" llegan al usuario como el mismo "error", que son cosas muy
+ * distintas: la primera es definitiva y la segunda se reintenta.
+ */
+export type S3ErrorCode = "NOT_FOUND" | "DENIED" | "OTHER";
+
+export class S3FetchError extends Error {
+  constructor(public code: S3ErrorCode, public bucket: string, public key: string, cause: unknown) {
+    super(`S3 ${code}: ${bucket}/${key}`);
+    this.name = "S3FetchError";
+    this.cause = cause;
+  }
+}
+
+/** Exportada para poder probarla: es la que decide qué ve el usuario. */
+export function clasificarErrorS3(err: any): S3ErrorCode {
+  const status = err?.$metadata?.httpStatusCode;
+  const nombre = String(err?.name ?? err?.Code ?? "");
+  if (status === 404 || nombre === "NoSuchKey" || nombre === "NotFound") return "NOT_FOUND";
+  if (status === 403 || nombre === "AccessDenied") return "DENIED";
+  return "OTHER";
+}
+
 export async function fetchEmailFromS3(bucketName: string, objectKey: string): Promise<string> {
   const s3 = await getS3();
   const { GetObjectCommand } = await import("@aws-sdk/client-s3");
-  const res = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: objectKey }));
-  return await res.Body!.transformToString("utf-8");
+  try {
+    const res = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: objectKey }));
+    return await res.Body!.transformToString("utf-8");
+  } catch (err) {
+    // Sin reintentos: un 404 no mejora reintentando, y el SDK ya reintenta lo
+    // que sí es transitorio. Sigue siendo un Error, así que los llamadores que
+    // solo hacen try/catch no cambian.
+    throw new S3FetchError(clasificarErrorS3(err), bucketName, objectKey, err);
+  }
 }
 
 // --- Email forwarding ---
@@ -694,6 +755,14 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
     if (opts?.configSet && String(err).includes("ConfigurationSetDoesNotExist")) {
       const domain = from.split("@")[1] ?? "";
       try { await createConfigurationSet(domain); } catch { /* best effort */ }
+      // El correo sale igual, pero sin config set SES no publica un solo evento:
+      // este mensaje se queda en "enviado" para siempre aunque llegue bien. El
+      // set ya quedó creado arriba, así que esto sólo debería verse una vez por
+      // dominio; si se repite, algo impide crearlo.
+      log("error", "ses", "Envío sin config set: este correo no tendrá estado de entrega", {
+        domain,
+        configSet: opts.configSet,
+      });
       delete cmd.ConfigurationSetName;
       res = await ses.send(new SendRawEmailCommand(cmd));
     } else {
@@ -1077,6 +1146,17 @@ export const EMAIL_IMAGE_PREFIX = "email-images/";
 /** Archivos adjuntos en tránsito: viven aquí sólo hasta que el correo sale. */
 export const EMAIL_FILE_PREFIX = "email-files/";
 
+/**
+ * Assets permanentes del dominio: hoy sólo el logo de la firma.
+ *
+ * 🔴 NO agregar este prefijo a `sweepOrphanEmailImages`. Los otros dos son
+ * efímeros a propósito —la imagen ya viaja dentro del correo, así que el objeto
+ * sobra— pero el logo tiene que seguir ahí meses después, porque cada correo
+ * enviado lo referencia por URL. Barrerlo rompería la firma de todos los correos
+ * ya entregados.
+ */
+export const DOMAIN_ASSET_PREFIX = "domain-assets/";
+
 export const ALLOWED_IMAGE_TYPES: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
@@ -1174,6 +1254,48 @@ export async function deleteEmailFileFromS3(key: string): Promise<void> {
   const s3 = await getS3();
   const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
   await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: `${EMAIL_FILE_PREFIX}${key}` }));
+}
+
+/**
+ * Sube el logo de la firma de un dominio. Permanente: nada lo barre.
+ *
+ * La llave lleva un UUID nuevo en cada subida a propósito. El objeto se sirve con
+ * caché inmutable de un año, así que reusar la llave dejaría a los navegadores y
+ * a los clientes de correo mostrando el logo viejo para siempre.
+ */
+export async function putDomainAssetToS3(key: string, body: Uint8Array, contentType: string): Promise<void> {
+  const s3 = await getS3();
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: `${DOMAIN_ASSET_PREFIX}${key}`,
+    Body: body,
+    ContentType: contentType,
+    CacheControl: "public, max-age=31536000, immutable",
+  }));
+}
+
+export async function getDomainAssetFromS3(key: string): Promise<{ body: Uint8Array; contentType: string } | null> {
+  const s3 = await getS3();
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  try {
+    const res = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: `${DOMAIN_ASSET_PREFIX}${key}` }));
+    const body = await res.Body!.transformToByteArray();
+    return { body, contentType: res.ContentType ?? "application/octet-stream" };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Borra el logo anterior al reemplazarlo. Mejor esfuerzo: si falla queda un
+ * objeto huérfano de unos KB, que es preferible a fallar la subida del nuevo.
+ * Ojo: los correos ya enviados que apuntan a esta llave perderán el logo.
+ */
+export async function deleteDomainAssetFromS3(key: string): Promise<void> {
+  const s3 = await getS3();
+  const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: `${DOMAIN_ASSET_PREFIX}${key}` }));
 }
 
 export async function getEmailImageFromS3(key: string): Promise<{ body: Uint8Array; contentType: string } | null> {

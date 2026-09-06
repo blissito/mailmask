@@ -1479,3 +1479,47 @@ body.mm-composer-locked { overflow: hidden; }
   text-align: left;
 }
 .mesa-metrics-table th { color: var(--mesa-text-3); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+
+/* Aviso cuando el original ya no se pudo leer de S3. */
+.mesa-msg-aviso {
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--mesa-note);
+  border-radius: 4px;
+  background: var(--mesa-note-bg);
+  color: var(--mesa-text-2);
+  font-size: 12px;
+}
+
+/* --- Logo de la firma --- */
+
+.mesa-logo-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.mesa-logo-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 60px;
+  padding: 6px;
+  border: 1px dashed var(--mesa-border-active);
+  border-radius: 8px;
+  background: #fff;
+  flex: 0 0 auto;
+}
+.mesa-logo-preview img { max-width: 100%; max-height: 100%; }
+.mesa-logo-empty { color: #9a9aa2; font-size: 11px; }
+
+.mesa-logo-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mesa-logo-btn { cursor: pointer; }
+.mesa-logo-hint {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--mesa-text-3);
+  font-size: 11px;
+}

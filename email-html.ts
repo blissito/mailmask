@@ -66,10 +66,21 @@ md.renderer.rules.alert_close = () => `</td></tr></table>`;
 // Word ignora `max-width` a secas y la muestra a tamaño original, desbordando.
 const CONTENT_WIDTH = 600;
 
+/**
+ * Ancho del logo de la firma. Sin esto heredaría CONTENT_WIDTH y saldría un logo
+ * de 600 px encabezando cada firma. El markdown no puede llevar el ancho —`md`
+ * corre con `html:false`— así que se deduce de la ruta, que es nuestra.
+ */
+const LOGO_WIDTH = 200;
+export const DOMAIN_LOGO_PATH = "/api/domain-logo/";
+
 const defaultImage = md.renderer.rules.image!;
 md.renderer.rules.image = (tokens, idx, options, env, self) => {
   const token = tokens[idx];
-  if (token.attrGet("width") === null) token.attrSet("width", String(CONTENT_WIDTH));
+  if (token.attrGet("width") === null) {
+    const src = String(token.attrGet("src") ?? "");
+    token.attrSet("width", String(src.includes(DOMAIN_LOGO_PATH) ? LOGO_WIDTH : CONTENT_WIDTH));
+  }
   return defaultImage(tokens, idx, options, env, self);
 };
 
@@ -168,10 +179,16 @@ export function sanitizeEmailHtml(rawHtml: string): RenderedEmail {
  * salga también en la parte de texto plano. Si se pegara al HTML, quien lea en modo
  * texto vería un correo sin firmar.
  */
-export function appendSignature(markdown: string, signature?: string | null): string {
+export function appendSignature(markdown: string, signature?: string | null, logoUrl?: string | null): string {
   const firma = (signature ?? "").trim();
-  if (!firma) return markdown;
-  return `${markdown.trim()}\n\n---\n\n${firma}`;
+  const logo = (logoUrl ?? "").trim();
+  if (!firma && !logo) return markdown;
+  // El logo va por URL y no incrustado a propósito: Microsoft 365, OWA y
+  // Outlook.com muestran las imágenes incrustadas como adjuntos, así que un logo
+  // con `cid:` le pondría icono de clip a cada correo, respuestas de una línea
+  // incluidas. El precio es que quien bloquee imágenes remotas ve un hueco.
+  const partes = [logo ? `![](${logo})` : "", firma].filter(Boolean);
+  return `${markdown.trim()}\n\n---\n\n${partes.join("\n\n")}`;
 }
 
 /**

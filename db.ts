@@ -61,6 +61,8 @@ export interface Domain {
   registeredViaMailmask?: boolean;
   /** Firma en markdown que el compositor añade al final de lo que se envía. */
   signature?: string | null;
+  /** Llave del logo de la firma en S3; se sirve por URL, no se incrusta. */
+  signatureLogoKey?: string | null;
 }
 
 export interface Alias {
@@ -228,6 +230,7 @@ function rowToDomain(r: typeof domains.$inferSelect): Domain {
     createdAt: r.createdAt,
     registeredViaMailmask: r.registeredViaMailmask || false,
     signature: r.signature ?? null,
+    signatureLogoKey: r.signatureLogoKey ?? null,
   };
 }
 
@@ -451,13 +454,17 @@ export function listUserDomains(email: string): Domain[] {
   return rows.map(rowToDomain);
 }
 
-export function updateDomain(id: string, updates: Partial<Pick<Domain, "verified" | "mxConfigured" | "signature">>): Domain | null {
-  if (updates.verified === undefined && updates.mxConfigured === undefined && updates.signature === undefined) return getDomain(id);
+export function updateDomain(id: string, updates: Partial<Pick<Domain, "verified" | "mxConfigured" | "signature" | "signatureLogoKey">>): Domain | null {
+  if (
+    updates.verified === undefined && updates.mxConfigured === undefined &&
+    updates.signature === undefined && updates.signatureLogoKey === undefined
+  ) return getDomain(id);
   const set: Record<string, any> = {};
   if (updates.verified !== undefined) set.verified = updates.verified;
   if (updates.mxConfigured !== undefined) set.mxConfigured = updates.mxConfigured;
   // null es un valor válido: es como se borra una firma.
   if (updates.signature !== undefined) set.signature = updates.signature;
+  if (updates.signatureLogoKey !== undefined) set.signatureLogoKey = updates.signatureLogoKey;
   const rows = db.update(domains).set(set).where(eq(domains.id, id)).returning().all();
   return rows.length ? rowToDomain(rows[0]) : null;
 }
@@ -2185,6 +2192,27 @@ export function deleteCannedResponse(id: string, domainId: string): boolean {
 
 /** Tope por mensaje. Lo que pasa de aquí son firmas y citas anidadas. */
 export const MAX_TEXTO_INDEXADO = 32 * 1024;
+
+/**
+ * El texto plano que quedó en el índice de búsqueda. Es el plan B cuando el
+ * objeto de S3 ya no está: el cuerpo del entrante no se guarda en `messages`
+ * a propósito, así que sin esto el correo se pierde por completo.
+ *
+ * Es texto truncado a 32 KB, sin formato ni adjuntos. Quien lo use tiene que
+ * decírselo al usuario.
+ */
+export function getIndexedBody(messageId: string): string | null {
+  if (!ftsDisponible) return null;
+  try {
+    const fila = sqlite.prepare(
+      `SELECT body FROM messages_fts WHERE message_id = ?`
+    ).get(messageId) as { body?: string } | undefined;
+    const texto = (fila?.body ?? "").trim();
+    return texto.length > 0 ? texto : null;
+  } catch {
+    return null;
+  }
+}
 
 export function indexMessage(args: {
   messageId: string;

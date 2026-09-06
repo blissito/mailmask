@@ -558,7 +558,19 @@ function deliveryBadge(msg) {
  * El alto es fijo con scroll propio: ajustarlo al contenido exige un postMessage
  * desde dentro, y dentro no corre JavaScript. Es el precio de no ejecutar nada.
  */
+// Qué decirle al lector cuando el original ya no se pudo leer. Son tres cosas
+// distintas y antes las tres decían "(Error al cargar el mensaje)".
+const AVISOS_CUERPO = {
+  index: "Mostramos una versión sin formato ni adjuntos: el original ya no está disponible.",
+  gone: "El contenido de este correo ya no está disponible.",
+  error: "No pudimos cargar este correo. Vuelve a intentarlo.",
+};
+
 function cuerpoMensaje(item) {
+  const aviso = AVISOS_CUERPO[item.bodyDegraded]
+    ? `<div class="mesa-msg-aviso">${esc(AVISOS_CUERPO[item.bodyDegraded])}</div>`
+    : "";
+  if (item.bodyDegraded) return aviso + (item.body ? esc(item.body) : "");
   if (item.body) return esc(item.body);
   if (!item.html) return "";
   // srcdoc escapado: el HTML del correo viaja como atributo, no como marcado.
@@ -622,11 +634,61 @@ async function openSignatureModal() {
   try {
     const res = await fetch(`/api/domains/${selectedDomainId}`);
     const data = await res.json().catch(() => ({}));
-    if (res.ok) area.value = data.signature || "";
+    if (res.ok) {
+      area.value = data.signature || "";
+      pintarLogoFirma(data.signatureLogoKey);
+    }
   } catch { /* se abre vacía */ }
   document.getElementById("modal-signature").classList.remove("hidden");
   lockBodyScroll();
   area.focus();
+}
+
+/** Muestra la vista previa del logo, o el hueco si no hay. */
+function pintarLogoFirma(key) {
+  const img = document.getElementById("signature-logo-img");
+  const vacio = document.getElementById("signature-logo-empty");
+  const quitar = document.getElementById("signature-logo-remove");
+  if (!img) return;
+  if (key) {
+    // Se pide con un parámetro anti-caché: el objeto se sirve como inmutable, y
+    // sin esto el navegador seguiría mostrando el logo anterior tras reemplazarlo.
+    img.src = `/api/domain-logo/${key}?v=${Date.now()}`;
+    img.hidden = false;
+    vacio.classList.add("mesa-hidden");
+    quitar.classList.remove("mesa-hidden");
+  } else {
+    img.hidden = true;
+    img.removeAttribute("src");
+    vacio.classList.remove("mesa-hidden");
+    quitar.classList.add("mesa-hidden");
+  }
+}
+
+async function subirLogoFirma(file) {
+  const err = document.getElementById("signature-error");
+  err.classList.add("hidden");
+  if (!file) return;
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`/api/domains/${selectedDomainId}/logo`, { method: "POST", body: fd });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    err.textContent = data.error || "No se pudo subir el logo";
+    err.classList.remove("hidden");
+    return;
+  }
+  // La respuesta trae la URL completa; para la vista previa basta la llave.
+  pintarLogoFirma(data.logoUrl.split("/api/domain-logo/")[1]);
+  toast("Logo actualizado");
+}
+
+async function quitarLogoFirma() {
+  const res = await fetch(`/api/domains/${selectedDomainId}/logo`, { method: "DELETE" });
+  if (res.ok) {
+    pintarLogoFirma(null);
+    toast("Logo quitado");
+  }
 }
 
 async function saveSignature() {
@@ -996,6 +1058,15 @@ function setupListeners() {
 
   // Firma, respuestas guardadas y el desplegable de Cc/Cco.
   document.getElementById("btn-signature").addEventListener("click", openSignatureModal);
+  const inputLogo = document.getElementById("signature-logo-file");
+  if (inputLogo) {
+    inputLogo.addEventListener("change", () => {
+      subirLogoFirma(inputLogo.files?.[0]);
+      // Sin esto, volver a elegir el MISMO archivo no dispara `change`.
+      inputLogo.value = "";
+    });
+  }
+  document.getElementById("signature-logo-remove")?.addEventListener("click", quitarLogoFirma);
   document.getElementById("signature-cancel").addEventListener("click", () => closeModal("modal-signature"));
   document.getElementById("signature-save").addEventListener("click", saveSignature);
 
