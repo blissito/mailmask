@@ -1410,6 +1410,18 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(ip, 3, 60_000);
     if (limited) return limited;
 
+    // Mismo captcha que el registro: esta ruta también manda correo por nuestro
+    // SES, así que sin él es una manguera para bombardear buzones ajenos y
+    // quemar la reputación del dominio.
+    const captcha = await verificarTurnstile((forgotBody as Record<string, unknown>).turnstileToken, ip);
+    if (!captcha.ok) {
+      log("warn", "auth", "Recuperación rechazada por Turnstile", { ip, codes: captcha.errores });
+      return new Response(
+        JSON.stringify({ error: "No pudimos verificar que eres humano. Recarga la página e inténtalo de nuevo." }),
+        { status: 400 },
+      );
+    }
+
     const email = (forgotBody.email ?? "").toLowerCase().trim();
 
     const emailLimited = checkRateLimit(`forgot:${email}`, 1, 60_000);
@@ -1441,7 +1453,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    body: t.Object({ email: t.String() }),
+    body: t.Object({ email: t.String(), turnstileToken: t.Optional(t.String()) }),
     detail: { tags: ["Auth"], summary: "Send password reset email" },
   })
 

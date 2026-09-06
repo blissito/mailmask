@@ -110,4 +110,26 @@ describe("El registro sí canjea el token", () => {
     assert.equal(canjeado, true, "el registro debe canjear el token contra Cloudflare");
     assert.equal(res.status, 400);
   });
+
+  it("🔴 POST /api/auth/forgot-password también lo canjea: manda correo por nuestro SES", async () => {
+    process.env.TURNSTILE_SECRET = "secreto-de-prueba";
+    let canjeado = false;
+    const real = fetchReal;
+    globalThis.fetch = (async (url: any, init: any) => {
+      if (String(url).includes("siteverify")) {
+        canjeado = true;
+        return new Response(JSON.stringify({ success: false, "error-codes": ["invalid-input-response"] }), { status: 200 });
+      }
+      return real(url, init);
+    }) as typeof fetch;
+
+    const res = await app.fetch(new Request("http://localhost/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": `10.9.8.${Math.floor(Math.random() * 250)}` },
+      body: JSON.stringify({ email: "quien-sea@ejemplo.com", turnstileToken: "token-de-bot" }),
+    }));
+
+    assert.equal(canjeado, true, "la recuperación debe canjear el token contra Cloudflare");
+    assert.equal(res.status, 400);
+  });
 });
