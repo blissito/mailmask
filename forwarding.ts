@@ -6,6 +6,7 @@ import { log } from "./logger.js";
 import { programar } from "./scheduler.js";
 import { acotarTexto } from "./regex-guard.js";
 import { notifyBandeja } from "./sse-hub.js";
+import { depositarEnImap, imapHabilitado } from "./imap-store.js";
 import { emitEvent } from "./webhooks.js";
 
 // --- SNS notification types ---
@@ -525,6 +526,13 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
         });
       } catch (err) {
         log("error", "forwarding", "Failed to save to Mesa", { error: String(err), domainId: domain.id });
+      }
+
+      // Buzón IMAP, para los dominios que lo tengan activado. Es un destino MÁS:
+      // `depositarEnImap` se traga sus propios errores a propósito, porque el
+      // reenvío de abajo no puede depender de que el buzón esté vivo.
+      if (imapHabilitado(domainName)) {
+        await depositarEnImap(rawContent, domainName);
       }
     }
 
