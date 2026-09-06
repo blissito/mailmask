@@ -386,6 +386,19 @@ function mostrarAvisoIndexado(data) {
   }
 }
 
+function actualizarBotonLimpiar() {
+  const campo = document.getElementById("search-input");
+  document.getElementById("search-clear")?.classList.toggle("mesa-hidden", !campo.value);
+}
+
+function limpiarBusqueda() {
+  const campo = document.getElementById("search-input");
+  campo.value = "";
+  actualizarBotonLimpiar();
+  campo.focus();
+  loadConversations();
+}
+
 function renderList() {
   const container = document.getElementById("conv-list");
   const empty = document.getElementById("list-empty");
@@ -395,12 +408,30 @@ function renderList() {
   const filtered = conversations;
 
   const sufijo = nextCursor ? "+" : "";
-  document.getElementById("conv-count").textContent =
-    `${filtered.length}${sufijo} ${filtered.length !== 1 ? "conversaciones" : "conversación"}`;
+  const buscando = !!document.getElementById("search-input")?.value.trim();
+  const sustantivo = filtered.length !== 1 ? "conversaciones" : "conversación";
+  document.getElementById("conv-count").textContent = buscando
+    ? `${filtered.length}${sufijo} ${filtered.length !== 1 ? "resultados" : "resultado"}`
+    : `${filtered.length}${sufijo} ${sustantivo}`;
 
   if (filtered.length === 0) {
     // Clear any rendered items but keep the empty state
     container.querySelectorAll(".mesa-conv").forEach(el => el.remove());
+    // "No hay nada" y "tu búsqueda no encontró nada" son mensajes distintos: el
+    // primero desorienta cuando acabas de buscar algo que no existe.
+    const consulta = document.getElementById("search-input")?.value.trim();
+    const titulo = document.getElementById("empty-title");
+    const desc = document.getElementById("empty-desc");
+    const btnLimpiar = document.getElementById("empty-clear-search");
+    if (consulta) {
+      if (titulo) titulo.textContent = "Sin resultados";
+      if (desc) desc.textContent = `No encontramos nada para «${consulta}».`;
+      btnLimpiar?.classList.remove("mesa-hidden");
+    } else {
+      if (titulo) titulo.textContent = "Sin conversaciones";
+      if (desc) desc.textContent = "Activa Bandeja en la configuración de tu dominio para ver los emails entrantes aquí.";
+      btnLimpiar?.classList.add("mesa-hidden");
+    }
     empty.classList.remove("mesa-hidden");
     return;
   }
@@ -1148,10 +1179,23 @@ function setupListeners() {
   // Debounce: sin esto, escribir "factura" son siete consultas con su búsqueda
   // de texto completo cada una.
   let temporizadorBusqueda = null;
-  document.getElementById("search-input").addEventListener("input", () => {
+  const campoBusqueda = document.getElementById("search-input");
+  campoBusqueda.addEventListener("input", () => {
+    actualizarBotonLimpiar();
     clearTimeout(temporizadorBusqueda);
     temporizadorBusqueda = setTimeout(() => loadConversations(), 300);
   });
+  // Escape limpia y vuelve a la lista completa. Sin esto había que borrar a mano
+  // letra por letra para hacer la siguiente búsqueda.
+  campoBusqueda.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") {
+      ev.stopPropagation();
+      if (campoBusqueda.value) limpiarBusqueda();
+      else campoBusqueda.blur();
+    }
+  });
+  document.getElementById("search-clear")?.addEventListener("click", limpiarBusqueda);
+  document.getElementById("empty-clear-search")?.addEventListener("click", limpiarBusqueda);
 
   const btnMas = document.getElementById("btn-load-more");
   if (btnMas) btnMas.addEventListener("click", () => loadConversations({ append: true }));

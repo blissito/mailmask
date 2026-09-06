@@ -109,6 +109,28 @@ body {
 .mesa-search:focus { outline: none; border-color: var(--mesa-accent); }
 .mesa-search::placeholder { color: var(--mesa-text-3); }
 
+/* La × vive dentro del campo, así que hay que dejarle sitio a la derecha. */
+.mesa-search-wrap { position: relative; display: inline-flex; }
+.mesa-search-wrap .mesa-search { padding-right: 26px; }
+
+.mesa-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--mesa-text-3);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mesa-search-clear:hover { color: var(--mesa-text); background: var(--mesa-surface-2); }
+
 /* --- Main layout --- */
 .mesa-main {
   display: flex;
