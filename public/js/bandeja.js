@@ -128,6 +128,10 @@ window.addEventListener("mm:toast", (e) => toast(e.detail));
 // El no-leído lo manda el servidor por conversación: antes vivía sólo en esta
 // pestaña, así que se perdía al recargar y era el mismo para todo el equipo.
 let unreadIds = new Set();
+// Las que ENTRARON con la pestaña abierta. Es un conjunto aparte de `unreadIds`
+// a propósito: la animación de llegada sólo tiene sentido para lo que acaba de
+// llegar. Aplicársela a todo lo no leído dejaba la lista entera latiendo sola.
+let convsNuevasEnVivo = new Set();
 let unreadCount = 0;
 // Presencia de los compañeros en el dominio, tal como llega por SSE.
 let presencias = [];
@@ -138,6 +142,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadDomains();
   setupListeners();
   setupKeyboard();
+  engancharClicksLista();
   mountComposers();
   iniciarLatidoPresencia();
 
@@ -397,7 +402,27 @@ function renderList() {
   }
 
   empty.classList.add("mesa-hidden");
-  const html = filtered.map((c, i) => {
+  const html = filtered.map((c, i) => convRowHtml(c, i)).join("");
+
+  // Replace only conversation items, preserve empty state element
+  container.querySelectorAll(".mesa-conv").forEach(el => el.remove());
+  container.insertAdjacentHTML("beforeend", html);
+
+  // El botón va siempre al final de la lista, después de las filas.
+  const btnMas = document.getElementById("btn-load-more");
+  if (btnMas) {
+    btnMas.classList.toggle("mesa-hidden", !nextCursor);
+    container.appendChild(btnMas);
+  }
+}
+
+/**
+ * El HTML de UNA fila. Está separado de renderList porque abrir una conversación
+ * o moverse con j/k no debe reconstruir la lista entera: hacerlo borraba y volvía
+ * a insertar los treinta elementos y todos parpadeaban a la vez.
+ */
+function convRowHtml(c, i) {
+  {
     const initials = c.from.split("@")[0].slice(0, 2);
     const time = formatTime(c.lastMessageAt);
     const isActive = activeConv?.id === c.id;
@@ -407,7 +432,8 @@ function renderList() {
     if (isSelected) classes += " selected";
     if (c.deletedAt) classes += " deleted";
     if (c.status === "snoozed") classes += " mesa-conv--snoozed";
-    if (unreadIds.has(c.id)) classes += " is-new mesa-conv--unread";
+    if (unreadIds.has(c.id)) classes += " mesa-conv--unread";
+    if (convsNuevasEnVivo.has(c.id)) classes += " is-new";
 
     let meta = `<span class="mesa-status-dot ${esc(c.status)}"></span>`;
     if (c.to) meta += `<span class="mesa-tag mesa-tag-alias">${esc(c.to.split("@")[0])}</span>`;
@@ -433,26 +459,35 @@ function renderList() {
         <div class="mesa-conv-meta">${meta}</div>
       </div>
     </div>`;
-  }).join("");
-
-  // Replace only conversation items, preserve empty state element
-  container.querySelectorAll(".mesa-conv").forEach(el => el.remove());
-  container.insertAdjacentHTML("beforeend", html);
-
-  // El botón va siempre al final de la lista, después de las filas.
-  const btnMas = document.getElementById("btn-load-more");
-  if (btnMas) {
-    btnMas.classList.toggle("mesa-hidden", !nextCursor);
-    container.appendChild(btnMas);
   }
+}
 
-  // Click handlers
-  container.querySelectorAll(".mesa-conv").forEach(el => {
-    el.addEventListener("click", () => {
-      const idx = parseInt(el.dataset.idx);
-      selectedIdx = idx;
-      openConversation(filtered[idx]);
-    });
+/**
+ * Marca cuál fila está abierta y cuál tiene el cursor de teclado, tocando sólo
+ * las clases. Antes esto pasaba por renderList y por eso toda la lista parpadeaba
+ * al seleccionar una conversación.
+ */
+function actualizarSeleccion() {
+  document.querySelectorAll("#conv-list .mesa-conv").forEach((el) => {
+    const idx = parseInt(el.dataset.idx);
+    el.classList.toggle("active", el.dataset.id === activeConv?.id);
+    el.classList.toggle("selected", idx === selectedIdx);
+  });
+}
+
+// Un solo listener delegado en el contenedor: así reemplazar una fila suelta no
+// obliga a volver a enganchar nada.
+function engancharClicksLista() {
+  const container = document.getElementById("conv-list");
+  if (!container || container.dataset.clicks) return;
+  container.dataset.clicks = "1";
+  container.addEventListener("click", (ev) => {
+    const fila = ev.target.closest(".mesa-conv");
+    if (!fila || !container.contains(fila)) return;
+    const idx = parseInt(fila.dataset.idx);
+    if (Number.isNaN(idx) || !conversations[idx]) return;
+    selectedIdx = idx;
+    openConversation(conversations[idx]);
   });
 }
 
@@ -469,8 +504,11 @@ async function openConversation(conv) {
   if (unreadIds.has(conv.id)) {
     // El GET del detalle la marca leída en el servidor; aquí sólo se adelanta la UI.
     unreadIds.delete(conv.id);
+    convsNuevasEnVivo.delete(conv.id);
     unreadCount = Math.max(0, unreadCount - 1);
     updateTitle();
+    // Quitar la negrita de no leída toca sólo esta fila, no la lista entera.
+    renderConvRow(conv.id);
   }
   enviarPresencia(conv.id, "viewing");
   document.getElementById("detail-empty").classList.add("mesa-hidden");
@@ -531,7 +569,7 @@ async function openConversation(conv) {
   const data = await res.json();
 
   renderMessages(data.messages ?? [], data.notes ?? []);
-  renderList(); // re-render to highlight active
+  actualizarSeleccion();
 }
 
 // Estado de entrega de un saliente. Lo alimenta el webhook de eventos de SES
@@ -998,6 +1036,7 @@ function setupListeners() {
     activeConv = null;
     selectedIdx = -1;
     unreadIds.clear();
+    convsNuevasEnVivo.clear();
     unreadCount = 0;
     updateTitle();
     document.getElementById("detail-empty").classList.remove("mesa-hidden");
@@ -1200,7 +1239,7 @@ function setupKeyboard() {
         activeConv = null;
         document.getElementById("detail-empty").classList.remove("mesa-hidden");
         document.getElementById("detail-loaded").classList.add("mesa-hidden");
-        renderList();
+        actualizarSeleccion();
         return;
       }
     }
@@ -1219,7 +1258,7 @@ function setupKeyboard() {
       const filtered = getFilteredConversations();
       if (selectedIdx < filtered.length - 1) {
         selectedIdx++;
-        renderList();
+        actualizarSeleccion();
         scrollToSelected();
       } else if (nextCursor) {
         // Al final de la página cargada: traer la siguiente sin que el usuario
@@ -1227,7 +1266,7 @@ function setupKeyboard() {
         loadConversations({ append: true }).then(() => {
           if (selectedIdx < conversations.length - 1) {
             selectedIdx++;
-            renderList();
+            actualizarSeleccion();
             scrollToSelected();
           }
         });
@@ -1237,7 +1276,7 @@ function setupKeyboard() {
       e.preventDefault();
       if (selectedIdx > 0) {
         selectedIdx--;
-        renderList();
+        actualizarSeleccion();
         scrollToSelected();
       }
     }
@@ -1461,9 +1500,12 @@ function renderConvRow(id) {
   const filtroEstado = document.getElementById("status-filter")?.value || "";
   const fuera = filtroEstado && filtroEstado !== "unread" && filtroEstado !== "deleted" && c.status !== filtroEstado;
   if (fuera) { removerFila(id); return; }
-  // renderList reconstruye la lista completa a partir del array local, que es
-  // barato (una página) y mantiene data-idx coherente con el cursor de teclado.
-  renderList();
+
+  const el = document.querySelector(`#conv-list .mesa-conv[data-id="${CSS.escape(id)}"]`);
+  if (!el) { renderList(); return; }
+  // Sólo esta fila. El índice se conserva del DOM para no desalinear j/k.
+  el.outerHTML = convRowHtml(c, parseInt(el.dataset.idx));
+  actualizarSeleccion();
 }
 
 // --- Presencia (detección de colisión) ---
@@ -1496,6 +1538,24 @@ function iniciarLatidoPresencia() {
       enviarPresencia(activeConv.id, "viewing");
     }
   }, 15000);
+}
+
+// Conversaciones donde ahora mismo hay OTRA persona. Se recuerda entre eventos
+// para repintar sólo lo que cambió: el latido llega cada 15 s y casi siempre trae
+// lo mismo, así que repintar por recibirlo hacía parpadear la lista sola.
+let convsConPresencia = new Set();
+
+function aplicarPresenciaEnLista() {
+  const ahora = new Set(
+    presencias
+      .filter(p => p.conversationId && p.email !== currentUser?.email)
+      .map(p => p.conversationId)
+  );
+  const cambiadas = new Set([...ahora, ...convsConPresencia]);
+  for (const id of cambiadas) {
+    if (ahora.has(id) !== convsConPresencia.has(id)) renderConvRow(id);
+  }
+  convsConPresencia = ahora;
 }
 
 function renderPresence() {
@@ -1594,11 +1654,10 @@ function connectSSE(domainId) {
     try {
       const data = e.data ? JSON.parse(e.data) : {};
       const convId = data.conversationId;
-      if (convId) unreadIds.add(convId);
+      if (convId) { unreadIds.add(convId); convsNuevasEnVivo.add(convId); }
       unreadCount++;
       updateTitle();
       await loadConversations();
-      renderList();
       const sender = data.from ? data.from.slice(0, 40) : "";
       toast(sender ? `Nueva conversación de ${sender}` : "Nueva conversación");
       playNotifSound();
@@ -1617,10 +1676,9 @@ function connectSSE(domainId) {
         const updated = conversations.find(c => c.id === convId);
         if (updated) openConversation(updated);
       } else {
-        if (convId) unreadIds.add(convId);
+        if (convId) { unreadIds.add(convId); convsNuevasEnVivo.add(convId); }
         unreadCount++;
         updateTitle();
-        renderList();
       }
       const subj = data.subject ? data.subject.slice(0, 40) : "conversación";
       toast(`Nuevo mensaje en: ${subj}`);
@@ -1718,7 +1776,7 @@ function connectSSE(domainId) {
     try {
       presencias = JSON.parse(e.data).agents || [];
       renderPresence();
-      renderList();
+      aplicarPresenciaEnLista();
     } catch (err) { console.error("SSE presence:", err); }
   });
 
