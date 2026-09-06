@@ -5820,7 +5820,10 @@ const app = new Elysia({ adapter: node() })
     body: t.Object({
       plan: t.Optional(t.String()),
       status: t.Optional(t.String()),
-      currentPeriodEnd: t.Optional(t.String()),
+      // Acepta null: el panel manda null cuando el campo de fecha queda vacío, y
+      // con t.String() a secas Elysia rechazaba la petición entera con 422 — el
+      // admin veía "Error al guardar" sin saber que era por la fecha.
+      currentPeriodEnd: t.Optional(t.Union([t.String(), t.Null()])),
       emailVerified: t.Optional(t.Boolean()),
     }),
     detail: { tags: ["Admin"], summary: "Update a user's subscription or verification status", security: [{ cookieAuth: [] }] },

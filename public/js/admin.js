@@ -252,10 +252,24 @@ async function saveUser() {
   const btn = document.getElementById("btn-save-user");
   btn.disabled = true; btn.textContent = "Guardando...";
 
+  const status = document.getElementById("detail-status").value;
+  const periodEnd = document.getElementById("detail-period-end").value || null;
+
+  // Un status "active" con la fecha vencida NO da plan: getUserPlanLimits mira
+  // primero si el periodo ya pasó y devuelve cero de todo. Es la trampa entera de
+  // esta pantalla, porque el formulario conserva la fecha anterior aunque cambies
+  // el plan, y el usuario se queda sin reenvío creyendo que lo activó.
+  if ((status === "active" || status === "cancelled") && periodEnd && new Date(periodEnd) < new Date()) {
+    if (!confirm(`La fecha de fin de periodo (${periodEnd}) ya pasó, así que el plan seguirá contando como inactivo y el correo no se reenviará.\n\n¿Guardar de todos modos?`)) {
+      btn.disabled = false; btn.textContent = "Guardar";
+      return;
+    }
+  }
+
   const body = {
     plan: document.getElementById("detail-plan").value,
-    status: document.getElementById("detail-status").value,
-    currentPeriodEnd: document.getElementById("detail-period-end").value || null,
+    status,
+    currentPeriodEnd: periodEnd,
     emailVerified: document.getElementById("detail-verified").checked,
   };
 
