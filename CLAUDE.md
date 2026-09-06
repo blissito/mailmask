@@ -158,7 +158,29 @@ La clave del sitio es pública y vive en el HTML; la secreta es `TURNSTILE_SECRE
 
 ## TODO
 
-### 🔥 Urgente — evaluar IMAP/POP
+### ✅ IMAP: el spike ya se hizo (6-sep-2026) — lo que queda es el puerto
+
+**Stalwart está corriendo en producción**, en una caja permanente de EasyBits (`mailmask-imap`, tier micro, $99/mes), bajo systemd y habilitado al arranque. Medido: **85 MB de RAM**, imagen de 98 MB, arranque en 20 s, y el store con un buzón pesa 1.9 MB. Los cuerpos van al S3 de siempre bajo el prefijo `buzones/`, con el usuario IAM `mailmask-stalwart` que sólo puede tocar ese prefijo (comprobado: recibe `AccessDenied` al intentar listar `inbound/`).
+
+Probado de punta a punta: entregar un correo, verlo aterrizar en S3, leerlo por IMAP y encontrarlo con `IMAP SEARCH BODY`.
+
+**La entrega va por JMAP sobre HTTPS, no por LMTP** (`imap-store.ts`). No es preferencia: **ningún template de EasyBits declara puertos crudos** — `template "ubuntu" does not declare raw port 993/tcp` — así que LMTP no es alcanzable desde Fly. JMAP sí sale por capa 7, y además es el contrato público del servidor; leer su S3 por debajo sería acoplarse a su formato interno.
+
+🔴 **Lo único que falta para que sea vendible es el 993** (y el 587, o el cliente lee pero no puede responder). EasyBits lo está construyendo. Ojo: **el 143 con STARTTLS no se puede rutear por SNI**, porque la conexión empieza en claro — si sale el router SNI, es 993 y ya.
+
+**Certificado**: ACME con DNS-01 contra Route 53, que Stalwart soporta nativo, emitido para `imap.mailmask.studio`. La gestión automática de DNS exige publicar **al menos un tipo** de registro: se eligió `tlsa` porque es el único inocuo — `mx`, `spf`, `dmarc` y `mtaSts` tocarían el correo del dominio, que entra por SES.
+
+**Cosas del producto que costaron encontrar, para no repetirlas:**
+- El archivo de `--config` **sólo declara el data store**; listeners, blob store, dominios y cuentas viven DENTRO del store y se administran por JMAP. No hay configuración como código: respaldar el store es respaldar la configuración.
+- Corre como usuario `stalwart`; un directorio de root lo tumba con `unable to open database file`, mensaje que no menciona permisos.
+- El POST a JMAP va a `/jmap` **sin barra final**: con ella redirige, se pierde el cuerpo y contesta `notRequest`.
+- El `apiUrl` de la sesión trae el hostname interno de la caja: hay que descartarlo y armar la URL sobre la pública.
+- **Rechaza contraseñas débiles**; el alta de buzones tendrá que generarlas.
+- `contact` de ACME y otros conjuntos se mandan como mapa con `true`, no como arreglo.
+
+Pendiente de producto: provisión de buzones (alta, contraseña, baja, cuota) y **el precio**. La referencia de +$99 por dominio hay que revisarla: ForwardEmail da IMAP con 10 GB por $3 USD.
+
+### 🔥 Contexto original del análisis (agosto 2026)
 - [ ] **Cerrar el hueco de recepción: cuánto cuesta y si AWS lo resuelve.** Hoy MailMask envía por SMTP pero **no ofrece IMAP ni POP**, así que nadie puede usar Outlook o Apple Mail como cliente completo: el correo entrante sigue cayendo en el buzón al que se reenvía. La landing lo prometía mal y ya se corrigió, pero el hueco de producto sigue ahí y es lo que separa "capa de reenvío" de "email profesional de verdad".
 
   **WorkMail ya está descartado, con números** (agosto 2026): cuesta **$4 USD por usuario al mes** (≈$76 MXN, con 50 GB e IMAP incluidos). Un solo buzón cuesta más que todo el plan Básico ($49). Pero el problema de fondo no es el margen: **cobra por usuario**, que es justo el modelo contra el que se posiciona el producto entero ("Google cobra por persona, MailMask por dominio"). Adoptarlo obligaría a cobrar por persona y borraría el diferenciador.
@@ -333,7 +355,7 @@ Objetivo: solidificar el tronco del servicio. Blindar seguridad, rendimiento y r
 
 1. [ ] **SES Tenants + aislamiento de reputación**: Implementar SES Tenants (feature de agosto 2025) para aislar reputación por dominio de cliente. 1 tenant por dominio, política Standard para Básico/Freelancer, Strict para Developer. Managed Dedicated IPs para tiers de pago (auto-scaling, sin warmup manual). EventBridge para recibir eventos de cambio de estado/reputación y pausar forwarding automáticamente. Evaluar VDM (Virtual Deliverability Manager) para dashboard de entregabilidad por config set. Relacionado: **`monthlyForwards`** (ver abajo).
 - [x] ~~**SMTP relay**~~: Implementado. Credenciales SMTP para enviar desde código/SaaS (no clientes de correo). Plan Equipo (antes Developer). IAM user por credencial con policy scoped al dominio.
-- [ ] **IMAP/POP (Dovecot)**: Integrar Dovecot open source (basado en ForwardEmail) para ofrecer servidor de entrada completo. Permitiría configurar clientes de correo (Apple Mail, Outlook, Thunderbird) con recepción + envío. Proyecto separado a futuro, no incluir en marketing actual.
+- [x] ~~**IMAP/POP (Dovecot)**~~: descartado. Se eligió **Stalwart** (Rust, S3 nativo, JMAP) y ya está corriendo; ver la sección de IMAP arriba. Dovecot no se evaluó más allá de la comparación inicial. Permitiría configurar clientes de correo (Apple Mail, Outlook, Thunderbird) con recepción + envío. Proyecto separado a futuro, no incluir en marketing actual.
 - [ ] Probar checkout autenticado con email diferente al collector de MP
 2. [ ] **SDK**: Cliente JS/TS para consumir la API de MailMask (crear aliases, listar dominios, etc.). Publicar en npm. Disponible en todos los planes.
 3. [x] ~~**Webhooks**~~: API y entrega hechas (sep-2026). UI en el dashboard (pestaña Webhooks, `loadWebhooks` en `app.js`): **no crea** —el secreto debe quedar en el código del cliente, así que muestra el snippet del SDK—; lista, últimas 5 entregas con código HTTP/intentos/error, y botones Probar, Pausar y Eliminar. `webhooks.ts`: `emitEvent()` sólo encola en `webhook_deliveries`; el cron de cada minuto (`deliverPending`) hace el POST con `X-MailMask-Signature: sha256=HMAC(secret, timestamp.body)` y reintenta 1m/5m/30m/2h/12h (5 intentos). Eventos: `email.received` (forwarding), `email.sent` (send y bulk), `email.delivered`/`email.bounced`/`email.complained` (webhook de SES). `ensureConfigSetEventDestination` ahora también **actualiza** destinos viejos para que suscriban `delivery` (`CONFIG_SET_EVENT_TYPES` en `ses.ts`): corre al arrancar y en verify, así que tras el deploy todos los dominios lo emiten. Rutas `/api/domains/:id/webhooks[...]`, plan `webhooks: true` (Equipo), sólo https públicas (`isPrivateUrl`), máx 10 por dominio. El SDK exporta `verifyWebhookSignature` (WebCrypto).
