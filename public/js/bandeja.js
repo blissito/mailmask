@@ -1311,9 +1311,17 @@ function updateComposerMode() {
 // --- Keyboard shortcuts ---
 function setupKeyboard() {
   document.addEventListener("keydown", (e) => {
-    // Skip if typing in input/textarea
-    const tag = e.target.tagName;
-    const isTyping = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+    // 🔴 El compositor es Tiptap: reemplaza el <textarea> por un <div
+    // contenteditable, así que mirar sólo el tagName dejaba pasar TODOS los
+    // atajos mientras se escribía una respuesta. Escribir "Ap" disparaba
+    // asignar y redactar. `isContentEditable` es lo que cubre ese caso; el
+    // closest cubre escribir dentro de un hijo del editor (negritas, enlaces).
+    const el = e.target;
+    const tag = el.tagName;
+    const isTyping =
+      tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" ||
+      el.isContentEditable === true ||
+      !!el.closest?.("[contenteditable='true'], .ProseMirror");
 
     if (e.key === "Escape") {
       // Close modal if open
