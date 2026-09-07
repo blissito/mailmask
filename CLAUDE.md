@@ -529,3 +529,22 @@ Objetivo: solidificar el tronco del servicio. Blindar seguridad, rendimiento y r
 - [ ] **Bandeja: asignar con select de team**: Cambiar input de email en modal de asignar por `<select>` que liste agentes del dominio (ya existe `GET /api/domains/:id/agents`).
 4. [ ] **Members y permisos por dominio**: UI completa para invitar miembros a un dominio, asignar roles (owner, editor, viewer), gestionar permisos. Incluye: modelo de datos (tabla members/invitations), endpoints CRUD, UI en dashboard para listar/invitar/remover miembros, control de acceso en todos los endpoints de dominio según rol. **Pendiente definir**: qué pueden ver los members (aliases, reglas, logs, bandeja), cómo se comparten dominios (invitación por email, link), qué ve un member en su dashboard cuando tiene acceso a dominios de otros usuarios.
 5. [ ] **Registro de dominios integrado (Route 53)**: El usuario busca, paga y tiene dominio+email funcionando sin configurar nada. Flujo: (1) búsqueda de disponibilidad via `route53domains:CheckDomainAvailability`, (2) pago via MercadoPago (cargo anual separado de suscripción), (3) registro via `route53domains:RegisterDomain` con contacto del usuario, (4) configuración DNS automática en hosted zone — MX apuntando a SES inbound, TXT de verificación, CNAMEs de DKIM — via `route53:ChangeResourceRecordSets`, (5) verificación SES automática del dominio. SDKs: `@aws-sdk/client-route-53` + `@aws-sdk/client-route-53-domains`. UI: buscador de dominio en dashboard con precios por TLD, estado de registro, renovación automática. Billing: cargo anual por dominio (~$12-14 USD .com) cobrado como producto separado en MP o incluido en planes altos. Modelo DB: tabla `domain_registrations` (domainId, route53OperationId, registeredAt, expiresAt, autoRenew, contactInfo). **Diferenciador clave**: ningún competidor (SimpleLogin, ImprovMX, ForwardEmail, addy.io) ofrece registro+configuración integrada — todos requieren que el usuario vaya a su registrador y configure DNS manualmente. Esto convierte a MailMask en solución "todo en uno" para email profesional.
+
+### Pendientes de la Bandeja (7-sep-2026, tarde)
+
+- 🔴 **El alto del iframe del correo: cuatro intentos fallidos, revertido.** Cuatro
+  fallidos: medir al insertar (mide el `about:blank` de 16 px), ocultar con
+  `opacity` y alto 0 (sin alto no se maqueta y `scrollHeight` da 0), y el
+  envoltorio colapsado con sondeo (`ajustarIframe` en `public/js/bandeja.js`).
+  Sigue naciendo chico y creciendo a la vista. Antes de un cuarto intento a
+  ciegas, **medir en el navegador de verdad** qué devuelve `scrollHeight` en
+  cada paso: puede ser que `srcdoc` + `sandbox="allow-same-origin"` no dé
+  acceso a `contentDocument` en Chrome y todo el sondeo esté leyendo cero
+  siempre, cayendo al fallback de los 400 px. Alternativa sin medir: alto fijo
+  generoso con "ver más", o mover el ajuste a un `postMessage` desde dentro,
+  que exige `allow-scripts` y hay que sopesar contra XSS.
+  El cuarto intento (envoltorio colapsado con el iframe a 2000 px) salió peor:
+  el correo de TikTok usa `height:100%`, así que **rellena el alto de medición**
+  y `scrollHeight` devuelve los 2000 px, no el alto real. Cualquier medida
+  hecha dentro de un iframe alto hereda ese problema con correos de tabla al
+  100%. Todo revertido en 650e3a5; vuelve el alto fijo de 420 px.
