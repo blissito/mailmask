@@ -806,12 +806,20 @@ function ajustarIframe(iframe) {
     try {
       const doc = iframe.contentDocument;
       if (!doc || !doc.body) return 0;
-      return Math.max(doc.documentElement?.scrollHeight ?? 0, doc.body.scrollHeight ?? 0);
+      // `scrollHeight` es entero y redondea hacia abajo: un cuerpo de 512.3 px
+      // devuelve 512 y el píxel que falta saca una barra de scroll. Por eso
+      // también se mira el rect, que sí trae decimales, y se redondea arriba.
+      return Math.ceil(Math.max(
+        doc.documentElement?.scrollHeight ?? 0,
+        doc.body.scrollHeight ?? 0,
+        doc.body.getBoundingClientRect().height,
+      ));
     } catch { return 0; }
   };
 
   const aplicar = (h) => {
-    iframe.style.height = Math.min(Math.max(h, 120), IFRAME_MAX) + "px";
+    // +2 px de holgura: sin ellos el redondeo deja la barra de scroll asomada.
+    iframe.style.height = Math.min(Math.max(h + 2, 120), IFRAME_MAX) + "px";
   };
 
   const fijar = (h) => {
