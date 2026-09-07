@@ -149,6 +149,7 @@
         <a href="#autenticacion">Autenticaci&oacute;n</a>
         <a href="#dominios">Dominios</a>
         <a href="#aliases">Aliases</a>
+        <a href="#buzones" class="pl-4">Buzones IMAP</a>
         <a href="#reglas">Reglas</a>
         <a href="#envio">Env&iacute;o de emails</a>
         <a href="#logs">Logs</a>
@@ -194,8 +195,13 @@
 <span class="cm">// Obtener un dominio</span>
 <span class="kw">const</span> domain = <span class="kw">await</span> mm.domains.<span class="fn">get</span>(<span class="str">"domain-id"</span>);
 
-<span class="cm">// Agregar dominio</span>
-<span class="kw">const</span> { domain } = <span class="kw">await</span> mm.domains.<span class="fn">create</span>(<span class="str">"example.com"</span>);
+<span class="cm">// Agregar dominio: devuelve los registros DNS que hay que publicar</span>
+<span class="kw">const</span> { domain, dnsRecords, requiereActivacion } = <span class="kw">await</span> mm.domains.<span class="fn">create</span>(<span class="str">"example.com"</span>);
+dnsRecords.mx;           <span class="cm">// { type: "MX", name, value: "10 inbound-smtp.us-east-1.amazonaws.com", priority: 10 }</span>
+dnsRecords.verification; <span class="cm">// { type: "TXT", name: "_amazonses.example.com", value }</span>
+dnsRecords.dkim;         <span class="cm">// 3 CNAME</span>
+dnsRecords.spf;          <span class="cm">// { type: "TXT", name, value: "v=spf1 include:amazonses.com ~all" }</span>
+<span class="cm">// requiereActivacion: true si es tu 2.&ordm; dominio: se guarda pero no reenv&iacute;a hasta activarlo ($99/mes)</span>
 
 <span class="cm">// Eliminar dominio</span>
 <span class="kw">await</span> mm.domains.<span class="fn">delete</span>(<span class="str">"domain-id"</span>);
@@ -208,7 +214,7 @@
 
       <!-- Aliases -->
       <h2 id="aliases" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Aliases</h2>
-      <p class="text-fg-muted mb-4">Crea y administra aliases de email. Cada alias reenv&iacute;a correo a uno o m&uacute;ltiples destinos.</p>
+      <p class="text-fg-muted mb-4">Crea y administra aliases (m&aacute;scaras) de email. Cada alias reenv&iacute;a correo a uno o m&uacute;ltiples destinos, guarda el correo en un buz&oacute;n IMAP propio, o las dos cosas. El dominio gratis permite 5 aliases; el activado, ilimitados. <code class="text-fg">*</code> como alias es el catch-all.</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Listar aliases</span>
 <span class="kw">const</span> aliases = <span class="kw">await</span> mm.aliases.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
 
@@ -229,6 +235,19 @@
 
 <span class="cm">// Eliminar alias</span>
 <span class="kw">await</span> mm.aliases.<span class="fn">delete</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);</code></pre>
+
+      <h3 id="buzones" class="text-lg font-semibold text-fg mt-8 mb-2">Buzones IMAP</h3>
+      <p class="text-fg-muted mb-4">En un <strong class="text-fg">dominio activado</strong>, un alias puede tener un buz&oacute;n real para leer y enviar desde Apple Mail, Outlook o Thunderbird (IMAP 993 y SMTP 465 con TLS). Buzones ilimitados con 10 GB compartidos por dominio, ampliables en bloques de +50 GB. <strong class="text-fg">La contrase&ntilde;a se devuelve una sola vez y MailMask no la guarda</strong>; si se pierde, se regenera desde el panel. Un alias con buz&oacute;n puede ir sin destinos de reenv&iacute;o.</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Alias con buz&oacute;n (y sin reenv&iacute;o)</span>
+<span class="kw">const</span> ventas = <span class="kw">await</span> mm.aliases.<span class="fn">create</span>(<span class="str">"domain-id"</span>, { alias: <span class="str">"ventas"</span>, mailbox: <span class="kw">true</span> });
+ventas.buzon;      <span class="cm">// { email, password, quotaBytes, imap: { host, port: 993 }, smtp: { host, port: 465 } }</span>
+ventas.errorBuzon; <span class="cm">// texto si el alias se cre&oacute; pero el buz&oacute;n no</span>
+
+<span class="cm">// Buz&oacute;n para un alias que ya existe</span>
+<span class="kw">const</span> buzon = <span class="kw">await</span> mm.aliases.<span class="fn">createMailbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
+
+<span class="cm">// Borrar el buz&oacute;n Y SU CORREO (el alias conserva sus destinos)</span>
+<span class="kw">await</span> mm.aliases.<span class="fn">deleteMailbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);</code></pre>
 
       <!-- Reglas -->
       <h2 id="reglas" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Reglas</h2>

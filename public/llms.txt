@@ -23,7 +23,8 @@ cuatro capacidades sobre él:
    puro, que no almacenan el contenido.
 4. **Reglas y automatización.** Reglas de enrutamiento por alias, API REST, SDK de
    JavaScript/TypeScript (`@easybits.cloud/mailmask` en npm) y webhooks en el dominio
-   activado, para conectar el correo con flujos automatizados.
+   activado, para conectar el correo con flujos automatizados. Servidor MCP en
+   https://www.mailmask.studio/mcp para que un agente de IA haga las altas con la API key.
 5. **Buzones IMAP propios.** En un dominio activado, cada alias puede tener un buzón real
    con contraseña, para leer y enviar desde Apple Mail, Outlook o Thunderbird
    (imap.mailmask.studio, 993 y 465), con 10 GB por dominio ampliables.
@@ -101,6 +102,8 @@ dominio por API o SMTP.
 
 Contenido de referencia sobre email en dominio propio, comparativas y guías.
 
+- Buzones IMAP en tu dominio: Apple Mail y Outlook sin Google — https://www.mailmask.studio/blog/buzones-imap-apple-mail-outlook-dominio-propio
+  Qué es un buzón IMAP, cómo se crea en MailMask, qué pasa con la Bandeja y el reenvío, cuánto cuesta por dominio y qué pasa al cancelar.
 - Automatiza tu email con n8n, Make y Zapier usando aliases — https://www.mailmask.studio/blog/automatizar-email-n8n-make-zapier-aliases
   Crea aliases dedicados para automatizar workflows de email con n8n, Make o Zapier. Guía práctica con ejemplos.
 - Cómo usar la Bandeja compartida de MailMask para atender clientes — https://www.mailmask.studio/blog/bandeja-compartida-tutorial
@@ -120,19 +123,19 @@ Contenido de referencia sobre email en dominio propio, comparativas y guías.
 - Email profesional para freelancers: cobra más con dominio propio — https://www.mailmask.studio/blog/email-profesional-freelancer
   Tener email con dominio propio te posiciona como profesional y justifica tarifas más altas. Aprende cómo configurarlo en minutos sin Google Workspace.
 - Email profesional en tu dominio sin Google Workspace — https://www.mailmask.studio/blog/email-profesional-sin-google-workspace
-  Deja de pagar $6 USD/usuario/mes por Google Workspace solo para tener email@tudominio.com. MailMask te da email profesional desde $49 MXN/mes con reenvío y aliases ilimitados.
+  Deja de pagar $6 USD/usuario/mes por Google Workspace solo para tener email@tudominio.com. MailMask te da email profesional gratis para empezar y $99 MXN por dominio con personas ilimitadas.
 - Email profesional para startups: dominio propio desde día uno — https://www.mailmask.studio/blog/email-profesional-startups
   Tu startup necesita email con dominio propio desde el primer día. Configúralo en minutos sin Google Workspace.
 - Email para tu tienda online: soporte y ventas con dominio propio — https://www.mailmask.studio/blog/email-tienda-online-soporte-ventas
   Configura emails profesionales para tu e-commerce: soporte@, ventas@, pedidos@ en tu dominio.
 - Cómo enviar emails desde tu dominio (no solo recibir) — https://www.mailmask.studio/blog/enviar-emails-desde-dominio
-  Tres formas de enviar como ventas@tudominio.com en MailMask: redactar desde la Bandeja, la API REST/SDK, y el SMTP relay. Planes, límites y cuándo usar cada una.
+  Tres formas de enviar como ventas@tudominio.com en MailMask: redactar desde la Bandeja, la API REST/SDK, y el SMTP relay. Qué necesitas, límites y cuándo usar cada una.
 - Cómo evitar que tus emails caigan en spam — https://www.mailmask.studio/blog/evitar-emails-caigan-en-spam
   Guía práctica para mejorar la entregabilidad de tus emails. Configura SPF, DKIM y DMARC correctamente.
 - Cómo gestionar emails de tu dominio en equipo sin Gmail — https://www.mailmask.studio/blog/gestionar-emails-dominio-equipo
-  Deja de compartir un Gmail genérico con tu equipo. MailMask te da aliases por área, múltiples destinatarios y bandeja compartida desde $49 MXN/mes.
+  Deja de compartir un Gmail genérico con tu equipo. MailMask te da aliases por área, múltiples destinatarios y bandeja compartida: gratis para empezar, $99 MXN por dominio con personas ilimitadas.
 - Cómo iniciar tu negocio con email profesional desde el primer día — https://www.mailmask.studio/blog/iniciar-negocio-email-profesional
-  Guía para emprendedores: deja de usar Gmail personal y configura email profesional con dominio propio desde el día uno. Dominio + MailMask por menos de $100 MXN/mes.
+  Guía para emprendedores: deja de usar Gmail personal y configura email profesional con dominio propio desde el día uno. MailMask es gratis: sólo pagas el dominio.
 - Cómo migrar de Google Workspace a MailMask — https://www.mailmask.studio/blog/migrar-google-workspace-a-mailmask
   Guía paso a paso para dejar Google Workspace y configurar email profesional en tu dominio con MailMask.
 - Email profesional en 2026: qué opciones existen y cuál conviene en LATAM — https://www.mailmask.studio/blog/opciones-email-profesional-2026
