@@ -1278,12 +1278,23 @@ async function abrirBuzon(alias, yaTiene) {
   loadAliases();
 }
 
+// Botón de copiar con icono: el texto "Copiar" tres veces en un modal chico estorba,
+// y al copiar el icono cambia a palomita 1.5 s (el sonido ya avisa).
+function botonCopiar(valor, titulo) {
+  return `<button type="button" data-mailbox="copy" data-value="${esc(valor)}" title="${esc(titulo)}" aria-label="${esc(titulo)}" class="shrink-0 p-1.5 rounded text-fg-subtle hover:text-fg hover:bg-line">
+    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+  </button>`;
+}
+
 function datosServidor(direccion) {
+  const fila = (k, v, copia, titulo) => `
+      <dt class="text-fg-subtle self-center">${k}</dt>
+      <dd class="flex items-center gap-1 min-w-0"><span class="font-mono text-fg break-all">${v}</span>${botonCopiar(copia, titulo)}</dd>`;
   return `
     <dl class="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-      <dt class="text-fg-subtle">Usuario</dt><dd class="font-mono text-fg break-all">${esc(direccion)}</dd>
-      <dt class="text-fg-subtle">Entrada (IMAP)</dt><dd class="font-mono text-fg">imap.mailmask.studio · 993 · SSL/TLS</dd>
-      <dt class="text-fg-subtle">Salida (SMTP)</dt><dd class="font-mono text-fg">imap.mailmask.studio · 465 · SSL/TLS</dd>
+      ${fila("Usuario", esc(direccion), direccion, "Copiar usuario")}
+      ${fila("Entrada (IMAP)", "imap.mailmask.studio · 993 · SSL/TLS", "imap.mailmask.studio", "Copiar servidor IMAP")}
+      ${fila("Salida (SMTP)", "imap.mailmask.studio · 465 · SSL/TLS", "imap.mailmask.studio", "Copiar servidor SMTP")}
     </dl>`;
 }
 
@@ -1292,7 +1303,7 @@ function credencialesNuevas(data, alias) {
     <p class="text-sm text-fg">Listo. <strong class="text-amber-400">Copia la contraseña ahora</strong>: no se guarda en ningún lado y no la volverás a ver.</p>
     <div class="mt-3 flex items-center gap-2">
       <code class="flex-1 font-mono text-sm bg-bg border border-line rounded px-3 py-2 break-all">${esc(data.password)}</code>
-      <button type="button" data-mailbox="copy" data-value="${esc(data.password)}" class="text-xs px-3 py-2 rounded bg-bg-inset text-fg hover:bg-line">Copiar</button>
+      ${botonCopiar(data.password, "Copiar contraseña")}
     </div>
     ${datosServidor(data.email)}
     <a href="/api/domains/${selectedDomain.id}/apple-profile?alias=${encodeURIComponent(alias)}" class="inline-block mt-4 text-xs px-3 py-2 rounded bg-bg-inset text-fg hover:bg-line">Perfil para Apple Mail</a>`;
@@ -2699,7 +2710,9 @@ function setupEventListeners() {
     if (b.dataset.mailbox === "copy") {
       navigator.clipboard.writeText(b.dataset.value);
       playSound("copy");
-      b.textContent = "¡Copiado!";
+      const antes = b.innerHTML;
+      b.innerHTML = '<svg class="h-4 w-4 text-mask-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+      setTimeout(() => { b.innerHTML = antes; }, 1500);
       return;
     }
     if (b.dataset.mailbox === "password") {

@@ -19,6 +19,7 @@ import {
   createUser,
   createDomain,
   getDomain,
+  getUserByApiKey,
   listUserDomains,
   updateDomain,
   deleteDomain,
@@ -829,7 +830,11 @@ async function requireBandeja(
 const app = new Elysia({ adapter: node() })
   .use(openapi({
     documentation: {
-      info: { title: "MailMask API", version: "1.0.0", description: "Email alias/forwarding service API" },
+      info: {
+        title: "MailMask API",
+        version: "1.0.0",
+        description: "API de MailMask: máscaras (alias) con reenvío, buzones IMAP, envío autenticado, reglas y webhooks sobre tu dominio. Autenticación: `Authorization: Bearer mk_…` con una API key creada en https://www.mailmask.studio/app (sección API Keys); 60 peticiones por minuto por llave. SDK: `@easybits.cloud/mailmask` en npm. Agentes de IA: servidor MCP en https://www.mailmask.studio/mcp con la misma llave. Guía: https://www.mailmask.studio/docs · resumen para modelos: https://www.mailmask.studio/llms.txt",
+      },
       components: {
         securitySchemes: {
           cookieAuth: { type: "apiKey", in: "cookie", name: "token" },
@@ -2018,7 +2023,12 @@ const app = new Elysia({ adapter: node() })
     if (!auth.startsWith("Bearer mk_")) {
       return new Response(JSON.stringify({ error: "Manda tu API key: Authorization: Bearer mk_…" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": "Bearer" } });
     }
-    const user = await getAuthUser(request);
+    // La llave se valida aquí sin gastar el tope por llave: cada herramienta vuelve a
+    // pasar por getAuthUser en la ruta interna, y contarla dos veces dejaba 30/min en
+    // vez de 60. Contra el escaneo de llaves queda el tope por IP.
+    const limited = await rateLimitGuard(getIp(request), 120, 60_000);
+    if (limited) return limited;
+    const user = await getUserByApiKey(auth.slice("Bearer ".length));
     if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: { "content-type": "application/json" } });
     const fetchLocal = ((url: string | URL | Request, init?: RequestInit) => app.fetch(new Request(url as string, init))) as unknown as typeof fetch;
     const res = await atenderMcp(request, { apiKey: auth.slice("Bearer ".length), fetchLocal });

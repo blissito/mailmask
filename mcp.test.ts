@@ -99,6 +99,13 @@ describe("MCP: agentes contra la app", () => {
     assert.match(r.json.result.content[0].text, /HTTP 404/);
   });
 
+  it("el tope por llave (60/min) se cuenta una vez por herramienta, no dos", async () => {
+    for (let i = 0; i < 50; i++) {
+      const r = await call("list_domains", {});
+      assert.ok(!r.json.result?.isError, `llamada ${i}: ${JSON.stringify(r.json)}`);
+    }
+  });
+
   it("search_tools encuentra por palabra", async () => {
     const r = await call("search_tools", { query: "webhook" });
     const nombres = r.json.result.structuredContent.result.map((t: { name: string }) => t.name);
