@@ -127,6 +127,27 @@
       "when": 1788890000000,
       "tag": "0017_utm_usuarios",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1788900000000,
+      "tag": "0018_dns_zona",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1788900100000,
+      "tag": "0019_dominios_renovacion",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1788900200000,
+      "tag": "0020_transferencias",
+      "breakpoints": true
     }
   ]
 }

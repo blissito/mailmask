@@ -5,7 +5,7 @@ import { log } from "./logger.js";
 import { db } from "./pg.js";
 import { tokens, emailLogs, forwardQueue, rateLimits, sendCounts, bulkJobs, users, addons } from "./schema.js";
 import { lte, and, eq, inArray, isNotNull, gt, sql as rawSql } from "drizzle-orm";
-import { purgeDeletedConversations, purgarConversacionesGratis, wakeSnoozedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, createDomain, listEffectiveAddons, updateAddon, recordOrder, addonLabel } from "./db.js";
+import { purgeDeletedConversations, purgarConversacionesGratis, wakeSnoozedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, listEffectiveAddons, updateAddon, recordOrder, addonLabel } from "./db.js";
 import { sendTemplate, expiryWarning } from "./emails.js";
 import { reconcilePendingAddons } from "./addon-sync.js";
 import { deliverPending, purgeOldDeliveries } from "./webhooks.js";
@@ -195,79 +195,93 @@ programar("0 3 * * *", async () => {
   }
 });
 
-// Every minute — poll Route 53 domain registrations in "registering" status
+// Cada minuto — sondea las operaciones de Route 53 en curso.
+//
+// El trabajo de verdad vive en `domain-provision.ts` porque tiene que ser idempotente:
+// esta secuencia solía correr entera sin persistir nada a medias, así que un fallo en el
+// paso 3 repetía el paso 1 al minuto siguiente y creaba otra hosted zone cada vez.
 programar("* * * * *", async () => {
   let regs;
   try {
     regs = getDomainRegistrationsByStatus("registering");
   } catch {
-    return; // table may not exist yet
+    return; // la tabla puede no existir todavía
   }
   if (!regs.length) return;
+
+  const { getOperationStatus } = await import("./route53.js");
+  const { finalizeDomainRegistration, marcarFalloDeAprovisionamiento } = await import("./domain-provision.js");
 
   for (const reg of regs) {
     if (!reg.route53OperationId) continue;
     try {
-      const { getOperationStatus, createHostedZone, updateNameservers, configureDnsRecords } = await import("./route53.js");
-      const { verifyDomain, createReceiptRule } = await import("./ses.js");
-
       const status = await getOperationStatus(reg.route53OperationId);
       log("info", "cron", "Domain registration poll", { domain: reg.domainName, status });
 
       if (status === "SUCCESSFUL") {
-        // 1. Create hosted zone
-        const { hostedZoneId, nameservers } = await createHostedZone(reg.domainName);
-
-        // 2. Update nameservers to point to our hosted zone
-        await updateNameservers(reg.domainName, nameservers);
-
-        // 3. Verify domain with SES (get tokens)
-        const dnsRecords = await verifyDomain(reg.domainName);
-
-        // 4. Configure DNS records (MX, TXT, DKIM, SPF)
-        await configureDnsRecords(hostedZoneId, reg.domainName, dnsRecords.verificationToken, dnsRecords.dkimTokens);
-
-        // 5. Create SES receipt rule
-        try {
-          await createReceiptRule(reg.domainName);
-        } catch (err: any) {
-          // May fail if SNS_TOPIC_ARN not set, non-fatal
-          log("warn", "cron", "Receipt rule creation failed (non-fatal)", { domain: reg.domainName, error: String(err) });
-        }
-
-        // 6. Insert into domains table
-        const domainRow = createDomain(reg.ownerEmail, reg.domainName, dnsRecords.dkimTokens, dnsRecords.verificationToken);
-
-        // 7. Mark domain as verified + registeredViaMailmask
-        // We need to update directly since createDomain doesn't set these
-        const { domains } = await import("./schema.js");
-        const { eq } = await import("drizzle-orm");
-        db.update(domains).set({
-          verified: true,
-          mxConfigured: true,
-          registeredViaMailmask: true,
-        }).where(eq(domains.id, domainRow.id)).run();
-
-        // 8. Update registration record
-        const expiresAt = new Date(Date.now() + 365 * 24 * 3600_000).toISOString();
-        updateDomainRegistration(reg.id, {
-          status: "registered",
-          domainId: domainRow.id,
-          hostedZoneId,
-          registeredAt: new Date().toISOString(),
-          expiresAt,
-        });
-
-        log("info", "cron", "Domain registration completed", { domain: reg.domainName, domainId: domainRow.id });
+        await finalizeDomainRegistration(reg);
       } else if (status === "FAILED" || status === "ERROR") {
         updateDomainRegistration(reg.id, { status: "failed", lastError: `Route 53 operation ${status}` });
         log("error", "cron", "Domain registration failed", { domain: reg.domainName, operationId: reg.route53OperationId });
       }
-      // IN_PROGRESS / SUBMITTED — just wait for next poll
+      // IN_PROGRESS / SUBMITTED — esperar al siguiente sondeo
     } catch (err: any) {
-      log("error", "cron", "Domain registration poll error", { domain: reg.domainName, error: String(err) });
-      updateDomainRegistration(reg.id, { lastError: String(err) });
+      await marcarFalloDeAprovisionamiento(reg, String(err));
     }
+  }
+});
+
+// Cada 10 minutos — transferencias en curso. Tardan de 5 a 7 días y dependen de que el
+// cliente conteste el correo de aprobación de su registrador, así que hay recordatorios.
+programar("*/10 * * * *", async () => {
+  try {
+    const { sondearTransferencias } = await import("./domain-provision.js");
+    await sondearTransferencias();
+  } catch (err) {
+    log("error", "cron", "Sondeo de transferencias falló", { error: String(err) });
+  }
+});
+
+// --- Dominios registrados: expiración, avisos y cobranza ---
+
+// 8:00 — la fecha de expiración y el AutoRenew los dice AWS, no nuestra base.
+programar("0 8 * * *", async () => {
+  try {
+    const { syncDomainExpirations } = await import("./domain-sync.js");
+    await syncDomainExpirations();
+  } catch (err) {
+    log("error", "cron", "Sync de expiración de dominios falló", { error: String(err) });
+  }
+});
+
+// 8:30 — avisos a 75, 30 y 7 días del vencimiento.
+programar("30 8 * * *", async () => {
+  try {
+    const { avisarRenovaciones } = await import("./domain-sync.js");
+    await avisarRenovaciones();
+  } catch (err) {
+    log("error", "cron", "Avisos de renovación fallaron", { error: String(err) });
+  }
+});
+
+// 8:45 — cobranza de los que no se pudieron cobrar. A los 21 días decide una persona:
+// dejar vencer el dominio de un cliente es irreversible y no se automatiza.
+programar("45 8 * * *", async () => {
+  try {
+    const { cobranzaDominios } = await import("./domain-sync.js");
+    await cobranzaDominios();
+  } catch (err) {
+    log("error", "cron", "Cobranza de dominios falló", { error: String(err) });
+  }
+});
+
+// 5:10 — MercadoPago a veces pierde el notification_url y el webhook nunca llega.
+programar("10 5 * * *", async () => {
+  try {
+    const { reconcileDomainRenewals } = await import("./domain-sync.js");
+    await reconcileDomainRenewals();
+  } catch (err) {
+    log("error", "cron", "Reconciliación de renovaciones falló", { error: String(err) });
   }
 });
 

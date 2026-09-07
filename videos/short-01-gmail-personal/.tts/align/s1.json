@@ -1,0 +1,52 @@
+[
+ {
+  "text": "Con",
+  "start": 0.05,
+  "end": 0.21
+ },
+ {
+  "text": "MailMask",
+  "start": 0.21,
+  "end": 0.42
+ },
+ {
+  "text": "escribes",
+  "start": 0.7,
+  "end": 1.26
+ },
+ {
+  "text": "desde",
+  "start": 1.26,
+  "end": 1.61
+ },
+ {
+  "text": "tu",
+  "start": 1.61,
+  "end": 1.74
+ },
+ {
+  "text": "propio",
+  "start": 1.75,
+  "end": 2.17
+ },
+ {
+  "text": "dominio",
+  "start": 2.17,
+  "end": 2.68
+ },
+ {
+  "text": "y",
+  "start": 2.68,
+  "end": 2.69
+ },
+ {
+  "text": "se",
+  "start": 2.69,
+  "end": 2.92
+ },
+ {
+  "text": "nota.",
+  "start": 2.92,
+  "end": 3.44
+ }
+]

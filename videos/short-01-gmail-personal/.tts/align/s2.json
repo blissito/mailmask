@@ -1,0 +1,42 @@
+[
+  {
+    "text": "Tu",
+    "start": 0.06,
+    "end": 0.13
+  },
+  {
+    "text": "dominio",
+    "start": 0.13,
+    "end": 0.56
+  },
+  {
+    "text": "recibe",
+    "start": 0.59,
+    "end": 0.97
+  },
+  {
+    "text": "correo",
+    "start": 1.07,
+    "end": 1.33
+  },
+  {
+    "text": "desde",
+    "start": 1.37,
+    "end": 1.7
+  },
+  {
+    "text": "hoy",
+    "start": 1.7,
+    "end": 1.87
+  },
+  {
+    "text": "sin",
+    "start": 2.01,
+    "end": 2.1
+  },
+  {
+    "text": "tarjeta.",
+    "start": 2.1,
+    "end": 2.78
+  }
+]

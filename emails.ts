@@ -382,6 +382,255 @@ export function chargeFailed(d: {
   };
 }
 
+
+// --- Dominios ---
+//
+// Hasta el 7-sep-2026 el flujo de registro de dominios no mandaba ni un solo correo: el
+// cliente pagaba y no volvía a saber nada.
+
+export function domainRegistered(d: {
+  domain: string;
+  expiresAt?: string | null;
+  order?: OrderLike | null;
+}): Email {
+  const rows: [string, string][] = [
+    ["Dominio", d.domain],
+    ...(d.expiresAt ? [["Vence el", shortDate(d.expiresAt)] as [string, string]] : []),
+    ...(d.order ? [["Folio", d.order.number] as [string, string]] : []),
+  ];
+  return {
+    subject: cleanSubject(`${d.domain} ya es tuyo y ya recibe correo`),
+    html: layout({
+      preheader: `Registramos ${d.domain} y le configuramos el DNS.`,
+      heading: `${d.domain} está listo`,
+      body: p(`Registramos tu dominio y le dejamos el DNS configurado: ya puede recibir correo en cuanto crees tu primera máscara.`)
+        + detailTable(rows)
+        + p("El DNS lo llevamos nosotros, así que puedes apuntar tu sitio web desde el panel sin salir de aquí."),
+      cta: { label: "Crear mi primera máscara", url: `${baseUrl()}/app` },
+      footerNote: "Guarda este correo: aquí está la fecha de vencimiento de tu dominio.",
+    }),
+    text: textBlock([
+      `Registramos ${d.domain} y le dejamos el DNS configurado.`,
+      textRows(rows),
+      `Entra a tu panel: ${baseUrl()}/app`,
+    ], true),
+  };
+}
+
+export function domainRenewalUpcoming(d: {
+  domain: string;
+  expiresAt: string;
+  priceCents: number;
+  currency?: string;
+  hasSubscription: boolean;
+}): Email {
+  const fecha = shortDate(d.expiresAt);
+  const precio = money(d.priceCents, d.currency ?? "MXN");
+
+  // Quien ya tiene la renovación activa no necesita un susto: necesita un aviso.
+  if (d.hasSubscription) {
+    return {
+      subject: cleanSubject(`${d.domain} se renueva el ${fecha}`),
+      html: layout({
+        preheader: `Renovación automática el ${fecha}. No tienes que hacer nada.`,
+        heading: `${d.domain} se renueva solo`,
+        body: p(`El ${fecha} renovamos ${d.domain} por un año más y MercadoPago te cobrará ${precio} con el método que tienes guardado.`)
+          + p("Si tu pago está al día no tienes que hacer nada."),
+        cta: { label: "Ver mi cuenta", url: `${baseUrl()}/app` },
+        billing: true,
+      }),
+      text: textBlock([
+        `El ${fecha} renovamos ${d.domain} y se te cobrarán ${precio}.`,
+        "Si tu pago está al día no tienes que hacer nada.",
+        `Ver tu cuenta: ${baseUrl()}/app`,
+      ], true),
+    };
+  }
+
+  return {
+    subject: cleanSubject(`${d.domain} vence el ${fecha}`),
+    html: layout({
+      preheader: `Activa la renovación de ${d.domain} antes del ${fecha}.`,
+      heading: `Tu dominio vence el ${fecha}`,
+      body: p(`${d.domain} vence el ${fecha} y todavía no tiene renovación automática activada.`)
+        + detailTable([["Dominio", d.domain], ["Vence el", fecha], ["Renovación anual", precio]])
+        + calloutBox("Un dominio vencido se pierde: deja de recibir correo, tu sitio deja de abrir y recuperarlo después cuesta mucho más que renovarlo. Actívala desde el panel en un minuto.", "warn"),
+      cta: { label: "Activar la renovación", url: `${baseUrl()}/app` },
+      billing: true,
+    }),
+    text: textBlock([
+      `${d.domain} vence el ${fecha} y no tiene renovación automática.`,
+      `Renovación anual: ${precio}.`,
+      "Un dominio vencido deja de recibir correo y recuperarlo cuesta mucho más.",
+      `Actívala aquí: ${baseUrl()}/app`,
+    ], true),
+  };
+}
+
+export function domainChargeFailed(d: {
+  domain: string;
+  attemptedCents: number;
+  currency?: string;
+  expiresAt?: string | null;
+}): Email {
+  const amount = money(d.attemptedCents, d.currency ?? "MXN");
+  // A propósito NO usa `chargeFailed`: ese dice que las máscaras dejan de reenviar, y en un
+  // dominio eso es falso. El dominio ya está renovado; lo que falta es el pago.
+  return {
+    subject: cleanSubject(`No pudimos cobrar la renovación de ${d.domain}`),
+    html: layout({
+      preheader: `El cargo de ${amount} fue rechazado. Tu dominio no está en riesgo inmediato.`,
+      heading: "No pudimos procesar tu pago",
+      body: p(`MercadoPago rechazó el cargo de ${amount} por la renovación anual de ${d.domain}.`)
+        + detailTable([
+          ["Dominio", d.domain],
+          ["Monto intentado", amount],
+          ...(d.expiresAt ? [["Vence el", shortDate(d.expiresAt)] as [string, string]] : []),
+        ])
+        + calloutBox("Tu dominio sigue funcionando y no está en riesgo inmediato: ya lo renovamos. Sólo falta que el cobro se complete.", "warn")
+        + p("MercadoPago reintenta solo durante los próximos días. Revisa que tu tarjeta tenga fondos y no esté vencida."),
+      cta: { label: "Actualizar mi pago", url: `${baseUrl()}/app` },
+      billing: true,
+    }),
+    text: textBlock([
+      `MercadoPago rechazó el cargo de ${amount} por la renovación de ${d.domain}.`,
+      "Tu dominio sigue funcionando y no está en riesgo inmediato: ya lo renovamos.",
+      "Revisa que tu tarjeta tenga fondos y no esté vencida.",
+      `Actualiza tu pago: ${baseUrl()}/app`,
+    ], true),
+  };
+}
+
+export function domainTransferStarted(d: { domain: string; order?: OrderLike | null }): Email {
+  return {
+    subject: cleanSubject(`Empezamos la transferencia de ${d.domain}`),
+    html: layout({
+      preheader: `Recibimos tu pago y pedimos la transferencia de ${d.domain}.`,
+      heading: "La transferencia va en camino",
+      body: p(`Pedimos a tu registrador actual que nos transfiera ${d.domain}. Tarda entre 5 y 7 días, y hay un paso que sólo puedes dar tú.`)
+        + calloutBox("Tu registrador actual te va a mandar un correo de aprobación. Si no lo contestas, la transferencia se cancela sola en unos días. Revisa también la carpeta de spam.", "warn")
+        + p("Mientras tanto tu dominio sigue funcionando exactamente igual: no tocamos su DNS."),
+      cta: { label: "Ver el estado", url: `${baseUrl()}/app` },
+    }),
+    text: textBlock([
+      `Pedimos la transferencia de ${d.domain}. Tarda de 5 a 7 días.`,
+      "Tu registrador actual te mandará un correo de aprobación: si no lo contestas, la transferencia se cancela.",
+      "Mientras tanto tu dominio sigue funcionando igual.",
+      `Ver el estado: ${baseUrl()}/app`,
+    ], true),
+  };
+}
+
+export function domainTransferPending(d: { domain: string; daysWaiting: number }): Email {
+  const urgente = d.daysWaiting >= 5;
+  return {
+    subject: cleanSubject(urgente
+      ? `Últimos días para aprobar la transferencia de ${d.domain}`
+      : `Falta que apruebes la transferencia de ${d.domain}`),
+    html: layout({
+      preheader: `Llevamos ${d.daysWaiting} días esperando la aprobación de tu registrador.`,
+      heading: "Falta tu aprobación",
+      body: p(`Llevamos ${d.daysWaiting} día(s) esperando a que apruebes la transferencia de ${d.domain}.`)
+        + calloutBox(
+          urgente
+            ? "Si no la apruebas en los próximos días, tu registrador cancelará la solicitud y habrá que empezar de nuevo."
+            : "El correo de aprobación lo manda tu registrador actual a la dirección del contacto administrativo. Si tienes la privacidad WHOIS encendida, es probable que no te haya llegado: apágala y pídenos que lo reenviemos.",
+          urgente ? "danger" : "warn",
+        ),
+      cta: { label: "Reenviar el correo de aprobación", url: `${baseUrl()}/app` },
+    }),
+    text: textBlock([
+      `Llevamos ${d.daysWaiting} día(s) esperando que apruebes la transferencia de ${d.domain}.`,
+      "El correo lo manda tu registrador actual al contacto administrativo del dominio.",
+      `Reenvíalo desde tu panel: ${baseUrl()}/app`,
+    ], true),
+  };
+}
+
+export function domainTransferDnsReview(d: { domain: string; recordCount: number; reviewUrl: string }): Email {
+  // El correo más delicado del flujo: si el cliente no revisa esta lista, al mover el
+  // dominio se le cae lo que no esté en ella.
+  return {
+    subject: cleanSubject(`Revisa el DNS de ${d.domain} antes de que se mueva`),
+    html: layout({
+      preheader: `Encontramos ${d.recordCount} registro(s). Lo que falte dejará de funcionar.`,
+      heading: "Revisa esto antes de seguir",
+      body: p(`Copiamos ${d.recordCount} registro(s) del DNS actual de ${d.domain} para que nada se caiga cuando el dominio se mueva.`)
+        + calloutBox("No podemos garantizar que estén todos: el DNS no se puede listar desde fuera, sólo consultar nombre por nombre. Compara la lista con la de tu proveedor actual — lo que no esté ahí dejará de funcionar en cuanto el dominio se mueva.", "danger")
+        + p("Puedes añadir lo que falte y corregir lo que esté mal. Nada se mueve hasta que lo apruebes."),
+      cta: { label: "Revisar mi DNS", url: d.reviewUrl },
+    }),
+    text: textBlock([
+      `Copiamos ${d.recordCount} registro(s) del DNS de ${d.domain}.`,
+      "No podemos garantizar que estén todos: compáralos con los de tu proveedor actual. Lo que falte dejará de funcionar.",
+      `Revísalos aquí: ${d.reviewUrl}`,
+    ], true),
+  };
+}
+
+export function domainTransferCompleted(d: { domain: string; expiresAt?: string | null }): Email {
+  return {
+    subject: cleanSubject(`${d.domain} ya está en MailMask`),
+    html: layout({
+      preheader: `La transferencia terminó y el DNS quedó configurado.`,
+      heading: "La transferencia terminó",
+      body: p(`${d.domain} ya está en tu cuenta de MailMask, con el año extra que incluye la transferencia.`)
+        + detailTable([
+          ["Dominio", d.domain],
+          ...(d.expiresAt ? [["Vence el", shortDate(d.expiresAt)] as [string, string]] : []),
+        ])
+        + p("Copiamos los registros que aprobaste, así que tu sitio y tus servicios siguen igual. Ahora puedes editarlos desde el panel."),
+      cta: { label: "Ver mi DNS", url: `${baseUrl()}/app` },
+    }),
+    text: textBlock([
+      `${d.domain} ya está en MailMask, con el año extra de la transferencia.`,
+      "Copiamos los registros que aprobaste: tu sitio sigue igual.",
+      `Ver tu DNS: ${baseUrl()}/app`,
+    ], true),
+  };
+}
+
+export function domainTransferFailed(d: { domain: string; reason?: string | null }): Email {
+  return {
+    subject: cleanSubject(`No se pudo transferir ${d.domain}`),
+    html: layout({
+      preheader: `La transferencia de ${d.domain} no se completó.`,
+      heading: "La transferencia no se completó",
+      body: p(`Tu registrador actual no completó la transferencia de ${d.domain}.`)
+        + (d.reason ? detailTable([["Motivo", d.reason]]) : "")
+        + p("Las causas más comunes: no se aprobó el correo a tiempo, el candado de transferencia seguía puesto, o el código de autorización ya no era válido.")
+        + calloutBox("Tu dominio no se movió y sigue funcionando en tu registrador actual. Escríbenos y lo revisamos contigo antes de volver a intentarlo; si ya nos pagaste, te lo devolvemos.", "warn"),
+      cta: { label: "Escríbenos", url: `mailto:${SUPPORT_EMAIL}` },
+    }),
+    text: textBlock([
+      `No se completó la transferencia de ${d.domain}.`,
+      d.reason ? `Motivo: ${d.reason}` : "",
+      "Tu dominio no se movió y sigue en tu registrador actual.",
+      `Escríbenos a ${SUPPORT_EMAIL} y lo revisamos.`,
+    ].filter(Boolean), true),
+  };
+}
+
+export function domainTransferOut(d: { domain: string; confirmUrl: string }): Email {
+  return {
+    subject: cleanSubject(`Confirma que quieres llevarte ${d.domain}`),
+    html: layout({
+      preheader: `Un clic y te damos el código para mover ${d.domain}.`,
+      heading: "¿Te llevas tu dominio?",
+      body: p(`Pediste el código de autorización (EPP) para mover ${d.domain} a otro registrador.`)
+        + calloutBox("Ese código entrega el dominio a quien lo tenga, por eso te lo mandamos por aquí y no en la pantalla. Si no fuiste tú, ignora este correo y avísanos.", "warn")
+        + p("Al confirmar quitamos el candado de transferencia. Tu dominio sigue funcionando en MailMask hasta que la transferencia se complete en el otro registrador."),
+      cta: { label: "Confirmar y ver mi código", url: d.confirmUrl },
+      footerNote: "El enlace vence en 30 minutos y sirve una sola vez.",
+    }),
+    text: textBlock([
+      `Pediste el código de autorización para mover ${d.domain}.`,
+      "Ese código entrega el dominio a quien lo tenga. Si no fuiste tú, ignora este correo.",
+      `Confirma aquí (vence en 30 minutos): ${d.confirmUrl}`,
+    ], true),
+  };
+}
+
 export function guestWelcome(d: {
   plan: string;
   setPasswordUrl: string;
@@ -811,6 +1060,29 @@ export const TEMPLATE_FIXTURES: Record<string, () => Email> = {
       mpPaymentId: "987654321", occurredAt: "2026-09-12T00:00:00.000Z",
     },
     nextChargeAt: "2026-10-12T00:00:00.000Z",
+  }),
+  domainRegistered: () => domainRegistered({
+    domain: "brendago.design", expiresAt: "2027-09-07T00:00:00.000Z",
+    order: { number: "MM-2609-0042", amountCents: 59900, currency: "MXN", occurredAt: "2026-09-07T00:00:00.000Z" },
+  }),
+  domainRenewalUpcomingConSub: () => domainRenewalUpcoming({
+    domain: "brendago.design", expiresAt: "2027-09-07T00:00:00.000Z", priceCents: 59900, hasSubscription: true,
+  }),
+  domainRenewalUpcomingSinSub: () => domainRenewalUpcoming({
+    domain: "brendago.design", expiresAt: "2027-09-07T00:00:00.000Z", priceCents: 59900, hasSubscription: false,
+  }),
+  domainChargeFailed: () => domainChargeFailed({
+    domain: "brendago.design", attemptedCents: 59900, expiresAt: "2027-09-07T00:00:00.000Z",
+  }),
+  domainTransferStarted: () => domainTransferStarted({ domain: "brendago.design" }),
+  domainTransferPending: () => domainTransferPending({ domain: "brendago.design", daysWaiting: 5 }),
+  domainTransferDnsReview: () => domainTransferDnsReview({
+    domain: "brendago.design", recordCount: 12, reviewUrl: "https://www.mailmask.studio/app",
+  }),
+  domainTransferCompleted: () => domainTransferCompleted({ domain: "brendago.design", expiresAt: "2028-09-07T00:00:00.000Z" }),
+  domainTransferFailed: () => domainTransferFailed({ domain: "brendago.design", reason: "El código de autorización no era válido" }),
+  domainTransferOut: () => domainTransferOut({
+    domain: "brendago.design", confirmUrl: "https://www.mailmask.studio/app?transfer-out=abc",
   }),
   chargeFailed: () => chargeFailed({
     concept: "Plan Básico (mensual)", attemptedCents: 4900,

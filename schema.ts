@@ -36,6 +36,13 @@ export const domains = sqliteTable("domains", {
   dkimTokens: text("dkim_tokens", { mode: "json" }).$type<string[]>().notNull().default([]),
   verificationToken: text("verification_token").notNull(),
   registeredViaMailmask: integer("registered_via_mailmask", { mode: "boolean" }).notNull().default(false),
+  // Zona DNS en Route 53. Vive aquí y no en `domain_registrations` porque un dominio de
+  // fuera puede delegar sus nameservers sin haberse comprado con nosotros.
+  hostedZoneId: text("hosted_zone_id"),
+  dnsZoneStatus: text("dns_zone_status").$type<"none" | "pending_delegation" | "active">().notNull().default("none"),
+  dnsNameservers: text("dns_nameservers", { mode: "json" }).$type<string[]>(),
+  dnsDelegatedAt: text("dns_delegated_at"),
+  dnsCheckedAt: text("dns_checked_at"),
   /** Firma en markdown que se añade al final de lo que se envía desde este dominio. */
   signature: text("signature"),
   // Llave del logo dentro de DOMAIN_ASSET_PREFIX. Se referencia por URL en la
@@ -283,9 +290,34 @@ export const domainRegistrations = sqliteTable("domain_registrations", {
   mpPaymentId: text("mp_payment_id"),
   lastError: text("last_error"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
+
+  // --- Renovación anual (0019) ---
+  kind: text("kind").$type<"register" | "transfer">().notNull().default("register"),
+  mpPreapprovalId: text("mp_preapproval_id"),
+  renewalStatus: text("renewal_status").$type<"none" | "active" | "past_due" | "cancelled">().notNull().default("none"),
+  renewalPriceCents: integer("renewal_price_cents"),
+  nextChargeAt: text("next_charge_at"),
+  lastSyncedAt: text("last_synced_at"),
+  // Espejo de lo que AWS reporta; `false` es el estado que pierde dominios.
+  awsAutoRenew: integer("aws_auto_renew", { mode: "boolean" }).notNull().default(true),
+  warnedAt: text("warned_at"),
+  dunningStartedAt: text("dunning_started_at"),
+
+  // --- Transferencias (0020) ---
+  // Sólo los últimos 4 caracteres: entregar un auth code es entregar el dominio.
+  transferAuthCodeHint: text("transfer_auth_code_hint"),
+  transferRequestedAt: text("transfer_requested_at"),
+  transferApprovedAt: text("transfer_approved_at"),
+  previousRegistrar: text("previous_registrar"),
+  dnsSnapshot: text("dns_snapshot", { mode: "json" }).$type<{ name: string; type: string; ttl: number; values: string[] }[]>(),
+  dnsSnapshotAt: text("dns_snapshot_at"),
+  dnsImportStatus: text("dns_import_status").$type<"none" | "discovered" | "approved">().notNull().default("none"),
 }, (table) => [
   index("idx_domain_reg_owner").on(table.ownerEmail),
   index("idx_domain_reg_status").on(table.status),
+  index("idx_domain_reg_expires").on(table.expiresAt),
+  index("idx_domain_reg_preapproval").on(table.mpPreapprovalId),
+  index("idx_domain_reg_kind").on(table.kind),
 ]);
 
 // Add-ons comprables encima del plan base. Cada fila es una unidad: el add-on de

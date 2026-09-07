@@ -52,6 +52,158 @@ información útil para el agente). No se exponen las API keys (un agente con un
 fabrica más), ni Bandeja ni billing. Pruebas en `mcp.test.ts`. Docs en `docs.html#mcp` y
 `EXTRA_DOCS` de `upload-docs.ts`. GET/DELETE dan 405: sin sesiones no hay stream ni cierre.
 
+## Dominios: registro, renovación, transferencias y DNS (7-sep-2026)
+
+El registro de un dominio nuevo llevaba meses construido y **nunca se había ejercitado**.
+Al revisarlo salieron tres bugs de producción y dos huecos de producto.
+
+**El caro:** `registerDomain` manda `AutoRenew: true` a AWS y el pago del cliente era una
+Preference **de una sola vez**. O sea, AWS renovaba el dominio cada año y **nos lo cobraba a
+nosotros**, en silencio, para siempre. Ahora hay una suscripción anual de MercadoPago
+(`domain-renew:<id>`, patrón de los add-ons) y un digest diario de dominios que vencen en
+menos de 90 días sin renovación cobrada.
+
+**`AutoRenew` se queda encendido y ningún cron lo apaga.** La asimetría manda: con AutoRenew
+el peor caso es pagar ~$13 USD de un cliente moroso; sin él, cualquier bug el día del
+vencimiento pierde el dominio, y rescatarlo en redención cuesta ~$90 USD más el correo
+caído. Por eso el impago **no** corta: cobra, insiste a los 3/7/14 días y a los 21 le pasa la
+decisión a una persona. El único lugar donde se apaga es un transfer-out confirmado.
+
+**Los otros dos bugs, ya arreglados:** `configureDnsRecords` hacía un UPSERT ciego —el UPSERT
+reemplaza el RRSet completo, así que el TXT del apex se llevaba por delante la verificación
+de Google del cliente y el MX su correo en producción—; y `createHostedZone` llevaba
+`Date.now()` en el `CallerReference`, así que cada reintento del cron creaba **otra** hosted
+zone para el mismo dominio (se pagan las dos y responde la equivocada). Hoy `ensureHostedZone`
+adopta la existente y `configureDnsRecords` fusiona el SPF en vez de pisarlo.
+`expiresAt` sale de `getDomainDetail`, no de `Date.now() + 365 días`.
+`GET /api/domains/registrations` ya no filtra `awsCostCents` al cliente.
+
+### Editor de DNS (`dns-records.ts`, `dns-import.ts`, `/api/domains/:id/dns`)
+
+**El modelo es el RRSet, no el registro suelto.** `ChangeResourceRecordSets` es atómico por
+`(nombre, tipo)` y no sabe borrar un valor: exponer valores sueltos obligaría a
+leer-modificar-escribir con una carrera invisible entre dos pestañas o dos llamadas de un
+agente. Con RRSets la operación natural es un UPSERT idempotente, que además es lo que un LLM
+usa sin romper nada.
+
+**El guardián no lleva escotilla de forzado.** Si existiera un `?force=true`, un agente lo
+pondría a la primera negativa. El MX, el TXT `_amazonses` y los CNAME de DKIM están
+bloqueados; el TXT del apex es **parcial** —editable mientras conserve
+`include:amazonses.com`— porque ahí conviven nuestro SPF y las verificaciones de Google,
+Stripe y demás. El 409 devuelve `suggestedValues` con la fusión ya hecha para que el agente
+reintente sin razonar. La salida legítima (mover el correo a otro proveedor) es borrar el
+dominio de MailMask.
+
+**Cobertura ampliada:** un dominio de fuera puede delegar sus nameservers a una hosted zone
+nuestra sin transferir el registro, y así tener el editor. `POST /dns/zone` **importa antes
+de enseñar los nameservers**, y si la importación o la fusión fallan borra la zona: media
+zona es peor que ninguna. La importación sondea con `node:dns/promises` contra los NS
+autoritativos actuales y una lista heurística de nombres —sin AXFR **no se puede enumerar la
+zona de otro**, sólo preguntar nombre por nombre—, así que el aviso de que puede faltar algo
+no es cortesía, es la verdad.
+
+La pestaña DNS **ya no se oculta** para los dominios comprados aquí: era justo el cliente que
+nos compró el dominio el único que no podía tocar nada. La lista de "copia esto en tu
+proveedor" sigue ahí como segunda rama: hay quien no va a delegar nunca.
+
+MCP: 7 herramientas, con `point_domain_to` de alto nivel. Un LLM sabe que Vercel quiere un
+CNAME, pero se inventa el destino y confunde apex con www; esa herramienta convierte tres
+llamadas frágiles en una determinista.
+
+### Transferencias (`domain-transfer.ts`)
+
+**Transfer-in.** Los requisitos se comprueban **antes de cobrar** (`CheckDomainTransferability`
+más RDAP para la edad de 60 días y el candado; la privacidad WHOIS y el acceso al correo los
+confirma el cliente porque no se pueden ver desde fuera). El auth code EPP **nunca toca disco
+ni logs**: vive en un `Map` con TTL de una hora y en la fila sólo quedan sus últimos 4
+caracteres.
+
+Dos cosas no obvias, y las dos existen para no tumbarle la web al cliente:
+
+1. **A `TransferDomain` se le pasan los nameservers actuales del cliente.** Si no se mandan,
+   AWS pone los suyos al completarse y el dominio se queda sin DNS de golpe. Pasándolos, el
+   transfer no cambia nada y la migración a nuestra zona la hacemos después, ya con la zona
+   poblada. Convierte el momento más peligroso en un no-evento.
+2. **`finalizeDomainRegistration` se detiene** si `kind === "transfer"` y el inventario de DNS
+   no está en `approved`. El orden después es normativo: crear zona → escribir **todo** el
+   inventario aprobado → `configureDnsRecords` con fusión → **y sólo entonces**
+   `updateNameservers`.
+
+El transfer-in de AWS incluye +1 año, así que se cobra el precio de renovación. El sondeo va
+cada 10 minutos; recordatorios a los 2, 5 y 8 días y cancelación a los 10 (AWS caduca la
+solicitud sola a los ~5 en muchos TLDs). Un fallo alerta con "hay que reembolsarle": el
+reembolso es manual.
+
+**Qué TLD se aceptan.** El alta de un dominio nuevo se limita a `TLD_PRICES`, una parrilla
+curada de 12 con precios pensados a mano. **La transferencia no**: ahí el dominio ya es del
+cliente, así que la pregunta no es "¿cuáles vendemos?" sino "¿cuáles puede mover AWS?" — y
+son **413**. Usar la tabla de 12 como filtro rechazaba a clientes que ya tenemos:
+`brendago.design` y `fancyfiles.app` son reales y los dos habrían sido un 400.
+`precioDeTransferencia()` en `tld-pricing.ts` devuelve el precio curado si existe y, si no,
+consulta `ListPrices` en vivo (caché de 24 h) y le aplica margen. El tipo de cambio es
+`USD_MXN` en el entorno y no un número clavado en el código: eso envejece en silencio y
+acaba vendiendo bajo costo. Un `TransferPrice` de cero o en otra moneda se **rechaza**, no
+se toma por una ganga. Ojo con el rango: `.design` cuesta $64 USD y hay TLDs de hasta $480,
+así que el margen es porcentual y no una cantidad fija.
+
+**Transfer-out** no es opcional: sin él, ofrecer migración entrante es asimétrico. El auth
+code va **por correo y no en la respuesta** —entregarlo es entregar el dominio— con un enlace
+de 30 minutos y un solo uso. `AutoRenew` se apaga sólo cuando la salida se confirma de
+verdad, nunca antes: si la transferencia se cae, el dominio se pierde.
+
+**Contacto WHOIS:** ya no es sólo el de MailMask. `whoisContact()` acepta los datos del
+cliente (no hace falta cuenta de AWS suya, son sólo datos) y en transfer-in deberían ser los
+suyos: el dominio ya era de él.
+
+### Antes de venderlo
+
+1. ~~IAM~~ **ya está**: el usuario `pulso_easybits` (476114113638) trae
+   `AmazonRoute53DomainsFullAccess` y `AmazonRoute53FullAccess`, así que cubre todo lo nuevo
+   —`GetDomainDetail`, `TransferDomain`, `RetrieveDomainAuthCode`,
+   `ListResourceRecordSets`, `ChangeResourceRecordSets`…—. Verificado el 7-sep-2026 con
+   `get-domain-detail` y `list-hosted-zones` reales. Ojo: `route53domains` **sólo responde
+   en us-east-1**.
+2. **Nada que tocar en el panel de MP.** Los pagos únicos de dominio (registro y
+   transferencia) entran por `/api/webhooks/mercadopago`, el mismo de siempre, en una rama
+   `type === "payment"` que delega en `procesarPagoDominio`. Hubo un momento en que vivían
+   en `/api/webhooks/mercadopago-domain`, y era una bomba: **el panel acepta una sola URL
+   por aplicación**, así que esa ruta sólo funcionaba mientras MP respetara el
+   `notification_url` que mandamos en cada Preference — y MP a veces lo pierde, que es justo
+   la razón de que exista el cron de reconciliación. Un pago de dominio perdido es cobrarle
+   al cliente y no registrarle nada.
+3. ~~Hosted zones duplicadas~~ **no hay**: la cuenta tiene tres zonas y una sola por
+   dominio (`mailmask.studio`, `easybits.cloud`, `ghosty.studio`). El bug del `Date.now()`
+   nunca llegó a morder porque no se registró ningún dominio por este camino.
+4. ~~Contrastar `TLD_PRICES`~~ **hecho el 7-sep-2026** contra `route53domains list-prices`.
+   Los costos que había eran estimaciones y varias se quedaban cortas por mucho (`.io` vale
+   $71 USD y decía $39; `.mx` $67 y decía $35; `.info` $30 y decía $12 — **ese se vendía a
+   $549 MXN costando ~$630, o sea con pérdida**). Y transferir no siempre vale lo mismo que
+   renovar: en `.click` y `.link` la transferencia cuesta $10 USD contra $3 y $5, así que
+   cobrar el precio de renovación por un transfer-in perdía dinero en cada uno; por eso hay
+   `transferUsdCents`/`transferMxnCents` aparte.
+
+   **El precio al público es costo × 1.2**, y eso es una decisión, no un descuido: un dominio
+   es una commodity con precio público —`.com.mx` está en $729 contra los $708 de
+   Squarespace— y el cliente lo comprueba en diez segundos. El margen del negocio son los
+   $99/mes de activación; el dominio es la conveniencia de que quede configurado solo. Un
+   margen de producto normal (1.8×) ponía `.com.mx` en $1099 y volvía la primera compra del
+   embudo el punto donde el cliente descubre que somos caros. `.click` y `.link` se salen del
+   1.2 por el piso de $60: a ese margen dejarían menos que la comisión de MercadoPago.
+
+   ⚠️ **El monto de un PreApproval de MercadoPago no se puede cambiar después**: el precio de
+   renovación se fija al contratar y tiene que aguantar años de tipo de cambio. Por eso el
+   margen no baja de 1.2 aunque se pueda. **Los precios de AWS cambian: revísalos con ese
+   comando antes de cada campaña.** El front tenía su propia copia de la tabla y se quedó
+   desfasada; ahora la pide a `GET /api/domains/tlds`.
+5. Una compra real de un `.click` ($139) de punta a punta, y un transfer-in de un dominio
+   propio.
+6. Términos: qué pasa si deja de pagar la renovación, y reembolsos de un transfer-in fallido
+   por culpa del registrador de origen.
+
+Fuera de la v1 a propósito: registros ALIAS (sólo apuntan a recursos de AWS, no sirven para
+Vercel ni Netlify, que es el 90% de los casos), routing ponderado/latency/failover, DNSSEC,
+parser de archivos de zona BIND, historial de cambios DNS y caché de RRSets en SQLite.
+
 ## AWS S3 Buckets
 These buckets must exist before the app works correctly. Create them manually if they don't exist:
 ```bash

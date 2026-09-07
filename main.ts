@@ -161,6 +161,9 @@ import {
   getDomainRegistrationsByUser,
   updateDomainRegistration,
   getDomainRegistrationByPaymentId,
+  getDomainRegistrationByPreapprovalId,
+  getDomainRegistrationByDomainName,
+  publicDomainRegistration,
   listCannedResponses,
   createCannedResponse,
   deleteCannedResponse,
@@ -224,6 +227,10 @@ import {
   addonPurchase,
   renewalReceipt,
   chargeFailed,
+  domainRegistered,
+  domainRenewalUpcoming,
+  domainChargeFailed,
+  domainTransferOut,
   guestWelcome,
   migrationDone,
   SUPPORT_EMAIL,
@@ -763,6 +770,225 @@ async function cancelMpPreapproval(preapprovalId: string, accessToken: string): 
     signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) throw new Error(`MP cancel ${preapprovalId}: ${await res.text()}`);
+}
+
+/**
+ * Pagos únicos de dominio (registro y transferencia) que llegan por el webhook de
+ * MercadoPago.
+ *
+ * Vivían en una ruta aparte, `/api/webhooks/mercadopago-domain`, y eso era una bomba: el
+ * panel de MercadoPago acepta **una sola URL por aplicación**, así que la segunda sólo
+ * funcionaba mientras MP respetara el `notification_url` que mandamos en cada Preference —
+ * y MP a veces lo pierde, que es justo la razón de que exista el cron de reconciliación.
+ * Un pago de dominio perdido significa cobrarle al cliente y no registrarle nada.
+ */
+// deno-lint-ignore no-explicit-any
+async function procesarPagoDominio(body: any, mpAccessToken: string): Promise<void> {
+  try {
+    // Fetch payment details from MP
+    const payRes = await fetch(`https://api.mercadopago.com/v1/payments/${body.data.id}`, {
+      headers: { Authorization: `Bearer ${mpAccessToken}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    const payment = await payRes.json();
+
+    log("info", "webhook", "MP domain payment fetched", { status: payment.status, external_reference: payment.external_reference });
+
+    if (payment.status === "approved" && payment.external_reference?.startsWith("domain-transfer:")) {
+      const regId = payment.external_reference.replace("domain-transfer:", "");
+      const reg = getDomainRegistration(regId);
+      if (!reg) {
+        log("warn", "webhook", "Transferencia no encontrada", { regId });
+        return;
+      }
+      if (reg.status !== "transfer_pending_payment") {
+        log("info", "webhook", "Transferencia ya procesada", { regId, status: reg.status });
+        return;
+      }
+
+      updateDomainRegistration(regId, { status: "transfer_paid", mpPaymentId: String(body.data.id) });
+      recordOrder({
+        userEmail: reg.ownerEmail,
+        kind: "charge",
+        subject: "domain_registration",
+        subjectId: reg.id,
+        subjectKey: reg.tld,
+        description: `Transferencia de dominio ${reg.domainName} (incluye 1 año)`,
+        amountCents: reg.priceCents,
+        listPriceCents: reg.priceCents,
+        currency: payment.currency_id ?? "MXN",
+        mpPaymentId: String(body.data.id),
+        mpStatus: payment.status,
+        eventKey: `domtransfer:${regId}`,
+        occurredAt: payment.date_approved ?? payment.date_created ?? undefined,
+        raw: payment,
+      });
+
+      const { iniciarTransferencia } = await import("./domain-provision.js");
+      await iniciarTransferencia(getDomainRegistration(regId)!);
+      return;
+    }
+
+    if (payment.status === "approved" && payment.external_reference?.startsWith("domain-reg:")) {
+      const regId = payment.external_reference.replace("domain-reg:", "");
+      const reg = getDomainRegistration(regId);
+      if (!reg) {
+        log("warn", "webhook", "Domain registration not found", { regId });
+        return;
+      }
+      if (reg.status !== "pending_payment") {
+        log("info", "webhook", "Domain registration already processed", { regId, status: reg.status });
+        return;
+      }
+
+      // Update to paid and start registration
+      updateDomainRegistration(regId, { status: "paid", mpPaymentId: String(body.data.id) });
+
+      // Entra al libro mayor igual que los demás: es un cargo real a una tarjeta
+      // real, y dejarlo fuera haría que el historial mienta por omisión.
+      recordOrder({
+        userEmail: reg.ownerEmail,
+        kind: "charge",
+        subject: "domain_registration",
+        subjectId: reg.id,
+        subjectKey: reg.tld,
+        description: `Registro de dominio ${reg.domainName}`,
+        amountCents: reg.priceCents,
+        listPriceCents: reg.priceCents,
+        currency: payment.currency_id ?? "MXN",
+        periodEnd: reg.expiresAt ?? null,
+        mpPaymentId: String(body.data.id),
+        mpStatus: payment.status,
+        eventKey: `domreg:${regId}`,
+        occurredAt: payment.date_approved ?? payment.date_created ?? undefined,
+        raw: payment,
+      });
+
+      try {
+        const { registerDomain } = await import("./route53.js");
+        const operationId = await registerDomain(reg.domainName);
+        updateDomainRegistration(regId, { status: "registering", route53OperationId: operationId });
+        log("info", "webhook", "Domain registration started", { domain: reg.domainName, operationId });
+      } catch (err: any) {
+        updateDomainRegistration(regId, { status: "failed", lastError: String(err) });
+        log("error", "webhook", "Domain registration failed", { domain: reg.domainName, error: String(err) });
+      }
+    }
+  } catch (err: any) {
+    log("error", "webhook", "MP domain webhook processing error", { error: String(err) });
+  }
+}
+
+/**
+ * Un cobro de la renovación anual de un dominio.
+ *
+ * A diferencia del plan y de los add-ons, aquí **el impago no corta el servicio**: AWS ya
+ * renovó el dominio (mandamos `AutoRenew: true` a propósito) y dejarlo caer es irreversible
+ * pasada la redención. Así que un rechazo abre cobranza, no una fecha de corte.
+ */
+export async function procesarRenovacionDominio(
+  reg: NonNullable<ReturnType<typeof getDomainRegistration>>,
+  // deno-lint-ignore no-explicit-any
+  ap: any,
+  approved: boolean,
+): Promise<void> {
+  const concepto = `Dominio ${reg.domainName} (1 año)`;
+  const montoCents = Math.round((ap.transaction_amount ?? 0) * 100);
+
+  if (!approved) {
+    updateDomainRegistration(reg.id, {
+      renewalStatus: "past_due",
+      dunningStartedAt: reg.dunningStartedAt ?? new Date().toISOString(),
+    });
+    const fallida = recordOrder({
+      userEmail: reg.ownerEmail,
+      kind: "failed_charge",
+      subject: "domain_registration",
+      subjectId: reg.id,
+      subjectKey: reg.tld,
+      description: concepto,
+      amountCents: 0,
+      listPriceCents: montoCents,
+      currency: ap.currency_id ?? "MXN",
+      periodEnd: reg.expiresAt ?? null,
+      mpPreapprovalId: ap.preapproval_id ?? null,
+      mpAuthorizedPaymentId: String(ap.id),
+      mpStatus: ap.status,
+      mpStatusDetail: ap.payment?.status_detail ?? ap.payment?.status ?? null,
+      eventKey: chargeEventKey(ap),
+      occurredAt: ap.date_created ?? undefined,
+      raw: ap,
+    });
+    log("warn", "billing", "Cobro de renovación de dominio rechazado", { domain: reg.domainName, email: reg.ownerEmail, duplicado: !fallida });
+
+    if (fallida && !(await isChargeFailureWarned(reg.ownerEmail))) {
+      try {
+        await sendTemplate(reg.ownerEmail, domainChargeFailed({
+          domain: reg.domainName,
+          attemptedCents: montoCents,
+          currency: ap.currency_id ?? "MXN",
+          expiresAt: reg.expiresAt ?? null,
+        }));
+        await markChargeFailureWarned(reg.ownerEmail);
+      } catch (e) {
+        log("error", "billing", "No se pudo avisar del cobro fallido del dominio", { domain: reg.domainName, error: String(e) });
+      }
+    }
+    return;
+  }
+
+  // La fecha nueva la dice AWS, no un +365 nuestro: es la que manda para el siguiente cobro.
+  let expiresAt = reg.expiresAt;
+  try {
+    const { getDomainDetail } = await import("./route53.js");
+    expiresAt = (await getDomainDetail(reg.domainName)).expirationDate ?? expiresAt;
+  } catch (e) {
+    log("warn", "billing", "No se pudo releer la expiración tras renovar", { domain: reg.domainName, error: String(e) });
+  }
+
+  updateDomainRegistration(reg.id, {
+    renewalStatus: "active",
+    expiresAt,
+    nextChargeAt: expiresAt ? new Date(Date.parse(expiresAt) - 60 * 864e5).toISOString() : null,
+    dunningStartedAt: null,
+    warnedAt: null,
+    lastSyncedAt: new Date().toISOString(),
+  });
+
+  const orden = recordOrder({
+    userEmail: reg.ownerEmail,
+    kind: "charge",
+    subject: "domain_registration",
+    subjectId: reg.id,
+    subjectKey: reg.tld,
+    description: concepto,
+    amountCents: montoCents,
+    listPriceCents: reg.renewalPriceCents ?? montoCents,
+    currency: ap.currency_id ?? "MXN",
+    periodEnd: expiresAt ?? null,
+    mpPreapprovalId: ap.preapproval_id ?? null,
+    mpAuthorizedPaymentId: String(ap.id),
+    mpPaymentId: ap.payment?.id ? String(ap.payment.id) : null,
+    mpStatus: ap.status,
+    // La llave es el id del pago y no el del preapproval: MP reenvía el mismo evento.
+    eventKey: chargeEventKey(ap),
+    occurredAt: ap.date_created ?? undefined,
+    raw: ap,
+  });
+
+  if (orden) {
+    try {
+      await sendTemplate(reg.ownerEmail, renewalReceipt({
+        concept: concepto,
+        order: orden,
+        nextChargeAt: expiresAt ? new Date(Date.parse(expiresAt) - 60 * 864e5).toISOString() : null,
+      }));
+    } catch (e) {
+      log("error", "billing", "No se pudo mandar el recibo de la renovación", { domain: reg.domainName, error: String(e) });
+    }
+  }
+
+  log("info", "billing", "Dominio renovado", { domain: reg.domainName, expiresAt });
 }
 
 async function checkDomainAccess(
@@ -2683,6 +2909,15 @@ const app = new Elysia({ adapter: node() })
     const eventKey = xRequestId || `${body.type ?? body.topic ?? "unknown"}:${dataId}:${ts}`;
     log("info", "webhook", "MP webhook received", { type: body.type ?? body.topic, dataId, eventKey });
 
+    // Pagos únicos de dominio (registro y transferencia). Van aquí y no en una ruta propia
+    // porque el panel de MercadoPago sólo admite una URL por aplicación.
+    if (body.type === "payment" && body.data?.id) {
+      const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+      if (!mpAccessToken) return new Response("Server misconfigured", { status: 500 });
+      await procesarPagoDominio(body, mpAccessToken);
+      return new Response("OK", { status: 200 });
+    }
+
     // Handle subscription_preapproval events
     if (body.type === "subscription_preapproval" && body.data?.id) {
       try {
@@ -2717,6 +2952,32 @@ const app = new Elysia({ adapter: node() })
         log("info", "webhook", "MP subscription fetched", { payer_email: sub.payer_email, external_reference: sub.external_reference, status: sub.status });
 
         const externalRef = sub.external_reference ?? "";
+
+        // Renovación anual de un dominio. Sale temprano por la misma razón que el add-on:
+        // la detección de plan por monto de más abajo tomaría los $599 de un .com por una
+        // suscripción y le rompería la cuenta al usuario.
+        if (externalRef.startsWith("domain-renew:")) {
+          const reg = getDomainRegistration(externalRef.slice("domain-renew:".length));
+          if (!reg) {
+            log("warn", "webhook", "Renovación de dominio sin fila", { externalRef });
+          } else if (sub.status === "authorized") {
+            updateDomainRegistration(reg.id, {
+              renewalStatus: "active",
+              mpPreapprovalId: String(body.data.id),
+              nextChargeAt: sub.auto_recurring?.start_date ?? reg.nextChargeAt,
+            });
+            log("info", "billing", "Renovación de dominio activada", { domain: reg.domainName, email: reg.ownerEmail });
+          } else if (sub.status === "cancelled" || sub.status === "paused") {
+            // No se apaga el AutoRenew de AWS: perder el dominio de un cliente es
+            // irreversible, así que esto lo decide una persona.
+            updateDomainRegistration(reg.id, { renewalStatus: "cancelled" });
+            await sendAlert(
+              "renovacion-dominio-cancelada",
+              `${reg.ownerEmail} canceló la renovación de ${reg.domainName} (vence ${reg.expiresAt ?? "?"}).\n\nAWS lo va a renovar igual y nos lo va a cobrar. Decide si se le ofrece transfer-out o se apaga el AutoRenew a mano.`,
+            );
+          }
+          return new Response("OK", { status: 200 });
+        }
 
         // Add-ons: preapproval propio, aparte de la suscripción base. Se atiende aquí y se
         // sale, para no tocar nunca subPlan/subMpId — la detección de plan por monto de
@@ -3089,6 +3350,15 @@ const app = new Elysia({ adapter: node() })
 
         const approved = ap.status === "processed" &&
           (!ap.payment?.status || ap.payment.status === "approved");
+
+        // La renovación de un dominio se atiende aquí y se sale: no es un plan ni un
+        // add-on, y su "acceso" no es una fecha de corte de servicio sino la expiración
+        // real que dice AWS.
+        const renovacionDominio = ap.preapproval_id ? getDomainRegistrationByPreapprovalId(ap.preapproval_id) : null;
+        if (renovacionDominio) {
+          await procesarRenovacionDominio(renovacionDominio, ap, approved);
+          return new Response("OK", { status: 200 });
+        }
 
         // El add-on se resuelve primero porque no vive en users.sub_mp_id.
         const renewingAddon = ap.preapproval_id ? getAddonByMpId(ap.preapproval_id) : null;
@@ -6079,6 +6349,24 @@ const app = new Elysia({ adapter: node() })
     detail: { tags: ["Domain Registration"], summary: "Search domain availability", security: [{ cookieAuth: [] }] },
   })
 
+  .get("/api/domains/tlds", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    // El front tenía su propia copia de esta tabla y se quedó desfasada en cuanto
+    // cambiaron los precios: enseñaba $549 por un `.info` que se vende en $899.
+    return Response.json(
+      Object.entries(TLD_PRICES).map(([tld, p]) => ({
+        tld,
+        price: p.userMxnCents,
+        renewPrice: p.renewMxnCents,
+        transferPrice: p.transferMxnCents,
+        popular: tld === ".com" || tld === ".io",
+      })),
+    );
+  }, {
+    detail: { tags: ["Domain Registration"], summary: "Available TLDs with their prices", security: [{ cookieAuth: [] }] },
+  })
+
   .post("/api/domains/register", async ({ request, body: regBody }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
@@ -6155,7 +6443,7 @@ const app = new Elysia({ adapter: node() })
           pending: backUrl,
         },
         auto_return: "approved",
-        notification_url: getMainDomainUrl() + "/api/webhooks/mercadopago-domain",
+        notification_url: getMainDomainUrl() + "/api/webhooks/mercadopago",
       }});
 
       // Store MP preference ID for tracking
@@ -6176,126 +6464,724 @@ const app = new Elysia({ adapter: node() })
     detail: { tags: ["Domain Registration"], summary: "Register a domain via Route 53 + MercadoPago", security: [{ cookieAuth: [] }] },
   })
 
-  .post("/api/webhooks/mercadopago-domain", async ({ request }) => {
-    // HMAC validation (same pattern as main webhook)
-    const secret = process.env.MP_WEBHOOK_SECRET;
-    if (!secret) {
-      log("error", "webhook", "MP_WEBHOOK_SECRET not configured");
-      return new Response("Server misconfigured", { status: 500 });
-    }
-    const xSignature = request.headers.get("x-signature") ?? "";
-    const xRequestId = request.headers.get("x-request-id") ?? "";
-    const url = new URL(request.url);
-    const dataId = url.searchParams.get("data.id") ?? "";
-
-    const parts = Object.fromEntries(
-      xSignature.split(",").map((p) => {
-        const [k, ...v] = p.trim().split("=");
-        return [k, v.join("=")];
-      }),
-    );
-    const ts = parts["ts"] ?? "";
-    const v1 = parts["v1"] ?? "";
-
-    const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(secret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"],
-    );
-    const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
-    const computed = Array.from(new Uint8Array(sig))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-
-    if (computed !== v1) {
-      log("warn", "webhook", "MP domain webhook: invalid signature");
-      return new Response("Unauthorized", { status: 401 });
-    }
-
-    const body = await request.json();
-    log("info", "webhook", "MP domain webhook received", { type: body.type, dataId: body.data?.id });
-
-    // Handle payment notifications
-    if (body.type === "payment" && body.data?.id) {
-      try {
-        const mpAccessToken = process.env.MP_ACCESS_TOKEN;
-        if (!mpAccessToken) return new Response("Server misconfigured", { status: 500 });
-
-        // Fetch payment details from MP
-        const payRes = await fetch(`https://api.mercadopago.com/v1/payments/${body.data.id}`, {
-          headers: { Authorization: `Bearer ${mpAccessToken}` },
-          signal: AbortSignal.timeout(10_000),
-        });
-        const payment = await payRes.json();
-
-        log("info", "webhook", "MP domain payment fetched", { status: payment.status, external_reference: payment.external_reference });
-
-        if (payment.status === "approved" && payment.external_reference?.startsWith("domain-reg:")) {
-          const regId = payment.external_reference.replace("domain-reg:", "");
-          const reg = getDomainRegistration(regId);
-          if (!reg) {
-            log("warn", "webhook", "Domain registration not found", { regId });
-            return new Response("OK", { status: 200 });
-          }
-          if (reg.status !== "pending_payment") {
-            log("info", "webhook", "Domain registration already processed", { regId, status: reg.status });
-            return new Response("OK", { status: 200 });
-          }
-
-          // Update to paid and start registration
-          updateDomainRegistration(regId, { status: "paid", mpPaymentId: String(body.data.id) });
-
-          // Entra al libro mayor igual que los demás: es un cargo real a una tarjeta
-          // real, y dejarlo fuera haría que el historial mienta por omisión.
-          recordOrder({
-            userEmail: reg.ownerEmail,
-            kind: "charge",
-            subject: "domain_registration",
-            subjectId: reg.id,
-            subjectKey: reg.tld,
-            description: `Registro de dominio ${reg.domainName}`,
-            amountCents: reg.priceCents,
-            listPriceCents: reg.priceCents,
-            currency: payment.currency_id ?? "MXN",
-            periodEnd: reg.expiresAt ?? null,
-            mpPaymentId: String(body.data.id),
-            mpStatus: payment.status,
-            eventKey: `domreg:${regId}`,
-            occurredAt: payment.date_approved ?? payment.date_created ?? undefined,
-            raw: payment,
-          });
-
-          try {
-            const { registerDomain } = await import("./route53.js");
-            const operationId = await registerDomain(reg.domainName);
-            updateDomainRegistration(regId, { status: "registering", route53OperationId: operationId });
-            log("info", "webhook", "Domain registration started", { domain: reg.domainName, operationId });
-          } catch (err: any) {
-            updateDomainRegistration(regId, { status: "failed", lastError: String(err) });
-            log("error", "webhook", "Domain registration failed", { domain: reg.domainName, error: String(err) });
-          }
-        }
-      } catch (err: any) {
-        log("error", "webhook", "MP domain webhook processing error", { error: String(err) });
-      }
-    }
-
-    return new Response("OK", { status: 200 });
-  }, {
-    detail: { tags: ["Webhooks"], summary: "MercadoPago domain registration webhook", hide: true },
-  })
 
   .get("/api/domains/registrations", async ({ request }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
 
-    const registrations = getDomainRegistrationsByUser(auth.email);
+    // La proyección pública quita `awsCostCents`: es lo que nos cuesta a nosotros el
+    // dominio en AWS, y salía tal cual en la respuesta al cliente.
+    const registrations = getDomainRegistrationsByUser(auth.email).map(publicDomainRegistration);
     return new Response(JSON.stringify(registrations), { headers: { "content-type": "application/json" } });
   }, {
     detail: { tags: ["Domain Registration"], summary: "List domain registrations for current user", security: [{ cookieAuth: [] }] },
+  })
+
+  // --- Transferencia de dominios ---
+  //
+  // Traer un dominio que ya es del cliente (transfer-in) y dejarlo salir (transfer-out).
+  // Lo delicado no es hablar con AWS: es que el dominio ya está en producción para alguien,
+  // así que nada se mueve sin un inventario de DNS aprobado por él.
+
+  .post("/api/domains/transfer/check", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    if (limited) return limited;
+
+    const d = String((body as { domain?: string }).domain ?? "").toLowerCase().trim();
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d)) return jsonErr("Formato de dominio inválido", 400);
+
+    // A diferencia del alta, la transferencia NO se limita a la parrilla de 12: el dominio
+    // ya es del cliente y la pregunta es si AWS puede moverlo, no si nosotros lo vendemos.
+    // Son 413 extensiones, e incluye las de clientes que ya tenemos (.design, .app).
+    const tld = "." + d.split(".").slice(1).join(".");
+    const { precioDeTransferencia } = await import("./tld-pricing.js");
+    const precio = await precioDeTransferencia(tld);
+    if (!precio) return jsonErr(`AWS no puede transferir dominios ${tld}. Escríbenos y lo revisamos contigo.`, 400);
+
+    const { checkDomainReadiness } = await import("./domain-transfer.js");
+    const { snapshotDns } = await import("./dns-import.js");
+
+    const [listo, inventario] = await Promise.all([
+      checkDomainReadiness(d),
+      snapshotDns(d).catch(() => ({ found: [], nameservers: [], warning: "No pudimos leer tu DNS actual." })),
+    ]);
+
+    return Response.json({
+      domain: d,
+      // Transferir incluye un año más. En `.click` y `.link` cuesta el doble que renovar,
+      // así que tiene su propio precio.
+      price: precio.transferMxnCents,
+      currency: "MXN",
+      ...listo,
+      dns: inventario,
+    });
+  }, {
+    body: t.Object({ domain: t.String() }),
+    detail: { tags: ["Domain Registration"], summary: "Check transfer-in prerequisites and snapshot current DNS", security: [{ cookieAuth: [] }] },
+  })
+
+  .post("/api/domains/transfer/start", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 3, 60_000);
+    if (limited) return limited;
+
+    const b = body as { domain: string; authCode: string; payerEmail?: string; dnsRecords?: unknown };
+    const d = String(b.domain ?? "").toLowerCase().trim();
+    const authCode = String(b.authCode ?? "").trim();
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d)) return jsonErr("Formato de dominio inválido", 400);
+    if (!authCode) return jsonErr("Falta el código de autorización (EPP) de tu registrador actual.", 400);
+
+    const tld = "." + d.split(".").slice(1).join(".");
+    const { precioDeTransferencia } = await import("./tld-pricing.js");
+    const precio = await precioDeTransferencia(tld);
+    if (!precio) return jsonErr(`AWS no puede transferir dominios ${tld}. Escríbenos y lo revisamos contigo.`, 400);
+    if (getDomainRegistrationByDomainName(d)) return jsonErr("Ya hay una transferencia o un registro en curso para este dominio.", 409);
+
+    const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+    if (!mpAccessToken) return jsonErr("MercadoPago no configurado", 500);
+
+    const { guardarAuthCode } = await import("./domain-transfer.js");
+    const { snapshotDns } = await import("./dns-import.js");
+
+    const inventario = Array.isArray(b.dnsRecords) && b.dnsRecords.length
+      ? { found: b.dnsRecords as never[] }
+      : await snapshotDns(d).catch(() => ({ found: [] as never[] }));
+
+    const reg = createDomainRegistration({
+      domainName: d,
+      ownerEmail: auth.email,
+      tld,
+      priceCents: precio.transferMxnCents,
+      awsCostCents: precio.transferUsdCents,
+      kind: "transfer",
+      renewalPriceCents: precio.renewMxnCents,
+      dnsSnapshot: inventario.found,
+    });
+
+    // El código completo vive en memoria y caduca en una hora; en la fila sólo quedan los
+    // últimos 4 caracteres, para que el cliente sepa cuál mandó.
+    const pista = guardarAuthCode(reg.id, authCode);
+    updateDomainRegistration(reg.id, { transferAuthCodeHint: pista });
+
+    try {
+      const { Preference } = await import("mercadopago");
+      const preference = new Preference({ accessToken: mpAccessToken });
+      const result = await preference.create({ body: {
+        items: [{ id: reg.id, title: `Transferencia de dominio: ${d} (incluye 1 año)`, quantity: 1, unit_price: precio.transferMxnCents / 100, currency_id: "MXN" }],
+        external_reference: `domain-transfer:${reg.id}`,
+        back_urls: { success: `${getMainDomainUrl()}/app`, failure: `${getMainDomainUrl()}/app`, pending: `${getMainDomainUrl()}/app` },
+        auto_return: "approved",
+        notification_url: `${getMainDomainUrl()}/api/webhooks/mercadopago`,
+      }});
+
+      updateDomainRegistration(reg.id, { mpPaymentId: result.id ?? "" });
+      return Response.json({ initPoint: result.init_point, registrationId: reg.id });
+    } catch (err) {
+      log("error", "billing", "MP transfer preference error", { domain: d, error: String(err) });
+      return jsonErr("Error al crear el pago en MercadoPago", 500);
+    }
+  }, {
+    body: t.Object({
+      domain: t.String(),
+      authCode: t.String(),
+      payerEmail: t.Optional(t.String()),
+      dnsRecords: t.Optional(t.Array(t.Any())),
+    }),
+    detail: { tags: ["Domain Registration"], summary: "Start a domain transfer-in", security: [{ cookieAuth: [] }] },
+  })
+
+  .post("/api/domains/transfer/:regId/auth-code", async ({ request, params, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 5, 60_000);
+    if (limited) return limited;
+
+    const reg = getDomainRegistration(params.regId);
+    if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Transferencia no encontrada", 404);
+
+    const authCode = String((body as { authCode?: string }).authCode ?? "").trim();
+    if (!authCode) return jsonErr("Falta el código de autorización.", 400);
+
+    const { guardarAuthCode } = await import("./domain-transfer.js");
+    updateDomainRegistration(reg.id, { transferAuthCodeHint: guardarAuthCode(reg.id, authCode) });
+
+    // Si el pago ya entró y el código se había vencido, arranca ahora.
+    if (reg.status === "transfer_paid") {
+      const { iniciarTransferencia } = await import("./domain-provision.js");
+      await iniciarTransferencia(getDomainRegistration(reg.id)!);
+    }
+    return Response.json({ ok: true });
+  }, {
+    body: t.Object({ authCode: t.String() }),
+    detail: { tags: ["Domain Registration"], summary: "Re-send the EPP auth code (it lives in memory and expires)", security: [{ cookieAuth: [] }] },
+  })
+
+  .get("/api/domains/transfer/:regId/dns", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const reg = getDomainRegistration(params.regId);
+    if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Transferencia no encontrada", 404);
+    return Response.json({ records: reg.dnsSnapshot ?? [], status: reg.dnsImportStatus, takenAt: reg.dnsSnapshotAt });
+  }, {
+    detail: { tags: ["Domain Registration"], summary: "Read the DNS inventory captured for a transfer", security: [{ cookieAuth: [] }] },
+  })
+
+  .put("/api/domains/transfer/:regId/dns", async ({ request, params, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 20, 60_000);
+    if (limited) return limited;
+
+    const reg = getDomainRegistration(params.regId);
+    if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Transferencia no encontrada", 404);
+
+    const { validarRRSet, ErrorDns } = await import("./dns-records.js");
+    const entrada = (body as { records?: unknown[] }).records ?? [];
+
+    try {
+      // Se valida al guardarlo, no al aplicarlo: descubrir aquí que un registro está mal es
+      // barato; descubrirlo cuando el dominio ya se movió, no.
+      const records = entrada.map((r) => validarRRSet(r as never, reg.domainName));
+      updateDomainRegistration(reg.id, {
+        dnsSnapshot: records,
+        dnsSnapshotAt: new Date().toISOString(),
+        dnsImportStatus: "discovered",
+      });
+      return Response.json({ records });
+    } catch (err) {
+      if (err instanceof ErrorDns) return jsonErr(err.message, 400);
+      throw err;
+    }
+  }, {
+    body: t.Object({ records: t.Array(t.Any()) }),
+    detail: { tags: ["Domain Registration"], summary: "Edit the DNS inventory before approving it", security: [{ cookieAuth: [] }] },
+  })
+
+  .post("/api/domains/transfer/:regId/dns/approve", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const reg = getDomainRegistration(params.regId);
+    if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Transferencia no encontrada", 404);
+    if (!reg.dnsSnapshot?.length) return jsonErr("Todavía no hay ningún registro que aprobar. Revisa el inventario primero.", 409);
+
+    updateDomainRegistration(reg.id, { dnsImportStatus: "approved" });
+    log("info", "route53", "Inventario DNS aprobado", { domain: reg.domainName, registros: reg.dnsSnapshot.length });
+    return Response.json({ ok: true });
+  }, {
+    detail: { tags: ["Domain Registration"], summary: "Approve the DNS inventory; nothing moves until this happens", security: [{ cookieAuth: [] }] },
+  })
+
+  .post("/api/domains/transfer/:regId/resend-email", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 3, 300_000);
+    if (limited) return limited;
+
+    const reg = getDomainRegistration(params.regId);
+    if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Transferencia no encontrada", 404);
+
+    try {
+      const { resendTransferEmail } = await import("./route53.js");
+      await resendTransferEmail(reg.domainName);
+      return Response.json({ ok: true });
+    } catch (err) {
+      log("error", "route53", "No se pudo reenviar el correo de aprobación", { domain: reg.domainName, error: String(err) });
+      return jsonErr("No se pudo reenviar el correo. Revisa tu registrador actual.", 502);
+    }
+  }, {
+    detail: { tags: ["Domain Registration"], summary: "Ask the registrar to resend the approval email", security: [{ cookieAuth: [] }] },
+  })
+
+  // --- Transfer-out: que el cliente se lleve su dominio ---
+  //
+  // No es opcional. Sin esto, ofrecer migración entrante es asimétrico: el cliente puede
+  // meter su dominio y no sacarlo, que es la definición de un secuestro.
+
+  .post("/api/domains/registrations/:regId/transfer-out", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 3, 300_000);
+    if (limited) return limited;
+
+    const reg = getDomainRegistration(params.regId);
+    if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Registro no encontrado", 404);
+    if (reg.status !== "registered") return jsonErr("Este dominio todavía no está registrado a tu nombre.", 409);
+
+    // Entregar el auth code es entregar el dominio, así que va por correo y no en la
+    // respuesta: si alguien se metió a la sesión, el código no le sirve de nada.
+    const token = crypto.randomUUID();
+    await db.insert(tokensTable).values({
+      token,
+      kind: "transfer-out",
+      value: { regId: reg.id },
+      expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+    });
+    try {
+      await sendTemplate(auth.email, domainTransferOut({
+        domain: reg.domainName,
+        confirmUrl: `${getMainDomainUrl()}/app?transfer-out=${token}`,
+      }));
+    } catch (err) {
+      log("error", "route53", "No se pudo mandar la confirmación de transfer-out", { domain: reg.domainName, error: String(err) });
+      return jsonErr("No pudimos mandarte el correo de confirmación. Escríbenos.", 500);
+    }
+
+    return Response.json({ ok: true, aviso: "Te mandamos un correo para confirmar. El código de autorización llega ahí, no aquí." });
+  }, {
+    detail: { tags: ["Domain Registration"], summary: "Request the EPP auth code to move the domain out", security: [{ cookieAuth: [] }] },
+  })
+
+  .post("/api/domains/transfer-out/confirm", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 5, 300_000);
+    if (limited) return limited;
+
+    const token = String((body as { token?: string }).token ?? "");
+    const fila = db.select().from(tokensTable).where(eq(tokensTable.token, token)).get();
+    if (!fila || fila.kind !== "transfer-out" || fila.expiresAt < new Date().toISOString()) {
+      return jsonErr("El enlace de confirmación venció o ya se usó. Pídelo otra vez.", 400);
+    }
+    // De un solo uso: el código que devuelve esta ruta entrega el dominio.
+    db.delete(tokensTable).where(eq(tokensTable.token, token)).run();
+    const regId = (fila.value as { regId: string }).regId;
+
+    const reg = getDomainRegistration(regId);
+    if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Registro no encontrado", 404);
+
+    try {
+      const { disableDomainTransferLock, retrieveDomainAuthCode } = await import("./route53.js");
+      await disableDomainTransferLock(reg.domainName);
+      const authCode = await retrieveDomainAuthCode(reg.domainName);
+
+      // El AutoRenew sigue encendido hasta que el dominio salga de verdad: si se apaga
+      // ahora y la transferencia no se completa, el dominio se pierde.
+      await sendAlert(
+        "transfer-out",
+        `${reg.ownerEmail} se lleva ${reg.domainName} a otro registrador.\n\nCuando la transferencia se complete, cancela su renovación en MercadoPago y apaga el AutoRenew en AWS. NO lo apagues antes: si la transferencia se cae, el dominio se pierde.`,
+      );
+      log("warn", "route53", "Transfer-out autorizado", { domain: reg.domainName, email: reg.ownerEmail });
+
+      return Response.json({
+        authCode,
+        domain: reg.domainName,
+        aviso: "Este es tu código de autorización (EPP). Dáselo a tu nuevo registrador. Quitamos el candado de transferencia; tu dominio sigue funcionando aquí hasta que la transferencia se complete.",
+      });
+    } catch (err) {
+      log("error", "route53", "Transfer-out falló", { domain: reg.domainName, error: String(err) });
+      return jsonErr("No pudimos preparar la salida del dominio. Escríbenos y lo hacemos a mano.", 502);
+    }
+  }, {
+    body: t.Object({ token: t.String() }),
+    detail: { tags: ["Domain Registration"], summary: "Confirm transfer-out and receive the EPP auth code", security: [{ cookieAuth: [] }] },
+  })
+
+  // --- Renovación anual del dominio ---
+  //
+  // Hasta aquí el registro se cobraba una sola vez con una Preference, pero a AWS le
+  // mandamos `AutoRenew: true`: o sea, AWS renovaba cada año y nos lo cobraba a nosotros.
+  // Esto es la suscripción que faltaba, con el mismo patrón de los add-ons.
+
+  .post("/api/domains/registrations/:regId/renewal", async ({ request, params, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 5, 60_000);
+    if (limited) return limited;
+
+    const reg = getDomainRegistration(params.regId);
+    if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Registro no encontrado", 404);
+    if (reg.status !== "registered") return jsonErr("Este dominio todavía no está registrado.", 409);
+    if (reg.renewalStatus === "active") return jsonErr("Este dominio ya tiene la renovación activada.", 409);
+
+    // Un dominio transferido puede ser de cualquiera de los 413 TLD de AWS, no sólo de la
+    // parrilla de 12: el precio de renovación se resuelve igual que el de la transferencia.
+    // `renewalPriceCents` es lo que se le cotizó al comprar, y manda sobre el vivo.
+    const { precioDeTransferencia } = await import("./tld-pricing.js");
+    const precio = await precioDeTransferencia(reg.tld);
+    const montoAnual = reg.renewalPriceCents ?? precio?.renewMxnCents;
+    if (!montoAnual) return jsonErr(`No tenemos precio de renovación para ${reg.tld}. Escríbenos.`, 400);
+
+    const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+    if (!mpAccessToken) return jsonErr("Billing no configurado", 500);
+
+    // El primer cobro cae 60 días antes del vencimiento: AWS renueva sola unos 45 días
+    // antes en varios TLDs, así que hay que haber cobrado para entonces.
+    const inicio = reg.expiresAt
+      ? new Date(Math.max(Date.now() + 864e5, Date.parse(reg.expiresAt) - 60 * 864e5))
+      : new Date(Date.now() + 864e5);
+
+    try {
+      const { default: MercadoPagoConfig, PreApproval } = await import("mercadopago").then((m) => ({
+        default: m.MercadoPagoConfig,
+        PreApproval: m.PreApproval,
+      }));
+      const preApproval = new PreApproval(new MercadoPagoConfig({ accessToken: mpAccessToken }));
+      const result = await preApproval.create({
+        body: {
+          // Sin la palabra "Plan": el webhook trae un /Plan (\w+)/i que activaría un plan
+          // por accidente. Salimos antes por el prefijo domain-renew:, pero no hay razón
+          // para dejar la mina puesta.
+          reason: `MailMask — Renovación anual · ${reg.domainName}`,
+          auto_recurring: {
+            frequency: 12,
+            frequency_type: "months",
+            transaction_amount: montoAnual / 100,
+            currency_id: "MXN",
+            start_date: inicio.toISOString(),
+          },
+          payer_email: (body as { payerEmail?: string })?.payerEmail || auth.email,
+          back_url: `${getMainDomainUrl()}/app?renovacion=ok`,
+          external_reference: `domain-renew:${reg.id}`,
+          notification_url: `${getMainDomainUrl()}/api/webhooks/mercadopago`,
+          // deno-lint-ignore no-explicit-any
+        } as any,
+      });
+
+      updateDomainRegistration(reg.id, {
+        mpPreapprovalId: result.id,
+        renewalPriceCents: montoAnual,
+        nextChargeAt: inicio.toISOString(),
+      });
+
+      return Response.json({ init_point: result.init_point, nextChargeAt: inicio.toISOString() });
+    } catch (err) {
+      log("error", "billing", "Domain renewal checkout failed", { domain: reg.domainName, error: String(err) });
+      return jsonErr("Error creando la suscripción de renovación", 500);
+    }
+  }, {
+    body: t.Optional(t.Object({ payerEmail: t.Optional(t.String()) })),
+    detail: { tags: ["Domain Registration"], summary: "Start the yearly renewal subscription for a domain", security: [{ cookieAuth: [] }] },
+  })
+
+  .post("/api/domains/registrations/:regId/renewal/cancel", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 3, 60_000);
+    if (limited) return limited;
+
+    const reg = getDomainRegistration(params.regId);
+    if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Registro no encontrado", 404);
+    if (!reg.mpPreapprovalId) return jsonErr("Este dominio no tiene renovación activa.", 409);
+
+    const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+    if (mpAccessToken) {
+      try {
+        await cancelMpPreapproval(reg.mpPreapprovalId, mpAccessToken);
+      } catch (err) {
+        log("error", "billing", "No se pudo cancelar el preapproval de renovación", { domain: reg.domainName, error: String(err) });
+        return jsonErr("No pudimos cancelar el cobro en MercadoPago. Inténtalo de nuevo.", 502);
+      }
+    }
+
+    updateDomainRegistration(reg.id, { renewalStatus: "cancelled" });
+
+    // No se apaga el AutoRenew de AWS aquí: el dominio se perdería para siempre y eso lo
+    // decide una persona, no un endpoint.
+    await sendAlert(
+      "renovacion-dominio-cancelada",
+      `${reg.ownerEmail} canceló la renovación de ${reg.domainName} (vence ${reg.expiresAt ?? "?"}).\n\nAWS lo va a renovar igual y nos lo va a cobrar. Decide si se le ofrece transfer-out o se apaga el AutoRenew a mano.`,
+    );
+
+    return Response.json({ ok: true, aviso: "Cancelamos el cobro. Tu dominio sigue activo hasta su fecha de vencimiento; escríbenos si quieres llevártelo a otro registrador." });
+  }, {
+    detail: { tags: ["Domain Registration"], summary: "Cancel the yearly renewal subscription", security: [{ cookieAuth: [] }] },
+  })
+
+  // --- DNS: editor de registros sobre Route 53 ---
+  //
+  // La API expone **RRSets completos**, no valores sueltos: `ChangeResourceRecordSets` es
+  // atómico por (nombre, tipo) y no sabe borrar un valor. Un PUT reemplaza el conjunto, que
+  // además lo vuelve idempotente — importante porque del otro lado puede haber un agente.
+
+  .get("/api/domains/:id/dns", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 20, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+
+    if (!d.hostedZoneId) {
+      // A propósito no es un 404: ante un 404 un agente abandona, ante una pista actúa.
+      return Response.json({
+        zone: { status: "none" as const },
+        records: [],
+        hint: `MailMask todavía no gestiona el DNS de ${d.domain}. Crea la zona con POST /api/domains/${d.id}/dns/zone: copiamos los registros que encontremos de tu proveedor actual y te damos los nameservers que hay que poner en tu registrador.`,
+      });
+    }
+
+    const { listRecordSets } = await import("./route53.js");
+    const { anotarRegistros } = await import("./dns-records.js");
+    const registros = await listRecordSets(d.hostedZoneId);
+
+    let delegated = d.dnsZoneStatus === "active";
+    if (!delegated && d.dnsNameservers?.length) {
+      const { delegacionActiva } = await import("./dns-import.js");
+      const estado = await delegacionActiva(d.domain, d.dnsNameservers);
+      delegated = estado.delegated;
+      if (delegated) {
+        updateDomain(d.id, { dnsZoneStatus: "active", dnsDelegatedAt: new Date().toISOString() });
+      }
+    }
+
+    return Response.json({
+      zone: {
+        status: delegated ? "active" : d.dnsZoneStatus,
+        hostedZoneId: d.hostedZoneId,
+        nameservers: d.dnsNameservers ?? [],
+        delegated,
+      },
+      records: anotarRegistros(registros as never, {
+        domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens,
+      }),
+    });
+  }, {
+    detail: { tags: ["DNS", "SDK"], summary: "List DNS records and zone state", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .post("/api/domains/:id/dns/zone", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 2, 300_000);
+    if (limited) return limited;
+
+    // Crear la zona cambia a dónde apunta el dominio y cuesta dinero: es cosa del dueño.
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+
+    if (d.hostedZoneId) return jsonErr("Este dominio ya tiene su DNS en MailMask.", 409);
+
+    const { ensureHostedZone, applyRecordChanges, configureDnsRecords, deleteHostedZone } = await import("./route53.js");
+    const { snapshotDns } = await import("./dns-import.js");
+
+    // El inventario se toma ANTES de crear nada: en cuanto el cliente delegue, esta consulta
+    // ya no devolvería su zona vieja.
+    const inventario = await snapshotDns(d.domain).catch(() => ({ found: [], nameservers: [], warning: "No se pudo leer tu DNS actual; revisa tus registros a mano antes de cambiar los nameservers." }));
+
+    const zona = await ensureHostedZone(d.domain);
+    try {
+      // 1. Primero lo del cliente, para que su web y su correo sigan vivos al delegar.
+      if (inventario.found.length) {
+        await applyRecordChanges(
+          zona.hostedZoneId,
+          inventario.found.map((rrset) => ({ action: "UPSERT" as const, rrset })),
+          `Importado del DNS anterior de ${d.domain}`,
+        );
+      }
+      // 2. Y encima lo nuestro, fusionando en vez de pisar.
+      await configureDnsRecords(zona.hostedZoneId, d.domain, d.verificationToken, d.dkimTokens, { preserveMx: true });
+    } catch (err) {
+      // Media zona es peor que ninguna: se deshace lo que acabamos de crear.
+      if (zona.created) await deleteHostedZone(zona.hostedZoneId).catch(() => {});
+      log("error", "route53", "Zone provisioning failed", { domain: d.domain, error: String(err) });
+      return jsonErr("No se pudo preparar la zona DNS. No cambiamos nada; inténtalo de nuevo.", 500);
+    }
+
+    updateDomain(d.id, {
+      hostedZoneId: zona.hostedZoneId,
+      dnsZoneStatus: "pending_delegation",
+      dnsNameservers: zona.nameservers,
+      dnsCheckedAt: new Date().toISOString(),
+    });
+
+    return Response.json({
+      hostedZoneId: zona.hostedZoneId,
+      nameservers: zona.nameservers,
+      imported: inventario.found,
+      importWarning: inventario.warning,
+    });
+  }, {
+    detail: { tags: ["DNS", "SDK"], summary: "Create (or adopt) the Route 53 hosted zone", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .get("/api/domains/:id/dns/delegation", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 20, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+    if (!d.dnsNameservers?.length) return jsonErr("Este dominio todavía no tiene zona DNS en MailMask.", 409);
+
+    const { delegacionActiva } = await import("./dns-import.js");
+    const estado = await delegacionActiva(d.domain, d.dnsNameservers);
+
+    updateDomain(d.id, {
+      dnsCheckedAt: new Date().toISOString(),
+      ...(estado.delegated && d.dnsZoneStatus !== "active"
+        ? { dnsZoneStatus: "active" as const, dnsDelegatedAt: new Date().toISOString() }
+        : {}),
+    });
+
+    return Response.json(estado);
+  }, {
+    detail: { tags: ["DNS", "SDK"], summary: "Check whether the domain already points to our nameservers", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .post("/api/domains/:id/dns/import", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 2, 300_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+
+    const { snapshotDns } = await import("./dns-import.js");
+    return Response.json(await snapshotDns(access.domain.domain));
+  }, {
+    detail: { tags: ["DNS", "SDK"], summary: "Probe the domain's current public DNS (read-only)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .put("/api/domains/:id/dns/records", async ({ request, params, body }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "write");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+    if (!d.hostedZoneId) return jsonErr("Este dominio todavía no tiene zona DNS en MailMask.", 409);
+
+    const { validarRRSet, conflictoDeConvivencia, aplicarGuardian, ErrorDns } = await import("./dns-records.js");
+    const { listRecordSets, applyRecordChanges } = await import("./route53.js");
+    const guardado = { domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens };
+
+    try {
+      const b = body as { name: string; type: string; ttl?: number; values: string[] };
+      const rrset = validarRRSet({ name: b.name, type: b.type as never, ttl: b.ttl ?? 300, values: b.values }, d.domain);
+
+      const bloqueo = aplicarGuardian("upsert", rrset, guardado);
+      if (bloqueo) {
+        return Response.json(
+          { error: bloqueo.message, ...(bloqueo.suggestedValues ? { suggestedValues: bloqueo.suggestedValues } : {}) },
+          { status: 409 },
+        );
+      }
+
+      const existentes = await listRecordSets(d.hostedZoneId);
+      const choque = conflictoDeConvivencia(rrset, existentes as never);
+      if (choque) return jsonErr(choque, 409);
+
+      const { changeId } = await applyRecordChanges(d.hostedZoneId, [{ action: "UPSERT", rrset }], `Cambio de ${user.email}`);
+      log("info", "route53", "DNS record upserted", { domain: d.domain, name: rrset.name, type: rrset.type, actor: user.email, changeId });
+
+      return Response.json({ record: rrset, changeId, propagacion: "Suele tardar menos de un minuto." });
+    } catch (err) {
+      if (err instanceof ErrorDns) return jsonErr(err.message, 400);
+      log("error", "route53", "DNS upsert failed", { domain: d.domain, error: String(err) });
+      return jsonErr("No se pudo aplicar el cambio en el DNS.", 502);
+    }
+  }, {
+    body: t.Object({
+      name: t.String(),
+      type: t.String(),
+      ttl: t.Optional(t.Number()),
+      values: t.Array(t.String()),
+    }),
+    detail: { tags: ["DNS", "SDK"], summary: "Create or replace a DNS record set", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .delete("/api/domains/:id/dns/records", async ({ request, params, body }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "write");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+    if (!d.hostedZoneId) return jsonErr("Este dominio todavía no tiene zona DNS en MailMask.", 409);
+
+    const { normalizarNombre, aplicarGuardian, ErrorDns } = await import("./dns-records.js");
+    const { listRecordSets, applyRecordChanges } = await import("./route53.js");
+
+    try {
+      const b = body as { name: string; type: string };
+      const name = normalizarNombre(b.name, d.domain);
+      const type = String(b.type).toUpperCase();
+
+      const existentes = await listRecordSets(d.hostedZoneId);
+      const actual = existentes.find((r) => r.name === name && r.type === type);
+      if (!actual) return jsonErr(`No hay ningún registro ${type} en ${name}.`, 404);
+
+      const bloqueo = aplicarGuardian("delete", actual as never, {
+        domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens,
+      });
+      if (bloqueo) return jsonErr(bloqueo.message, 409);
+
+      // Se borra con los valores actuales: Route 53 exige que el RRSet coincida exacto.
+      const { changeId } = await applyRecordChanges(d.hostedZoneId, [{ action: "DELETE", rrset: actual }], `Borrado de ${user.email}`);
+      log("info", "route53", "DNS record deleted", { domain: d.domain, name, type, actor: user.email, changeId });
+
+      return Response.json({ ok: true, changeId });
+    } catch (err) {
+      if (err instanceof ErrorDns) return jsonErr(err.message, 400);
+      log("error", "route53", "DNS delete failed", { domain: d.domain, error: String(err) });
+      return jsonErr("No se pudo borrar el registro.", 502);
+    }
+  }, {
+    body: t.Object({ name: t.String(), type: t.String() }),
+    detail: { tags: ["DNS", "SDK"], summary: "Delete a DNS record set", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .post("/api/domains/:id/dns/preset", async ({ request, params, body }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "write");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+    if (!d.hostedZoneId) return jsonErr("Este dominio todavía no tiene zona DNS en MailMask.", 409);
+
+    const { expandirPreset, validarRRSet, conflictoDeConvivencia, aplicarGuardian, ErrorDns } = await import("./dns-records.js");
+    const { listRecordSets, applyRecordChanges } = await import("./route53.js");
+    const guardado = { domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens };
+
+    try {
+      const b = body as { preset: string; target?: string; subdomain?: string };
+      const crudos = expandirPreset(b.preset as never, d.domain, b.target, b.subdomain);
+      const rrsets = crudos.map((r) => validarRRSet(r, d.domain));
+
+      const existentes = await listRecordSets(d.hostedZoneId);
+      for (const rrset of rrsets) {
+        const bloqueo = aplicarGuardian("upsert", rrset, guardado);
+        if (bloqueo) return jsonErr(bloqueo.message, 409);
+        const choque = conflictoDeConvivencia(rrset, existentes as never);
+        if (choque) return jsonErr(choque, 409);
+      }
+
+      // Todo en un solo cambio: o entra la plantilla completa, o no entra nada.
+      const { changeId } = await applyRecordChanges(
+        d.hostedZoneId,
+        rrsets.map((rrset) => ({ action: "UPSERT" as const, rrset })),
+        `Plantilla ${b.preset} aplicada por ${user.email}`,
+      );
+
+      return Response.json({ records: rrsets, changeId, propagacion: "Suele tardar menos de un minuto." });
+    } catch (err) {
+      if (err instanceof ErrorDns) return jsonErr(err.message, 400);
+      log("error", "route53", "DNS preset failed", { domain: d.domain, error: String(err) });
+      return jsonErr("No se pudo aplicar la plantilla.", 502);
+    }
+  }, {
+    body: t.Object({
+      preset: t.String(),
+      target: t.Optional(t.String()),
+      subdomain: t.Optional(t.String()),
+    }),
+    detail: { tags: ["DNS", "SDK"], summary: "Apply a hosting preset (Vercel, Netlify, …)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
   // --- API Keys ---

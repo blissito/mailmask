@@ -324,3 +324,72 @@ export interface ApiKey {
   lastUsedAt?: string;
   createdAt: string;
 }
+
+// --- DNS ---
+
+export type DnsRecordType = "A" | "AAAA" | "CNAME" | "TXT" | "MX" | "NS" | "CAA" | "SRV";
+
+/**
+ * Un conjunto de registros con el mismo nombre y tipo. El DNS trabaja así, no con registros
+ * sueltos: `values` es la lista completa y al escribirla reemplaza lo que hubiera.
+ */
+export interface DnsRRSet {
+  name: string;
+  type: DnsRecordType;
+  ttl: number;
+  values: string[];
+}
+
+export interface DnsRRSetAnotado extends DnsRRSet {
+  /** Lo pone MailMask para que el correo funcione. */
+  managed: boolean;
+  editable: boolean;
+  managedReason?: string;
+  /** Valores que hay que conservar aunque el registro sea editable (el SPF). */
+  protectedValues?: string[];
+}
+
+export interface DnsZoneState {
+  status: "none" | "pending_delegation" | "active";
+  hostedZoneId?: string;
+  nameservers?: string[];
+  delegated?: boolean;
+}
+
+export interface DnsListResponse {
+  zone: DnsZoneState;
+  records: DnsRRSetAnotado[];
+  /** Presente cuando todavía no hay zona: dice qué hacer. */
+  hint?: string;
+}
+
+export interface DnsZoneCreated {
+  hostedZoneId: string;
+  nameservers: string[];
+  /** Lo que copiamos de tu proveedor anterior. Revísalo: puede faltar algo. */
+  imported: DnsRRSet[];
+  importWarning: string;
+}
+
+export interface DnsDelegation {
+  delegated: boolean;
+  observed: string[];
+  expected: string[];
+}
+
+export interface DnsImportResult {
+  found: DnsRRSet[];
+  nameservers: string[];
+  warning: string;
+}
+
+export interface DnsChangeResult {
+  record?: DnsRRSet;
+  records?: DnsRRSet[];
+  changeId: string;
+  propagacion: string;
+}
+
+export type DnsPreset =
+  | "vercel" | "netlify" | "github-pages" | "cloudflare-pages" | "render" | "fly"
+  | "redirect-a-www" | "dmarc";

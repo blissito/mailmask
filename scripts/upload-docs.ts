@@ -172,9 +172,12 @@ Herramientas (cada una es un método del SDK, con las mismas reglas y límites):
 - Máscaras y buzones: list_aliases, create_alias (con mailbox: true crea también el buzón IMAP y devuelve la contraseña una sola vez), update_alias, delete_alias, create_mailbox, delete_mailbox.
 - Reglas: list_rules, create_rule, update_rule, delete_rule.
 - Webhooks: list_webhooks, create_webhook, update_webhook, delete_webhook, test_webhook, webhook_deliveries.
+- DNS: list_dns_records, create_dns_zone, dns_delegation_status, set_dns_record, delete_dns_record, import_dns_records, point_domain_to (apunta el dominio a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render o Fly sin saber qué registros hacen falta).
 - Envío: send_email (acepta idempotencyKey), bulk_send, bulk_status.
 - Operación: list_logs, list_suppressions, add_suppression, remove_suppression, list_smtp_credentials, create_smtp_credential, revoke_smtp_credential.
 - search_tools: busca herramientas por palabra clave.
+
+Sobre el DNS: set_dns_record REEMPLAZA el conjunto de valores de ese nombre y tipo, así que para añadir un valor hay que leer primero con list_dns_records e incluir también los que ya estaban. Los registros que MailMask necesita para el correo (MX, TXT de verificación, SPF y CNAME de DKIM) vienen marcados con managed y no se pueden borrar: el agente recibe un 409 explicando por qué. create_dns_zone importa lo que encuentre del proveedor anterior y devuelve los nameservers que hay que cambiar en el registrador; hasta que se cambien, nada de lo que se edite tiene efecto.
 
 Un error del servidor (por ejemplo, un dominio gratis pidiendo un buzón, que requiere dominio activado a $99 MXN/mes) llega al agente como resultado con isError y el mensaje tal cual. Las API keys no se crean ni revocan por MCP. Límite: 60 peticiones por minuto por llave. No hay Bandeja ni facturación por MCP. No existe un paquete npm de MCP: el servidor es la URL.`,
   },

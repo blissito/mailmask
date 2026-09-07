@@ -62,6 +62,12 @@ export interface Domain {
   verificationToken: string;
   createdAt: string;
   registeredViaMailmask?: boolean;
+  /** Hosted zone de Route 53, si MailMask le gestiona el DNS. */
+  hostedZoneId?: string | null;
+  dnsZoneStatus?: "none" | "pending_delegation" | "active";
+  dnsNameservers?: string[] | null;
+  dnsDelegatedAt?: string | null;
+  dnsCheckedAt?: string | null;
   /** Firma en markdown que el compositor añade al final de lo que se envía. */
   signature?: string | null;
   /** Llave del logo de la firma en S3; se sirve por URL, no se incrusta. */
@@ -246,6 +252,11 @@ function rowToDomain(r: typeof domains.$inferSelect): Domain {
     verificationToken: r.verificationToken,
     createdAt: r.createdAt,
     registeredViaMailmask: r.registeredViaMailmask || false,
+    hostedZoneId: r.hostedZoneId ?? null,
+    dnsZoneStatus: r.dnsZoneStatus ?? "none",
+    dnsNameservers: r.dnsNameservers ?? null,
+    dnsDelegatedAt: r.dnsDelegatedAt ?? null,
+    dnsCheckedAt: r.dnsCheckedAt ?? null,
     signature: r.signature ?? null,
     signatureLogoKey: r.signatureLogoKey ?? null,
   };
@@ -478,17 +489,21 @@ export function listUserDomains(email: string): Domain[] {
   return rows.map(rowToDomain);
 }
 
-export function updateDomain(id: string, updates: Partial<Pick<Domain, "verified" | "mxConfigured" | "signature" | "signatureLogoKey">>): Domain | null {
-  if (
-    updates.verified === undefined && updates.mxConfigured === undefined &&
-    updates.signature === undefined && updates.signatureLogoKey === undefined
-  ) return getDomain(id);
+const CAMPOS_DOMINIO = [
+  "verified", "mxConfigured", "signature", "signatureLogoKey", "registeredViaMailmask",
+  "hostedZoneId", "dnsZoneStatus", "dnsNameservers", "dnsDelegatedAt", "dnsCheckedAt",
+] as const;
+
+export function updateDomain(
+  id: string,
+  updates: Partial<Pick<Domain, typeof CAMPOS_DOMINIO[number]>>,
+): Domain | null {
   const set: Record<string, any> = {};
-  if (updates.verified !== undefined) set.verified = updates.verified;
-  if (updates.mxConfigured !== undefined) set.mxConfigured = updates.mxConfigured;
-  // null es un valor válido: es como se borra una firma.
-  if (updates.signature !== undefined) set.signature = updates.signature;
-  if (updates.signatureLogoKey !== undefined) set.signatureLogoKey = updates.signatureLogoKey;
+  for (const campo of CAMPOS_DOMINIO) {
+    // null es un valor válido: es como se borra una firma.
+    if (updates[campo] !== undefined) set[campo] = updates[campo];
+  }
+  if (!Object.keys(set).length) return getDomain(id);
   const rows = db.update(domains).set(set).where(eq(domains.id, id)).returning().all();
   return rows.length ? rowToDomain(rows[0]) : null;
 }
@@ -2237,22 +2252,72 @@ export function getCampaignStats(): CampaignStats[] {
 // --- Domain Registration (Route 53) ---
 
 // TLD → { awsUsdCents: cost to us in USD cents, userMxnCents: price to user in MXN cents }
-export const TLD_PRICES: Record<string, { awsUsdCents: number; userMxnCents: number }> = {
-  ".com":    { awsUsdCents: 1300, userMxnCents: 59900 },
-  ".net":    { awsUsdCents: 1100, userMxnCents: 49900 },
-  ".org":    { awsUsdCents: 1200, userMxnCents: 54900 },
-  ".io":     { awsUsdCents: 3900, userMxnCents: 179900 },
-  ".co":     { awsUsdCents: 2500, userMxnCents: 114900 },
-  ".click":  { awsUsdCents: 300,  userMxnCents: 13900 },
-  ".link":   { awsUsdCents: 500,  userMxnCents: 22900 },
-  ".mx":     { awsUsdCents: 3500, userMxnCents: 159900 },
-  ".com.mx": { awsUsdCents: 3500, userMxnCents: 159900 },
-  ".xyz":    { awsUsdCents: 1200, userMxnCents: 54900 },
-  ".info":   { awsUsdCents: 1200, userMxnCents: 54900 },
-  ".me":     { awsUsdCents: 1900, userMxnCents: 86900 },
+/**
+ * Renovar y transferir no cuestan lo mismo que dar de alta en varios TLDs (`.xyz` y `.info`
+ * son baratísimos el primer año y caros después; el transfer-in de AWS **incluye +1 año**,
+ * así que se cobra como una renovación). Sin `renew*` el modelo de renovación estaría
+ * cobrando el precio de alta, que es justo el error que hace perder dinero al año.
+ */
+/**
+ * Costos verificados contra `route53domains list-prices` el 7-sep-2026, en USD. Los que
+ * estaban antes eran estimaciones y varias se quedaron cortas por mucho: `.io` costaba $71
+ * y no $39, `.mx` $67 y no $35, `.info` $30 y no $12 — ese último se estaba **vendiendo
+ * por debajo del costo**.
+ *
+ * Renovar y transferir no siempre valen lo mismo que dar de alta: en `.click` y `.link` la
+ * transferencia cuesta $10 USD contra $3 y $5 de renovación, así que cobrar el precio de
+ * renovación por un transfer-in sería perder dinero en cada uno.
+ */
+/**
+ * Costos verificados contra `route53domains list-prices` el 7-sep-2026, en USD; los de antes
+ * eran estimaciones y varias se quedaban cortas por mucho (`.io` cuesta $71 y decía $39,
+ * `.info` $30 y decía $12 — ese se vendía **bajo costo**).
+ *
+ * El precio al público es **costo × 1.2**, no un margen de producto: un dominio es una
+ * commodity con precio público y el cliente lo comprueba en diez segundos. El margen del
+ * negocio está en los $99/mes de activación; el dominio es la conveniencia de que quede
+ * configurado solo. `.click` y `.link` se salen del 1.2 por el piso: a ese margen dejarían
+ * menos que la comisión de MercadoPago.
+ *
+ * Renovar y transferir no siempre valen lo mismo que dar de alta: en `.click` y `.link` la
+ * transferencia cuesta $10 USD contra $3 y $5, así que cobrar el precio de renovación por un
+ * transfer-in sería perder dinero en cada uno.
+ *
+ * ⚠️ Al tocar esto, recuerda que **el monto de un PreApproval de MercadoPago no se puede
+ * cambiar después**: el precio de renovación se fija al contratar y tiene que aguantar años
+ * de tipo de cambio.
+ */
+export const TLD_PRICES: Record<string, {
+  awsUsdCents: number; userMxnCents: number;
+  renewUsdCents: number; renewMxnCents: number;
+  transferUsdCents: number; transferMxnCents: number;
+}> = {
+  ".com":     { awsUsdCents: 1600, userMxnCents: 39900, renewUsdCents: 1600, renewMxnCents: 39900, transferUsdCents: 1600, transferMxnCents: 39900 },
+  ".net":     { awsUsdCents: 1700, userMxnCents: 42900, renewUsdCents: 1700, renewMxnCents: 42900, transferUsdCents: 1700, transferMxnCents: 42900 },
+  ".org":     { awsUsdCents: 1600, userMxnCents: 39900, renewUsdCents: 1600, renewMxnCents: 39900, transferUsdCents: 1600, transferMxnCents: 39900 },
+  ".io":      { awsUsdCents: 7100, userMxnCents: 178900, renewUsdCents: 7100, renewMxnCents: 178900, transferUsdCents: 7100, transferMxnCents: 178900 },
+  ".co":      { awsUsdCents: 3800, userMxnCents: 95900, renewUsdCents: 3800, renewMxnCents: 95900, transferUsdCents: 3800, transferMxnCents: 95900 },
+  ".click":   { awsUsdCents: 300, userMxnCents: 11900, renewUsdCents: 300, renewMxnCents: 11900, transferUsdCents: 1000, transferMxnCents: 26900 },
+  ".link":    { awsUsdCents: 500, userMxnCents: 15900, renewUsdCents: 500, renewMxnCents: 15900, transferUsdCents: 1000, transferMxnCents: 26900 },
+  ".mx":      { awsUsdCents: 6700, userMxnCents: 168900, renewUsdCents: 6700, renewMxnCents: 168900, transferUsdCents: 6700, transferMxnCents: 168900 },
+  ".com.mx":  { awsUsdCents: 2900, userMxnCents: 72900, renewUsdCents: 2900, renewMxnCents: 72900, transferUsdCents: 2900, transferMxnCents: 72900 },
+  ".xyz":     { awsUsdCents: 1900, userMxnCents: 47900, renewUsdCents: 1900, renewMxnCents: 47900, transferUsdCents: 1900, transferMxnCents: 47900 },
+  ".info":    { awsUsdCents: 3000, userMxnCents: 75900, renewUsdCents: 3000, renewMxnCents: 75900, transferUsdCents: 3000, transferMxnCents: 75900 },
+  ".me":      { awsUsdCents: 3100, userMxnCents: 77900, renewUsdCents: 3100, renewMxnCents: 77900, transferUsdCents: 3100, transferMxnCents: 77900 },
 };
 
-export type DomainRegistrationStatus = "pending_payment" | "paid" | "registering" | "registered" | "failed";
+export type DomainRegistrationStatus =
+  | "pending_payment" | "paid" | "registering" | "registered" | "failed"
+  // Transfer-in: la solicitud tarda 5-7 días y depende de que el cliente apruebe el correo
+  // que manda AWS, así que necesita estados propios antes de entrar al pipeline normal.
+  | "transfer_pending_payment" | "transfer_paid" | "transfer_submitted"
+  | "transfer_awaiting_approval" | "transfer_failed" | "transfer_cancelled";
+
+export type DomainRegistrationKind = "register" | "transfer";
+export type DomainRenewalStatus = "none" | "active" | "past_due" | "cancelled";
+export type DnsImportStatus = "none" | "discovered" | "approved";
+
+export interface DnsSnapshotRecord { name: string; type: string; ttl: number; values: string[] }
 
 export interface DomainRegistration {
   id: string;
@@ -2271,6 +2336,28 @@ export interface DomainRegistration {
   mpPaymentId: string | null;
   lastError: string | null;
   createdAt: string;
+  kind: DomainRegistrationKind;
+  mpPreapprovalId: string | null;
+  renewalStatus: DomainRenewalStatus;
+  renewalPriceCents: number | null;
+  nextChargeAt: string | null;
+  lastSyncedAt: string | null;
+  awsAutoRenew: boolean;
+  warnedAt: string | null;
+  dunningStartedAt: string | null;
+  transferAuthCodeHint: string | null;
+  transferRequestedAt: string | null;
+  transferApprovedAt: string | null;
+  previousRegistrar: string | null;
+  dnsSnapshot: DnsSnapshotRecord[] | null;
+  dnsSnapshotAt: string | null;
+  dnsImportStatus: DnsImportStatus;
+}
+
+/** Lo que puede ver el cliente. `awsCostCents` es nuestro costo interno y salía en la API. */
+export function publicDomainRegistration(r: DomainRegistration) {
+  const { awsCostCents: _costo, lastError, ...resto } = r;
+  return { ...resto, lastError: lastError ? "El registro falló; escríbenos y lo revisamos." : null };
 }
 
 export function createDomainRegistration(data: {
@@ -2279,18 +2366,29 @@ export function createDomainRegistration(data: {
   tld: string;
   priceCents: number;
   awsCostCents: number;
+  kind?: DomainRegistrationKind;
+  renewalPriceCents?: number;
+  transferAuthCodeHint?: string;
+  dnsSnapshot?: DnsSnapshotRecord[];
 }): DomainRegistration {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+  const kind = data.kind ?? "register";
   db.insert(domainRegistrations).values({
     id,
     domainName: data.domainName,
     ownerEmail: data.ownerEmail,
-    status: "pending_payment",
+    status: kind === "transfer" ? "transfer_pending_payment" : "pending_payment",
     tld: data.tld,
     priceCents: data.priceCents,
     awsCostCents: data.awsCostCents,
     createdAt: now,
+    kind,
+    renewalPriceCents: data.renewalPriceCents ?? null,
+    transferAuthCodeHint: data.transferAuthCodeHint ?? null,
+    dnsSnapshot: data.dnsSnapshot ?? null,
+    dnsSnapshotAt: data.dnsSnapshot ? now : null,
+    dnsImportStatus: data.dnsSnapshot ? "discovered" : "none",
   }).run();
   return getDomainRegistration(id)!;
 }
@@ -2314,17 +2412,46 @@ export function getDomainRegistrationsByStatus(status: DomainRegistrationStatus)
     .all() as DomainRegistration[];
 }
 
-export function updateDomainRegistration(id: string, updates: Partial<{
-  status: DomainRegistrationStatus;
-  domainId: string;
-  route53OperationId: string;
-  hostedZoneId: string;
-  registeredAt: string;
-  expiresAt: string;
-  mpPaymentId: string;
-  lastError: string;
-}>): void {
-  db.update(domainRegistrations).set(updates).where(eq(domainRegistrations.id, id)).run();
+type CamposRegistro =
+  | "status" | "domainId" | "route53OperationId" | "hostedZoneId" | "registeredAt"
+  | "expiresAt" | "mpPaymentId" | "lastError" | "autoRenew"
+  | "kind" | "mpPreapprovalId" | "renewalStatus" | "renewalPriceCents" | "nextChargeAt"
+  | "lastSyncedAt" | "awsAutoRenew" | "warnedAt" | "dunningStartedAt"
+  | "transferAuthCodeHint" | "transferRequestedAt" | "transferApprovedAt"
+  | "previousRegistrar" | "dnsSnapshot" | "dnsSnapshotAt" | "dnsImportStatus";
+
+/** `autoRenew` estaba en la tabla desde el principio y esta función no dejaba escribirlo. */
+export function updateDomainRegistration(
+  id: string,
+  updates: Partial<Pick<DomainRegistration, CamposRegistro>>,
+): void {
+  if (!Object.keys(updates).length) return;
+  db.update(domainRegistrations).set(updates as any).where(eq(domainRegistrations.id, id)).run();
+}
+
+export function getDomainRegistrationByDomainName(domainName: string): DomainRegistration | null {
+  const rows = db.select().from(domainRegistrations)
+    .where(eq(domainRegistrations.domainName, domainName))
+    .orderBy(desc(domainRegistrations.createdAt))
+    .all();
+  return rows.length ? (rows[0] as DomainRegistration) : null;
+}
+
+export function getDomainRegistrationByPreapprovalId(mpPreapprovalId: string): DomainRegistration | null {
+  const rows = db.select().from(domainRegistrations)
+    .where(eq(domainRegistrations.mpPreapprovalId, mpPreapprovalId))
+    .all();
+  return rows.length ? (rows[0] as DomainRegistration) : null;
+}
+
+/** Dominios ya registrados que vencen antes de una fecha. Base de avisos y cobranza. */
+export function getDomainRegistrationsExpiringBefore(iso: string): DomainRegistration[] {
+  return db.select().from(domainRegistrations)
+    .where(and(
+      eq(domainRegistrations.status, "registered"),
+      lte(domainRegistrations.expiresAt, iso),
+    ))
+    .all() as DomainRegistration[];
 }
 
 export function getDomainRegistrationByPaymentId(mpPaymentId: string): DomainRegistration | null {

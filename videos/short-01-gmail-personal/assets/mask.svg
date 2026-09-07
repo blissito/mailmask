@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <!-- Shadow -->
+  <ellipse cx="40" cy="42" rx="28" ry="24" fill="#a0182c"/>
+  <!-- Body -->
+  <ellipse cx="40" cy="38" rx="28" ry="22" fill="#d7263d"/>
+  <!-- Aberturas de la máscara -->
+  <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="#f2b705" stroke-width="1.8"/>
+  <ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="#f2b705" stroke-width="1.8"/>
+  <!-- Iris y pupila -->
+  <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/>
+  <circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/>
+  <circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/>
+  <circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
+  <!-- Doble brillo: luz y rebote -->
+  <circle cx="30.2" cy="34.9" r="1.9" fill="#ffffff"/>
+  <circle cx="54.2" cy="34.9" r="1.9" fill="#ffffff"/>
+  <circle cx="26.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/>
+  <circle cx="50.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/>
+  <!-- Crown -->
+  <path d="M40 18 L40 26" stroke="#f2b705" stroke-width="2" stroke-linecap="round"/>
+  <path d="M36 19 L40 26 L44 19" stroke="#f2b705" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>

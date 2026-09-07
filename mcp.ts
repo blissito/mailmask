@@ -66,6 +66,54 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
   tool("create_mailbox", "Crea un buzón IMAP para una máscara existente (dominio activado). Devuelve email, contraseña (una sola vez) y datos IMAP/SMTP.", { domainId, alias: aliasName }, (a) => sdk.aliases.createMailbox(a.domainId, a.alias));
   tool("delete_mailbox", "Borra el buzón IMAP de una máscara Y TODO SU CORREO. La máscara debe conservar al menos un destino.", { domainId, alias: aliasName }, (a) => sdk.aliases.deleteMailbox(a.domainId, a.alias));
 
+  // --- DNS ---
+  //
+  // Las descripciones están escritas para que las lea un LLM: dicen qué hace la herramienta,
+  // qué NO puede hacer y qué hacer después. La trampa de `set_dns_record` es que reemplaza
+  // el conjunto, así que se dice explícitamente cómo se añade un valor sin borrar los otros.
+
+  tool("list_dns_records",
+    "Lista los registros DNS del dominio y el estado de su zona. Los que traen `managed: true` los pone MailMask para que el correo funcione y no se pueden borrar. Llámala SIEMPRE antes de crear o cambiar un registro: te dice si ese nombre ya está ocupado y con qué valores.",
+    { domainId }, (a) => sdk.dns.list(a.domainId));
+
+  tool("create_dns_zone",
+    "Crea la zona DNS de MailMask para un dominio registrado fuera. Copia los registros que encuentre de tu proveedor actual y devuelve los nameservers que el dueño tiene que poner en su registrador; hasta que los cambie, nada de lo que edites tiene efecto. Enseña la lista `imported` al usuario antes de que los cambie: lo que no aparezca ahí dejará de funcionar.",
+    { domainId }, (a) => sdk.dns.createZone(a.domainId));
+
+  tool("dns_delegation_status",
+    "Comprueba si el dominio ya apunta a los nameservers de MailMask. Devuelve los que se observan hoy y los que se esperan. Un cambio de nameservers tarda de 1 a 48 horas.",
+    { domainId }, (a) => sdk.dns.delegation(a.domainId));
+
+  tool("set_dns_record",
+    "Crea o reemplaza un registro DNS. Es idempotente: `values` sustituye por completo lo que hubiera en ese nombre y tipo, así que para AÑADIR un valor primero léelo con list_dns_records e incluye también los que ya estaban. `name` puede ser '@' para la raíz o un subdominio ('www'). En MX la prioridad va dentro del valor: '10 mail.ejemplo.com'. TTL por defecto 300.",
+    {
+      domainId,
+      name: z.string().describe("'@' para la raíz, o el subdominio ('www')"),
+      type: z.enum(["A", "AAAA", "CNAME", "TXT", "MX", "NS", "CAA", "SRV"]),
+      values: z.array(z.string()).describe("La lista COMPLETA de valores que debe quedar"),
+      ttl: z.number().optional().describe("Segundos, entre 60 y 172800. Por defecto 300."),
+    },
+    (a) => sdk.dns.upsert(a.domainId, { name: a.name, type: a.type, values: a.values, ttl: a.ttl }));
+
+  tool("delete_dns_record",
+    "Borra un registro DNS completo, con todos sus valores. Los registros de correo de MailMask están protegidos y devuelven un error: no insistas, la única forma de quitarlos es eliminar el dominio de MailMask.",
+    { domainId, name: z.string(), type: z.enum(["A", "AAAA", "CNAME", "TXT", "MX", "NS", "CAA", "SRV"]) },
+    (a) => sdk.dns.delete(a.domainId, a.name, a.type));
+
+  tool("import_dns_records",
+    "Consulta el DNS público actual del dominio y devuelve lo que encuentra, sin escribir nada. Sirve para revisar qué habría que copiar antes de delegar. No garantiza ser exhaustivo.",
+    { domainId }, (a) => sdk.dns.import(a.domainId));
+
+  tool("point_domain_to",
+    "Apunta el dominio (o un subdominio) a un servicio de hosting sin tener que saber qué registros hacen falta. Para 'vercel' el `target` es el dominio que da Vercel ('mi-proyecto.vercel.app'); para 'github-pages' es 'usuario.github.io'; para 'dmarc' es el correo donde recibir los informes. Sin `subdomain` apunta la raíz y www.",
+    {
+      domainId,
+      provider: z.enum(["vercel", "netlify", "github-pages", "cloudflare-pages", "render", "fly", "redirect-a-www", "dmarc"]),
+      target: z.string().optional().describe("El destino que te dio el servicio"),
+      subdomain: z.string().optional().describe("Para apuntar sólo un subdominio, p. ej. 'app'"),
+    },
+    (a) => sdk.dns.preset(a.domainId, a.provider, a.target, a.subdomain));
+
   // --- Reglas ---
   const ruleShape = {
     field: z.enum(["to", "from", "subject"]),

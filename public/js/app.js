@@ -933,15 +933,9 @@ async function selectDomain(id) {
 
   document.getElementById("alias-domain-suffix").textContent = `@${selectedDomain.domain}`;
 
-  // Hide DNS tab for domains registered via MailMask (DNS is automatic)
-  const dnsBtn = document.querySelector('.tab-btn[data-tab="dns"]');
-  if (dnsBtn) {
-    if (selectedDomain.registeredViaMailmask) {
-      dnsBtn.classList.add("hidden");
-    } else {
-      dnsBtn.classList.remove("hidden");
-    }
-  }
+  // La pestaña DNS está siempre: desde que hay editor, el dominio comprado con nosotros es
+  // justamente el que más tiene que editar. Antes se ocultaba porque "el DNS es automático".
+  document.querySelector('.tab-btn[data-tab="dns"]')?.classList.remove("hidden");
 
   switchTab("aliases");
   await loadAliases();
@@ -1120,16 +1114,12 @@ async function searchDomainAvailability() {
           <button type="button" id="btn-search-another" class="w-full bg-bg-inset hover:bg-line text-fg text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors mb-2">
             Buscar otro dominio
           </button>
-          <div class="relative group">
-            <button type="button" disabled class="w-full bg-bg-inset text-fg-subtle text-sm font-semibold px-4 py-2.5 rounded-lg cursor-not-allowed">
-              Transferir dominio a MailMask
-            </button>
-            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-line text-fg text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-              Próximamente
-            </div>
-          </div>
+          <button type="button" id="btn-transferir" class="w-full bg-bg-inset hover:bg-line text-fg text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
+            Transferir dominio a MailMask
+          </button>
         </div>`;
       resultEl.querySelector("#btn-connect-existing").addEventListener("click", () => connectExistingDomain(q));
+      resultEl.querySelector("#btn-transferir").addEventListener("click", () => iniciarTransferencia(q));
       resultEl.querySelector("#btn-search-another").addEventListener("click", () => {
         resultEl.classList.add("hidden");
         input.value = "";
@@ -1141,6 +1131,94 @@ async function searchDomainAvailability() {
   } catch {
     resultEl.innerHTML = `<p class="text-sm text-red-500">Error de conexión</p>`;
   }
+}
+
+// --- Transferencia entrante ---
+//
+// Cuatro pasos: requisitos, código y pago, espera, y revisión del DNS. El orden importa:
+// los requisitos se comprueban ANTES de cobrar, y nada se mueve hasta que el cliente
+// aprueba el inventario de su DNS actual.
+
+async function iniciarTransferencia(dominio) {
+  const dlg = document.createElement("div");
+  dlg.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto";
+  dlg.innerHTML = `
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-lg p-5 my-8">
+      <h3 class="font-semibold text-fg mb-1">Transferir ${esc(dominio)}</h3>
+      <p class="text-sm text-fg-muted mb-4">Comprobando si tu registrador lo permite…</p>
+      <div id="transf-cuerpo"></div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button type="button" data-action="cerrar" class="text-sm text-fg-muted hover:text-fg px-3 py-2">Cerrar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg);
+  dlg.querySelector('[data-action="cerrar"]').addEventListener("click", () => dlg.remove());
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.remove(); });
+
+  const cuerpo = dlg.querySelector("#transf-cuerpo");
+  const res = await fetch("/api/domains/transfer/check", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ domain: dominio }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    cuerpo.innerHTML = `<p class="text-sm text-red-500">${esc(data.error || "No pudimos comprobarlo.")}</p>`;
+    return;
+  }
+
+  const marca = (ok) => ok === true
+    ? `<span class="text-accent-text">✓</span>`
+    : ok === false
+      ? `<span class="text-red-500">✗</span>`
+      : `<span class="text-amber-600">?</span>`;
+
+  const bloqueado = data.requisitos.some(r => r.ok === false);
+
+  cuerpo.innerHTML = `
+    <ul class="space-y-2 mb-4">
+      ${data.requisitos.map(r => `
+        <li class="text-sm">
+          <div class="flex gap-2"><span class="w-4 shrink-0">${marca(r.ok)}</span><span class="text-fg">${esc(r.texto)}</span></div>
+          ${r.ayuda ? `<p class="text-xs text-fg-subtle ml-6 mt-0.5">${esc(r.ayuda)}</p>` : ""}
+        </li>`).join("")}
+    </ul>
+    <div class="border border-line rounded-lg p-3 mb-4">
+      <p class="text-sm text-fg mb-1">Encontramos <strong>${data.dns.found.length}</strong> registro(s) en tu DNS actual.</p>
+      <p class="text-xs text-fg-subtle">Los copiamos para que tu sitio no se caiga. Podrás revisarlos y corregirlos antes de que el dominio se mueva.</p>
+    </div>
+    ${bloqueado ? `<p class="text-sm text-amber-600 mb-3">Arregla lo marcado con ✗ en tu registrador actual y vuelve a intentarlo.</p>` : `
+      <label class="block text-xs text-fg-muted mb-1">Código de autorización (EPP)</label>
+      <input id="transf-code" placeholder="Lo pides en tu registrador actual" class="w-full bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg font-mono mb-3">
+      <p id="transf-error" class="text-sm text-red-500 mb-2 hidden"></p>
+      <button type="button" id="transf-pagar" class="w-full bg-accent hover:bg-accent/90 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
+        Transferir por $${(data.price / 100).toFixed(0)} MXN · incluye 1 año
+      </button>
+      <p class="text-xs text-fg-subtle mt-2">Tarda de 5 a 7 días. Tu registrador te mandará un correo de aprobación que tienes que contestar.</p>`}`;
+
+  if (bloqueado) return;
+
+  dlg.querySelector("#transf-pagar").addEventListener("click", async () => {
+    const code = dlg.querySelector("#transf-code").value.trim();
+    const err = dlg.querySelector("#transf-error");
+    if (!code) {
+      err.textContent = "Falta el código de autorización.";
+      err.classList.remove("hidden");
+      return;
+    }
+    const r = await fetch("/api/domains/transfer/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ domain: dominio, authCode: code, dnsRecords: data.dns.found }),
+    });
+    const j = await r.json();
+    if (!r.ok) {
+      err.textContent = j.error || "No se pudo iniciar la transferencia.";
+      err.classList.remove("hidden");
+      return;
+    }
+    window.location.href = j.initPoint;
+  });
 }
 
 async function connectExistingDomain(domain) {
@@ -1704,18 +1782,11 @@ function renderHealthPanel() {
 
 // --- DNS ---
 
-function renderDnsRecords() {
+// Los registros que hay que copiar a mano en el proveedor del cliente. No desaparece con
+// el editor: hay quien no va a delegar nunca su DNS con nosotros, y está bien.
+function renderDnsRecords(contenedor) {
   if (!selectedDomain) return;
-  const records = document.getElementById("dns-records");
-
-  if (selectedDomain.registeredViaMailmask) {
-    records.innerHTML = `
-      <div class="flex items-center gap-2 bg-green-900/20 border border-accent/30 rounded-lg px-4 py-3">
-        <svg class="w-5 h-5 text-accent-text" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-        <span class="text-sm text-accent-text font-medium">DNS configurado automáticamente por MailMask</span>
-      </div>`;
-    return;
-  }
+  const records = contenedor || document.getElementById("dns-records");
 
   const d = selectedDomain.domain;
   const dnsItems = [
@@ -1820,6 +1891,331 @@ function renderDnsRecords() {
         </div>
       `).join("")}
     </div>`;
+}
+
+// --- Editor de DNS ---
+//
+// Tres estados: sin zona (el cliente elige delegar o configurar a mano), esperando la
+// delegación (le enseñamos los nameservers y lo que copiamos), y activa (la tabla editable).
+
+let _dnsEstado = null;
+let _dnsTimer = null;
+
+function dnsDetenerSondeo() {
+  if (_dnsTimer) { clearInterval(_dnsTimer); _dnsTimer = null; }
+}
+
+async function loadDns() {
+  dnsDetenerSondeo();
+  const cont = document.getElementById("dns-records");
+  if (!selectedDomain) return;
+  cont.innerHTML = `<div class="px-4 py-6 text-sm text-fg-muted">Cargando…</div>`;
+
+  try {
+    const res = await fetch(`/api/domains/${selectedDomain.id}/dns`);
+    if (!res.ok) throw new Error("no se pudo leer el DNS");
+    _dnsEstado = await res.json();
+  } catch {
+    cont.innerHTML = `<div class="px-4 py-4 text-sm text-fg-muted">No pudimos leer el DNS. Mientras tanto, estos son los registros que hay que configurar:</div>`;
+    const manual = document.createElement("div");
+    cont.appendChild(manual);
+    renderDnsRecords(manual);
+    return;
+  }
+
+  const estado = _dnsEstado.zone.status;
+  if (estado === "none") renderDnsSinZona(cont);
+  else if (estado === "pending_delegation") renderDnsDelegacion(cont);
+  else renderDnsTabla(cont);
+}
+
+function renderDnsSinZona(cont) {
+  cont.innerHTML = `
+    <div class="p-4 space-y-4">
+      <div class="border border-line rounded-lg p-4 bg-bg-elev">
+        <h4 class="font-semibold text-fg mb-1">Deja que MailMask lleve tu DNS</h4>
+        <p class="text-sm text-fg-muted mb-3">
+          Copiamos los registros que encontremos de tu proveedor actual y te damos los
+          nameservers que hay que cambiar. Tu sitio sigue funcionando: sólo cambia quién
+          responde las preguntas sobre <strong>${esc(selectedDomain.domain)}</strong>.
+        </p>
+        <button type="button" data-action="dns-crear-zona" class="bg-accent hover:bg-accent/90 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+          Activar el editor de DNS
+        </button>
+      </div>
+      <details class="border border-line rounded-lg">
+        <summary class="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-fg">
+          Prefiero configurarlo yo en mi proveedor
+        </summary>
+        <div id="dns-manual" class="border-t border-line"></div>
+      </details>
+    </div>`;
+  renderDnsRecords(document.getElementById("dns-manual"));
+  cont.querySelector('[data-action="dns-crear-zona"]').addEventListener("click", dnsCrearZona);
+}
+
+async function dnsCrearZona() {
+  const btn = document.querySelector('[data-action="dns-crear-zona"]');
+  btn.disabled = true;
+  btn.textContent = "Preparando tu zona…";
+
+  const res = await fetch(`/api/domains/${selectedDomain.id}/dns/zone`, { method: "POST" });
+  const data = await res.json();
+  if (!res.ok) {
+    btn.disabled = false;
+    btn.textContent = "Activar el editor de DNS";
+    alert(data.error || "No se pudo crear la zona.");
+    return;
+  }
+  playSound("success");
+  loadDns();
+}
+
+function renderDnsDelegacion(cont) {
+  const ns = _dnsEstado.zone.nameservers || [];
+  cont.innerHTML = `
+    <div class="p-4 space-y-4">
+      <div class="border border-amber-500/30 bg-amber-500/10 rounded-lg p-4">
+        <h4 class="font-semibold text-fg mb-1">Falta un paso en tu registrador</h4>
+        <p class="text-sm text-fg-muted mb-3">
+          Entra a donde compraste <strong>${esc(selectedDomain.domain)}</strong> y sustituye
+          sus nameservers por estos. Hasta que lo hagas, lo que edites aquí no tiene efecto.
+        </p>
+        <div class="space-y-1">
+          ${ns.map(n => `
+            <div class="flex items-center gap-2">
+              <code class="text-xs font-mono text-fg break-all select-all">${esc(n)}</code>
+              <button type="button" data-action="copy" data-copy-value="${esc(n)}" class="text-fg-subtle hover:text-fg p-1 rounded hover:bg-line" title="Copiar">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              </button>
+            </div>`).join("")}
+        </div>
+        <div class="mt-3 flex items-center gap-3">
+          <button type="button" data-action="dns-comprobar" class="bg-bg-inset hover:bg-line text-fg text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors">
+            Ya los cambié
+          </button>
+          <span id="dns-delegacion-estado" class="text-xs text-fg-subtle"></span>
+        </div>
+      </div>
+      <div>
+        <p class="text-sm text-fg-muted mb-2">
+          Esto es lo que hay en tu zona. Revísalo: <strong>lo que no esté aquí dejará de
+          funcionar</strong> cuando cambies los nameservers.
+        </p>
+        <div class="border border-line rounded-lg overflow-hidden" id="dns-tabla"></div>
+      </div>
+    </div>`;
+
+  renderDnsFilas(document.getElementById("dns-tabla"));
+  cont.querySelector('[data-action="dns-comprobar"]').addEventListener("click", dnsComprobarDelegacion);
+  // Mientras la pestaña esté a la vista, se pregunta solo.
+  _dnsTimer = setInterval(dnsComprobarDelegacion, 60_000);
+}
+
+async function dnsComprobarDelegacion() {
+  const el = document.getElementById("dns-delegacion-estado");
+  if (!el) { dnsDetenerSondeo(); return; }
+  el.textContent = "Comprobando…";
+
+  const res = await fetch(`/api/domains/${selectedDomain.id}/dns/delegation`);
+  const data = await res.json();
+  if (data.delegated) {
+    dnsDetenerSondeo();
+    playSound("success");
+    loadDns();
+    return;
+  }
+  el.textContent = data.observed?.length
+    ? `Todavía vemos ${data.observed[0]}. Los cambios de nameservers tardan de 1 a 48 horas.`
+    : "Todavía no vemos el cambio. Puede tardar hasta 48 horas.";
+}
+
+function renderDnsTabla(cont) {
+  cont.innerHTML = `
+    <div class="p-4">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-sm text-fg-muted">MailMask lleva el DNS de este dominio.</p>
+        <button type="button" data-action="dns-nuevo" class="bg-accent hover:bg-accent/90 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors">
+          + Añadir registro
+        </button>
+      </div>
+      <div class="border border-line rounded-lg overflow-hidden" id="dns-tabla"></div>
+    </div>`;
+  renderDnsFilas(document.getElementById("dns-tabla"));
+  cont.querySelector('[data-action="dns-nuevo"]').addEventListener("click", () => dnsFormulario(null));
+}
+
+function renderDnsFilas(tabla) {
+  const registros = _dnsEstado.records || [];
+  const candado = `<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>`;
+
+  tabla.innerHTML = `
+    <div class="hidden sm:grid grid-cols-[64px_minmax(0,1fr)_minmax(0,1.6fr)_64px_92px] gap-3 px-3 py-2 text-[10px] uppercase tracking-widest text-fg-subtle bg-bg-elev border-b border-line">
+      <span>Tipo</span><span>Nombre</span><span>Valor</span><span>TTL</span><span></span>
+    </div>
+    <div class="divide-y divide-line">
+      ${registros.map((r, i) => `
+        <div class="px-3 py-2.5 grid grid-cols-1 sm:grid-cols-[64px_minmax(0,1fr)_minmax(0,1.6fr)_64px_92px] gap-2 sm:gap-3 sm:items-start">
+          <div><span class="inline-block font-mono font-bold text-xs text-fg bg-bg-inset px-2 py-0.5 rounded">${esc(r.type)}</span></div>
+          <div class="min-w-0"><code class="text-xs font-mono text-fg break-all">${esc(r.name)}</code></div>
+          <div class="min-w-0">
+            ${r.values.map(v => `<code class="block text-xs font-mono text-fg break-all">${esc(v)}</code>`).join("")}
+          </div>
+          <div class="text-xs text-fg-subtle">${r.ttl}</div>
+          <div class="flex items-center gap-2">
+            ${r.managed && !r.editable
+              ? `<span class="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-semibold text-accent-text">${candado} MailMask</span>`
+              : `<button type="button" data-dns-editar="${i}" class="text-xs text-fg-subtle hover:text-fg">Editar</button>
+                 ${r.managed ? "" : `<button type="button" data-dns-borrar="${i}" class="text-xs text-fg-subtle hover:text-red-500">Borrar</button>`}`}
+          </div>
+          ${r.managedReason
+            // Visible como texto y no en un title=: en móvil no hay hover.
+            ? `<div class="sm:col-span-5 text-xs text-fg-subtle sm:pl-[76px]">${esc(r.managedReason)}</div>`
+            : ""}
+        </div>`).join("")}
+    </div>`;
+
+  tabla.querySelectorAll("[data-dns-editar]").forEach(b =>
+    b.addEventListener("click", () => dnsFormulario(registros[Number(b.dataset.dnsEditar)])));
+  tabla.querySelectorAll("[data-dns-borrar]").forEach(b =>
+    b.addEventListener("click", () => dnsBorrar(registros[Number(b.dataset.dnsBorrar)])));
+}
+
+const DNS_AYUDA = {
+  A: "La dirección IPv4 del servidor. Ejemplo: 76.76.21.21",
+  AAAA: "La dirección IPv6 del servidor.",
+  CNAME: "El nombre al que apunta. No se puede usar en la raíz del dominio.",
+  TXT: "Texto libre. Si es más largo de 255 caracteres lo partimos solos.",
+  MX: "La prioridad va dentro del valor: 10 mail.ejemplo.com",
+  NS: "Sólo para delegar un subdominio.",
+  CAA: 'Qué autoridad puede emitir certificados: 0 issue "letsencrypt.org"',
+  SRV: "prioridad peso puerto host. El nombre debe ser _servicio._protocolo.",
+};
+
+function dnsFormulario(registro) {
+  const editando = !!registro;
+  const tipos = ["A", "AAAA", "CNAME", "TXT", "MX", "NS", "CAA", "SRV"];
+  const sufijo = `.${selectedDomain.domain}`;
+  const nombreCorto = registro
+    ? (registro.name === selectedDomain.domain ? "@" : registro.name.replace(sufijo, ""))
+    : "";
+  // En un registro parcialmente gestionado (el TXT de la raíz), lo nuestro no se puede quitar.
+  const fijos = registro?.protectedValues || [];
+  const editables = registro ? registro.values.filter(v => !fijos.includes(v)) : [];
+
+  const dlg = document.createElement("div");
+  dlg.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4";
+  dlg.innerHTML = `
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-lg p-5">
+      <h3 class="font-semibold text-fg mb-4">${editando ? "Editar registro" : "Añadir registro"}</h3>
+      <div class="space-y-3">
+        <div class="grid grid-cols-[110px_1fr] gap-3">
+          <div>
+            <label class="block text-xs text-fg-muted mb-1">Tipo</label>
+            <select id="dns-f-tipo" ${editando ? "disabled" : ""} class="w-full bg-bg-inset border border-line rounded-lg px-2 py-2 text-sm text-fg">
+              ${tipos.map(t => `<option ${registro?.type === t ? "selected" : ""}>${t}</option>`).join("")}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-fg-muted mb-1">Nombre</label>
+            <input id="dns-f-nombre" ${editando ? "disabled" : ""} value="${esc(nombreCorto)}" placeholder="@ para la raíz, o www"
+              class="w-full bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg font-mono">
+          </div>
+        </div>
+        ${fijos.length ? `
+          <div>
+            <label class="block text-xs text-fg-muted mb-1">De MailMask (no se puede quitar)</label>
+            ${fijos.map(v => `<code class="block text-xs font-mono text-fg-subtle bg-bg-inset border border-line rounded px-2 py-1.5 break-all">${esc(v)}</code>`).join("")}
+          </div>` : ""}
+        <div>
+          <label class="block text-xs text-fg-muted mb-1">Valor${fijos.length ? "es adicionales" : "(es)"} — uno por línea</label>
+          <textarea id="dns-f-valores" rows="3" class="w-full bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg font-mono">${esc(editables.join("\n"))}</textarea>
+          <p id="dns-f-ayuda" class="text-xs text-fg-subtle mt-1"></p>
+        </div>
+        <div class="w-28">
+          <label class="block text-xs text-fg-muted mb-1">TTL</label>
+          <input id="dns-f-ttl" type="number" value="${registro?.ttl ?? 300}" class="w-full bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg">
+        </div>
+        <p id="dns-f-error" class="text-sm text-red-500 hidden"></p>
+        <div id="dns-f-sugerencia" class="hidden"></div>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button type="button" data-action="cancelar" class="text-sm text-fg-muted hover:text-fg px-3 py-2">Cancelar</button>
+        <button type="button" data-action="guardar" class="bg-accent hover:bg-accent/90 text-white text-sm font-semibold px-4 py-2 rounded-lg">Guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg);
+
+  const tipoEl = dlg.querySelector("#dns-f-tipo");
+  const ayudaEl = dlg.querySelector("#dns-f-ayuda");
+  const pintarAyuda = () => { ayudaEl.textContent = DNS_AYUDA[tipoEl.value] || ""; };
+  tipoEl.addEventListener("change", pintarAyuda);
+  pintarAyuda();
+
+  const cerrar = () => dlg.remove();
+  dlg.querySelector('[data-action="cancelar"]').addEventListener("click", cerrar);
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) cerrar(); });
+
+  dlg.querySelector('[data-action="guardar"]').addEventListener("click", async () => {
+    const errEl = dlg.querySelector("#dns-f-error");
+    const sugEl = dlg.querySelector("#dns-f-sugerencia");
+    errEl.classList.add("hidden");
+    sugEl.classList.add("hidden");
+    sugEl.innerHTML = "";
+
+    const valores = [
+      ...fijos,
+      ...dlg.querySelector("#dns-f-valores").value.split("\n").map(v => v.trim()).filter(Boolean),
+    ];
+
+    const cuerpo = {
+      name: dlg.querySelector("#dns-f-nombre").value.trim() || "@",
+      type: tipoEl.value,
+      ttl: Number(dlg.querySelector("#dns-f-ttl").value) || 300,
+      values: valores,
+    };
+
+    const res = await fetch(`/api/domains/${selectedDomain.id}/dns/records`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(cuerpo),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      errEl.textContent = data.error || "No se pudo guardar.";
+      errEl.classList.remove("hidden");
+      // El servidor puede devolver los valores ya arreglados (el SPF del apex).
+      if (data.suggestedValues) {
+        sugEl.classList.remove("hidden");
+        sugEl.innerHTML = `<button type="button" class="text-sm text-accent-text hover:underline">Corregir automáticamente</button>`;
+        sugEl.querySelector("button").addEventListener("click", () => {
+          dlg.querySelector("#dns-f-valores").value = data.suggestedValues.filter(v => !fijos.includes(v)).join("\n");
+          sugEl.classList.add("hidden");
+          errEl.classList.add("hidden");
+        });
+      }
+      return;
+    }
+
+    playSound("success");
+    cerrar();
+    loadDns();
+  });
+}
+
+async function dnsBorrar(registro) {
+  if (!confirm(`¿Borrar el registro ${registro.type} de ${registro.name}? Esto puede tumbar lo que dependa de él.`)) return;
+
+  const res = await fetch(`/api/domains/${selectedDomain.id}/dns/records`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: registro.name, type: registro.type }),
+  });
+  const data = await res.json();
+  if (!res.ok) { alert(data.error || "No se pudo borrar."); return; }
+  playSound("pop");
+  loadDns();
 }
 
 async function verifyDns() {
@@ -2149,7 +2545,7 @@ function switchTab(tab) {
   if (tab === "aliases") loadAliases();
   else if (tab === "rules") loadRules();
   else if (tab === "logs") loadLogs();
-  else if (tab === "dns") { renderDnsRecords(); renderHealthPanel(); }
+  else if (tab === "dns") { loadDns(); renderHealthPanel(); }
   else if (tab === "members") loadMembers();
   else if (tab === "smtp") loadSmtpCredentials();
   else if (tab === "webhooks") loadWebhooks();
@@ -2296,22 +2692,21 @@ function hideModal(id) {
   unlockBodyScroll();
 }
 
-const AVAILABLE_TLDS = [
-  { tld: ".com", price: 59900, popular: true },
-  { tld: ".mx", price: 159900 },
-  { tld: ".com.mx", price: 159900 },
-  { tld: ".net", price: 49900 },
-  { tld: ".org", price: 54900 },
-  { tld: ".io", price: 179900, popular: true },
-  { tld: ".co", price: 114900 },
-  { tld: ".click", price: 13900 },
-  { tld: ".link", price: 22900 },
-  { tld: ".xyz", price: 54900 },
-  { tld: ".info", price: 54900 },
-  { tld: ".me", price: 86900 },
-];
+// Los precios los manda el servidor: esta lista estaba duplicada a mano y se quedó
+// desfasada en cuanto cambiaron.
+let AVAILABLE_TLDS = [];
 
-function renderTldGrid(base) {
+async function cargarTlds() {
+  if (AVAILABLE_TLDS.length) return AVAILABLE_TLDS;
+  try {
+    const res = await fetch("/api/domains/tlds");
+    if (res.ok) AVAILABLE_TLDS = await res.json();
+  } catch { /* sin lista, el grid no se pinta y el buscador sigue funcionando */ }
+  return AVAILABLE_TLDS;
+}
+
+async function renderTldGrid(base) {
+  await cargarTlds();
   const container = document.getElementById("add-domain-tld-list");
   const gridEl = document.getElementById("add-domain-tld-grid");
   if (!container || !gridEl) return;

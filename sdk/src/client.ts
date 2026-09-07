@@ -4,6 +4,8 @@ import type {
   BulkSendInput, BulkJob, BulkJobCreated, SmtpCredential, SmtpCredentialCreated,
   ApiKey, SendOptions, UploadAttachmentInput, UploadedAttachment, Suppression,
   Webhook, WebhookCreated, CreateWebhookInput, UpdateWebhookInput, WebhookDelivery,
+  DnsRecordType, DnsRRSet, DnsListResponse, DnsZoneCreated, DnsDelegation, DnsImportResult,
+  DnsChangeResult, DnsPreset,
 } from "./types.js";
 
 class MailMaskError extends Error {
@@ -39,6 +41,7 @@ export class MailMask {
   webhooks: WebhooksResource;
   smtp: SmtpResource;
   apiKeys: ApiKeysResource;
+  dns: DnsResource;
 
   constructor(config: MailMaskConfig) {
     this.apiKey = config.apiKey;
@@ -58,6 +61,7 @@ export class MailMask {
     this.webhooks = new WebhooksResource(req);
     this.smtp = new SmtpResource(req);
     this.apiKeys = new ApiKeysResource(req);
+    this.dns = new DnsResource(req);
   }
 }
 
@@ -71,6 +75,24 @@ class DomainsResource {
   delete(id: string) { return this.req<{ ok: boolean }>(`/api/domains/${id}`, { method: "DELETE" }); }
   health(id: string) { return this.req<Record<string, unknown>>(`/api/domains/${id}/health`); }
   verify(id: string) { return this.req<DomainVerification>(`/api/domains/${id}/verify`, { method: "POST" }); }
+}
+
+class DnsResource {
+  constructor(private req: Req) {}
+  list(domainId: string) { return this.req<DnsListResponse>(`/api/domains/${domainId}/dns`); }
+  createZone(domainId: string) { return this.req<DnsZoneCreated>(`/api/domains/${domainId}/dns/zone`, { method: "POST" }); }
+  delegation(domainId: string) { return this.req<DnsDelegation>(`/api/domains/${domainId}/dns/delegation`); }
+  import(domainId: string) { return this.req<DnsImportResult>(`/api/domains/${domainId}/dns/import`, { method: "POST" }); }
+  /** Reemplaza el conjunto: `values` sustituye por completo lo que hubiera en ese nombre y tipo. */
+  upsert(domainId: string, record: { name: string; type: DnsRecordType; values: string[]; ttl?: number }) {
+    return this.req<DnsChangeResult>(`/api/domains/${domainId}/dns/records`, { method: "PUT", body: JSON.stringify(record) });
+  }
+  delete(domainId: string, name: string, type: DnsRecordType) {
+    return this.req<{ ok: boolean; changeId: string }>(`/api/domains/${domainId}/dns/records`, { method: "DELETE", body: JSON.stringify({ name, type }) });
+  }
+  preset(domainId: string, preset: DnsPreset, target?: string, subdomain?: string) {
+    return this.req<DnsChangeResult>(`/api/domains/${domainId}/dns/preset`, { method: "POST", body: JSON.stringify({ preset, target, subdomain }) });
+  }
 }
 
 class AliasesResource {

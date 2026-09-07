@@ -18,6 +18,8 @@ const suffix = Date.now();
 const enviados: { from: string; to: string; subject: string; opts?: any }[] = [];
 // "S3" en memoria para los adjuntos.
 const archivos = new Map<string, { body: Uint8Array; contentType: string }>();
+// Zona de Route 53 en memoria, llaveada por `nombre|tipo`.
+const zonaDns = new Map<string, { name: string; type: string; ttl: number; values: string[] }>();
 
 // Estado que "SES" reporta. Los tests lo mueven para simular que la identidad
 // desapareció de la cuenta, que es lo que le pasó a brendago.design.
@@ -60,6 +62,31 @@ describe("SDK ↔ servidor: contrato", () => {
         deleteReceiptRule: async () => undefined,
         deleteConfigurationSet: async () => undefined,
         deleteDomainIdentity: async () => undefined,
+      },
+    });
+
+    // Route 53 en memoria: el editor de DNS habla con AWS y aquí sólo interesa el contrato.
+    mock.module("./route53.ts", {
+      namedExports: {
+        listRecordSets: async () => [...zonaDns.values()],
+        // deno-lint-ignore no-explicit-any
+        applyRecordChanges: async (_z: string, cambios: any[]) => {
+          for (const c of cambios) {
+            const k = `${c.rrset.name}|${c.rrset.type}`;
+            if (c.action === "DELETE") zonaDns.delete(k); else zonaDns.set(k, c.rrset);
+          }
+          return { changeId: "C1" };
+        },
+        ensureHostedZone: async () => ({ hostedZoneId: "ZSDK", nameservers: ["ns-1.awsdns-01.com"], created: true }),
+        configureDnsRecords: async () => undefined,
+        deleteHostedZone: async () => undefined,
+      },
+    });
+    mock.module("./dns-import.ts", {
+      namedExports: {
+        snapshotDns: async () => ({ found: [], nameservers: [], warning: "aviso" }),
+        delegacionActiva: async (_d: string, esperados: string[]) => ({ delegated: false, observed: ["ns1.viejo.com"], expected: esperados }),
+        nameserversActuales: async () => ["ns1.viejo.com"],
       },
     });
 
@@ -512,5 +539,72 @@ describe("SDK ↔ servidor: contrato", () => {
     // y el destinatario quedó suprimido
     assert.ok((await mm.suppressions.list(domainId)).some((s) => s.email === "acuse@example.com"));
     await mm.suppressions.remove(domainId, "acuse@example.com");
+  });
+  // --- DNS ---
+  //
+  // Siete métodos nuevos del SDK: si alguno apunta a una ruta que no existe, aquí sale.
+
+  it("dns: sin zona, list devuelve la pista en vez de fallar", async () => {
+    const r = await mm.dns.list(domainId);
+    assert.equal(r.zone.status, "none");
+    assert.match(r.hint ?? "", /dns\/zone/);
+    assert.deepEqual(r.records, []);
+  });
+
+  it("dns: createZone deja la zona lista y en espera de delegación", async () => {
+    const z = await mm.dns.createZone(domainId);
+    assert.equal(z.hostedZoneId, "ZSDK");
+    assert.deepEqual(z.nameservers, ["ns-1.awsdns-01.com"]);
+    assert.ok(z.importWarning, "hay que avisar de que la importación puede no ser completa");
+
+    const r = await mm.dns.list(domainId);
+    assert.equal(r.zone.status, "pending_delegation");
+  });
+
+  it("dns: upsert, list y delete de un registro propio", async () => {
+    await mm.dns.upsert(domainId, { name: "www", type: "CNAME", values: ["cname.vercel-dns.com"] });
+    const listado = await mm.dns.list(domainId);
+    const www = listado.records.find((r) => r.name === `www.${dominio}`)!;
+    assert.deepEqual(www.values, ["cname.vercel-dns.com"]);
+    assert.equal(www.managed, false);
+
+    await mm.dns.delete(domainId, "www", "CNAME");
+    assert.ok(!(await mm.dns.list(domainId)).records.some((r) => r.name === `www.${dominio}`));
+  });
+
+  it("dns: el guardián no deja borrar el MX ni quitar el SPF", async () => {
+    await mm.dns.upsert(domainId, { name: "@", type: "MX", values: ["10 inbound-smtp.us-east-1.amazonaws.com"] })
+      .catch(() => {/* si el guardián ya lo bloquea, se siembra a mano abajo */});
+    zonaDns.set(`${dominio}|MX`, { name: dominio, type: "MX", ttl: 300, values: ["10 inbound-smtp.us-east-1.amazonaws.com"] });
+    zonaDns.set(`${dominio}|TXT`, { name: dominio, type: "TXT", ttl: 300, values: ['"v=spf1 include:amazonses.com ~all"'] });
+
+    await assert.rejects(
+      () => mm.dns.delete(domainId, "@", "MX"),
+      (e: MailMaskError) => e.status === 409 && /dejas de recibir correo/.test(e.message),
+    );
+    await assert.rejects(
+      () => mm.dns.upsert(domainId, { name: "@", type: "TXT", values: ["solo-mi-verificacion=1"] }),
+      (e: MailMaskError) => e.status === 409 && /spam/.test(e.message),
+    );
+    assert.ok(zonaDns.has(`${dominio}|MX`), "el MX sigue en pie");
+  });
+
+  it("dns: preset, delegation e import", async () => {
+    const p = await mm.dns.preset(domainId, "vercel", "mi-proyecto.vercel.app");
+    assert.equal(p.records!.length, 2);
+
+    const d = await mm.dns.delegation(domainId);
+    assert.equal(d.delegated, false);
+    assert.deepEqual(d.observed, ["ns1.viejo.com"]);
+
+    const i = await mm.dns.import(domainId);
+    assert.ok(i.warning);
+  });
+
+  it("dns: un TTL inválido vuelve como 400 con el mensaje del servidor", async () => {
+    await assert.rejects(
+      () => mm.dns.upsert(domainId, { name: "x", type: "A", values: ["1.2.3.4"], ttl: 5 }),
+      (e: MailMaskError) => e.status === 400 && /60/.test(e.message),
+    );
   });
 });

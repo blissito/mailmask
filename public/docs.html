@@ -452,10 +452,13 @@ claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \
         <li><strong>M&aacute;scaras y buzones</strong>: <code>list_aliases</code>, <code>create_alias</code> (con <code>mailbox: true</code> crea tambi&eacute;n el buz&oacute;n IMAP), <code>update_alias</code>, <code>delete_alias</code>, <code>create_mailbox</code>, <code>delete_mailbox</code>.</li>
         <li><strong>Reglas</strong>: <code>list_rules</code>, <code>create_rule</code>, <code>update_rule</code>, <code>delete_rule</code>.</li>
         <li><strong>Webhooks</strong>: <code>list_webhooks</code>, <code>create_webhook</code>, <code>update_webhook</code>, <code>delete_webhook</code>, <code>test_webhook</code>, <code>webhook_deliveries</code>.</li>
+        <li><strong>DNS</strong>: <code>list_dns_records</code>, <code>create_dns_zone</code>, <code>dns_delegation_status</code>, <code>set_dns_record</code>, <code>delete_dns_record</code>, <code>import_dns_records</code>, <code>point_domain_to</code> (apunta el dominio a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render o Fly sin saber qu&eacute; registros hacen falta).</li>
         <li><strong>Env&iacute;o</strong>: <code>send_email</code> (con <code>idempotencyKey</code>), <code>bulk_send</code>, <code>bulk_status</code>.</li>
         <li><strong>Operaci&oacute;n</strong>: <code>list_logs</code>, <code>list_suppressions</code>, <code>add_suppression</code>, <code>remove_suppression</code>, <code>list_smtp_credentials</code>, <code>create_smtp_credential</code>, <code>revoke_smtp_credential</code>.</li>
         <li><code>search_tools</code>: busca herramientas por palabra clave, para clientes que cargan el cat&aacute;logo bajo demanda.</li>
       </ul>
+      <p class="text-fg-muted text-sm mb-4">Sobre el DNS: <code>set_dns_record</code> <strong>reemplaza</strong> el conjunto de valores de ese nombre y tipo, as&iacute; que para a&ntilde;adir un valor hay que leer primero con <code>list_dns_records</code> e incluir tambi&eacute;n los que ya estaban. Los registros que MailMask necesita para tu correo (el MX, el TXT de verificaci&oacute;n, el SPF y los CNAME de DKIM) vienen marcados con <code>managed</code> y no se pueden borrar: el agente recibe un 409 explicando por qu&eacute;.</p>
+
       <p class="text-fg-muted text-sm mb-4">Un error del servidor (por ejemplo, un dominio gratis pidiendo un buz&oacute;n) llega al agente como resultado con <code>isError</code> y el mensaje tal cual, no como fallo del protocolo. Las API keys no se crean ni revocan por MCP: un agente con una llave no puede fabricar m&aacute;s. El l&iacute;mite es el mismo de la API: 60 peticiones por minuto por llave.</p>
 
       <!-- Referencia -->

@@ -1,0 +1,52 @@
+[
+  {
+    "text": "Todavía",
+    "start": 0.05,
+    "end": 0.49
+  },
+  {
+    "text": "le",
+    "start": 0.49,
+    "end": 0.63
+  },
+  {
+    "text": "escribes",
+    "start": 0.63,
+    "end": 1.19
+  },
+  {
+    "text": "a",
+    "start": 1.19,
+    "end": 1.2
+  },
+  {
+    "text": "tus",
+    "start": 1.3,
+    "end": 1.42
+  },
+  {
+    "text": "clientes",
+    "start": 1.53,
+    "end": 2.03
+  },
+  {
+    "text": "desde",
+    "start": 2.18,
+    "end": 2.43
+  },
+  {
+    "text": "un",
+    "start": 2.43,
+    "end": 2.58
+  },
+  {
+    "text": "Gmail",
+    "start": 2.58,
+    "end": 2.95
+  },
+  {
+    "text": "personal.",
+    "start": 3.04,
+    "end": 3.62
+  }
+]

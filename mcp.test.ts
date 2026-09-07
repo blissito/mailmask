@@ -5,6 +5,8 @@ import assert from "node:assert/strict";
 
 const suffix = Date.now().toString(36);
 
+const zonaDns = new Map<string, { name: string; type: string; ttl: number; values: string[] }>();
+
 describe("MCP: agentes contra la app", () => {
   // deno-lint-ignore no-explicit-any
   let app: any, dbmod: any, sqlite: any;
@@ -24,6 +26,30 @@ describe("MCP: agentes contra la app", () => {
 
   before(async () => {
     const realSes = await import("./ses.ts");
+    mock.module("./route53.ts", {
+      namedExports: {
+        listRecordSets: async () => [...zonaDns.values()],
+        // deno-lint-ignore no-explicit-any
+        applyRecordChanges: async (_z: string, cambios: any[]) => {
+          for (const c of cambios) {
+            const k = `${c.rrset.name}|${c.rrset.type}`;
+            if (c.action === "DELETE") zonaDns.delete(k); else zonaDns.set(k, c.rrset);
+          }
+          return { changeId: "C1" };
+        },
+        ensureHostedZone: async () => ({ hostedZoneId: "ZMCP", nameservers: ["ns-1.awsdns-01.com"], created: true }),
+        configureDnsRecords: async () => undefined,
+        deleteHostedZone: async () => undefined,
+      },
+    });
+    mock.module("./dns-import.ts", {
+      namedExports: {
+        snapshotDns: async () => ({ found: [], nameservers: [], warning: "aviso" }),
+        delegacionActiva: async (_d: string, e: string[]) => ({ delegated: false, observed: ["ns1.viejo.com"], expected: e }),
+        nameserversActuales: async () => ["ns1.viejo.com"],
+      },
+    });
+
     mock.module("./ses.ts", { namedExports: {
       ...realSes,
       verifyDomain: async () => ({ verificationToken: "tok", dkimTokens: ["d1", "d2", "d3"] }),
@@ -111,5 +137,45 @@ describe("MCP: agentes contra la app", () => {
     const nombres = r.json.result.structuredContent.result.map((t: { name: string }) => t.name);
     assert.ok(nombres.includes("create_webhook"));
     assert.ok(!nombres.includes("create_domain"));
+  });
+  it("el agente puede montar el DNS de un dominio de punta a punta", async () => {
+    const dom = (await call("create_domain", { domain: `mcp-dns-${suffix}.com` })).json.result.structuredContent.domain;
+
+    // 1. Sin zona no hay 404, hay una pista accionable: ante un 404 un agente abandona.
+    const sinZona = await call("list_dns_records", { domainId: dom.id });
+    assert.equal(sinZona.json.result.structuredContent.zone.status, "none");
+    assert.match(sinZona.json.result.structuredContent.hint, /dns\/zone/);
+
+    // 2. Crea la zona y recibe los nameservers para el registrador.
+    const zona = await call("create_dns_zone", { domainId: dom.id });
+    assert.ok(!zona.json.result.isError, JSON.stringify(zona.json.result));
+    assert.deepEqual(zona.json.result.structuredContent.nameservers, ["ns-1.awsdns-01.com"]);
+
+    // 3. Apunta el dominio a Vercel con una sola herramienta.
+    const vercel = await call("point_domain_to", { domainId: dom.id, provider: "vercel", target: "mi-proyecto.vercel.app" });
+    assert.ok(!vercel.json.result.isError, JSON.stringify(vercel.json.result));
+    assert.equal(vercel.json.result.structuredContent.records.length, 2);
+
+    // 4. Y ve lo que quedó, con lo de MailMask marcado como intocable.
+    // (`configureDnsRecords` está mockeada, así que el MX se siembra a mano.)
+    zonaDns.set(`mcp-dns-${suffix}.com|MX`, { name: `mcp-dns-${suffix}.com`, type: "MX", ttl: 300, values: ["10 inbound-smtp.us-east-1.amazonaws.com"] });
+    const listado = await call("list_dns_records", { domainId: dom.id });
+    const registros = listado.json.result.structuredContent.records;
+    assert.ok(registros.some((r: any) => r.type === "A" && r.values.includes("76.76.21.21")));
+    assert.equal(registros.find((r: any) => r.type === "MX").managed, true);
+    assert.equal(registros.find((r: any) => r.type === "MX").editable, false);
+  });
+
+  it("borrar el MX vuelve como isError, no como excepción", async () => {
+    const dom = (await call("create_domain", { domain: `mcp-mx-${suffix}.com` })).json.result.structuredContent.domain;
+    await call("create_dns_zone", { domainId: dom.id });
+    zonaDns.set(`mcp-mx-${suffix}.com|MX`, { name: `mcp-mx-${suffix}.com`, type: "MX", ttl: 300, values: ["10 inbound-smtp.us-east-1.amazonaws.com"] });
+
+    const r = await call("delete_dns_record", { domainId: dom.id, name: "@", type: "MX" });
+    assert.equal(r.status, 200);
+    assert.equal(r.json.result.isError, true);
+    assert.match(r.json.result.content[0].text, /HTTP 409/);
+    // El texto le dice al agente cuál es la salida legítima, para que no busque un force.
+    assert.match(r.json.result.content[0].text, /elimina el dominio de MailMask/);
   });
 });

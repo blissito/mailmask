@@ -1,0 +1,52 @@
+[
+ {
+  "text": "$99",
+  "start": 0.03,
+  "end": 0.47
+ },
+ {
+  "text": "pesos",
+  "start": 0.47,
+  "end": 0.87
+ },
+ {
+  "text": "por",
+  "start": 0.87,
+  "end": 1.11
+ },
+ {
+  "text": "dominio,",
+  "start": 1.11,
+  "end": 1.8
+ },
+ {
+  "text": "todo",
+  "start": 1.81,
+  "end": 2.13
+ },
+ {
+  "text": "incluido,",
+  "start": 2.13,
+  "end": 2.94
+ },
+ {
+  "text": "empieza",
+  "start": 3.12,
+  "end": 3.52
+ },
+ {
+  "text": "gratis",
+  "start": 3.52,
+  "end": 4
+ },
+ {
+  "text": "en",
+  "start": 4,
+  "end": 4.16
+ },
+ {
+  "text": "mailmask.studio",
+  "start": 4.16,
+  "end": 5.46
+ }
+]

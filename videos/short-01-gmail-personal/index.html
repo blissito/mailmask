@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="es" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,96,800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #faf6ee; }
+      body { font-family: "Bricolage Grotesque", system-ui, sans-serif; font-weight: 800; color: #1c1917; }
+      .clip { position: absolute; inset: 0; }
+      .mono { font-family: "JetBrains Mono", monospace; font-weight: 700; }
+
+      /* background: cream, soft grid moving one cell, two breathing blobs, vignette */
+      #bgfill { position: absolute; inset: 0; background: #faf6ee; }
+      #grid { position: absolute; left: -60px; top: -60px; width: 1200px; height: 2040px; opacity: .55;
+        background-image: linear-gradient(#e4dccd 2px, transparent 2px), linear-gradient(90deg, #e4dccd 2px, transparent 2px); background-size: 60px 60px; }
+      .blob { position: absolute; width: 900px; height: 900px; border-radius: 50%; filter: blur(120px); opacity: .22; }
+      #blob1 { left: -300px; top: 100px; background: #d7263d; }
+      #blob2 { left: 500px; top: 1100px; background: #f2b705; }
+      #vig { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 48%, rgba(250,246,238,0) 45%, rgba(60,30,20,.16) 100%); }
+
+      /* scenes: two panels, vertically centred */
+      .scene { z-index: 10; }
+      .panel { position: absolute; inset: 0; padding: 200px 80px 660px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 40px; }
+      .panel.b { opacity: 0; }
+      .kicker { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 26px; letter-spacing: .22em; text-transform: uppercase; color: #78716c; }
+      h1 { font-size: 108px; line-height: .95; letter-spacing: -.03em; font-weight: 800; width: 920px; }
+      h1 em, .big em { font-style: normal; color: #d7263d; }
+      .big { font-size: 220px; line-height: .9; letter-spacing: -.04em; }
+      .huge { font-size: 340px; line-height: .85; letter-spacing: -.06em; color: #d7263d; }
+      .note { font-family: "JetBrains Mono", monospace; font-weight: 400; font-size: 30px; color: #57534e; letter-spacing: .04em; }
+
+      /* email card */
+      .mail { width: 920px; background: #fffdf9; border: 3px solid #e4dccd; border-radius: 28px; overflow: hidden; text-align: left; position: relative;
+        box-shadow: 0 30px 60px -30px rgba(60,30,20,.3); font-family: "JetBrains Mono", monospace; font-weight: 400; font-size: 32px; color: #1c1917; }
+      .mailbar { display: flex; align-items: center; gap: 12px; background: #f2ecdf; border-bottom: 2px solid #e4dccd; padding: 22px 30px; font-size: 24px; color: #57534e; }
+      .mailbar i { width: 16px; height: 16px; border-radius: 50%; background: #e4dccd; display: block; }
+      .mailbar span { margin-left: 12px; }
+      .mailbar .app { font-weight: 700; font-size: 28px; color: #1c1917; margin-left: 16px; }
+      .mail.old .mailbar .app { color: #c5221f; }
+      .fromline { display: flex; flex-direction: column; gap: 10px; padding: 26px 34px 22px; border-bottom: 2px solid #e4dccd; }
+      .fromline b { color: #78716c; font-weight: 700; font-size: 24px; letter-spacing: .18em; text-transform: uppercase; }
+      .fromline .from { font-size: 40px; font-weight: 700; letter-spacing: -.02em; }
+      #gtag { position: absolute; right: 30px; top: 96px; padding: 10px 22px; background: #f2ecdf; border: 3px solid #e4dccd; border-radius: 999px; font-size: 26px; font-weight: 700; color: #57534e; opacity: 0; }
+      .row { display: flex; gap: 24px; padding: 22px 34px; border-bottom: 2px solid #e4dccd; }
+      .row b { width: 130px; color: #78716c; font-weight: 700; }
+      .body { padding: 36px 34px 44px; display: flex; flex-direction: column; gap: 18px; }
+      .body i { display: block; height: 18px; border-radius: 9px; background: #f2ecdf; }
+      .mail.old { filter: grayscale(1); opacity: .92; }
+      .mail.old .from { color: #57534e; }
+      .mail.old .fromline .from { color: #1c1917; }
+      .mail.new { border-color: #d7263d; }
+      .mail.new .from { color: #d7263d; font-weight: 700; }
+      .mail.new .mailbar { background: #d7263d; color: #fff; }
+      .mail.new .mailbar i { background: rgba(255,255,255,.5); }
+      #circle { position: absolute; left: 395px; top: 84px; width: 190px; height: 90px; opacity: 0; }
+      #stamp { position: absolute; right: 40px; bottom: 36px; padding: 10px 24px; border: 6px solid #d7263d; color: #d7263d; border-radius: 14px;
+        font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 46px; letter-spacing: -.02em; opacity: 0; }
+      .chips { display: flex; gap: 16px; padding: 0 34px 36px; }
+      .chip { font-size: 24px; font-weight: 700; color: #059669; background: rgba(16,185,129,.12); border: 2px solid rgba(5,150,105,.3); border-radius: 999px; padding: 8px 18px; }
+
+      /* mask */
+      .maskwrap { width: 420px; height: 420px; }
+      .maskwrap svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 30px 40px rgba(160,24,44,.35)); }
+
+      /* DNS rows */
+      .dns { width: 920px; display: flex; flex-direction: column; gap: 18px; text-align: left; font-family: "JetBrains Mono", monospace; font-weight: 400; font-size: 34px; }
+      .dns div { display: flex; align-items: center; gap: 24px; background: #fffdf9; border: 3px solid #e4dccd; border-radius: 20px; padding: 26px 30px; }
+      .dns b { width: 130px; color: #78716c; font-weight: 700; }
+      .dns span { flex: 1; color: #1c1917; }
+      .dns .ok { width: 56px; height: 56px; border-radius: 50%; background: #059669; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 700; }
+
+      /* inbox */
+      .inbox { width: 920px; background: #fffdf9; border: 3px solid #e4dccd; border-radius: 28px; overflow: hidden; text-align: left; font-family: "JetBrains Mono", monospace; font-weight: 400; font-size: 30px; box-shadow: 0 30px 60px -30px rgba(60,30,20,.3); }
+      .inbox .hd { padding: 22px 30px; background: #f2ecdf; border-bottom: 2px solid #e4dccd; color: #57534e; font-size: 24px; letter-spacing: .18em; text-transform: uppercase; font-weight: 700; }
+      .th { padding: 22px 30px; border-bottom: 2px solid #e4dccd; display: flex; justify-content: space-between; color: #57534e; }
+      .th.sel { background: rgba(215,38,61,.08); color: #1c1917; border-left: 8px solid #d7263d; }
+      .th b { font-weight: 700; }
+      .notewrap { padding: 26px 30px; display: flex; flex-direction: column; gap: 18px; }
+      .inote { background: #fff4c2; border: 2px solid #f2b705; border-radius: 16px; padding: 20px 24px; font-size: 28px; color: #5a4300; }
+      .assign { align-self: flex-start; font-size: 26px; font-weight: 700; color: #d7263d; border: 3px solid #d7263d; border-radius: 999px; padding: 10px 22px; }
+
+      /* comparison */
+      .cmp { display: flex; gap: 28px; width: 940px; }
+      .col { flex: 1; border-radius: 28px; padding: 44px 30px; display: flex; flex-direction: column; gap: 22px; align-items: center; }
+      .col .name { font-family: "JetBrains Mono"; font-size: 26px; letter-spacing: .18em; text-transform: uppercase; font-weight: 700; }
+      .col .price { font-size: 72px; line-height: 1; letter-spacing: -.03em; }
+      .col .sub { font-family: "JetBrains Mono"; font-weight: 400; font-size: 26px; }
+      .col.g { background: #f2ecdf; border: 3px solid #e4dccd; color: #57534e; }
+      .col.m { background: #d7263d; color: #fff; box-shadow: 0 30px 60px -30px rgba(160,24,44,.6); }
+      .col.m .sub { color: rgba(255,255,255,.85); }
+      #strike { position: absolute; left: 10%; top: 50%; width: 80%; height: 10px; background: #d7263d; border-radius: 5px; transform-origin: left center; }
+
+      /* CTA */
+      .btn { background: #d7263d; color: #fff; border-radius: 999px; padding: 30px 70px; font-size: 64px; letter-spacing: -.02em; box-shadow: 0 30px 60px -25px rgba(160,24,44,.7); }
+      .url { font-family: "JetBrains Mono"; font-weight: 700; font-size: 52px; color: #1c1917; letter-spacing: -.02em; }
+
+      /* karaoke */
+      .cap { position: absolute; inset: auto; left: 60px; right: 60px; top: 1330px; height: 320px; z-index: 40; display: flex; align-items: center; justify-content: center; text-align: center; }
+      .capin { font-size: 104px; line-height: 1.05; letter-spacing: -.03em; }
+      .w { display: inline-block; color: #78716c; opacity: .6; }
+
+      /* wipe columns */
+      #wipes { position: absolute; inset: 0; z-index: 60; pointer-events: none; }
+      .colw { position: absolute; top: 0; width: 182px; height: 1920px; background: #d7263d;
+        background-image: linear-gradient(rgba(160,24,44,.5) 2px, transparent 2px), linear-gradient(90deg, rgba(160,24,44,.5) 2px, transparent 2px); background-size: 60px 60px; }
+    </style>
+  </head>
+  <body>
+    <div data-composition-id="mailmask-short-01" data-start="0" data-duration="32.150" data-width="1080" data-height="1920" style="position:relative;width:1080px;height:1920px;overflow:hidden">
+      <div class="clip" id="bg" data-start="0" data-duration="32.150">
+        <div id="bgfill"></div><div id="grid"></div><div class="blob" id="blob1"></div><div class="blob" id="blob2"></div><div id="vig"></div>
+      </div>
+
+      <div class="clip scene" id="s0" data-start="0.000" data-duration="5.669">
+        <div class="panel" id="s0-a"><div class="kicker">MailMask · correo con tu dominio</div><h1>Todavía escribes desde un <em>Gmail personal</em></h1></div>
+        <div class="panel b" id="s0-b">
+  <div class="mail old">
+    <div class="mailbar"><i></i><i></i><i></i><span class="app">Gmail</span><span>· Nuevo mensaje</span></div>
+    <div class="fromline"><b>De</b><span class="from">pedro.diseño2011@gmail.com</span></div>
+    <div class="row"><b>Para</b><span>cliente@empresa.com</span></div>
+    <div class="row"><b>Asunto</b><span>Cotización sitio web</span></div>
+    <div class="body"><i style="width:82%"></i><i style="width:64%"></i><i style="width:71%"></i></div>
+    <div id="gtag">cuenta personal</div><div id="stamp">¿EN SERIO?</div>
+  </div></div>
+      </div>
+
+      <div class="clip scene" id="s1" data-start="5.669" data-duration="5.663">
+        <div class="panel" id="s1-a"><div class="maskwrap" id="mask1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <!-- Shadow -->
+  <ellipse cx="40" cy="42" rx="28" ry="24" fill="#a0182c"/>
+  <!-- Body -->
+  <ellipse cx="40" cy="38" rx="28" ry="22" fill="#d7263d"/>
+  <!-- Aberturas de la máscara -->
+  <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="#f2b705" stroke-width="1.8"/>
+  <ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="#f2b705" stroke-width="1.8"/>
+  <!-- Iris y pupila -->
+  <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/>
+  <circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/>
+  <circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/>
+  <circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
+  <!-- Doble brillo: luz y rebote -->
+  <circle cx="30.2" cy="34.9" r="1.9" fill="#ffffff"/>
+  <circle cx="54.2" cy="34.9" r="1.9" fill="#ffffff"/>
+  <circle cx="26.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/>
+  <circle cx="50.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/>
+  <!-- Crown -->
+  <path d="M40 18 L40 26" stroke="#f2b705" stroke-width="2" stroke-linecap="round"/>
+  <path d="M36 19 L40 26 L44 19" stroke="#f2b705" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>
+</div><h1>Con MailMask escribes desde <em>tu dominio</em></h1></div>
+        <div class="panel b" id="s1-b">
+  <div class="mail new">
+    <div class="mailbar"><i></i><i></i><i></i><span class="app">MailMask</span><span>· Nuevo mensaje</span></div>
+    <div class="fromline"><b>De</b><span class="from">pedro@tuestudio.mx</span></div>
+    <div class="row"><b>Para</b><span>cliente@empresa.com</span></div>
+    <div class="row"><b>Asunto</b><span>Cotización sitio web</span></div>
+    <div class="body"><i style="width:82%"></i><i style="width:64%"></i><i style="width:71%"></i></div>
+    <div class="chips"><span class="chip" id="chip-dkim">DKIM ✓</span><span class="chip" id="chip-spf">SPF ✓</span><span class="chip" id="chip-nota" style="color:#d7263d;background:rgba(215,38,61,.1);border-color:rgba(215,38,61,.3)">se nota</span></div>
+  </div></div>
+      </div>
+
+      <div class="clip scene" id="s2" data-start="11.332" data-duration="4.859">
+        <div class="panel" id="s2-a"><h1 id="s2-title">Tu dominio recibe <em>correo</em></h1>
+         <div class="dns">
+           <div id="dns0"><b>MX</b><span>inbound-smtp.us-east-1…</span><i class="ok">✓</i></div>
+           <div id="dns1"><b>TXT</b><span>v=spf1 include:amazonses…</span><i class="ok">✓</i></div>
+           <div id="dns2"><b>CNAME</b><span>dkim._domainkey…</span><i class="ok">✓</i></div>
+         </div></div>
+        <div class="panel b" id="s2-b"><div class="big">Desde <em id="hoy">hoy</em></div><div class="note" id="tarjeta">sin tarjeta · un dominio gratis</div></div>
+      </div>
+
+      <div class="clip scene" id="s3" data-start="16.191" data-duration="6.531">
+        <div class="panel" id="s3-a"><div class="inbox" id="inbox">
+           <div class="hd">Bandeja · tuestudio.mx</div>
+           <div class="th"><span>Luis Ortega</span><span>Factura agosto</span></div>
+           <div class="th sel"><b>Ana García</b><span>Cotización sitio web</span></div>
+           <div class="th"><span>Tienda MX</span><span>Pedido #1042</span></div>
+           <div class="notewrap"><div class="inote">Nota interna · ya le mandé precios, falta el hosting — Pedro</div><div class="assign" id="assign">Asignado a Ana</div></div>
+         </div></div>
+        <div class="panel b" id="s3-b"><div class="cmp">
+           <div class="col g" id="colg" style="position:relative"><div class="name">Google</div><div class="price" id="gprice">$140</div><div class="sub">× persona · al mes</div><div id="strike"></div></div>
+           <div class="col m" id="colm"><div class="name">MailMask</div><div class="price">∞</div><div class="sub">personas · un solo pago</div></div>
+         </div></div>
+      </div>
+
+      <div class="clip scene" id="s4" data-start="22.722" data-duration="9.428">
+        <div class="panel" id="s4-a"><div class="huge" id="price">$99</div><div class="big" style="font-size:96px" id="pordom">por <em>dominio</em></div><div class="note" id="todo">todo incluido · personas ilimitadas · al mes</div></div>
+        <div class="panel b" id="s4-b"><div class="maskwrap" style="width:300px;height:300px" id="mask4"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <!-- Shadow -->
+  <ellipse cx="40" cy="42" rx="28" ry="24" fill="#a0182c"/>
+  <!-- Body -->
+  <ellipse cx="40" cy="38" rx="28" ry="22" fill="#d7263d"/>
+  <!-- Aberturas de la máscara -->
+  <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="#f2b705" stroke-width="1.8"/>
+  <ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="#f2b705" stroke-width="1.8"/>
+  <!-- Iris y pupila -->
+  <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/>
+  <circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/>
+  <circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/>
+  <circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
+  <!-- Doble brillo: luz y rebote -->
+  <circle cx="30.2" cy="34.9" r="1.9" fill="#ffffff"/>
+  <circle cx="54.2" cy="34.9" r="1.9" fill="#ffffff"/>
+  <circle cx="26.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/>
+  <circle cx="50.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/>
+  <!-- Crown -->
+  <path d="M40 18 L40 26" stroke="#f2b705" stroke-width="2" stroke-linecap="round"/>
+  <path d="M36 19 L40 26 L44 19" stroke="#f2b705" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>
+</div><div class="btn" id="btn">Empieza gratis</div><div class="url" id="url">mailmask.studio</div></div>
+      </div>
+
+      <div class="clip cap" id="cap0" data-start="0.830" data-duration="1.140"><div class="capin"><span class="w" id="w0_0">Todavía</span> <span class="w" id="w0_1">le</span> <span class="w" id="w0_2">escribes</span></div></div>
+      <div class="clip cap" id="cap1" data-start="1.970" data-duration="1.240"><div class="capin"><span class="w" id="w1_0">a</span> <span class="w" id="w1_1">tus</span> <span class="w" id="w1_2">clientes</span> <span class="w" id="w1_3">desde</span></div></div>
+      <div class="clip cap" id="cap2" data-start="3.210" data-duration="2.210"><div class="capin"><span class="w" id="w2_0">un</span> <span class="w" id="w2_1">Gmail</span> <span class="w" id="w2_2">personal.</span></div></div>
+      <div class="clip cap" id="cap3" data-start="6.499" data-duration="1.210"><div class="capin"><span class="w" id="w3_0">Con</span> <span class="w" id="w3_1">MailMask</span> <span class="w" id="w3_2">escribes</span></div></div>
+      <div class="clip cap" id="cap4" data-start="7.709" data-duration="0.910"><div class="capin"><span class="w" id="w4_0">desde</span> <span class="w" id="w4_1">tu</span> <span class="w" id="w4_2">propio</span></div></div>
+      <div class="clip cap" id="cap5" data-start="8.619" data-duration="2.290"><div class="capin"><span class="w" id="w5_0">dominio</span> <span class="w" id="w5_1">y</span> <span class="w" id="w5_2">se</span> <span class="w" id="w5_3">nota.</span></div></div>
+      <div class="clip cap" id="cap6" data-start="12.172" data-duration="1.010"><div class="capin"><span class="w" id="w6_0">Tu</span> <span class="w" id="w6_1">dominio</span> <span class="w" id="w6_2">recibe</span></div></div>
+      <div class="clip cap" id="cap7" data-start="13.182" data-duration="0.940"><div class="capin"><span class="w" id="w7_0">correo</span> <span class="w" id="w7_1">desde</span> <span class="w" id="w7_2">hoy</span></div></div>
+      <div class="clip cap" id="cap8" data-start="14.122" data-duration="1.790"><div class="capin"><span class="w" id="w8_0">sin</span> <span class="w" id="w8_1">tarjeta.</span></div></div>
+      <div class="clip cap" id="cap9" data-start="17.001" data-duration="0.910"><div class="capin"><span class="w" id="w9_0">Y tu</span> <span class="w" id="w9_1">equipo</span> <span class="w" id="w9_2">entero</span></div></div>
+      <div class="clip cap" id="cap10" data-start="17.911" data-duration="1.350"><div class="capin"><span class="w" id="w10_0">en</span> <span class="w" id="w10_1">una</span> <span class="w" id="w10_2">sola</span> <span class="w" id="w10_3">bandeja,</span></div></div>
+      <div class="clip cap" id="cap11" data-start="19.261" data-duration="0.510"><div class="capin"><span class="w" id="w11_0">Google</span> <span class="w" id="w11_1">cobra</span></div></div>
+      <div class="clip cap" id="cap12" data-start="19.771" data-duration="0.760"><div class="capin"><span class="w" id="w12_0">por</span> <span class="w" id="w12_1">persona,</span></div></div>
+      <div class="clip cap" id="cap13" data-start="20.531" data-duration="1.660"><div class="capin"><span class="w" id="w13_0">aquí</span> <span class="w" id="w13_1">no.</span></div></div>
+      <div class="clip cap" id="cap14" data-start="23.532" data-duration="1.780"><div class="capin"><span class="w" id="w14_0">$99</span> <span class="w" id="w14_1">pesos</span> <span class="w" id="w14_2">por</span> <span class="w" id="w14_3">dominio,</span></div></div>
+      <div class="clip cap" id="cap15" data-start="25.312" data-duration="1.310"><div class="capin"><span class="w" id="w15_0">todo</span> <span class="w" id="w15_1">incluido,</span></div></div>
+      <div class="clip cap" id="cap16" data-start="26.622" data-duration="0.880"><div class="capin"><span class="w" id="w16_0">empieza</span> <span class="w" id="w16_1">gratis</span></div></div>
+      <div class="clip cap" id="cap17" data-start="27.502" data-duration="2.480"><div class="capin"><span class="w" id="w17_0">en</span> <span class="w" id="w17_1">mailmask.studio</span></div></div>
+
+      <div class="clip" id="wipeclip" data-start="0" data-duration="32.150">
+        <div id="wipes"><div class="colw" id="c0" style="left:0px"></div><div class="colw" id="c1" style="left:180px"></div><div class="colw" id="c2" style="left:360px"></div><div class="colw" id="c3" style="left:540px"></div><div class="colw" id="c4" style="left:720px"></div><div class="colw" id="c5" style="left:900px"></div></div>
+      </div>
+
+      <audio id="v0" src="assets/voice/em_santa/s0.wav" data-start="0.900" data-duration="3.669"></audio>
+      <audio id="v1" src="assets/voice/em_santa/s1.wav" data-start="6.569" data-duration="3.563"></audio>
+      <audio id="v2" src="assets/voice/em_santa/s2.wav" data-start="12.232" data-duration="2.859"></audio>
+      <audio id="v3" src="assets/voice/em_santa/s3.wav" data-start="17.091" data-duration="4.331"></audio>
+      <audio id="v4" src="assets/voice/em_santa/s4.wav" data-start="23.622" data-duration="5.525"></audio>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const RED = "#d7263d", SUBTLE = "#78716c", FG = "#1c1917";
+      const START = [0,5.669,11.332,16.191,22.722];
+
+      // ---- background: grid travels exactly one cell; blobs breathe (finite repeats)
+      tl.to("#grid", { x: 60, y: 60, duration: 3, ease: "none", repeat: 9 }, 0);
+      tl.to("#blob1", { scale: 1.18, x: 60, duration: 2.6, ease: "sine.inOut", yoyo: true, repeat: 11 }, 0);
+      tl.to("#blob2", { scale: .86, y: -60, duration: 3.1, ease: "sine.inOut", yoyo: true, repeat: 9 }, 0.4);
+
+      // ---- wipes: columns fall with 35 ms stagger, cover the cut, keep going down
+      tl.set(".colw", { yPercent: -100 }, 0);
+      
+      tl.to(".colw", { yPercent: 0, duration: 0.34, ease: "power3.in", stagger: .035 }, 5.034);
+      tl.to(".colw", { yPercent: 100, duration: 0.36, ease: "power3.out", stagger: .035 }, 5.789);
+      tl.set(".colw", { yPercent: -100 }, 6.424);
+      tl.to(".colw", { yPercent: 0, duration: 0.34, ease: "power3.in", stagger: .035 }, 10.697);
+      tl.to(".colw", { yPercent: 100, duration: 0.36, ease: "power3.out", stagger: .035 }, 11.452);
+      tl.set(".colw", { yPercent: -100 }, 12.087);
+      tl.to(".colw", { yPercent: 0, duration: 0.34, ease: "power3.in", stagger: .035 }, 15.556);
+      tl.to(".colw", { yPercent: 100, duration: 0.36, ease: "power3.out", stagger: .035 }, 16.311);
+      tl.set(".colw", { yPercent: -100 }, 16.946);
+      tl.to(".colw", { yPercent: 0, duration: 0.34, ease: "power3.in", stagger: .035 }, 22.087);
+      tl.to(".colw", { yPercent: 100, duration: 0.36, ease: "power3.out", stagger: .035 }, 22.842);
+      tl.set(".colw", { yPercent: -100 }, 23.477);
+
+      // ---- panel handoff: A leaves left, B enters right (0.42 s power4.inOut)
+      function swap(i, t) {
+        tl.set("#s" + i + "-b", { xPercent: 100, opacity: 1 }, t - .01);
+        tl.to("#s" + i + "-a", { xPercent: -200, duration: .42, ease: "power4.inOut" }, t);
+        tl.to("#s" + i + "-b", { xPercent: 0, duration: .42, ease: "power4.inOut" }, t);
+      }
+      const PULSES = [];
+      function pulse(sel, t, s) { PULSES.push(t); tl.to(sel, { scale: s || 1.22, duration: .18, ease: "back.out(3)", repeat: 1, yoyo: true }, t); }
+      function settle(sel, t) { tl.from(sel, { y: 26, duration: .5, ease: "power3.out" }, t); }
+
+      // ---- s0 · «Todavía@0.95 clientes@2.43 desde@3.08 Gmail@3.48 personal@3.94»
+      settle("#s0-a h1", 0.1);
+      settle("#s0-a .kicker", 0);
+      pulse("#s0-a h1 em", 3.480);
+      swap(0, 2.780);
+      pulse("#s0-b .from", 3.480, 1.08);
+      tl.to("#gtag", { opacity: 1, duration: .01 }, 3.940).from("#gtag", { scale: .6, duration: .3, ease: "back.out(2)" }, 3.940);
+      tl.to("#stamp", { opacity: 1, duration: .01 }, 4.640).from("#stamp", { scale: 2.2, rotate: -14, duration: .3, ease: "power4.in" }, 4.640);
+      tl.to("#s0-b .mail", { x: 8, duration: .05, yoyo: true, repeat: 5 }, 4.920);
+
+      // ---- s1 · «Con@6.62 MailMask@6.78 escribes@7.83 dominio@8.74 nota@9.49»
+      tl.from("#mask1", { x: -700, rotate: -30, duration: .7, ease: "back.out(1.4)" }, START[1] + .5);
+      settle("#s1-a h1", START[1] + .6);
+      tl.to("#mask1", { rotate: -6, y: -10, duration: .5, ease: "sine.inOut", yoyo: true, repeat: 5 }, START[1] + 1.2);
+      pulse("#mask1", 6.779, 1.15);
+      pulse("#s1-a h1 em", 8.719);
+      swap(1, 8.029);
+      pulse("#s1-b .from", 8.739, 1.08);
+      pulse("#chip-dkim", 9.039, 1.15); pulse("#chip-spf", 9.189, 1.15);
+      tl.from("#chip-nota", { scale: 0, duration: .35, ease: "back.out(2.5)" }, 9.489);
+
+      // ---- s2 · «dominio@12.36 recibe@12.82 correo@13.30 desde@13.60 hoy@13.93 tarjeta@14.33»
+      settle("#s2-title", START[2] + .35);
+      settle(".dns", START[2] + .45);
+      pulse("#dns0", 12.362, 1.06); pulse("#dns1", 12.822, 1.06); pulse("#dns2", 13.302, 1.06);
+      swap(2, 13.252);
+      pulse("#hoy", 13.932, 1.3);
+      pulse("#tarjeta", 14.332, 1.12);
+
+      // ---- s3 · «equipo@17.27 bandeja@18.59 Google@19.38 persona@20.07 no@20.99»
+      settle("#inbox", START[3] + .35);
+      tl.from(".th", { x: -30, opacity: 0, duration: .3, stagger: .08, ease: "power2.out" }, START[3] + .15);
+      pulse("#inbox", 17.271, 1.03);
+      pulse("#assign", 18.591, 1.18);
+      swap(3, 18.931);
+      pulse("#gprice", 20.071, 1.25);
+      tl.fromTo("#strike", { scaleX: 0 }, { scaleX: 1, duration: .25, ease: "power3.out" }, 20.991);
+      pulse("#colm", 20.991, 1.08);
+
+      // ---- s4 · «99@23.65 pesos@24.09 dominio@24.73 incluido@25.75 empieza@26.74 gratis@27.14 url@27.78»
+      tl.from("#price", { scale: .5, duration: .55, ease: "back.out(1.8)" }, START[4] + .35);
+      settle("#pordom", START[4] + .5); settle("#todo", START[4] + .6);
+      pulse("#price", 24.092, 1.1);
+      pulse("#pordom em", 24.732);
+      pulse("#todo", 25.752, 1.1);
+      swap(4, 26.342);
+      tl.from("#mask4", { rotate: -25, scale: .6, duration: .5, ease: "back.out(1.6)" }, 26.542);
+      pulse("#btn", 27.142, 1.12);
+      pulse("#url", 27.782, 1.1);
+      tl.to("#mask4", { rotate: 6, duration: .6, ease: "sine.inOut", yoyo: true, repeat: 5 }, 27.142);
+
+      // ---- karaoke: the current word pops red, then stays ink
+      const LINES = [{"k":0,"s":0.83,"base":0.9,"words":[{"id":"w0_0","s":0.05,"e":0.49},{"id":"w0_1","s":0.49,"e":0.63},{"id":"w0_2","s":0.63,"e":1.19}]},{"k":1,"s":1.97,"base":0.9,"words":[{"id":"w1_0","s":1.19,"e":1.2},{"id":"w1_1","s":1.3,"e":1.42},{"id":"w1_2","s":1.53,"e":2.03},{"id":"w1_3","s":2.18,"e":2.43}]},{"k":2,"s":3.21,"base":0.9,"words":[{"id":"w2_0","s":2.43,"e":2.58},{"id":"w2_1","s":2.58,"e":2.95},{"id":"w2_2","s":3.04,"e":3.62}]},{"k":3,"s":6.499,"base":6.569,"words":[{"id":"w3_0","s":0.05,"e":0.21},{"id":"w3_1","s":0.21,"e":0.42},{"id":"w3_2","s":0.7,"e":1.26}]},{"k":4,"s":7.709,"base":6.569,"words":[{"id":"w4_0","s":1.26,"e":1.61},{"id":"w4_1","s":1.61,"e":1.74},{"id":"w4_2","s":1.75,"e":2.17}]},{"k":5,"s":8.619,"base":6.569,"words":[{"id":"w5_0","s":2.17,"e":2.68},{"id":"w5_1","s":2.68,"e":2.69},{"id":"w5_2","s":2.69,"e":2.92},{"id":"w5_3","s":2.92,"e":3.44}]},{"k":6,"s":12.172,"base":12.232,"words":[{"id":"w6_0","s":0.06,"e":0.13},{"id":"w6_1","s":0.13,"e":0.56},{"id":"w6_2","s":0.59,"e":0.97}]},{"k":7,"s":13.182,"base":12.232,"words":[{"id":"w7_0","s":1.07,"e":1.33},{"id":"w7_1","s":1.37,"e":1.7},{"id":"w7_2","s":1.7,"e":1.87}]},{"k":8,"s":14.122,"base":12.232,"words":[{"id":"w8_0","s":2.01,"e":2.1},{"id":"w8_1","s":2.1,"e":2.78}]},{"k":9,"s":17.001,"base":17.091,"words":[{"id":"w9_0","s":0.03,"e":0.18},{"id":"w9_1","s":0.18,"e":0.56},{"id":"w9_2","s":0.56,"e":0.94}]},{"k":10,"s":17.911,"base":17.091,"words":[{"id":"w10_0","s":0.94,"e":1.06},{"id":"w10_1","s":1.06,"e":1.25},{"id":"w10_2","s":1.25,"e":1.47},{"id":"w10_3","s":1.5,"e":2.12}]},{"k":11,"s":19.261,"base":17.091,"words":[{"id":"w11_0","s":2.29,"e":2.49},{"id":"w11_1","s":2.49,"e":2.79}]},{"k":12,"s":19.771,"base":17.091,"words":[{"id":"w12_0","s":2.8,"e":2.98},{"id":"w12_1","s":2.98,"e":3.56}]},{"k":13,"s":20.531,"base":17.091,"words":[{"id":"w13_0","s":3.56,"e":3.83},{"id":"w13_1","s":3.9,"e":4.2}]},{"k":14,"s":23.532,"base":23.622,"words":[{"id":"w14_0","s":0.03,"e":0.47},{"id":"w14_1","s":0.47,"e":0.87},{"id":"w14_2","s":0.87,"e":1.11},{"id":"w14_3","s":1.11,"e":1.8}]},{"k":15,"s":25.312,"base":23.622,"words":[{"id":"w15_0","s":1.81,"e":2.13},{"id":"w15_1","s":2.13,"e":2.94}]},{"k":16,"s":26.622,"base":23.622,"words":[{"id":"w16_0","s":3.12,"e":3.52},{"id":"w16_1","s":3.52,"e":4}]},{"k":17,"s":27.502,"base":23.622,"words":[{"id":"w17_0","s":4,"e":4.16},{"id":"w17_1","s":4.16,"e":5.46}]}];
+      LINES.forEach((l) => {
+        tl.from("#cap" + l.k + " .capin", { y: 24, scale: .9, duration: .22, ease: "back.out(1.8)" }, l.s);
+        l.words.forEach((w) => {
+          tl.set("#" + w.id, { color: RED, opacity: 1 }, l.base + w.s)
+            .fromTo("#" + w.id, { scale: 1.3, y: -8 }, { scale: 1.06, y: 0, duration: .22, immediateRender: false, ease: "back.out(2)" }, l.base + w.s)
+            .set("#" + w.id, { color: FG, scale: 1, y: 0 }, l.base + w.e);
+        });
+      });
+
+      tl.set({}, {}, 32.150);
+      window.__timelines["mailmask-short-01"] = tl;
+      window.__pulses = PULSES;
+    </script>
+  </body>
+</html>
