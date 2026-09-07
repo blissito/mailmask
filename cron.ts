@@ -134,6 +134,19 @@ programar("0 5 * * *", async () => {
   if (!mpToken) return;
   try {
     const rows = await db.select({ email: users.email, subMpId: users.subMpId }).from(users);
+    // Un preapproval ya vinculado a alguien (plan) o a un add-on no es huérfano de nadie.
+    // Sin esto, el plan migrado de una clienta —con `payer_email` vacío, que la búsqueda
+    // de MP devuelve para CUALQUIER correo— salía como "pago sin vincular" de todos los
+    // usuarios sin suscripción, cada madrugada.
+    const vinculados = new Set<string>([
+      ...rows.map((r) => r.subMpId).filter((x): x is string => !!x),
+      ...(await db.select({ id: addons.mpPreapprovalId }).from(addons)).map((r) => r.id).filter((x): x is string => !!x),
+    ]);
+    const esDeEsteUsuario = (p: { external_reference?: string; payer_email?: string }, email: string) => {
+      const e = email.toLowerCase();
+      const ref = (p.external_reference ?? "").toLowerCase();
+      return ref === e || ref === `migrate:${e}` || (p.payer_email ?? "").toLowerCase() === e;
+    };
     const huerfanos: string[] = [];
     for (const u of rows) {
       if (u.subMpId) continue;
@@ -141,7 +154,7 @@ programar("0 5 * * *", async () => {
       // checkout autenticado, y `payer_email` puede ser otro (el de la cuenta de MP del
       // pagador, que ahora se pregunta aparte). Buscar solo por payer_email dejaba de
       // encontrar justamente a quien pagó con otra cuenta de MercadoPago.
-      const encontradas = new Map<string, { id: string; status: string; external_reference?: string }>();
+      const encontradas = new Map<string, { id: string; status: string; external_reference?: string; payer_email?: string }>();
       for (const q of [`external_reference=${encodeURIComponent(u.email)}`, `payer_email=${encodeURIComponent(u.email)}`]) {
         const res = await fetch(
           `https://api.mercadopago.com/preapproval/search?${q}`,
@@ -152,7 +165,8 @@ programar("0 5 * * *", async () => {
         for (const p of j.results ?? []) encontradas.set(p.id, p);
       }
       const dePlan = [...encontradas.values()].filter((p) =>
-        p.status === "authorized" && !(p.external_reference ?? "").startsWith("addon:"));
+        p.status === "authorized" && !(p.external_reference ?? "").startsWith("addon:")
+        && !vinculados.has(p.id) && esDeEsteUsuario(p as { external_reference?: string; payer_email?: string }, u.email));
       if (dePlan.length > 0) huerfanos.push(`${u.email} → ${dePlan[0].id}`);
     }
     if (huerfanos.length > 0) {

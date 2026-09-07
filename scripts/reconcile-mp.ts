@@ -9,7 +9,7 @@
  *   npx tsx scripts/reconcile-mp.ts --fix    # vincula los huérfanos que encuentre
  */
 import { db } from "../pg.js";
-import { users } from "../schema.js";
+import { users, addons } from "../schema.js";
 import { eq } from "drizzle-orm";
 
 const FIX = process.argv.includes("--fix");
@@ -46,6 +46,11 @@ const huerfanos: { email: string; preapproval: Preapproval }[] = [];
 const cortesias: string[] = [];
 const rotos: { email: string; mpId: string; motivo: string }[] = [];
 
+const vinculados = new Set<string>([
+  ...rows.map((r) => r.subMpId).filter((x): x is string => !!x),
+  ...db.select({ id: addons.mpPreapprovalId }).from(addons).all().map((r) => r.id).filter((x): x is string => !!x),
+]);
+
 for (const u of rows) {
   let encontrados: Preapproval[] = [];
   try {
@@ -63,8 +68,16 @@ for (const u of rows) {
     continue;
   }
 
-  // Add-ons aparte: su external_reference empieza con "addon:".
-  const dePlan = encontrados.filter((p) => !(p.external_reference ?? "").startsWith("addon:"));
+  // Add-ons aparte: su external_reference empieza con "addon:". Y sólo cuenta lo que de
+  // verdad nombra a ESTE usuario: la búsqueda de MP por payer_email devuelve los
+  // preapprovals con payer_email vacío para cualquier correo (el plan migrado de una
+  // clienta salía como huérfano de todos). Lo ya vinculado a alguien tampoco es huérfano.
+  const e = u.email.toLowerCase();
+  const dePlan = encontrados.filter((p) => {
+    const ref = (p.external_reference ?? "").toLowerCase();
+    const mio = ref === e || ref === `migrate:${e}` || ((p as { payer_email?: string }).payer_email ?? "").toLowerCase() === e;
+    return mio && !ref.startsWith("addon:") && !vinculados.has(p.id);
+  });
 
   if (!u.subMpId && dePlan.length > 0) {
     huerfanos.push({ email: u.email, preapproval: dePlan[0] });
