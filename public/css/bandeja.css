@@ -1457,12 +1457,18 @@ body.mm-composer-locked { overflow: hidden; }
 .mesa-msg-html {
   display: block;
   width: 100%;
-  height: 420px; /* inicial; bandeja.js lo ajusta al contenido */
+  /* Nace sin alto e invisible; bandeja.js lo mide y entonces se muestra,
+     para que no aparezca con scroll y luego brinque al ajustarse. */
+  height: 0;
+  opacity: 0;
   overflow: hidden;
+  transition: opacity 120ms ease;
   border: 1px solid var(--mesa-border);
   border-radius: 6px;
   background: var(--mesa-paper);
 }
+.mesa-msg-html.is-medido { opacity: 1; }
+.mesa-msg-html:not(.is-medido) { height: 200px; }
 
 /* --- Pestañas y métricas --- */
 

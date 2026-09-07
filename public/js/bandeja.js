@@ -792,7 +792,10 @@ function ajustarIframe(iframe) {
       const doc = iframe.contentDocument;
       if (!doc || !doc.documentElement) return;
       const h = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight ?? 0);
-      if (h > 0) iframe.style.height = Math.min(h + 16, 4000) + "px";
+      if (h > 0) {
+        iframe.style.height = Math.min(h + 16, 4000) + "px";
+        iframe.classList.add("is-medido");
+      }
     } catch {}
   };
   iframe.addEventListener("load", () => {
@@ -805,6 +808,8 @@ function ajustarIframe(iframe) {
     setTimeout(medir, 500);
   });
   medir();
+  // Si por lo que sea nunca se pudo medir, que no se quede invisible.
+  setTimeout(() => iframe.classList.add("is-medido"), 1500);
 }
 
 // Separa "a@x.com, b@y.com" en lista. El servidor vuelve a validar cada dirección;
