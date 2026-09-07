@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Buzones IMAP en tu dominio: Apple Mail y Outlook — MailMask</title>
+    <meta name="description" content="Un buzón IMAP en tu dominio, sin Google: Apple Mail, Outlook o Thunderbird con 10 GB por dominio activado. Qué cambia frente a reenviar y cuánto cuesta." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/buzones-imap-apple-mail-outlook-dominio-propio" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="Buzones IMAP con tu dominio: Apple Mail y Outlook sin Google Workspace" />
+    <meta property="og:description" content="Un alias puede reenviar, guardar en la Bandeja o tener buzón IMAP: los tres a la vez. Cómo se crea un buzón en MailMask, qué pasa con el reenvío y cuánto cuesta frente a cobrar por persona." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/buzones-imap-apple-mail-outlook-dominio-propio" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="og:image" content="https://www.mailmask.studio/blog/img/buzones-imap.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Un iPhone y una laptop con Apple Mail abierto reciben un sobre con la máscara de MailMask desde un buzón con el nombre de un dominio" />
+    <meta property="og:image:secure_url" content="https://www.mailmask.studio/blog/img/buzones-imap.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta name="twitter:image" content="https://www.mailmask.studio/blog/img/buzones-imap.jpg" />
+    <meta property="article:published_time" content="2026-09-07" />
+    <meta property="article:modified_time" content="2026-09-07" />
+    <meta property="article:section" content="Producto" />
+    <meta property="article:tag" content="IMAP" />
+    <meta property="article:tag" content="Apple Mail" />
+    <meta property="article:tag" content="Outlook" />
+    <meta property="article:tag" content="email" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@HectorBlisS" />
+    <meta name="twitter:creator" content="@HectorBlisS" />
+    <meta name="twitter:title" content="Buzones IMAP con tu dominio: Apple Mail y Outlook sin Google Workspace" />
+    <meta name="twitter:description" content="Buzones IMAP ilimitados con 10 GB por dominio activado. Apple Mail, Outlook y Thunderbird con tu dominio, sin pagar por persona." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <script src="/js/theme.js"></script>
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Buzones IMAP con tu dominio: Apple Mail y Outlook sin Google Workspace",
+      "description": "Un alias puede reenviar, guardar en la Bandeja o tener buzón IMAP: los tres a la vez. Cómo se crea un buzón en MailMask, qué pasa con el reenvío y la Bandeja, y cuánto cuesta frente a cobrar por persona.",
+      "datePublished": "2026-09-07",
+      "dateModified": "2026-09-07",
+      "image": "https://www.mailmask.studio/blog/img/buzones-imap.jpg",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/buzones-imap-apple-mail-outlook-dominio-propio"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Buzones IMAP con tu dominio: Apple Mail y Outlook sin Google Workspace", "item": "https://www.mailmask.studio/blog/buzones-imap-apple-mail-outlook-dominio-propio" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Qué es un buzón IMAP y en qué se diferencia de reenviar?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Un buzón IMAP guarda el correo en un servidor que es tuyo y lo sincroniza con cualquier cliente: Apple Mail, Outlook, Thunderbird o el teléfono. Reenviar sólo pasa el correo a otro buzón que ya tienes, normalmente Gmail, así que sigues dependiendo de ese proveedor. Con buzón propio, el correo vive en tu dominio y nada más."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Puedo usar Apple Mail u Outlook con mi dominio sin Google Workspace?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí. Un buzón de MailMask se configura en cualquier cliente que hable IMAP y SMTP: recepción por IMAP en el puerto 993 y envío por SMTP en el 465, ambos con TLS. Para Apple Mail y iPhone la app genera un perfil .mobileconfig que deja la cuenta lista con un toque. Lo que sale desde ahí va firmado con el DKIM y el SPF de tu dominio."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo se crea un buzón en MailMask?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Un buzón es una máscara con buzón. Al crear la máscara en un dominio activado, marcas la opción de buzón; la app genera una contraseña fuerte, la muestra una sola vez y no la guarda. Si se pierde, se genera otra. Después descargas el perfil de Apple o copias los datos IMAP y SMTP para Outlook o Thunderbird."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué pasa con la Bandeja y el reenvío si además tengo buzón?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Siguen funcionando igual. El MX del dominio apunta a Amazon SES, que recibe el correo y lo entrega a MailMask; el buzón IMAP es un destino más, al lado del reenvío y la Bandeja. Una misma máscara puede reenviar, guardar en la Bandeja y depositar en el buzón a la vez. Si el buzón falla, el reenvío y la Bandeja no se enteran."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cuánto cuesta un buzón IMAP en MailMask y cómo se compara?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Los buzones vienen incluidos al activar el dominio: $99 MXN al mes por dominio, con buzones ilimitados que comparten 10 GB, y bloques de +50 GB por $99 más. Google Workspace cobra $140 MXN por persona al mes y Fastmail unos $60 USD por persona al año; MailMask cobra por dominio y las personas son ilimitadas. Se parece más a Migadu, que cobra por almacenamiento."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué pasa con mi correo si cancelo?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Al cancelar la activación del dominio, los buzones quedan 30 días en solo lectura y puedes descargar cada uno como archivo .mbox, el formato estándar que abren Apple Mail, Thunderbird y Gmail. Pasados esos 30 días el contenido se borra. El correo es tuyo y se va contigo."
+          }
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="site bg-bg text-fg antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4 border-b border-line/70 bg-bg/85 backdrop-blur">
+      <a href="/" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Buzones IMAP con tu dominio: Apple Mail y Outlook sin Google Workspace</h1>
+        <div class="meta">
+          <span>📅 7 Sep 2026</span>
+          <span>⏱ 6 min de lectura</span>
+        </div>
+      </header>
+
+      <figure class="blog-cover">
+        <img src="/blog/img/buzones-imap.jpg" alt="Un iPhone y una laptop con Apple Mail abierto reciben un sobre con la máscara de MailMask desde un buzón con el nombre de un dominio" width="1200" height="630" fetchpriority="high" />
+      </figure>
+
+      <div class="blog-content">
+        <p>Hasta hace unos días, MailMask era una capa <em>encima</em> de tu correo: recibía en tu dominio, reenviaba a Gmail y te dejaba responder desde la Bandeja. Funcionaba, pero el correo seguía viviendo en Google. Si querías abrir <code>hola@tudominio.com</code> en Apple Mail o en Outlook, la respuesta era "todavía no".</p>
+
+        <p>Desde septiembre de 2026 la respuesta es "sí": <strong>cualquier máscara de un dominio activado puede tener su propio buzón IMAP</strong>, con Apple Mail, Outlook, Thunderbird o el correo del teléfono, sin Google en medio. Este artículo explica qué es un buzón, cómo se crea, qué pasa con el reenvío y la Bandeja cuando además tienes buzón, y cuánto cuesta frente a las opciones que cobran por persona.</p>
+
+        <h2>¿Qué es un buzón IMAP y en qué se diferencia de reenviar?</h2>
+
+        <p><strong>Un buzón IMAP guarda el correo en un servidor que es tuyo y lo sincroniza con cualquier cliente que lo abra.</strong> Lo lees en la laptop, lo marcas como leído en el teléfono y los dos coinciden, porque la verdad vive en el servidor y no en cada aparato. Es lo que Gmail y Outlook hacen por dentro, sólo que aquí el servidor está en tu dominio.</p>
+
+        <p>Reenviar es otra cosa: el correo llega a tu dominio y se pasa a un buzón que ya tienes, casi siempre Gmail. Es rápido de configurar y para muchos negocios es suficiente, pero tiene un techo. <strong>Sigues dependiendo de Google</strong>: si cierras esa cuenta o cambias de proveedor, el historial se queda allá.</p>
+
+        <p>En MailMask una máscara puede hacer una cosa, la otra, o las dos. <code>hola@</code> puede reenviar a tu Gmail de siempre mientras <code>ventas@</code> tiene buzón propio y <code>facturas@</code> hace las dos cosas. Se decide por máscara, no por dominio.</p>
+
+        <h2>¿Puedo usar Apple Mail u Outlook con mi dominio sin Google Workspace?</h2>
+
+        <p><strong>Sí: un buzón de MailMask se configura en cualquier cliente que hable IMAP y SMTP.</strong> Son los dos protocolos de siempre, así que no hay app propia que instalar ni extensión que aprobar. Los datos son los mismos en todos los clientes:</p>
+
+        <table>
+          <thead>
+            <tr><th>Qué</th><th>Servidor</th><th>Puerto</th><th>Seguridad</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Recibir (IMAP)</td><td>el servidor de correo de MailMask</td><td>993</td><td>TLS</td></tr>
+            <tr><td>Enviar (SMTP)</td><td>el servidor de correo de MailMask</td><td>465</td><td>TLS</td></tr>
+          </tbody>
+        </table>
+
+        <p>Para Apple Mail, en Mac y en iPhone, la app genera un <strong>perfil de configuración</strong> (<code>.mobileconfig</code>) que deja la cuenta lista con un toque: no hay que teclear puertos ni elegir entre SSL y STARTTLS. Outlook y Thunderbird piden los datos de la tabla una sola vez.</p>
+
+        <p>Lo que sale desde Apple Mail sale de verdad desde tu dominio: el correo lo entrega Amazon SES firmado con el DKIM y el SPF que ya tienes configurados, igual que lo que sale de la Bandeja. Y un detalle que en otros servicios falla: desde el buzón puedes escribirle a <strong>una máscara del mismo dominio</strong>. Que <code>buzon@</code> le escriba a <code>hola@</code> y el correo llegue a donde <code>hola@</code> reenvía parece obvio, pero exige que el servidor sepa que esa dirección no vive en él.</p>
+
+        <h2>¿Cómo se crea un buzón en MailMask?</h2>
+
+        <p><strong>Un buzón es una máscara con buzón, y se crea desde la misma pantalla que cualquier máscara.</strong> No hay una sección aparte de "usuarios" ni de "cuentas": al dar de alta una máscara en un dominio activado, marcas la opción de buzón y puedes dejar los destinos de reenvío vacíos si quieres que ese correo viva sólo ahí.</p>
+
+        <ol>
+          <li><strong>Creas la máscara</strong> con buzón. La app genera una contraseña fuerte, no una que "cumpla la política" sino una con entropía real.</li>
+          <li><strong>La contraseña se muestra una sola vez.</strong> MailMask no la guarda en ningún lado; si se pierde, se genera otra y se cambia en el cliente. No hay forma de "recuperarla", porque no existe copia.</li>
+          <li><strong>Descargas el perfil de Apple</strong> o copias los datos IMAP y SMTP para Outlook o Thunderbird.</li>
+        </ol>
+
+        <p>Lo de la contraseña no es descuido, es diseño. Un servidor que guarda contraseñas de buzones en claro es un servidor que las puede filtrar, y uno que las guarda cifradas tiene que pedirte la vieja para cambiarla. Preferimos que nadie, ni nosotros, tenga esa llave más que tú.</p>
+
+        <h2>¿Qué pasa con la Bandeja y el reenvío si además tengo buzón?</h2>
+
+        <p><strong>Siguen funcionando igual, porque el buzón es un destino más y no un reemplazo del camino de entrada.</strong> El MX de tu dominio sigue apuntando a Amazon SES, que recibe el correo, lo revisa contra spam y virus, y se lo entrega a MailMask. A partir de ahí la máscara decide a dónde va.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 720 300" width="100%" role="img" aria-labelledby="diagBuzon" xmlns="http://www.w3.org/2000/svg">
+            <title id="diagBuzon">Camino de un correo entrante: el remitente manda a tu dominio, el MX lo lleva a Amazon SES, SES lo entrega a MailMask, y MailMask lo reparte según la máscara: reenvía a Gmail, guarda en la Bandeja y deposita en el buzón IMAP, que Apple Mail, Outlook o Thunderbird sincronizan. Los tres destinos son independientes.</title>
+            <defs>
+              <marker id="arwBuzon" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" fill="rgb(var(--mask-500))" />
+              </marker>
+            </defs>
+
+            <!-- Row 1: inbound path -->
+            <rect x="16" y="110" width="110" height="52" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="71" y="132" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Remitente</text>
+            <text x="71" y="150" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">escribe a hola@</text>
+
+            <line x1="126" y1="136" x2="170" y2="136" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwBuzon)" />
+            <text x="148" y="126" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">MX</text>
+
+            <rect x="172" y="110" width="120" height="52" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="232" y="132" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Amazon SES</text>
+            <text x="232" y="150" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">recibe, filtra spam</text>
+
+            <line x1="292" y1="136" x2="336" y2="136" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwBuzon)" />
+            <text x="314" y="126" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">entrega</text>
+
+            <rect x="338" y="98" width="140" height="76" rx="8" fill="#18181b" stroke="rgb(var(--mask-500))" stroke-width="2" />
+            <text x="408" y="122" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">MailMask</text>
+            <text x="408" y="140" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">lee la máscara hola@</text>
+            <text x="408" y="158" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">y reparte</text>
+
+            <!-- Branch 1: forward -->
+            <line x1="478" y1="112" x2="540" y2="46" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwBuzon)" />
+            <text x="496" y="66" text-anchor="middle" fill="#4ade80" font-family="system-ui, sans-serif" font-size="10" font-weight="600">reenvía a</text>
+            <rect x="544" y="22" width="160" height="44" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="624" y="40" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="12" font-weight="600">Gmail</text>
+            <text x="624" y="56" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">el buzón que ya tienes</text>
+
+            <!-- Branch 2: bandeja -->
+            <line x1="478" y1="136" x2="540" y2="136" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwBuzon)" />
+            <text x="509" y="128" text-anchor="middle" fill="#4ade80" font-family="system-ui, sans-serif" font-size="10" font-weight="600">guarda en</text>
+            <rect x="544" y="114" width="160" height="44" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="624" y="132" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="12" font-weight="600">Bandeja</text>
+            <text x="624" y="148" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">en el navegador, en equipo</text>
+
+            <!-- Branch 3: IMAP mailbox -->
+            <line x1="478" y1="160" x2="540" y2="226" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwBuzon)" />
+            <text x="496" y="212" text-anchor="middle" fill="#4ade80" font-family="system-ui, sans-serif" font-size="10" font-weight="600">deposita en</text>
+            <rect x="544" y="206" width="160" height="44" rx="8" fill="#18181b" stroke="rgb(var(--mask-500))" stroke-width="2" />
+            <text x="624" y="224" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="12" font-weight="600">Buzón IMAP</text>
+            <text x="624" y="240" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">10 GB por dominio</text>
+
+            <!-- IMAP clients -->
+            <line x1="624" y1="250" x2="624" y2="272" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwBuzon)" />
+            <text x="660" y="265" text-anchor="start" fill="#4ade80" font-family="system-ui, sans-serif" font-size="10" font-weight="600">IMAP 993</text>
+            <rect x="504" y="274" width="200" height="22" rx="6" fill="#18181b" stroke="#3f3f46" />
+            <text x="604" y="289" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="11">Apple Mail · Outlook · Thunderbird</text>
+
+            <!-- Note: the three are independent -->
+            <text x="16" y="230" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11" letter-spacing="1.5">POR MÁSCARA</text>
+            <text x="16" y="250" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">uno, dos o los tres destinos</text>
+            <text x="16" y="268" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">si el buzón falla, el reenvío sigue</text>
+          </svg>
+          <figcaption>El correo entra por un solo camino y se reparte al final. Activar un buzón no toca el reenvío ni la Bandeja: sólo agrega una flecha.</figcaption>
+        </figure>
+
+        <p>Esto tiene dos consecuencias prácticas. La primera es que <strong>puedes activar el buzón sin migrar nada</strong>: el reenvío a Gmail sigue mientras te acomodas en Apple Mail, y lo apagas cuando quieras. La segunda es que <strong>un problema en el buzón no te deja sin correo</strong>: el reenvío y la Bandeja ni se enteran.</p>
+
+        <p>Y la Bandeja sigue siendo el lugar para trabajar en equipo. Un buzón es de una persona, con su contraseña; la Bandeja es del dominio, con asignaciones, notas internas e historial compartido. Muchos negocios querrán las dos: la Bandeja para atender <code>soporte@</code> entre varios y el buzón para que cada quien tenga <code>su-nombre@</code> en el teléfono.</p>
+
+        <h2>¿Cuánto cuesta un buzón IMAP en MailMask y cómo se compara?</h2>
+
+        <p><strong>Los buzones vienen incluidos al activar el dominio: $99 MXN al mes, buzones ilimitados que comparten 10 GB, y bloques de +50 GB por $99 más.</strong> No se cobra por buzón ni por persona. Si un dominio necesita tres buzones o treinta, cuesta lo mismo mientras quepan en el espacio.</p>
+
+        <table>
+          <thead>
+            <tr><th>Servicio</th><th>Cobra por</th><th>1 dominio, 5 personas</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Google Workspace</td><td>persona</td><td>$700 MXN al mes</td></tr>
+            <tr><td>Fastmail</td><td>persona</td><td>~$300 USD al año (unos $60 USD por persona)</td></tr>
+            <tr><td>Zoho Mail gratis</td><td>—</td><td>$0, pero sin IMAP: sólo su app</td></tr>
+            <tr><td>Migadu</td><td>almacenamiento</td><td>desde $19 USD al año por 5 GB, buzones ilimitados</td></tr>
+            <tr><td>MailMask</td><td>dominio</td><td><strong>$99 MXN al mes</strong>, personas ilimitadas, 10 GB</td></tr>
+          </tbody>
+        </table>
+
+        <p>La referencia más honesta es Migadu, que también cobra por espacio y regala buzones. Lo que MailMask suma sobre ese modelo es todo lo demás en el mismo precio: las máscaras que reenvían, la Bandeja compartida, la API y el registro de reenvíos. Y el dominio activado incluye <strong>50 correos nuevos al día</strong> desde la Bandeja o la API. Si mandas mucho más que eso desde código, escríbenos.</p>
+
+        <p>Cobrar por almacenamiento y no por buzón no es generosidad: es que el espacio es lo único que crece solo. Diez buzones vacíos no cuestan nada; un solo buzón con 40 GB de adjuntos sí. Por eso el medidor es el espacio del dominio y no el número de personas.</p>
+
+        <h2>¿Qué pasa con mi correo si cancelo?</h2>
+
+        <p><strong>Los buzones quedan 30 días en solo lectura y puedes descargar cada uno como archivo <code>.mbox</code>.</strong> Es el formato estándar que importan Apple Mail, Thunderbird y Gmail, así que el correo se va contigo a donde sea. Pasados los 30 días el contenido se borra.</p>
+
+        <p>Durante esos 30 días el reenvío y la Bandeja regresan al modo gratis del dominio, que sigue recibiendo correo. Lo que se apaga es el buzón como lugar para escribir y recibir por IMAP, no tu dominio.</p>
+
+        <p>Si te interesa el camino completo, sigue con <a href="/blog/email-profesional-sin-google-workspace">email profesional sin Google Workspace</a>, con <a href="/blog/migrar-google-workspace-a-mailmask">cómo migrar de Google Workspace a MailMask</a> o con <a href="/blog/bandeja-compartida-tutorial">cómo usar la Bandeja compartida</a>, que es la otra mitad de esta historia.</p>
+
+        <h2>Resumen rápido</h2>
+
+        <ul>
+          <li><strong>Un buzón IMAP guarda tu correo en tu dominio</strong> y lo sincroniza con Apple Mail, Outlook, Thunderbird o el teléfono. Reenviar sólo lo pasa a Gmail.</li>
+          <li><strong>Una máscara puede reenviar, guardar en la Bandeja y tener buzón</strong>, en cualquier combinación. El MX no se mueve: SES recibe y MailMask reparte.</li>
+          <li><strong>La contraseña se muestra una vez y no se guarda.</strong> Si se pierde, se genera otra.</li>
+          <li><strong>$99 MXN por dominio activado</strong> con buzones ilimitados y 10 GB; +50 GB por $99. Google cobra $140 por persona.</li>
+          <li><strong>Al cancelar, 30 días de solo lectura</strong> y descarga en <code>.mbox</code>. El correo es tuyo.</li>
+        </ul>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Tu dominio en Apple Mail, sin Google</h2>
+      <p>Máscaras, Bandeja compartida y buzones IMAP con 10 GB por dominio. Gratis para empezar · $99 por dominio activado.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-line py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-fg-muted text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-fg-subtle text-sm flex gap-4">
+          <a href="/terms" class="hover:text-fg transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-fg transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-fg transition-colors">Blog</a>
+          <a href="/login" class="hover:text-fg transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-fg-subtle text-xs mt-4">
+        © 2026 by fixter.org
+      </p>
+    </footer>
+  </body>
+</html>

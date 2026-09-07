@@ -40,7 +40,7 @@
       "headline": "Cómo migrar de Google Workspace a MailMask",
       "description": "Guía paso a paso para dejar Google Workspace y configurar email profesional en tu dominio con MailMask.",
       "datePublished": "2026-02-23",
-      "dateModified": "2026-08-12",
+      "dateModified": "2026-09-07",
       "image": "https://www.mailmask.studio/blog/img/migrar.jpg",
       "author": { "@type": "Organization", "name": "MailMask" },
       "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
@@ -67,7 +67,7 @@
       "totalTime": "PT30M",
       "step": [
         { "@type": "HowToStep", "position": 1, "name": "Inventariar direcciones activas", "text": "Haz una lista de todas las direcciones de email que usas en Google Workspace: usuarios, aliases y grupos." },
-        { "@type": "HowToStep", "position": 2, "name": "Crear cuenta en MailMask", "text": "Regístrate en mailmask.studio/register y selecciona el plan que cubra tu número de dominios." },
+        { "@type": "HowToStep", "position": 2, "name": "Crear cuenta en MailMask", "text": "Regístrate en mailmask.studio/register. La cuenta es gratis y no pide tarjeta; activa tu dominio por $99 MXN/mes cuando lo necesites." },
         { "@type": "HowToStep", "position": 3, "name": "Agregar dominio", "text": "En el dashboard de MailMask, agrega tu dominio y copia los registros DNS proporcionados." },
         { "@type": "HowToStep", "position": 4, "name": "Configurar registros DNS", "text": "Cambia los registros MX en tu proveedor de dominio para apuntar a MailMask. Agrega los registros DKIM y SPF." },
         { "@type": "HowToStep", "position": 5, "name": "Crear aliases", "text": "Recrea cada dirección de Workspace como un alias en MailMask, apuntando al Gmail personal de cada miembro." },
@@ -104,7 +104,7 @@
 
         <h2>Por qué tiene sentido migrar</h2>
 
-        <p>El plan más barato de Google Workspace cuesta <strong>$140 MXN al mes por usuario</strong>. Si tienes un equipo de 5 personas, son $700 MXN mensuales solo por email. Con MailMask, el <a href="/pricing">plan Básico</a> cuesta $49 MXN/mes con 10 máscaras en un dominio. El plan Equipo ($299 MXN/mes) cubre 5 dominios con máscaras ilimitadas, envío autenticado y Bandeja compartida.</p>
+        <p>El plan más barato de Google Workspace cuesta <strong>$140 MXN al mes por usuario</strong>. Si tienes un equipo de 5 personas, son $700 MXN mensuales solo por email. Con MailMask, la <a href="/pricing">cuenta es gratis</a>: 5 máscaras en tu dominio y una Bandeja para leer y responder. Activar el dominio cuesta $99 MXN/mes e incluye personas ilimitadas, máscaras ilimitadas, envío autenticado, buzones IMAP y Bandeja compartida.</p>
 
         <p>La diferencia clave: MailMask no te cobra por usuario. Creas todos los aliases que necesites y cada uno reenvía al inbox personal (Gmail, Outlook, lo que sea) de cada miembro del equipo. Todos reciben email en <code>@tudominio.com</code>, pero cada quien lo lee en su bandeja habitual.</p>
 
@@ -125,7 +125,7 @@
           <li><strong>Google Drive / Docs / Sheets:</strong> usa las versiones gratuitas con tu cuenta personal de Google, o alternativas como Notion o Dropbox.</li>
           <li><strong>Google Calendar:</strong> tu cuenta personal de Google Calendar funciona igual.</li>
           <li><strong>Google Meet:</strong> la versión gratuita de Meet, Zoom o Teams cubre la mayoría de casos.</li>
-          <li><strong>Almacenamiento de buzón:</strong> los emails se reenvían a tu inbox existente, MailMask no almacena correos a largo plazo.</li>
+          <li><strong>Suite ofimática:</strong> nada de Drive, Docs ni Meet. El correo sí: con el dominio activado tienes buzones IMAP con 10 GB para Apple Mail, Outlook o Thunderbird, además del reenvío.</li>
         </ul>
 
         <p>Si tu equipo depende fuertemente de la integración entre Gmail, Drive y Calendar dentro de Workspace, evalúa si las alternativas gratuitas cubren tu flujo antes de migrar.</p>
@@ -147,12 +147,12 @@
 
         <h3>1. Crea tu cuenta en MailMask</h3>
 
-        <p><a href="/register">Regístrate en mailmask.studio</a> con el email personal del administrador (no el de Workspace). Elige el plan según tus necesidades:</p>
+        <p><a href="/register">Regístrate en mailmask.studio</a> con el email personal del administrador (no el de Workspace). No hay planes que elegir:</p>
 
         <ul>
-          <li><strong>Básico ($49 MXN/mes):</strong> 1 dominio, aliases ilimitados, recepción.</li>
-          <li><strong>Equipo ($299 MXN/mes):</strong> hasta 15 dominios, envío autenticado (DKIM+SPF), responder desde aliases.</li>
-          <li><strong>Dominio extra ($79 MXN/mes):</strong> para sumar marcas o clientes a cualquiera de los dos planes.</li>
+          <li><strong>Gratis ($0):</strong> 1 dominio, 5 máscaras, reenvío hasta 1,000 correos al mes, Bandeja para una persona. Sin tarjeta.</li>
+          <li><strong>Dominio activado ($99 MXN/mes):</strong> personas ilimitadas, máscaras ilimitadas, envío autenticado (DKIM+SPF), 50 correos nuevos al día, buzones IMAP con 10 GB y Bandeja compartida.</li>
+          <li><strong>Un dominio más son $99 más:</strong> para sumar marcas o clientes, sin escaleras.</li>
         </ul>
 
         <h3>2. Agrega tu dominio</h3>
@@ -191,7 +191,7 @@
         <ul>
           <li>Los emails llegan al destinatario correcto.</li>
           <li>Los headers de DKIM y SPF pasan (revisa en Gmail: menú de 3 puntos → "Mostrar original").</li>
-          <li>Si tienes plan Equipo, prueba responder desde el alias.</li>
+          <li>Prueba responder desde el alias en la Bandeja y, si activaste el dominio, envía un correo nuevo desde él.</li>
         </ul>
 
         <h3>6. Cancela Google Workspace</h3>
@@ -228,10 +228,10 @@
 
         <ul>
           <li><strong>Google Workspace:</strong> $140 MXN × 5 usuarios × 12 meses = $8,400 MXN/año</li>
-          <li><strong>MailMask Equipo:</strong> $299 MXN × 12 meses = $3,588 MXN/año (o $2,990 pagando anual)</li>
+          <li><strong>MailMask, dominio activado:</strong> $99 MXN × 12 meses = $1,188 MXN/año (o $990 pagando anual)</li>
         </ul>
 
-        <p>Con un equipo de 5, ya ahorras. Con 10 personas, Workspace cuesta $12,000 MXN/año vs los mismos $5,388 MXN de MailMask — porque MailMask no cobra por usuario. Mientras más crece tu equipo, mayor es el ahorro.</p>
+        <p>Con un equipo de 5 ahorras más de $7,000 MXN al año. Con 10 personas, Workspace cuesta $16,800 MXN/año vs los mismos $1,188 MXN de MailMask — porque MailMask no cobra por usuario. Mientras más crece tu equipo, mayor es el ahorro.</p>
 
         <h2>Conclusión</h2>
 
@@ -243,7 +243,7 @@
 
     <section class="blog-cta">
       <h2>Empieza tu migración hoy</h2>
-      <p>Email profesional en tu dominio desde $49 MXN/mes. Sin cobro por usuario.</p>
+      <p>Gratis para empezar · $99 por dominio activado. Sin cobro por usuario.</p>
       <a href="/register" class="cta-btn">Crear cuenta gratis</a>
     </section>
 

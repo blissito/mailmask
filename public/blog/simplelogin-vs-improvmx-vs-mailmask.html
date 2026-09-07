@@ -22,6 +22,7 @@
     <meta property="og:image:type" content="image/jpeg" />
     <meta name="twitter:image" content="https://www.mailmask.studio/blog/img/comparativa-og.jpg" />
     <meta property="article:published_time" content="2026-02-23" />
+    <meta property="article:modified_time" content="2026-09-07" />
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@HectorBlisS" />
@@ -42,7 +43,7 @@
       "headline": "SimpleLogin vs ImprovMX vs MailMask: comparativa 2026",
       "description": "Comparamos las 3 mejores alternativas de email forwarding: precios, features y para quién es cada una.",
       "datePublished": "2026-02-23",
-      "dateModified": "2026-08-12",
+      "dateModified": "2026-09-07",
       "image": "https://www.mailmask.studio/blog/img/comparativa.jpg",
       "author": { "@type": "Organization", "name": "MailMask" },
       "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
@@ -96,7 +97,7 @@
 
         <h3>MailMask</h3>
 
-        <p>Servicio de email forwarding con enfoque en <strong>dominios propios para freelancers, agencias y equipos</strong>. Incluye bandeja compartida (Bandeja), SMTP relay, auto-configuración de DKIM+SPF, y precios en pesos mexicanos. Orientado al mercado latinoamericano.</p>
+        <p>Servicio de email forwarding con enfoque en <strong>dominios propios para freelancers, agencias y equipos</strong>. Incluye bandeja compartida (Bandeja), buzones IMAP, SMTP relay, auto-configuración de DKIM+SPF, y precios en pesos mexicanos. La cuenta es gratis y cada dominio se activa por $99 MXN/mes. Orientado al mercado latinoamericano.</p>
 
         <h2>Tabla comparativa</h2>
 
@@ -114,37 +115,43 @@
               <td><strong>Plan gratuito</strong></td>
               <td>10 aliases, 1 buzón</td>
               <td>25 aliases, 1 dominio</td>
-              <td>No (prueba gratuita)</td>
+              <td>1 dominio, 5 máscaras, Bandeja (sin tarjeta)</td>
             </tr>
             <tr>
               <td><strong>Precio base</strong></td>
               <td>~$70 MXN/mes ($4 USD, cobro en dólares)</td>
               <td>~$180 MXN/mes ($9.99 USD, cobro en dólares)</td>
-              <td>$49 MXN/mes</td>
+              <td>$99 MXN/mes por dominio activado</td>
             </tr>
             <tr>
               <td><strong>Dominios propios</strong></td>
               <td>Hasta 5 (plan premium)</td>
               <td>Hasta 30 (plan premium)</td>
-              <td>1 en Básico, 5 en Equipo (+$79 c/u)</td>
+              <td>1 gratis; cada dominio más son $99</td>
             </tr>
             <tr>
               <td><strong>Aliases</strong></td>
               <td>Ilimitados (premium)</td>
               <td>Ilimitados (pago)</td>
-              <td>Ilimitados</td>
+              <td>5 gratis, ilimitados al activar</td>
             </tr>
             <tr>
               <td><strong>Envío desde dominio</strong></td>
               <td>Reply via alias</td>
               <td>SMTP (plan de pago)</td>
-              <td>Bandeja + SMTP relay</td>
+              <td>Bandeja + SMTP relay + Apple Mail/Outlook (50 correos nuevos al día)</td>
             </tr>
             <tr>
               <td><strong>Bandeja compartida</strong></td>
               <td>No</td>
               <td>No</td>
               <td>Si (Bandeja integrada)</td>
+            </tr>
+            <tr>
+              <td><strong>Buzones IMAP</strong></td>
+              <td>No (usa Proton Mail)</td>
+              <td>No</td>
+              <td>Sí, ilimitados con 10 GB (Apple Mail, Outlook, Thunderbird)</td>
             </tr>
             <tr>
               <td><strong>DKIM auto-config</strong></td>
@@ -156,7 +163,7 @@
               <td><strong>SMTP relay</strong></td>
               <td>No</td>
               <td>Si (plan premium)</td>
-              <td>Sí (plan Equipo)</td>
+              <td>Sí (dominio activado)</td>
             </tr>
             <tr>
               <td><strong>Reglas de forwarding</strong></td>
@@ -219,17 +226,18 @@
 
         <p><strong>Puntos a favor:</strong></p>
         <ul>
-          <li>Precios en MXN accesibles para el mercado latino ($49 MXN/mes base).</li>
+          <li>Precios en MXN accesibles para el mercado latino: cuenta gratis y $99 MXN/mes por dominio activado, con personas ilimitadas.</li>
           <li><strong>Bandeja compartida</strong> — tu equipo puede ver y responder emails desde una interfaz web sin configurar clientes de correo. Ningun otro servicio de forwarding incluye esto.</li>
+          <li><strong>Buzones IMAP</strong> ilimitados con 10 GB por dominio activado: lee y responde desde Apple Mail, Outlook o Thunderbird sin depender de Gmail. Los otros dos sólo reenvían.</li>
           <li>DKIM y SPF se configuran automáticamente al agregar un dominio.</li>
-          <li>SMTP relay en plan Equipo para enviar desde código o aplicaciones.</li>
+          <li>SMTP relay en dominio activado para enviar desde código o aplicaciones.</li>
           <li>Reglas avanzadas de forwarding con wildcards y múltiples destinos.</li>
           <li>Interfaz y soporte en español.</li>
         </ul>
 
         <p><strong>Limitaciones:</strong></p>
         <ul>
-          <li>Sin plan gratuito permanente (solo prueba gratuita).</li>
+          <li>La cuenta gratis cubre un dominio con 5 máscaras y no envía correo nuevo (sí responde desde la Bandeja).</li>
           <li>Servicio más joven que los otros dos.</li>
           <li>Menos integraciones con terceros por ahora.</li>
         </ul>
@@ -257,6 +265,7 @@
           <li>Quieres <strong>precios en pesos mexicanos</strong> sin depender del tipo de cambio.</li>
           <li>Prefieres que DKIM y SPF se configuren solos sin pelear con registros DNS.</li>
           <li>Necesitas SMTP relay para enviar emails desde tu aplicación o SaaS.</li>
+          <li>Quieres leer tu correo en <strong>Apple Mail u Outlook</strong> con un buzón propio, no reenviado a Gmail.</li>
           <li>Eres freelancer o agencia que maneja <strong>múltiples dominios de clientes</strong>.</li>
         </ul>
 
@@ -266,29 +275,29 @@
         <ul>
           <li>SimpleLogin Premium: ~$70 MXN/mes (cobro en USD)</li>
           <li>ImprovMX gratis: $0 (con limitaciones)</li>
-          <li>MailMask Basico: $49 MXN/mes</li>
+          <li>MailMask gratis: $0 (1 dominio, 5 máscaras, Bandeja); $99 MXN/mes si quieres máscaras ilimitadas, buzones IMAP y enviar como tu@dominio</li>
         </ul>
 
         <p><strong>Agencia con 5 dominios de clientes:</strong></p>
         <ul>
           <li>SimpleLogin: ~$70 MXN/mes (cobro en USD) — hasta 5 dominios</li>
           <li>ImprovMX Premium: ~$180 MXN/mes (cobro en USD) — hasta 30 dominios</li>
-          <li>MailMask Equipo: $299 MXN/mes — 5 dominios + Bandeja + envio autenticado</li>
+          <li>MailMask: $495 MXN/mes — $99 por cada dominio activado, con Bandeja compartida, buzones IMAP y envío autenticado, personas ilimitadas</li>
         </ul>
 
-        <p>Para la agencia, MailMask es más caro en precio base pero incluye Bandeja compartida y envío autenticado — features que en los otros servicios no existen o requieren herramientas adicionales como Helpscout o Intercom (que cuestan mucho mas).</p>
+        <p>Para la agencia, MailMask es más caro en precio base pero incluye Bandeja compartida, buzones IMAP y envío autenticado — features que en los otros servicios no existen o requieren herramientas adicionales como Helpscout o Intercom (que cobran por persona y cuestan mucho más).</p>
 
         <h2>Conclusión</h2>
 
         <p>No hay un "mejor" servicio universal. SimpleLogin es ideal para privacidad personal. ImprovMX es perfecto para forwarding simple y rápido. MailMask es la mejor opción si necesitas email profesional con bandeja compartida, especialmente si operas en Latinoamérica y quieres pagar en moneda local.</p>
 
-        <p>Lo importante es que <strong>dejes de usar tu Gmail personal para tu negocio</strong>. Cualquiera de estas tres opciones es mejor que dar una dirección <code>@gmail.com</code> en tu tarjeta de presentación. Si quieres explorar MailMask, puedes <a href="/register">crear tu cuenta</a> y probarlo gratis, o revisar los <a href="/pricing">planes y precios</a> para encontrar el que se ajuste a tu necesidad.</p>
+        <p>Lo importante es que <strong>dejes de usar tu Gmail personal para tu negocio</strong>. Cualquiera de estas tres opciones es mejor que dar una dirección <code>@gmail.com</code> en tu tarjeta de presentación. Si quieres explorar MailMask, puedes <a href="/register">crear tu cuenta gratis</a> sin tarjeta, o revisar los <a href="/pricing">precios</a>: $99 MXN/mes por dominio activado, sin planes ni escaleras.</p>
       </div>
     </article>
 
     <section class="blog-cta">
       <h2>Prueba MailMask hoy</h2>
-      <p>Email profesional con bandeja compartida desde $49 MXN/mes. Sin complicaciones.</p>
+      <p>Email profesional con bandeja compartida. Gratis para empezar · $99 por dominio activado.</p>
       <a href="/register" class="cta-btn">Crear cuenta gratis</a>
     </section>
 

@@ -5,7 +5,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cómo enviar emails desde tu dominio (no solo recibir) — MailMask</title>
-    <meta name="description" content="Tres formas de enviar como ventas@tudominio.com en MailMask: redactar desde la Bandeja, la API REST/SDK, y el SMTP relay. Planes, límites y cuándo usar cada una." />
+    <meta name="description" content="Tres formas de enviar como ventas@tudominio.com en MailMask: redactar desde la Bandeja, la API REST/SDK, y el SMTP relay. Qué incluye el dominio activado, límites y cuándo usar cada una." />
     <link rel="canonical" href="https://www.mailmask.studio/blog/enviar-emails-desde-dominio" />
     <meta property="og:title" content="Cómo enviar emails desde tu dominio (no solo recibir)" />
     <meta property="og:description" content="Tres formas de enviar desde tu dominio: Bandeja, API/SDK y SMTP relay." />
@@ -26,7 +26,7 @@
     <meta name="twitter:description" content="Tres formas de enviar desde tu dominio: Bandeja, API/SDK y SMTP relay." />
     <meta name="twitter:image" content="https://www.mailmask.studio/blog/img/enviar-dominio-og.jpg" />
     <meta property="article:published_time" content="2026-02-24" />
-    <meta property="article:modified_time" content="2026-08-12" />
+    <meta property="article:modified_time" content="2026-09-07" />
     <script src="/js/analytics.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -41,7 +41,7 @@
       "headline": "Cómo enviar emails desde tu dominio (no solo recibir)",
       "description": "Tres formas de enviar como ventas@tudominio.com en MailMask: redactar desde la Bandeja, la API REST/SDK y el SMTP relay.",
       "datePublished": "2026-02-24",
-      "dateModified": "2026-08-12",
+      "dateModified": "2026-09-07",
       "image": "https://www.mailmask.studio/blog/img/enviar-desde-dominio-og.jpg",
       "author": { "@type": "Organization", "name": "MailMask" },
       "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
@@ -74,18 +74,18 @@
         },
         {
           "@type": "Question",
-          "name": "¿El plan Básico puede enviar desde su dominio?",
+          "name": "¿La cuenta gratis puede enviar desde su dominio?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "El plan Básico de $49 MXN al mes incluye la Bandeja y puede responder conversaciones sin costo extra. Para iniciar un correo nuevo necesita el add-on de envíos: 25 al día por +$49 MXN o 100 al día por +$99 MXN, excluyentes entre sí."
+            "text": "La cuenta gratis incluye la Bandeja y puede responder conversaciones sin costo. Para iniciar un correo nuevo hay que activar el dominio: $99 MXN al mes con 50 correos nuevos al día incluidos."
           }
         },
         {
           "@type": "Question",
-          "name": "¿Cuántos envíos al día incluye cada plan?",
+          "name": "¿Cuántos envíos al día incluye un dominio activado?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Equipo ($299 MXN) incluye 200 envíos al día por dominio. Básico responde sin límite de plan e inicia correos nuevos solo con el add-on de 25 o 100 al día. Los topes se cuentan por dominio y por día."
+            "text": "Un dominio activado ($99 MXN al mes) incluye 50 correos nuevos al día. La cuenta gratis responde desde la Bandeja pero no inicia correos nuevos. Los topes se cuentan por dominio y por día."
           }
         },
         {
@@ -101,7 +101,7 @@
           "name": "¿Qué método de envío debo usar?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Usa la Bandeja para escribirle a una persona, la API REST o el SDK para enviar desde tu propio código, y el SMTP relay (plan Equipo) para conectar un SaaS o un sistema que ya habla SMTP."
+            "text": "Usa la Bandeja para escribirle a una persona, la API REST o el SDK para enviar desde tu propio código, y el SMTP relay (dominio activado) para conectar un SaaS o un sistema que ya habla SMTP."
           }
         }
       ]
@@ -120,7 +120,7 @@
         <h1>Cómo enviar emails desde tu dominio (no solo recibir)</h1>
         <div class="meta">
           <span>📅 24 Feb 2026</span>
-          <span>🔄 Actualizado 12 Ago 2026</span>
+          <span>🔄 Actualizado 7 Sep 2026</span>
           <span>⏱ 7 min de lectura</span>
         </div>
       </header>
@@ -210,17 +210,17 @@
                style="width:100%;height:340px;object-fit:cover;object-position:center 35%;border-radius:12px;display:block" />
         </figure>
 
-        <h2>¿Qué plan necesito para enviar?</h2>
+        <h2>¿Qué necesito para enviar desde mi dominio?</h2>
 
-        <p>Responder desde la Bandeja está incluido desde el plan Básico de $49 MXN al mes, sin costo extra. Iniciar un correo nuevo es lo que requiere cupo de envío.</p>
+        <p>Responder desde la Bandeja está incluido en la cuenta gratis, sin costo. Iniciar un correo nuevo es lo que requiere cupo de envío, y ese cupo viene con el dominio activado.</p>
 
-        <p>Básico trae la Bandeja, 1 dominio, 5 máscaras y 15 días de historial. Para escribir primero necesitas un add-on de envíos: <strong>25 al día por +$49 MXN</strong> o <strong>100 al día por +$99 MXN</strong>. Son excluyentes: eliges uno.</p>
+        <p>La cuenta gratis trae la Bandeja para una persona, 1 dominio y 5 máscaras; muestra 7 días de historial y guarda 30. No hay planes que elegir ni tarjeta que dar.</p>
 
-        <p>Equipo ($299 MXN) ya incluye <strong>200 envíos al día por dominio</strong>, 5 dominios, 5 miembros por dominio, SMTP relay y webhooks. Los add-ons se compran desde el panel con un plan activo; también hay dominio extra por +$79 MXN cada uno. Todo el detalle está en <a href="/pricing">precios</a>.</p>
+        <p>Activar el dominio cuesta <strong>$99 MXN al mes</strong> e incluye <strong>50 correos nuevos al día</strong>, personas ilimitadas, máscaras ilimitadas, buzones IMAP para Apple Mail u Outlook, SMTP relay, webhooks y el historial completo. Cada dominio más son $99 más; no hay escaleras. Todo el detalle está en <a href="/pricing">precios</a>.</p>
 
         <div class="highlight-box">
           <h4>Ojo con el conteo</h4>
-          <p>Los topes de envío se cuentan <strong>por dominio y por día</strong>, no por cuenta. Con Equipo y 5 dominios tienes 200 envíos diarios en cada uno, no 200 repartidos entre todos.</p>
+          <p>Los topes de envío se cuentan <strong>por dominio y por día</strong>, no por cuenta. Con 5 dominios activados tienes 50 correos nuevos diarios en cada uno, no 50 repartidos entre todos.</p>
         </div>
 
         <h2>¿Cómo envío desde mi código con la API o el SDK?</h2>
@@ -229,13 +229,13 @@
 
         <p>Es el camino para correos que dispara tu aplicación: confirmaciones de compra, avisos de una tarea terminada, respuestas automáticas de un formulario. El cuerpo lleva el alias remitente, el destinatario, el asunto y el contenido.</p>
 
-        <p>Cada envío cuenta contra el tope diario del dominio, igual que si lo hubieras mandado a mano desde la Bandeja. Si tu app supera el tope, la API responde con error en lugar de cobrarte de más: te toca subir de plan o agregar el add-on de envíos.</p>
+        <p>Cada envío cuenta contra el tope diario del dominio, igual que si lo hubieras mandado a mano desde la Bandeja. Si tu app supera el tope, la API responde con error en lugar de cobrarte de más. Si tu volumen por API va a ser alto de forma sostenida, escríbenos antes.</p>
 
         <p>La referencia completa de parámetros y ejemplos está en la <a href="/docs">documentación</a>.</p>
 
         <h2>¿Cuándo conviene el SMTP relay?</h2>
 
-        <p>Cuando el sistema que va a enviar ya habla SMTP y no lo vas a modificar. Está disponible en el plan Equipo, con credenciales generadas por dominio.</p>
+        <p>Cuando el sistema que va a enviar ya habla SMTP y no lo vas a modificar. Está disponible en cualquier dominio activado, con credenciales generadas por dominio.</p>
 
         <p>No lo uses para escribirle a una persona ni para algo que tu código ya podría resolver con la API: el SMTP relay existe para el software que no te deja elegir cómo enviar.</p>
 
@@ -243,7 +243,7 @@
 
         <h2>Comparación de los tres métodos</h2>
 
-        <p>Esta tabla resume la decisión: mira para qué sirve cada uno y qué plan lo habilita.</p>
+        <p>Esta tabla resume la decisión: mira para qué sirve cada uno y qué lo habilita.</p>
 
         <div class="table-wrap">
           <table>
@@ -251,7 +251,7 @@
               <tr>
                 <th>Método</th>
                 <th>Para qué sirve</th>
-                <th>Qué plan lo permite</th>
+                <th>Qué lo permite</th>
                 <th>Esfuerzo técnico</th>
               </tr>
             </thead>
@@ -259,19 +259,19 @@
               <tr>
                 <td><strong>Bandeja</strong></td>
                 <td>Escribirle a una persona: soporte, ventas, seguimiento de un hilo.</td>
-                <td>Responder desde Básico. Iniciar correos con add-on de envíos, o incluido en Equipo.</td>
+                <td>Responder, gratis. Iniciar correos, con el dominio activado (50 al día).</td>
                 <td>Ninguno. Botón Redactar o tecla <code>c</code>.</td>
               </tr>
               <tr>
                 <td><strong>API REST / SDK</strong></td>
                 <td>Enviar desde tu propio código o app: transaccionales y notificaciones.</td>
-                <td>Cualquier plan con cupo de envío disponible.</td>
+                <td>Dominio activado, con cupo de envío disponible.</td>
                 <td>Medio. Una llamada HTTP con tu API key.</td>
               </tr>
               <tr>
                 <td><strong>SMTP relay</strong></td>
                 <td>Conectar un SaaS o sistema existente que solo habla SMTP.</td>
-                <td>Plan Equipo.</td>
+                <td>Dominio activado.</td>
                 <td>Bajo, pero fuera de MailMask: configuras host, puerto y credenciales.</td>
               </tr>
             </tbody>
@@ -287,9 +287,9 @@
         <p>Eso significa que cada correo sale firmado y el servidor del destinatario puede comprobar que de verdad viene de ti. Si quieres entender qué está pasando debajo, lee <a href="/blog/que-son-dkim-spf-dmarc">qué son DKIM, SPF y DMARC</a>.</p>
 
         <p>Además hay una <strong>lista de supresión</strong>: a quien rebotó o te marcó como spam, MailMask deja de escribirle. Duele perder un contacto, pero protege la reputación del dominio para todos los demás. Complementa esto con las prácticas de <a href="/blog/evitar-emails-caigan-en-spam">cómo evitar que tus emails caigan en spam</a>: asunto honesto, sin listas compradas y con volumen que crece poco a poco.</p>
-        <p>Empieza por la Bandeja. Es gratis dentro de tu plan para responder, no requiere configuración y cubre el 90% de los casos reales.</p>
+        <p>Empieza por la Bandeja. Responder es gratis, no requiere configuración y cubre el 90% de los casos reales.</p>
 
-        <p>Cuando tu producto necesite mandar correos solo, pasa a la API. Y si ya tienes un sistema que envía y no lo quieres tocar, el SMTP relay del plan Equipo lo conecta sin cambiar una línea.</p>
+        <p>Cuando tu producto necesite mandar correos solo, pasa a la API. Y si ya tienes un sistema que envía y no lo quieres tocar, el SMTP relay del dominio activado lo conecta sin cambiar una línea.</p>
 
         <p><a href="/register">Crea tu cuenta en MailMask</a> y empieza a enviar y recibir como <code>hola@tudominio.com</code> hoy.</p>
       </div>
@@ -297,7 +297,7 @@
 
     <section class="blog-cta">
       <h2>Envía y recibe con tu dominio</h2>
-      <p>Bandeja, API y SMTP relay. Desde $49 MXN/mes.</p>
+      <p>Bandeja, API y SMTP relay. Gratis para empezar · $99 por dominio activado.</p>
       <a href="/register" class="cta-btn">Crear cuenta gratis</a>
     </section>
 
