@@ -1,5 +1,5 @@
 import type {
-  MailMaskConfig, Domain, DomainVerification, Alias, CreateAliasInput, UpdateAliasInput,
+  MailMaskConfig, Domain, DomainCreated, DomainVerification, Alias, AliasCreated, MailboxCreated, CreateAliasInput, UpdateAliasInput,
   Rule, CreateRuleInput, UpdateRuleInput, EmailLog, SendEmailInput,
   BulkSendInput, BulkJob, BulkJobCreated, SmtpCredential, SmtpCredentialCreated,
   ApiKey, SendOptions, UploadAttachmentInput, UploadedAttachment, Suppression,
@@ -67,7 +67,7 @@ class DomainsResource {
   constructor(private req: Req) {}
   list() { return this.req<Domain[]>("/api/domains"); }
   get(id: string) { return this.req<Domain>(`/api/domains/${id}`); }
-  create(domain: string) { return this.req<{ domain: Domain }>("/api/domains", { method: "POST", body: JSON.stringify({ domain }) }); }
+  create(domain: string) { return this.req<DomainCreated>("/api/domains", { method: "POST", body: JSON.stringify({ domain }) }); }
   delete(id: string) { return this.req<{ ok: boolean }>(`/api/domains/${id}`, { method: "DELETE" }); }
   health(id: string) { return this.req<Record<string, unknown>>(`/api/domains/${id}/health`); }
   verify(id: string) { return this.req<DomainVerification>(`/api/domains/${id}/verify`, { method: "POST" }); }
@@ -76,7 +76,11 @@ class DomainsResource {
 class AliasesResource {
   constructor(private req: Req) {}
   list(domainId: string) { return this.req<Alias[]>(`/api/domains/${domainId}/alias`); }
-  create(domainId: string, input: CreateAliasInput) { return this.req<Alias>(`/api/domains/${domainId}/alias`, { method: "POST", body: JSON.stringify(input) }); }
+  create(domainId: string, input: CreateAliasInput) { return this.req<AliasCreated>(`/api/domains/${domainId}/alias`, { method: "POST", body: JSON.stringify({ ...input, destinations: input.destinations ?? [] }) }); }
+  /** Crea un buzón IMAP para una máscara existente. La contraseña sólo se devuelve aquí. */
+  createMailbox(domainId: string, alias: string) { return this.req<MailboxCreated>(`/api/domains/${domainId}/alias/${alias}/mailbox`, { method: "POST" }); }
+  /** Borra el buzón Y SU CORREO. La máscara debe conservar al menos un destino. */
+  deleteMailbox(domainId: string, alias: string) { return this.req<{ ok: boolean }>(`/api/domains/${domainId}/alias/${alias}/mailbox`, { method: "DELETE" }); }
   update(domainId: string, alias: string, input: UpdateAliasInput) { return this.req<Alias>(`/api/domains/${domainId}/alias/${alias}`, { method: "PUT", body: JSON.stringify(input) }); }
   delete(domainId: string, alias: string) { return this.req<{ ok: boolean }>(`/api/domains/${domainId}/alias/${alias}`, { method: "DELETE" }); }
 }

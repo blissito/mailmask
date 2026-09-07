@@ -22,6 +22,26 @@ export interface Domain {
   forwardPerHour?: number;
 }
 
+export interface DnsRecord {
+  type: "MX" | "TXT" | "CNAME";
+  name: string;
+  value: string;
+  priority?: number;
+}
+
+/** Respuesta de `domains.create`: el dominio y los registros DNS que hay que poner. */
+export interface DomainCreated {
+  domain: Domain;
+  /** true si es el 2.º dominio sin activar: se guarda pero no reenvía hasta activarlo ($99/mes). */
+  requiereActivacion: boolean;
+  dnsRecords: {
+    mx: DnsRecord;
+    verification: DnsRecord;
+    dkim: DnsRecord[];
+    spf: DnsRecord;
+  };
+}
+
 /** Respuesta de `domains.verify`. */
 export interface DomainVerification {
   domain: string;
@@ -41,12 +61,32 @@ export interface Alias {
   lastFrom?: string | null;
   lastAt?: string | null;
   createdAt: string;
+  /** true si la máscara guarda el correo en un buzón IMAP. */
+  mailboxEnabled?: boolean;
+}
+
+/** Credenciales de un buzón IMAP recién creado. La contraseña se muestra una sola vez. */
+export interface MailboxCreated {
+  email: string;
+  password: string;
+  quotaBytes: number;
+  imap: { host: string; port: number; security: string };
+  smtp: { host: string; port: number; security: string };
+}
+
+/** `aliases.create`: el alias, y si pediste buzón, sus credenciales o por qué no se creó. */
+export interface AliasCreated extends Alias {
+  buzon?: MailboxCreated | null;
+  errorBuzon?: string | null;
 }
 
 export interface CreateAliasInput {
   /** Parte local, sin el dominio: "hola" para hola@tudominio.com. `*` para catch-all. */
   alias: string;
-  destinations: string[];
+  /** Adónde reenviar. Puede ir vacío sólo si `mailbox` es true. */
+  destinations?: string[];
+  /** Crear también un buzón IMAP (requiere dominio activado). */
+  mailbox?: boolean;
 }
 
 export interface UpdateAliasInput {

@@ -36,7 +36,19 @@ await mm.send.send(domainId, {
 
 // List aliases for a domain
 const aliases = await mm.aliases.list(domainId);
+
+// Add a domain — returns the DNS records to configure (MX, TXT, DKIM, SPF)
+const { domain, dnsRecords } = await mm.domains.create("yourdomain.com");
+
+// An alias with an IMAP mailbox (activated domain): password is returned once
+const inbox = await mm.aliases.create(domainId, { alias: "sales", mailbox: true });
+console.log(inbox.buzon?.password, inbox.buzon?.imap);
 ```
+
+## MCP
+
+The same actions are available to AI agents at `https://www.mailmask.studio/mcp`
+(Streamable HTTP, `Authorization: Bearer mk_...`). See https://www.mailmask.studio/docs#mcp.
 
 ## More
 

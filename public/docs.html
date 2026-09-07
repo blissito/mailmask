@@ -413,20 +413,31 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
 
       <!-- MCP -->
       <h2 id="mcp" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">MCP Server</h2>
-      <div class="bg-yellow-900/20 border border-yellow-800/30 rounded-lg p-4 mb-4">
-        <p class="text-yellow-400 text-sm font-medium mb-1">Pr&oacute;ximamente</p>
-        <p class="text-fg-muted text-sm">Estamos desarrollando un servidor MCP (Model Context Protocol) que permite a agentes de IA como Claude interactuar con tu cuenta de MailMask directamente. Podr&aacute;s crear aliases, gestionar reglas y enviar emails desde cualquier cliente MCP compatible.</p>
-      </div>
-      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto mb-4"><code><span class="cm">// claude_desktop_config.json (pr&oacute;ximamente)</span>
+      <p class="text-fg-muted mb-4">MailMask expone un servidor <strong>MCP</strong> (Model Context Protocol) en <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">https://www.mailmask.studio/mcp</code>, con transporte Streamable HTTP y sin sesiones. Un agente (Claude Code, Claude Desktop, Cursor, cualquier cliente MCP) puede dar de alta dominios, m&aacute;scaras, buzones IMAP, reglas y webhooks, y enviar correo, con la misma API key de la secci&oacute;n anterior.</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto mb-4"><code><span class="cm"># Claude Code</span>
+claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \
+  --header <span class="str">"Authorization: Bearer mk_..."</span></code></pre>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto mb-4"><code><span class="cm">// Claude Desktop, Cursor y otros clientes (mcp.json)</span>
 {
   <span class="str">"mcpServers"</span>: {
     <span class="str">"mailmask"</span>: {
-      <span class="str">"command"</span>: <span class="str">"npx"</span>,
-      <span class="str">"args"</span>: [<span class="str">"@easybits.cloud/mailmask-mcp"</span>],
-      <span class="str">"env"</span>: { <span class="str">"MAILMASK_API_KEY"</span>: <span class="str">"mk_..."</span> }
+      <span class="str">"type"</span>: <span class="str">"http"</span>,
+      <span class="str">"url"</span>: <span class="str">"https://www.mailmask.studio/mcp"</span>,
+      <span class="str">"headers"</span>: { <span class="str">"Authorization"</span>: <span class="str">"Bearer mk_..."</span> }
     }
   }
 }</code></pre>
+      <p class="text-fg-muted mb-2">Herramientas (cada una es un m&eacute;todo del SDK, con las mismas reglas y l&iacute;mites):</p>
+      <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-4">
+        <li><strong>Dominios</strong>: <code>list_domains</code>, <code>get_domain</code>, <code>create_domain</code> (devuelve los registros DNS: MX, TXT, DKIM, SPF), <code>verify_domain</code>, <code>domain_health</code>, <code>delete_domain</code>.</li>
+        <li><strong>M&aacute;scaras y buzones</strong>: <code>list_aliases</code>, <code>create_alias</code> (con <code>mailbox: true</code> crea tambi&eacute;n el buz&oacute;n IMAP), <code>update_alias</code>, <code>delete_alias</code>, <code>create_mailbox</code>, <code>delete_mailbox</code>.</li>
+        <li><strong>Reglas</strong>: <code>list_rules</code>, <code>create_rule</code>, <code>update_rule</code>, <code>delete_rule</code>.</li>
+        <li><strong>Webhooks</strong>: <code>list_webhooks</code>, <code>create_webhook</code>, <code>update_webhook</code>, <code>delete_webhook</code>, <code>test_webhook</code>, <code>webhook_deliveries</code>.</li>
+        <li><strong>Env&iacute;o</strong>: <code>send_email</code> (con <code>idempotencyKey</code>), <code>bulk_send</code>, <code>bulk_status</code>.</li>
+        <li><strong>Operaci&oacute;n</strong>: <code>list_logs</code>, <code>list_suppressions</code>, <code>add_suppression</code>, <code>remove_suppression</code>, <code>list_smtp_credentials</code>, <code>create_smtp_credential</code>, <code>revoke_smtp_credential</code>.</li>
+        <li><code>search_tools</code>: busca herramientas por palabra clave, para clientes que cargan el cat&aacute;logo bajo demanda.</li>
+      </ul>
+      <p class="text-fg-muted text-sm mb-4">Un error del servidor (por ejemplo, un dominio gratis pidiendo un buz&oacute;n) llega al agente como resultado con <code>isError</code> y el mensaje tal cual, no como fallo del protocolo. Las API keys no se crean ni revocan por MCP: un agente con una llave no puede fabricar m&aacute;s. El l&iacute;mite es el mismo de la API: 60 peticiones por minuto por llave.</p>
 
       <!-- Referencia -->
       <h2 id="referencia" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Referencia API</h2>

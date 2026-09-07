@@ -38,6 +38,20 @@ enmascaraba el desajuste.
 Al agregar un método al SDK, agrégale su caso en `sdk.test.ts`. Un test que sólo
 comprueba "no es 404" ya vale: eso solo habría atrapado 6 de los 10 bugs.
 
+## MCP (`mcp.ts`, 7-sep-2026)
+
+`POST /mcp` es un servidor MCP Streamable HTTP **sin sesiones** (`@modelcontextprotocol/sdk`,
+`WebStandardStreamableHTTPServerTransport`, `enableJsonResponse`), autenticado sólo con
+`Authorization: Bearer mk_…` (la API key normal; sin ella 401, y `/mcp` está exento de CSRF
+porque nunca acepta cookie). **Cada herramienta es el SDK real** (`sdk/src`, que sí viaja
+en la imagen) hablando con la app en proceso vía `app.fetch` — el mismo truco de
+`sdk.test.ts` —, así que no puede desalinearse de una ruta sin que `sdk.test.ts` lo cace.
+Para añadir una: método en el SDK → caso en `sdk.test.ts` → `tool()` en `mcp.ts`. Un
+`MailMaskError` sale como `isError` con `HTTP <status>: <mensaje>` (el 403 del precio es
+información útil para el agente). No se exponen las API keys (un agente con una llave no
+fabrica más), ni Bandeja ni billing. Pruebas en `mcp.test.ts`. Docs en `docs.html#mcp` y
+`EXTRA_DOCS` de `upload-docs.ts`. GET/DELETE dan 405: sin sesiones no hay stream ni cierre.
+
 ## AWS S3 Buckets
 These buckets must exist before the app works correctly. Create them manually if they don't exist:
 ```bash
@@ -322,7 +336,8 @@ Bandeja **y** en el buzón. Es el producto entero funcionando sobre un dominio d
    restaura. Sin eso, un incidente de disco es esta sesión otra vez.
 5. **Medir índice/GB de buzón** con correo real: decide si 10 GB por $99 y +50 GB por $99
    se sostienen.
-6. Blog (25 posts con precios viejos), campañas por mes (+5,000/$99, aprobación manual),
+6. **Correo de recuperación de carrito a Oswaldo** (checkout `pending` del 26-ago; ahora empezar es gratis).
+7. Blog (25 posts con precios viejos), campañas por mes (+5,000/$99, aprobación manual),
    borrar el secreto `IMAP_ENABLED_DOMAINS` en Fly, rotar `EASYBITS_API_KEY`,
    `TURNSTILE_SECRET` y el admin de Stalwart (viajaron por el chat).
 

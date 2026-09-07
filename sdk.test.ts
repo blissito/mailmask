@@ -8,7 +8,7 @@
 //
 // Va aparte, como compose-flow.test.ts, porque el mock de ses.ts tiene que
 // instalarse antes de que main.ts lo cargue — de ahí los imports dinámicos.
-import { describe, it, before, mock } from "node:test";
+import { describe, it, before, mock, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
 import { MailMask, MailMaskError, verifyWebhookSignature } from "./sdk/src/index.js";
@@ -110,6 +110,10 @@ describe("SDK ↔ servidor: contrato", () => {
     devDomainId = devDom.id;
     sqlite.prepare("UPDATE domains SET verified = 1 WHERE id = ?").run(devDomainId);
   });
+
+  // El tope de `rateLimitGuard` es por IP y compartido entre rutas: la suite entera cuenta
+  // como un solo cliente, así que se limpia antes de cada caso.
+  beforeEach(() => sqlite.prepare("DELETE FROM rate_limits").run());
 
   it("la llave que emite el servidor autentica en el SDK", async () => {
     const dominios = await mm.domains.list();
@@ -299,12 +303,33 @@ describe("SDK ↔ servidor: contrato", () => {
   });
 
   it("domains.create y delete", async () => {
-    const { domain } = await dev.domains.create(`nuevo-${suffix}.com`);
+    const creado = await dev.domains.create(`nuevo-${suffix}.com`);
+    const { domain } = creado;
     assert.equal(domain.domain, `nuevo-${suffix}.com`);
+    // Sin los registros DNS un agente no puede decirle al usuario qué poner.
+    assert.equal(creado.dnsRecords.mx.type, "MX");
+    assert.equal(creado.dnsRecords.dkim.length, 3);
+    assert.equal(creado.dnsRecords.verification.name, `_amazonses.nuevo-${suffix}.com`);
     assert.equal((await dev.domains.get(domain.id)).id, domain.id);
     const res = await dev.domains.delete(domain.id);
     assert.equal(res.ok, true);
     await assert.rejects(() => dev.domains.get(domain.id), (err: MailMaskError) => err.status === 404);
+  });
+
+  it("aliases.create con mailbox: sin destinos en activado, 403 en gratis; createMailbox/deleteMailbox existen", async () => {
+    // Activado: la máscara nace aunque el servidor IMAP no esté configurado en pruebas;
+    // el SDK recibe la razón en `errorBuzon`, no un 5xx.
+    const a = await dev.aliases.create(devDomainId, { alias: `buzon-${suffix}`, mailbox: true });
+    assert.equal(a.alias, `buzon-${suffix}`);
+    assert.deepEqual(a.destinations, []);
+    assert.equal(a.mailboxEnabled, false);
+    assert.equal(typeof a.errorBuzon, "string");
+    // Gratis: no hay buzones.
+    await assert.rejects(() => sinEnvios.aliases.create(domainId, { alias: "x", mailbox: true }), (e: MailMaskError) => e.status === 403 || e.status === 404);
+    await assert.rejects(() => dev.aliases.create(devDomainId, { alias: `sin-nada-${suffix}` }), (e: MailMaskError) => e.status === 400);
+    // createMailbox pega a la ruta real (aquí 502: Stalwart no configurado), no a un 404.
+    await assert.rejects(() => dev.aliases.createMailbox(devDomainId, `buzon-${suffix}`), (e: MailMaskError) => e.status === 502);
+    await assert.rejects(() => dev.aliases.deleteMailbox(devDomainId, `buzon-${suffix}`), (e: MailMaskError) => e.status === 404);
   });
 
   it("apiKeys.create devuelve la llave una vez y revoke la invalida", async () => {

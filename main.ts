@@ -210,6 +210,7 @@ import { sqlite } from "./pg.js";
 import { log } from "./logger.js";
 import { createSmtpIamCredential, revokeSmtpIamCredential } from "./ses.js";
 import { crearBuzon, cambiarPassword, borrarBuzon, exportarBuzon } from "./stalwart.js";
+import { atenderMcp } from "./mcp.js";
 import {
   sendTemplate,
   verifyEmail as verifyEmailTemplate,
@@ -847,7 +848,7 @@ const app = new Elysia({ adapter: node() })
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
-        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/health", "/healthz", "/docs",
+        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/health", "/healthz", "/docs", "/mcp",
       ],
       staticFile: true,
     },
@@ -870,11 +871,13 @@ const app = new Elysia({ adapter: node() })
       ? getMainDomainUrl()
       : request.headers.get("origin") || "http://localhost:8000";
     if (request.method === "OPTIONS") {
+      // Un cliente MCP en el navegador manda Bearer y la versión del protocolo.
+      const esMcp = new URL(request.url).pathname === "/mcp";
       return new Response(null, {
         headers: {
-          "access-control-allow-origin": corsOrigin,
+          "access-control-allow-origin": esMcp ? "*" : corsOrigin,
           "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
-          "access-control-allow-headers": "content-type, x-csrf-token",
+          "access-control-allow-headers": esMcp ? "content-type, authorization, mcp-protocol-version, mcp-session-id" : "content-type, x-csrf-token",
           "access-control-allow-credentials": "true",
           "access-control-max-age": "86400",
         },
@@ -898,6 +901,9 @@ const app = new Elysia({ adapter: node() })
     // Es seguro exentarlo: no muta nada persistente, sólo un dato en memoria con
     // TTL de 35 s, y sigue exigiendo sesión y permiso de lectura del dominio.
     if (url.pathname === "/api/bandeja/presence") return;
+    // /mcp sólo acepta Bearer (nunca cookie), así que no hay CSRF que proteger; sin
+    // Bearer la propia ruta contesta 401 en vez de un 403 confuso.
+    if (url.pathname === "/mcp") return;
     // Skip CSRF for Bearer token auth (inherently CSRF-safe)
     const authHeader = request.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) return;
@@ -905,6 +911,15 @@ const app = new Elysia({ adapter: node() })
     const cookies = parseCookies(request.headers.get("cookie"));
     const cookieToken = cookies["csrf_token"];
     const headerToken = request.headers.get("x-csrf-token");
+    // Sin cookie de sesión no hay nada que proteger: la sesión caducó o se cerró en
+    // otra pestaña. Un 403 de CSRF aquí dejaba al usuario en un panel muerto; el 401
+    // es lo que la app entiende como "vuelve a entrar".
+    if (!cookies["token"] && !cookieToken) {
+      return new Response(JSON.stringify({ error: "Sesión expirada" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      });
+    }
     if (!cookieToken || !headerToken || cookieToken !== headerToken) {
       return new Response(JSON.stringify({ error: "Token CSRF inválido" }), {
         status: 403,
@@ -1991,6 +2006,25 @@ const app = new Elysia({ adapter: node() })
   })
 
   // --- Aliases ---
+
+  // --- MCP: agentes de IA con la misma API key de siempre ---
+  .all("/mcp", async ({ request }) => {
+    if (request.method === "OPTIONS") return new Response(null, { status: 204 });
+    if (request.method !== "POST") {
+      // Sin sesiones no hay stream que reanudar (GET) ni sesión que cerrar (DELETE).
+      return new Response(JSON.stringify({ error: "Método no permitido" }), { status: 405, headers: { "content-type": "application/json", allow: "POST" } });
+    }
+    const auth = request.headers.get("authorization") ?? "";
+    if (!auth.startsWith("Bearer mk_")) {
+      return new Response(JSON.stringify({ error: "Manda tu API key: Authorization: Bearer mk_…" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": "Bearer" } });
+    }
+    const user = await getAuthUser(request);
+    if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: { "content-type": "application/json" } });
+    const fetchLocal = ((url: string | URL | Request, init?: RequestInit) => app.fetch(new Request(url as string, init))) as unknown as typeof fetch;
+    const res = await atenderMcp(request, { apiKey: auth.slice("Bearer ".length), fetchLocal });
+    res.headers.set("access-control-allow-origin", "*");
+    return res;
+  }, { detail: { tags: ["MCP"], summary: "Servidor MCP (Streamable HTTP)" } })
 
   .get("/api/domains/:id/alias", async ({ request, params }) => {
     const user = await getAuthUser(request);
