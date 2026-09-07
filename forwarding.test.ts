@@ -502,6 +502,25 @@ describe("processInbound", () => {
     assert.ok(threadConv!.messageCount >= 2, `Expected messageCount >= 2, got ${threadConv!.messageCount}`);
   });
 
+  it("saveToMesa: el mismo correo dos veces (destinatario repetido o reentrega) no duplica el mensaje", async () => {
+    // SES lista el buzón una vez por cada aparición en To/Cc; y SNS reintenta.
+    const msgId = `dup-${crypto.randomUUID()}`;
+    const n = makeSnsNotification({
+      from: "tiktok@external.com",
+      to: `info@${fwdDomain}`,
+      subject: `Dup ${msgId}`,
+      messageId: msgId,
+    });
+    const parsed = JSON.parse(n.Message);
+    parsed.receipt.recipients = [`info@${fwdDomain}`, `INFO@${fwdDomain}`];
+    n.Message = JSON.stringify(parsed);
+    await processInbound(n as any);
+    await processInbound(n as any); // reentrega
+    const conv = listConversations(fwdDomainId, {}).find(c => c.subject === `Dup ${msgId}`);
+    assert.ok(conv);
+    assert.equal(conv!.messageCount, 1);
+  });
+
   it("saveToMesa: unrelated email creates new conversation", async () => {
     const convsBefore = listConversations(fwdDomainId, {});
     const countBefore = convsBefore.length;

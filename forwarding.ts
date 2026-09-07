@@ -271,6 +271,13 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
   // Try to find existing conversation by threading
   let conv = await findConversationByThread(domainId, from, references);
 
+  if (conv && messageIdHeader && conv.threadReferences.includes(messageIdHeader)) {
+    // Ya está: el mismo Message-ID sólo puede ser una reentrega (SNS reintenta) o
+    // el mismo destinatario dos veces. Guardarlo otra vez duplica el hilo.
+    log("info", "mesa", "Inbound already in conversation, skipped", { conversationId: conv.id, domainId, messageId: messageIdHeader });
+    return { conversationId: conv.id, isNew: false };
+  }
+
   if (conv) {
     // Add message to existing conversation
     const msg = await addMessage({
@@ -482,7 +489,9 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     return { action: "rejected", details: "Spam or virus detected" };
   }
 
-  const recipients = receipt.recipients;
+  // Sin duplicados: SES lista al mismo buzón una vez por cada vez que aparece en
+  // To/Cc, y cada pasada guardaba el correo otra vez en la Bandeja (TikTok, 7-sep-2026).
+  const recipients = [...new Set(receipt.recipients.map((r) => r.toLowerCase()))];
 
   // Fetch raw email from S3 (SNS notification only has metadata)
   let rawContent = notification.content ?? "";
