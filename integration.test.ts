@@ -304,6 +304,16 @@ describe("Add-ons API", () => {
     await res.body?.cancel();
   });
 
+  it("el perfil de Apple lee el dominio de la ruta, no de la query", async () => {
+    // El enlace que genera la app es /api/domains/:id/apple-profile?alias=x y devolvía
+    // "domainId requerido" porque el handler miraba la query.
+    const res = await req(`/api/domains/${domainId}/apple-profile?alias=solo-buzon`, { headers: { cookie: cookie! } });
+    assert.notEqual(res.status, 400);
+    // Con buzón (si Stalwart lo creó) es el .mobileconfig; sin él, 404 explícito. Nunca 400.
+    assert.ok([200, 404].includes(res.status), `status ${res.status}`);
+    await res.body?.cancel();
+  });
+
   it("activar dos veces el mismo dominio da 409", async () => {
     const res = await jsonPost("/api/addons/checkout", { kind: "domain", domainId }, cookie!, csrfToken);
     assert.equal(res.status, 409);

@@ -5116,11 +5116,13 @@ const app = new Elysia({ adapter: node() })
   // Perfil de Apple Mail. Se sirve como archivo y NO necesita ningún DNS del
   // cliente: Apple Mail no soporta SRV (RFC 6186) ni el autoconfig de Mozilla, así
   // que el perfil es el único camino automático que existe para macOS e iOS.
-  .get("/api/domains/:id/apple-profile", async ({ request }) => {
+  .get("/api/domains/:id/apple-profile", async ({ request, params }) => {
     const url = new URL(request.url);
     const alias = (url.searchParams.get("alias") ?? "").trim().toLowerCase();
 
-    const gate = await requireBandeja(request, url.searchParams.get("domainId") ?? undefined, "read");
+    // El dominio viene en la ruta (`:id`); leerlo de la query devolvía "domainId requerido"
+    // al enlace que la propia app genera.
+    const gate = await requireBandeja(request, params.id, "read");
     if (!gate.ok) return gate.res;
     const { domain } = gate;
 
