@@ -1468,7 +1468,7 @@ body.mm-composer-locked { overflow: hidden; }
   background: var(--mesa-paper);
 }
 .mesa-msg-html.is-medido { opacity: 1; }
-.mesa-msg-html:not(.is-medido) { height: 200px; }
+.mesa-msg-html:not(.is-medido) { height: 0; border-width: 0; }
 
 /* --- Pestañas y métricas --- */
 

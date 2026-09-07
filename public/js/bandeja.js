@@ -783,33 +783,47 @@ function renderMessages(messages, notes) {
   container.scrollTop = container.scrollHeight;
 }
 
-// El alto del iframe se ajusta al correo: un alto fijo dejaba media pantalla vacía
-// con un scroll dentro de otro. Se mide al cargar y otra vez cuando terminan
-// de bajar las imágenes, que es lo que cambia la altura después del load.
+// El alto del iframe se ajusta al correo, y se muestra hasta tenerlo. Medir antes
+// de tiempo es lo que brincaba: al insertarlo, contentDocument es un about:blank
+// de 16 px; después llega el srcdoc y luego las imágenes, y cada paso crecía a
+// la vista. Aquí se espera al documento real Y a que sus imágenes terminen (con
+// tope de 2 s), se mide una vez, y sólo entonces se enseña.
 function ajustarIframe(iframe) {
-  const medir = () => {
+  let mostrado = false;
+  const aplicar = () => {
     try {
       const doc = iframe.contentDocument;
       if (!doc || !doc.documentElement) return;
       const h = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight ?? 0);
-      if (h > 0) {
-        iframe.style.height = Math.min(h + 16, 4000) + "px";
-        iframe.classList.add("is-medido");
+      if (h > 0) iframe.style.height = Math.min(h + 16, 4000) + "px";
+    } catch {}
+  };
+  const mostrar = () => {
+    if (mostrado) return;
+    mostrado = true;
+    aplicar();
+    iframe.classList.add("is-medido");
+    // Si una imagen sin dimensiones llega tarde, se sigue el alto sin volver a ocultar.
+    try {
+      const doc = iframe.contentDocument;
+      if (doc?.documentElement && "ResizeObserver" in window) {
+        new ResizeObserver(aplicar).observe(doc.documentElement);
       }
     } catch {}
   };
-  iframe.addEventListener("load", () => {
-    medir();
-    try {
-      iframe.contentDocument?.querySelectorAll("img").forEach((img) => {
-        if (!img.complete) img.addEventListener("load", medir, { once: true });
-      });
-    } catch {}
-    setTimeout(medir, 500);
-  });
-  medir();
-  // Si por lo que sea nunca se pudo medir, que no se quede invisible.
-  setTimeout(() => iframe.classList.add("is-medido"), 1500);
+  const alCargar = () => {
+    let imgs = [];
+    try { imgs = [...(iframe.contentDocument?.images ?? [])].filter((i) => !i.complete); } catch {}
+    if (imgs.length === 0) return mostrar();
+    let faltan = imgs.length;
+    const una = () => { if (--faltan === 0) mostrar(); };
+    imgs.forEach((i) => { i.addEventListener("load", una, { once: true }); i.addEventListener("error", una, { once: true }); });
+    setTimeout(mostrar, 2000);
+  };
+  // `load` dispara cuando el srcdoc ya está parseado; el about:blank previo no cuenta.
+  iframe.addEventListener("load", alCargar);
+  // Red de seguridad: nunca dejarlo invisible.
+  setTimeout(mostrar, 4000);
 }
 
 // Separa "a@x.com, b@y.com" en lista. El servidor vuelve a validar cada dirección;
