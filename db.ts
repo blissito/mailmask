@@ -74,6 +74,14 @@ export interface Alias {
   forwardCount?: number;
   lastFrom?: string;
   lastAt?: string;
+  /** Con buzón, el alias GUARDA su correo; `destinations` puede ir vacío. */
+  mailboxEnabled?: boolean;
+  mailboxAccountId?: string;
+  mailboxQuotaBytes?: number;
+  mailboxUsedBytes?: number;
+  mailboxUsedAt?: string;
+  mailboxCreatedAt?: string;
+  mailboxGraceUntil?: string;
 }
 
 export interface Rule {
@@ -244,6 +252,13 @@ function rowToAlias(r: typeof alias.$inferSelect): Alias {
     forwardCount: r.forwardCount || undefined,
     lastFrom: r.lastFrom ?? undefined,
     lastAt: r.lastAt ?? undefined,
+    mailboxEnabled: r.mailboxEnabled ?? false,
+    mailboxAccountId: r.mailboxAccountId ?? undefined,
+    mailboxQuotaBytes: r.mailboxQuotaBytes ?? undefined,
+    mailboxUsedBytes: r.mailboxUsedBytes ?? 0,
+    mailboxUsedAt: r.mailboxUsedAt ?? undefined,
+    mailboxCreatedAt: r.mailboxCreatedAt ?? undefined,
+    mailboxGraceUntil: r.mailboxGraceUntil ?? undefined,
   };
 }
 
@@ -518,6 +533,94 @@ export function bumpAliasStats(domainId: string, aliasName: string, from: string
 export function deleteAlias(domainId: string, aliasName: string): boolean {
   const result = db.delete(alias).where(and(eq(alias.domainId, domainId), eq(alias.alias, aliasName))).run();
   return result.changes > 0;
+}
+
+// --- Buzones IMAP ---
+//
+// El buzón vive FUERA de esta base: la cuenta real está en Stalwart y aquí sólo queda
+// su `accountId`. Por eso borrar un alias tiene que borrar también allá, y por eso hay
+// un barrido de huérfanas — un DELETE en cascada al borrar un dominio dejaría cuentas
+// vivas ocupando disco que pagamos, sin nada en la base que las nombre.
+
+export function marcarBuzon(domainId: string, aliasName: string, o: { accountId: string; quotaBytes: number }): void {
+  db.update(alias).set({
+    mailboxEnabled: true,
+    mailboxAccountId: o.accountId,
+    mailboxQuotaBytes: o.quotaBytes,
+    mailboxCreatedAt: new Date().toISOString(),
+  }).where(and(eq(alias.domainId, domainId), eq(alias.alias, aliasName))).run();
+}
+
+export function desmarcarBuzon(domainId: string, aliasName: string): void {
+  db.update(alias).set({
+    mailboxEnabled: false,
+    mailboxAccountId: null,
+    mailboxQuotaBytes: null,
+    mailboxUsedBytes: 0,
+    mailboxUsedAt: null,
+    mailboxCreatedAt: null,
+  }).where(and(eq(alias.domainId, domainId), eq(alias.alias, aliasName))).run();
+}
+
+/** Caché del uso que reporta el servidor. NO es la verdad para facturar. */
+export function anotarUsoBuzon(domainId: string, aliasName: string, usados: number): void {
+  db.update(alias).set({ mailboxUsedBytes: usados, mailboxUsedAt: new Date().toISOString() })
+    .where(and(eq(alias.domainId, domainId), eq(alias.alias, aliasName))).run();
+}
+
+/** Todos los buzones de la instalación, con su dominio, para cuota y reconciliación. */
+export function listarBuzonesActivos(): { domainId: string; domain: string; alias: string; accountId: string; quotaBytes: number | null }[] {
+  const rows = db.select({
+    domainId: alias.domainId, alias: alias.alias, accountId: alias.mailboxAccountId,
+    quotaBytes: alias.mailboxQuotaBytes, domain: domains.domain,
+  })
+    .from(alias)
+    .innerJoin(domains, eq(alias.domainId, domains.id))
+    .where(eq(alias.mailboxEnabled, true))
+    .all();
+  return rows
+    .filter((r) => r.accountId)
+    .map((r) => ({ ...r, accountId: r.accountId! }));
+}
+
+/** Bytes de cuota ya repartidos entre los buzones de un dominio. */
+export function bytesDeBuzonesDelDominio(domainId: string): number {
+  const rows = db.select({ q: alias.mailboxQuotaBytes })
+    .from(alias)
+    .where(and(eq(alias.domainId, domainId), eq(alias.mailboxEnabled, true)))
+    .all();
+  return rows.reduce((t, r) => t + (r.q ?? 0), 0);
+}
+
+/** Buzones de un usuario sin add-on vigente: entran en gracia o toca borrarlos. */
+export function buzonesDelUsuario(userEmail: string): { domainId: string; domain: string; alias: string; accountId: string; graceUntil: string | null }[] {
+  const rows = db.select({
+    domainId: alias.domainId, alias: alias.alias, accountId: alias.mailboxAccountId,
+    graceUntil: alias.mailboxGraceUntil, domain: domains.domain,
+  })
+    .from(alias)
+    .innerJoin(domains, eq(alias.domainId, domains.id))
+    .where(and(eq(alias.mailboxEnabled, true), eq(domains.ownerEmail, userEmail)))
+    .all();
+  return rows.filter((r) => r.accountId).map((r) => ({ ...r, accountId: r.accountId! }));
+}
+
+export function fijarGraciaBuzon(domainId: string, aliasName: string, hasta: string | null): void {
+  db.update(alias).set({ mailboxGraceUntil: hasta })
+    .where(and(eq(alias.domainId, domainId), eq(alias.alias, aliasName))).run();
+}
+
+/** Buzones cuya gracia ya venció: su correo se borra de verdad. */
+export function buzonesConGraciaVencida(): { domainId: string; domain: string; alias: string; accountId: string }[] {
+  const ahora = new Date().toISOString();
+  const rows = db.select({
+    domainId: alias.domainId, alias: alias.alias, accountId: alias.mailboxAccountId, domain: domains.domain,
+  })
+    .from(alias)
+    .innerJoin(domains, eq(alias.domainId, domains.id))
+    .where(and(eq(alias.mailboxEnabled, true), isNotNull(alias.mailboxGraceUntil), lte(alias.mailboxGraceUntil, ahora)))
+    .all();
+  return rows.filter((r) => r.accountId).map((r) => ({ ...r, accountId: r.accountId! }));
 }
 
 export function countAliases(domainId: string): number {
@@ -888,17 +991,20 @@ export function createCourtesyAddon(input: {
   return run();
 }
 
-export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; sendsUnlocked: boolean; api: boolean; webhooks: boolean; forwardPerHour: number; smtpRelay: boolean; monthlyForwards: number } {
+export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; sendsUnlocked: boolean; api: boolean; webhooks: boolean; forwardPerHour: number; smtpRelay: boolean; monthlyForwards: number; mailboxes: boolean; mailboxBytes: number } {
   const sub = user.subscription;
   if (sub && (sub.status === "active" || sub.status === "cancelled")) {
     if (sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) < new Date()) {
-      return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, sendsUnlocked: false, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false, monthlyForwards: 0 };
+      return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, sendsUnlocked: false, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false, monthlyForwards: 0, mailboxes: false, mailboxBytes: 0 };
     }
     const plan = PLANS[sub.plan];
     const active = listEffectiveAddons(user.email);
     // sends100 gana sobre sends25 si por alguna razón hay ambos.
     const sendsAddon = active.find((a) => a.kind === "sends100") ?? active.find((a) => a.kind === "sends25");
     const extraDomains = active.filter((a) => a.kind === "domain").length;
+    // El buzón se compra por dominio y es acumulable: cada add-on suma su bolsa de
+    // almacenamiento. Ningún plan lo incluye — ver el porqué en `ADDONS` de plans.ts.
+    const mailboxAddons = active.filter((a) => a.kind === "mailbox").length;
     // Math.max para que un add-on viejo de 25 no *reduzca* los envíos de un plan mayor.
     const sends = sendsAddon ? Math.max(plan.sends, (ADDONS[sendsAddon.kind] as { sends: number }).sends) : plan.sends;
     return {
@@ -913,9 +1019,11 @@ export function getUserPlanLimits(user: User): { domains: number; aliases: numbe
       forwardPerHour: plan.forwardPerHour,
       smtpRelay: plan.smtpRelay,
       monthlyForwards: plan.monthlyForwards,
+      mailboxes: mailboxAddons > 0,
+      mailboxBytes: mailboxAddons * (ADDONS.mailbox as { mailboxBytes: number }).mailboxBytes,
     };
   }
-  return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, sendsUnlocked: false, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false, monthlyForwards: 0 };
+  return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, sendsUnlocked: false, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false, monthlyForwards: 0, mailboxes: false, mailboxBytes: 0 };
 }
 
 // --- Reenvíos por mes, por cuenta ---

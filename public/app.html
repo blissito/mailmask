@@ -434,6 +434,19 @@
   </div>
 
   <!-- Modal: Edit alias -->
+  <!-- Buzón IMAP. La contraseña se muestra una sola vez: la entrega del correo va con
+       la credencial de administrador del servidor, así que la del buzón no se guarda. -->
+  <div id="modal-mailbox" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
+    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg p-6">
+      <h3 class="text-lg font-bold mb-1">Buzón IMAP</h3>
+      <p id="mailbox-title" class="font-mono text-sm text-mask-400 mb-4 break-all"></p>
+      <div id="mailbox-body"></div>
+      <div class="flex justify-end mt-6">
+        <button type="button" class="btn-cancel-modal px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-mailbox">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="modal-edit-alias" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
     <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
       <h3 class="text-lg font-bold mb-4">Editar alias <span id="edit-alias-name" class="font-mono text-mask-400"></span></h3>

@@ -49,10 +49,20 @@ export const PLANS_FOR_SALE = ["basico", "equipo"] as const;
 // Se compran encima del plan base. El de envíos se compra una vez y desbloquea el envío
 // en todos los dominios del usuario; el tope sigue aplicando por dominio y por día,
 // que es como ya se llavea sendCounts. El de dominio es cupo acumulable y no incluye envíos.
+// El de buzón es **por dominio** y trae una bolsa de almacenamiento que se reparte
+// entre TODOS los buzones de ese dominio, con buzones ilimitados. Es el diferenciador
+// aplicado al correo: Google cobra por persona, ForwardEmail por buzón, MailMask por
+// dominio — un equipo de cinco crea cinco buzones y paga lo mismo que uno.
+//
+// No va incluido en ningún plan a propósito. Meter un recurso sin medidor en una cuota
+// fija ya salió caro una vez (el reenvío ilimitado, que es por lo que existe
+// `monthlyForwards`), y el almacenamiento tiene la misma forma: crece solo, nunca baja,
+// y no se puede purgar sin avisar. Nace con cuota explícita.
 export const ADDONS = {
   sends25:  { price: 49_00, sends: 25,  label: "Envíos 25/día" },
   sends100: { price: 99_00, sends: 100, label: "Envíos 100/día" },
   domain:   { price: 79_00, domains: 1, label: "Dominio extra" },
+  mailbox:  { price: 99_00, mailboxBytes: 10 * 1024 * 1024 * 1024, label: "Buzón IMAP 10 GB" },
 } as const;
 
 export type AddonKind = keyof typeof ADDONS;

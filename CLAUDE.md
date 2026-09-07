@@ -158,27 +158,39 @@ La clave del sitio es pública y vive en el HTML; la secreta es `TURNSTILE_SECRE
 
 ## TODO
 
-### ✅ IMAP: el spike ya se hizo (6-sep-2026) — lo que queda es el puerto
+## Buzones IMAP (7-sep-2026)
 
-**Stalwart está corriendo en producción**, en una caja permanente de EasyBits (`mailmask-imap`, tier micro, $99/mes), bajo systemd y habilitado al arranque. Medido: **85 MB de RAM**, imagen de 98 MB, arranque en 20 s, y el store con un buzón pesa 1.9 MB. Los cuerpos van al S3 de siempre bajo el prefijo `buzones/`, con el usuario IAM `mailmask-stalwart` que sólo puede tocar ese prefijo (comprobado: recibe `AccessDenied` al intentar listar `inbound/`).
+**Stalwart corre en producción** en una caja permanente de EasyBits (`sb_4ba99ed3-…`, template `mail-svc`, `persistent` y `protected`), con 993 y 465 alcanzables desde fuera por el router SNI, certificado ACME DNS-01 contra Route 53 y salida por SES (SPF y DKIM en verde). Un alias puede tener **buzón**, **reenvío**, o los dos; y un buzón sin reenvío es lo que convierte a MailMask en reemplazo de Gmail y no en una capa encima.
 
-Probado de punta a punta: entregar un correo, verlo aterrizar en S3, leerlo por IMAP y encontrarlo con `IMAP SEARCH BODY`.
+**Un buzón es un alias con buzón**, no una tabla aparte (columnas `mailbox_*` en `alias`) — es también el modelo de ForwardEmail. Se cobra con el add-on `mailbox` ($99/mes **por dominio**, 10 GB compartidos entre buzones **ilimitados** de ese dominio). **Ningún plan lo incluye**, y no es tacañería: meter un recurso sin medidor en una cuota fija ya salió caro una vez —es la razón de que exista `monthlyForwards`— y el almacenamiento tiene la misma forma: crece solo, nunca baja y no se puede purgar sin avisar.
 
-**La entrega va por JMAP sobre HTTPS, no por LMTP** (`imap-store.ts`). No es preferencia: **ningún template de EasyBits declara puertos crudos** — `template "ubuntu" does not declare raw port 993/tcp` — así que LMTP no es alcanzable desde Fly. JMAP sí sale por capa 7, y además es el contrato público del servidor; leer su S3 por debajo sería acoplarse a su formato interno.
+### Lo que hay que saber para tocarlo
 
-🔴 **Lo único que falta para que sea vendible es el 993** (y el 587, o el cliente lee pero no puede responder). EasyBits lo está construyendo. Ojo: **el 143 con STARTTLS no se puede rutear por SNI**, porque la conexión empieza en claro — si sale el router SNI, es 993 y ya.
+- **Nunca guardamos la contraseña de un buzón.** Stalwart autoriza al admin por petición, así que `Email/import` con un `accountId` ajeno funciona: una sola credencial de administrador entrega en todos los buzones. La contraseña se genera, se muestra una vez y se olvida. Esto **excluye a propósito el cifrado por usuario**: con cifrado, cambiar la contraseña exige la vieja para descifrar la llave privada, y un panel que no la pida destruye el correo en silencio. Nuestro cifrado es de almacenamiento, no privacidad frente al operador.
+- **`Principal/query` devuelve lista vacía —no un error— si la dirección no existe**, y resuelve también los alias. Ese vacío es el **fail-closed** de `imap-store.ts`: sin buzón conocido no se deposita. Antes del 7-sep el depósito entregaba siempre en el INBOX de un usuario global ignorando al destinatario; con un solo dominio activado no se notaba, con dos habría sido una **fuga entre clientes**. Hay tres pruebas que lo fijan.
+- **La administración NO va por REST**: `/api/principal` da 404 en 0.16. Todo es JMAP en `POST /jmap` (**sin barra final**: con ella redirige, se pierde el cuerpo y contesta `notRequest`) con `"using": ["urn:stalwart:jmap"]` y métodos `x:*`. El esquema completo está en `GET /api/schema` de la caja. La credencial de administrador está en `/etc/stalwart.env`.
+- **`emailAddress` lo deriva el servidor**; mandarlo explícito revienta con `invalidPatch`.
+- **Nunca mandes `null`** en un campo opcional: tumba la petición entera con `400 notRequest`, el mismo error engañoso que la barra final.
+- **Rechaza contraseñas débiles con zxcvbn**, no con una regla de caracteres: hace falta entropía real, no "cumplir una política".
+- Cuota: `quotas/maxDiskQuota` en bytes; el uso se lee en la **misma** llamada (`x:Account/get` con `usedDiskQuota`). **`mailbox_used_bytes` es una caché, jamás la verdad para facturar** — todo contador de cuota deriva, en Stalwart y en todo el mundo Dovecot. Se reconcilia a diario.
+- El archivo de `--config` **sólo declara el data store**; listeners, blob store, dominios y cuentas viven DENTRO del store. Respaldar el store es respaldar la configuración. Corre como usuario `stalwart`; un directorio de root lo tumba con `unable to open database file`, que no menciona permisos.
 
-**Certificado**: ACME con DNS-01 contra Route 53, que Stalwart soporta nativo, emitido para `imap.mailmask.studio`. La gestión automática de DNS exige publicar **al menos un tipo** de registro: se eligió `tlsa` porque es el único inocuo — `mx`, `spf`, `dmarc` y `mtaSts` tocarían el correo del dominio, que entra por SES.
+### 🔴 El mapeo del hostname apunta a un puerto, y equivocarlo es invisible
 
-**Cosas del producto que costaron encontrar, para no repetirlas:**
-- El archivo de `--config` **sólo declara el data store**; listeners, blob store, dominios y cuentas viven DENTRO del store y se administran por JMAP. No hay configuración como código: respaldar el store es respaldar la configuración.
-- Corre como usuario `stalwart`; un directorio de root lo tumba con `unable to open database file`, mensaje que no menciona permisos.
-- El POST a JMAP va a `/jmap` **sin barra final**: con ella redirige, se pierde el cuerpo y contesta `notRequest`.
-- El `apiUrl` de la sesión trae el hostname interno de la caja: hay que descartarlo y armar la URL sobre la pública.
-- **Rechaza contraseñas débiles**; el alta de buzones tendrá que generarlas.
-- `contact` de ACME y otros conjuntos se mandan como mapa con `true`, no como arreglo.
+El 6-sep el hostname quedó mapeado al **465** (submission, TLS implícito), así que Caddy hablaba HTTP en claro contra un socket TLS y `/.well-known/jmap` daba **502** con `\x15\x03\x03…` —una alerta TLS— en el detalle. **Todo depósito falló en silencio**, por diseño: el reenvío no depende del buzón. Debe apuntar a **8080** (HTTP plano de Stalwart), no a 443, que es donde termina Caddy. El cron de cada 5 minutos ahora lo caza.
 
-Pendiente de producto: provisión de buzones (alta, contraseña, baja, cuota) y **el precio**. La referencia de +$99 por dominio hay que revisarla: ForwardEmail da IMAP con 10 GB por $3 USD.
+### 🔴 La caja no está en la cuenta, y por eso no tiene respaldo
+
+`sandbox_status` la reporta con `ownerId: "anonymous"`: no aparece en `list_machines` y `list_backups` viene vacío. EasyBits **sí** respalda cada noche, pero copia los `dataPaths` del runspec — sin dueño no hay runspec y no hay nada que copiar. **Hay que registrarla con un `dataPaths` que incluya `/opt/stalwart`** (store + `acme/`). Aparte, la cuenta paga $99/mes por `mailmask-imap` (`sb_7e5ef08a…`), que está en estado `lost`.
+
+Todo el estado durable son **6.1 MB**, y `stalwart --export` lo vuelca en 20 s y 840 KB. El dump es KV por subespacio, **independiente del backend**. ⚠️ `--import` **se niega a escribir sobre una base no vacía** y el servidor debe estar **detenido** para exportar o importar.
+
+**No mover el store a Postgres hoy.** Se puede (es backend de primera clase), pero con `SearchStore: Default` sobre Postgres el índice de texto **trunca los cuerpos a 650 KB** por el límite de `tsvector` — y `IMAP SEARCH BODY` es justo lo que validó el spike. Sería una regresión. La respuesta correcta el día que quieras dos máquinas, no antes.
+
+### Sigue pendiente
+
+- **Re-medir el cociente índice/buzón con correo real** (50–100 KB, con HTML y adjuntos). Los 28 KB de metadatos por mensaje se midieron con correos de 2.5 KB y el índice crece con el texto, así que no se extrapola. El techo es blando: **+100 GB NVMe son $99/mes**.
+- El 587 no existe (el 143 con STARTTLS no se puede rutear por SNI: la conexión empieza en claro). Los clientes usan **465**.
 
 ### 🔥 Contexto original del análisis (agosto 2026)
 - [ ] **Cerrar el hueco de recepción: cuánto cuesta y si AWS lo resuelve.** Hoy MailMask envía por SMTP pero **no ofrece IMAP ni POP**, así que nadie puede usar Outlook o Apple Mail como cliente completo: el correo entrante sigue cayendo en el buzón al que se reenvía. La landing lo prometía mal y ya se corrigió, pero el hueco de producto sigue ahí y es lo que separa "capa de reenvío" de "email profesional de verdad".

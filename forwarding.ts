@@ -532,7 +532,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
       // `depositarEnImap` se traga sus propios errores a propósito, porque el
       // reenvío de abajo no puede depender de que el buzón esté vivo.
       if (imapHabilitado(domainName)) {
-        await depositarEnImap(rawContent, domainName);
+        await depositarEnImap(rawContent, domainName, recipient);
       }
     }
 
@@ -589,7 +589,10 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
       // Tope mensual por cuenta: el correo ya quedó en la Bandeja (arriba); lo que se
       // frena es el reenvío al buzón externo, que es la mitad del costo y lo que un
       // ataque a un catch-all infla sin límite.
-      if (owner) {
+      //
+      // Un alias que sólo GUARDA (buzón IMAP, sin destinos) no gasta cuota: lo que el
+      // tope acota es el envío por SES, y guardar en el buzón no manda ningún correo.
+      if (owner && matched.destinations.length > 0) {
         const cap = getUserPlanLimits(owner).monthlyForwards;
         const used = getMonthlyForwards(owner.email);
         const month = new Date().toISOString().slice(0, 7);

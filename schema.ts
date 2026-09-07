@@ -50,6 +50,21 @@ export const alias = sqliteTable("alias", {
   lastFrom: text("last_from"),
   lastAt: text("last_at"),
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
+  // --- Buzón IMAP ---
+  // Un alias puede GUARDAR su correo además de (o en vez de) reenviarlo. Con el buzón
+  // activo, `destinations` puede ir vacío: es lo que convierte a MailMask en reemplazo
+  // de Gmail y no en una capa encima. Guardamos el accountId de Stalwart, **nunca la
+  // contraseña** — la entrega va con la credencial de administrador.
+  mailboxEnabled: integer("mailbox_enabled", { mode: "boolean" }).notNull().default(false),
+  mailboxAccountId: text("mailbox_account_id"),
+  mailboxQuotaBytes: integer("mailbox_quota_bytes"),
+  // Caché de lo que reporta el servidor, no la verdad: todo contador de cuota deriva,
+  // así que esto se reconcilia y NO se factura contra ello.
+  mailboxUsedBytes: integer("mailbox_used_bytes").notNull().default(0),
+  mailboxUsedAt: text("mailbox_used_at"),
+  mailboxCreatedAt: text("mailbox_created_at"),
+  // Gracia tras la baja: solo lectura hasta aquí, después se borra.
+  mailboxGraceUntil: text("mailbox_grace_until"),
 }, (table) => [
   primaryKey({ columns: [table.domainId, table.alias] }),
 ]);

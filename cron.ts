@@ -11,6 +11,8 @@ import { reconcilePendingAddons } from "./addon-sync.js";
 import { deliverPending, purgeOldDeliveries } from "./webhooks.js";
 import { notifyBandeja } from "./sse-hub.js";
 import { ejecutarBackfill, backfillPendiente } from "./search-backfill.js";
+import { estaVivo, diasDeCertificado, leerUso, listarBuzones, congelarBuzon, borrarBuzon, stalwartConfigurado } from "./stalwart.js";
+import { listarBuzonesActivos, anotarUsoBuzon, buzonesDelUsuario, fijarGraciaBuzon, buzonesConGraciaVencida, desmarcarBuzon } from "./db.js";
 
 // Webhooks: entregas pendientes y reintentos vencidos.
 programar("* * * * *", async () => {
@@ -173,6 +175,23 @@ programar("0 4 * * *", async () => {
           log("info", "billing", "Add-on cancelado: el plan base expiró", { email: u.email, addonId: addon.id, kind: addon.kind });
         } catch (err) {
           log("error", "billing", "No se pudo cancelar add-on de plan expirado", { email: u.email, addonId: addon.id, error: String(err) });
+        }
+      }
+
+      // El buzón NO se borra al vencer el plan. Con un buzón sin reenvío, lo que hay
+      // dentro es el único ejemplar del correo de esa persona: se congela en solo
+      // lectura 30 días para que pueda descargarlo, y hasta entonces no se toca.
+      if (cancelados.some((c) => c === addonLabel("mailbox"))) {
+        const hasta = new Date(Date.now() + 30 * 86400_000).toISOString();
+        for (const b of buzonesDelUsuario(u.email)) {
+          if (b.graceUntil) continue; // Ya estaba en gracia; no se reinicia el reloj.
+          try {
+            await congelarBuzon(b.accountId);
+            fijarGraciaBuzon(b.domainId, b.alias, hasta);
+            log("info", "billing", "Buzón congelado con 30 días de gracia", { email: u.email, buzon: `${b.alias}@${b.domain}` });
+          } catch (err) {
+            log("error", "billing", "No se pudo congelar el buzón", { email: u.email, buzon: `${b.alias}@${b.domain}`, error: String(err) });
+          }
         }
       }
 
@@ -395,5 +414,117 @@ programar("0 9 * * *", async () => {
     }
   } catch (err) {
     log("error", "cron", "Chequeo de volumen falló", { error: String(err) });
+  }
+});
+
+
+// --- Servidor IMAP: salud, certificado, cuota y huérfanas ---
+//
+// Nada de esto existía, y por eso el 6-sep-2026 el depósito de correo en los buzones
+// estuvo cayéndose en silencio: el hostname quedó apuntando al puerto de submission,
+// Caddy hablaba HTTP en claro contra un socket TLS, y el reenvío —que no depende del
+// buzón, a propósito— siguió funcionando sin que nadie notara nada.
+
+// Dos fallos seguidos antes de avisar: un 502 aislado durante un despliegue no es una
+// caída, y una alerta que grita por cada parpadeo se aprende a ignorar.
+let fallosSeguidos = 0;
+
+programar("*/5 * * * *", async () => {
+  if (!stalwartConfigurado()) return;
+  try {
+    if (await estaVivo()) {
+      if (fallosSeguidos >= 2) log("info", "cron", "El servidor IMAP volvió");
+      fallosSeguidos = 0;
+      return;
+    }
+    fallosSeguidos++;
+    log("warn", "cron", "El servidor IMAP no responde", { fallosSeguidos });
+    if (fallosSeguidos === 2) {
+      await sendAlert("imap-caido", "El servidor IMAP no responde en /jmap/session. Los buzones no reciben correo nuevo (el reenvío y la Bandeja siguen funcionando).");
+    }
+  } catch (err) {
+    log("error", "cron", "Fallo comprobando el servidor IMAP", { error: String(err) });
+  }
+});
+
+// Certificado. Se renueva solo con ACME, pero "se renueva solo" es exactamente el
+// tipo de cosa que se descubre rota el día que caduca.
+programar("0 6 * * *", async () => {
+  if (!stalwartConfigurado()) return;
+  try {
+    const dias = await diasDeCertificado();
+    if (dias === null) return;
+    if (dias < 21) {
+      await sendAlert("imap-certificado", `El certificado del servidor IMAP caduca en ${dias} días. Si expira, ningún cliente de correo podrá conectarse.`);
+    }
+  } catch (err) {
+    log("error", "cron", "Fallo leyendo el certificado del servidor IMAP", { error: String(err) });
+  }
+});
+
+// Uso por buzón. Lo que guardamos es una CACHÉ de lo que reporta el servidor: todo
+// contador de cuota deriva, así que esto se reconcilia y no se factura contra ello.
+programar("30 6 * * *", async () => {
+  if (!stalwartConfigurado()) return;
+  try {
+    for (const b of listarBuzonesActivos()) {
+      const r = await leerUso(b.accountId);
+      if (!r.ok) continue;
+      anotarUsoBuzon(b.domainId, b.alias, r.valor.usados);
+
+      const limite = r.valor.limite ?? b.quotaBytes;
+      if (limite && r.valor.usados / limite > 0.85) {
+        const pct = Math.round((r.valor.usados / limite) * 100);
+        await sendAlert("imap-cuota", `El buzón ${b.alias}@${b.domain} va al ${pct}% de su cuota. Al llenarse dejará de recibir.`);
+      }
+    }
+  } catch (err) {
+    log("error", "cron", "Fallo reconciliando el uso de los buzones", { error: String(err) });
+  }
+});
+
+// Huérfanas: cuentas vivas en Stalwart que ya no tienen fila aquí. Pasa solo — borrar
+// un dominio borra sus alias EN CASCADA, y la cuenta del servidor no se entera.
+//
+// Sólo REPORTA. Borrar correo por una discrepancia de inventario es mucho peor que
+// pagar disco de más, y una lista corta en la alerta se revisa a mano en un minuto.
+programar("0 7 * * *", async () => {
+  if (!stalwartConfigurado()) return;
+  try {
+    const enServidor = await listarBuzones();
+    if (!enServidor.ok) return;
+
+    const conocidas = new Set(listarBuzonesActivos().map((b) => `${b.alias}@${b.domain}`.toLowerCase()));
+    const huerfanas = enServidor.valor.filter((c) => !conocidas.has(c.email));
+    if (!huerfanas.length) return;
+
+    log("warn", "cron", "Buzones en el servidor IMAP sin fila en la base", { total: huerfanas.length });
+    await sendAlert(
+      "imap-huerfanas",
+      `Hay ${huerfanas.length} buzón(es) en el servidor IMAP sin máscara en la base: ${huerfanas.map((c) => c.email).slice(0, 20).join(", ")}. ` +
+      "Ocupan disco y contienen correo. Revísalos antes de borrar nada.",
+    );
+  } catch (err) {
+    log("error", "cron", "Fallo buscando buzones huérfanos", { error: String(err) });
+  }
+});
+
+
+// Gracia vencida: aquí sí se borra el correo, y es irreversible. Va aparte del cron de
+// add-ons a propósito — apagar un cobro y destruir correo no deben compartir un try.
+programar("15 7 * * *", async () => {
+  if (!stalwartConfigurado()) return;
+  for (const b of buzonesConGraciaVencida()) {
+    try {
+      const r = await borrarBuzon(b.accountId, `${b.alias}@${b.domain}`);
+      if (!r.ok) {
+        log("error", "cron", "No se pudo borrar un buzón con gracia vencida", { buzon: `${b.alias}@${b.domain}`, error: r.error });
+        continue;
+      }
+      desmarcarBuzon(b.domainId, b.alias);
+      log("info", "cron", "Buzón borrado tras 30 días de gracia", { buzon: `${b.alias}@${b.domain}` });
+    } catch (err) {
+      log("error", "cron", "Fallo borrando un buzón con gracia vencida", { buzon: `${b.alias}@${b.domain}`, error: String(err) });
+    }
   }
 });

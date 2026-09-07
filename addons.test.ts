@@ -176,3 +176,70 @@ describe("Supresión: matching insensible a mayúsculas", () => {
     assert.equal(isSuppressed(dom.id, "otro@empresa.com"), false);
   });
 });
+
+/**
+ * El buzón IMAP es un add-on por dominio con una bolsa de almacenamiento COMPARTIDA
+ * entre todos los buzones de ese dominio, y buzones ilimitados. Es el diferenciador
+ * aplicado al correo: Google cobra por persona, ForwardEmail por buzón, MailMask por
+ * dominio. Ningún plan lo incluye, a propósito — meter un recurso sin medidor en una
+ * cuota fija ya salió caro una vez, y por eso existe `monthlyForwards`.
+ */
+describe("Add-on de buzón IMAP", () => {
+  const sinAddon = `buzon-sin-${crypto.randomUUID()}@test.com`;
+  const conUno = `buzon-uno-${crypto.randomUUID()}@test.com`;
+  const conDos = `buzon-dos-${crypto.randomUUID()}@test.com`;
+  const equipo = `buzon-equipo-${crypto.randomUUID()}@test.com`;
+
+  const GB = 1024 * 1024 * 1024;
+
+  before(() => {
+    seedUser(sinAddon, "basico");
+    seedUser(conUno, "basico");
+    seedUser(conDos, "basico");
+    seedUser(equipo, "equipo");
+
+    for (const email of [conUno, conDos]) {
+      const a = createAddon(email, "mailbox");
+      updateAddon(a.id, { status: "active", currentPeriodEnd: FUTURE });
+    }
+    const extra = createAddon(conDos, "mailbox");
+    updateAddon(extra.id, { status: "active", currentPeriodEnd: FUTURE });
+  });
+
+  it("sin el add-on no hay buzones, ni en Básico ni en Equipo", () => {
+    assert.equal(limitsOf(sinAddon).mailboxes, false);
+    assert.equal(limitsOf(sinAddon).mailboxBytes, 0);
+    // Equipo tampoco lo incluye: el almacenamiento crece solo y nunca baja.
+    assert.equal(limitsOf(equipo).mailboxes, false);
+    assert.equal(limitsOf(equipo).mailboxBytes, 0);
+  });
+
+  it("un add-on da 10 GB", () => {
+    const l = limitsOf(conUno);
+    assert.equal(l.mailboxes, true);
+    assert.equal(l.mailboxBytes, 10 * GB);
+  });
+
+  it("es acumulable: dos add-ons son 20 GB", () => {
+    assert.equal(limitsOf(conDos).mailboxBytes, 20 * GB);
+  });
+
+  it("cuesta $99 y está en el catálogo a la venta", () => {
+    assert.equal(ADDONS.mailbox.price, 99_00);
+    assert.equal(ADDONS.mailbox.mailboxBytes, 10 * GB);
+  });
+
+  it("con el plan vencido no quedan buzones habilitados", () => {
+    // El add-on sigue vivo pero el plan base no: el cron lo congela con 30 días de
+    // gracia. Lo que NO puede pasar es que siga contando como capacidad disponible.
+    const vencido = `buzon-vencido-${crypto.randomUUID()}@test.com`;
+    sqlite.prepare(
+      "INSERT OR REPLACE INTO users (email,password_hash,created_at,sub_plan,sub_status,sub_period_end) VALUES (?,?,?,?,?,?)",
+    ).run(vencido, "x", new Date().toISOString(), "basico", "active", PAST);
+    const a = createAddon(vencido, "mailbox");
+    updateAddon(a.id, { status: "active", currentPeriodEnd: FUTURE });
+
+    assert.equal(limitsOf(vencido).mailboxes, false);
+    assert.equal(limitsOf(vencido).mailboxBytes, 0);
+  });
+});

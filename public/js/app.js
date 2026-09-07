@@ -1293,7 +1293,10 @@ async function loadAliases() {
   renderAliases(aliases);
 }
 
+let aliasesActuales = [];
+
 function renderAliases(aliases) {
+  aliasesActuales = aliases;
   const list = document.getElementById("aliases-list");
   const empty = document.getElementById("aliases-empty");
 
@@ -1309,19 +1312,79 @@ function renderAliases(aliases) {
       <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span class="font-mono text-sm break-all ${a.enabled ? 'text-zinc-100' : 'text-zinc-500 line-through'}">${a.alias === '*' ? '*' : esc(a.alias)}@${esc(selectedDomain.domain)}</span>
-          <span class="text-zinc-500">→</span>
+          ${a.destinations.length ? `<span class="text-zinc-500">→</span>` : ''}
           ${a.destinations.map(d => `<span class="text-sm text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-0.5 break-all">${esc(d)}</span>`).join("")}
+          ${a.mailboxEnabled ? `<span class="text-xs text-mask-300 bg-mask-500/10 border border-mask-500/30 rounded-md px-2 py-0.5" title="El correo se guarda aquí y se lee con IMAP">Buzón${a.mailboxGraceUntil ? ' · sólo lectura' : ''}</span>` : ''}
         </div>
         ${a.forwardCount ? `<div class="text-xs text-zinc-500 mt-1">${a.forwardCount} reenviado${a.forwardCount === 1 ? '' : 's'}${a.lastFrom ? ` · último de ${esc(a.lastFrom)}` : ''}${a.lastAt ? ` · ${relativeTime(a.lastAt)}` : ''}</div>` : ''}
       </div>
       <div class="flex items-center gap-3 sm:gap-2 shrink-0">
         <button data-action="copy-alias" data-value="${a.alias === '*' ? '' : esc(a.alias) + '@' + esc(selectedDomain.domain)}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors${a.alias === '*' ? ' hidden' : ''}" title="Copiar la dirección para compartirla">Copiar</button>
         <button data-action="edit-alias" data-alias="${esc(a.alias)}" data-destinations="${esc(a.destinations.join(', '))}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Editar</button>
+        <button data-action="mailbox-alias" data-alias="${esc(a.alias)}" data-has="${a.mailboxEnabled ? '1' : ''}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors${a.alias === '*' ? ' hidden' : ''}" title="Buzón IMAP para leer en Apple Mail u Outlook">${a.mailboxEnabled ? 'Buzón' : 'Crear buzón'}</button>
         <button data-action="toggle-alias" data-alias="${esc(a.alias)}" data-enabled="${!a.enabled}" class="text-xs px-2 py-1 rounded ${a.enabled ? 'bg-green-900/30 text-green-400' : 'bg-zinc-700 text-zinc-400'}">${a.enabled ? 'Activo' : 'Inactivo'}</button>
         <button data-action="remove-alias" data-alias="${esc(a.alias)}" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Eliminar</button>
       </div>
     </div>
   `).join("");
+}
+
+// --- Buzón IMAP ---
+//
+// La contraseña se muestra UNA sola vez y no se guarda en ningún lado: la entrega del
+// correo va con la credencial de administrador del servidor, así que la del buzón no
+// vuelve a hacer falta. Si se pierde, se genera otra.
+async function abrirBuzon(alias, yaTiene) {
+  const caja = document.getElementById("mailbox-body");
+  const direccion = `${alias}@${selectedDomain.domain}`;
+  document.getElementById("mailbox-title").textContent = direccion;
+  caja.innerHTML = `<p class="text-sm text-zinc-400">Un momento…</p>`;
+  showModal("modal-mailbox");
+
+  if (yaTiene) {
+    caja.innerHTML = `
+      <p class="text-sm text-zinc-400">Este buzón ya existe. Configúralo en tu app de correo:</p>
+      ${datosServidor(direccion)}
+      <div class="flex flex-wrap gap-2 mt-5">
+        <a href="/api/domains/${selectedDomain.id}/apple-profile?alias=${encodeURIComponent(alias)}" class="text-xs px-3 py-2 rounded bg-zinc-800 text-zinc-200 hover:bg-zinc-700">Perfil para Apple Mail</a>
+        <a href="/api/domains/${selectedDomain.id}/alias/${encodeURIComponent(alias)}/mailbox/export" class="text-xs px-3 py-2 rounded bg-zinc-800 text-zinc-200 hover:bg-zinc-700">Descargar todo (.mbox)</a>
+        <button type="button" data-mailbox="password" class="text-xs px-3 py-2 rounded bg-zinc-800 text-zinc-200 hover:bg-zinc-700">Nueva contraseña</button>
+        <button type="button" data-mailbox="delete" class="text-xs px-3 py-2 rounded text-red-400 hover:bg-red-950/40">Eliminar buzón</button>
+      </div>`;
+    return;
+  }
+
+  const res = await fetch(`/api/domains/${selectedDomain.id}/alias/${encodeURIComponent(alias)}/mailbox`, {
+    method: "POST",
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    caja.innerHTML = `<p class="text-sm text-red-400">${esc(data.error || "No se pudo crear el buzón")}</p>`;
+    return;
+  }
+  playSound("success");
+  caja.innerHTML = credencialesNuevas(data, alias);
+  loadAliases();
+}
+
+function datosServidor(direccion) {
+  return `
+    <dl class="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+      <dt class="text-zinc-500">Usuario</dt><dd class="font-mono text-zinc-200 break-all">${esc(direccion)}</dd>
+      <dt class="text-zinc-500">Entrada (IMAP)</dt><dd class="font-mono text-zinc-200">imap.mailmask.studio · 993 · SSL/TLS</dd>
+      <dt class="text-zinc-500">Salida (SMTP)</dt><dd class="font-mono text-zinc-200">imap.mailmask.studio · 465 · SSL/TLS</dd>
+    </dl>`;
+}
+
+function credencialesNuevas(data, alias) {
+  return `
+    <p class="text-sm text-zinc-300">Listo. <strong class="text-amber-400">Copia la contraseña ahora</strong>: no se guarda en ningún lado y no la volverás a ver.</p>
+    <div class="mt-3 flex items-center gap-2">
+      <code class="flex-1 font-mono text-sm bg-zinc-950 border border-zinc-700 rounded px-3 py-2 break-all">${esc(data.password)}</code>
+      <button type="button" data-mailbox="copy" data-value="${esc(data.password)}" class="text-xs px-3 py-2 rounded bg-zinc-800 text-zinc-200 hover:bg-zinc-700">Copiar</button>
+    </div>
+    ${datosServidor(data.email)}
+    <a href="/api/domains/${selectedDomain.id}/apple-profile?alias=${encodeURIComponent(alias)}" class="inline-block mt-4 text-xs px-3 py-2 rounded bg-zinc-800 text-zinc-200 hover:bg-zinc-700">Perfil para Apple Mail</a>`;
 }
 
 async function toggleAlias(alias, enabled) {
@@ -2570,8 +2633,12 @@ function setupEventListeners() {
 
     initChips(form.querySelector("[data-chips]")).commit();
     const destinations = form.destinations.value.split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
-    if (destinations.length === 0) {
-      errEl.textContent = "Agrega al menos un destino";
+    // Sin destinos es válido SI la máscara guarda su correo en un buzón: eso es un
+    // buzón sin reenvío, que es lo que permite dejar Gmail. Sin destinos y sin buzón,
+    // en cambio, el correo no iría a ningún lado.
+    const tieneBuzon = aliasesActuales.find(a => a.alias === form.alias.value)?.mailboxEnabled;
+    if (destinations.length === 0 && !tieneBuzon) {
+      errEl.textContent = "Agrega al menos un destino, o crea un buzón donde guardar el correo";
       errEl.classList.remove("hidden");
       return;
     }
@@ -2693,6 +2760,8 @@ function setupEventListeners() {
       setTimeout(() => { copiar.textContent = antes; copiar.classList.remove("text-green-400"); }, 1500);
       return;
     }
+    const buzon = e.target.closest("[data-action='mailbox-alias']");
+    if (buzon) { abrirBuzon(buzon.dataset.alias, Boolean(buzon.dataset.has)); return; }
     const remove = e.target.closest("[data-action='remove-alias']");
     if (remove) removeAlias(remove.dataset.alias);
     const edit = e.target.closest("[data-action='edit-alias']");
@@ -2704,6 +2773,43 @@ function setupEventListeners() {
       initChips(form.querySelector("[data-chips]")).set(edit.dataset.destinations);
       document.getElementById("edit-alias-error").classList.add("hidden");
       showModal("modal-edit-alias");
+    }
+  });
+
+  // Botones dentro del modal de buzón. La CSP prohíbe onclick en el HTML, así que
+  // todo va por delegación.
+  document.getElementById("mailbox-body")?.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-mailbox]");
+    if (!b) return;
+    const alias = document.getElementById("mailbox-title").textContent.split("@")[0];
+    const base = `/api/domains/${selectedDomain.id}/alias/${encodeURIComponent(alias)}/mailbox`;
+
+    if (b.dataset.mailbox === "copy") {
+      navigator.clipboard.writeText(b.dataset.value);
+      playSound("copy");
+      b.textContent = "¡Copiado!";
+      return;
+    }
+    if (b.dataset.mailbox === "password") {
+      if (!confirm("Se generará una contraseña nueva y la actual dejará de servir en todos tus dispositivos. ¿Seguir?")) return;
+      const res = await fetch(`${base}/password`, { method: "POST" });
+      const data = await res.json();
+      document.getElementById("mailbox-body").innerHTML = res.ok
+        ? credencialesNuevas({ ...data, email: `${alias}@${selectedDomain.domain}` }, alias)
+        : `<p class="text-sm text-red-400">${esc(data.error)}</p>`;
+      return;
+    }
+    if (b.dataset.mailbox === "delete") {
+      // Esto borra correo y no se puede deshacer, así que se ofrece la descarga antes.
+      if (!confirm("Se borrará el buzón Y TODO SU CORREO, sin vuelta atrás. Descárgalo antes si lo necesitas. ¿Seguir?")) return;
+      const res = await fetch(base, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        document.getElementById("mailbox-body").innerHTML = `<p class="text-sm text-red-400">${esc(data.error)}</p>`;
+        return;
+      }
+      hideModal("modal-mailbox");
+      loadAliases();
     }
   });
 

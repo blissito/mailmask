@@ -7,7 +7,7 @@ import * as dns from "node:dns/promises";
 import { programar, esServidor } from "./scheduler.js";
 import { revisarPatron } from "./regex-guard.js";
 import { verificarTurnstile } from "./turnstile.js";
-import { generarPerfilApple, nombreArchivoPerfil } from "./apple-profile.js";
+import { generarPerfilApple, nombreArchivoPerfil, IMAP_HOST } from "./apple-profile.js";
 import { addSseClient, notifyBandeja, setPresence, clearPresence, listPresence, notifyPresence } from "./sse-hub.js";
 import { ftsDisponible } from "./pg.js";
 import { backfillPendiente } from "./search-backfill.js";
@@ -48,6 +48,9 @@ import {
   getUserBySubscriptionId,
   extendSubscriptionPeriod,
   getUserPlanLimits,
+  marcarBuzon,
+  desmarcarBuzon,
+  bytesDeBuzonesDelDominio,
   setVerifyToken,
   getUserByVerifyToken,
   verifyUserEmail,
@@ -203,6 +206,7 @@ import type { InlineImage, Attachment } from "./ses.js";
 import { sqlite } from "./pg.js";
 import { log } from "./logger.js";
 import { createSmtpIamCredential, revokeSmtpIamCredential } from "./ses.js";
+import { crearBuzon, cambiarPassword, borrarBuzon, exportarBuzon } from "./stalwart.js";
 import {
   sendTemplate,
   verifyEmail as verifyEmailTemplate,
@@ -2123,11 +2127,18 @@ const app = new Elysia({ adapter: node() })
           { status: 400 },
         );
       }
+      // Un alias tiene que hacer ALGO con el correo que llega: reenviarlo o guardarlo.
+      // Sin destinos es válido si tiene buzón — es lo que permite un buzón directo, sin
+      // reenviar a ningún lado, que es lo que convierte a MailMask en reemplazo de Gmail
+      // y no en una capa encima. Sin ninguna de las dos cosas, el correo se perdería.
       if (body.destinations.length === 0) {
-        return new Response(
-          JSON.stringify({ error: "Se requiere al menos un destino" }),
-          { status: 400 },
-        );
+        const actual = await getAlias(params.id, params.alias.toLowerCase());
+        if (!actual?.mailboxEnabled) {
+          return new Response(
+            JSON.stringify({ error: "Se requiere al menos un destino, o un buzón donde guardar el correo" }),
+            { status: 400 },
+          );
+        }
       }
       updates.destinations = body.destinations;
     }
@@ -2163,6 +2174,21 @@ const app = new Elysia({ adapter: node() })
       });
     }
     const domain = access.domain;
+
+    // Si la máscara tiene buzón, la cuenta vive FUERA de esta base y un DELETE aquí
+    // la dejaría viva: disco que pagamos, con correo de alguien que ya se fue, y nada
+    // que la nombre. Se borra primero allá; si falla, no se borra la fila, porque una
+    // fila sin cuenta se arregla sola y una cuenta sin fila no.
+    const previo = await getAlias(domain.id, params.alias);
+    if (previo?.mailboxEnabled && previo.mailboxAccountId) {
+      const r = await borrarBuzon(previo.mailboxAccountId, `${params.alias}@${domain.domain}`);
+      if (!r.ok) {
+        log("error", "admin", "No se pudo borrar el buzón al borrar la máscara", {
+          domainId: domain.id, alias: params.alias, error: r.error,
+        });
+        return new Response(JSON.stringify({ error: `No se pudo borrar el buzón: ${r.error}` }), { status: 502 });
+      }
+    }
 
     const deleted = await deleteAlias(domain.id, params.alias);
     if (!deleted)
@@ -5291,6 +5317,13 @@ const app = new Elysia({ adapter: node() })
     if (!alias || !/^[a-z0-9._%+-]+$/.test(alias)) {
       return new Response(JSON.stringify({ error: "alias requerido (sólo la parte antes de la arroba)" }), { status: 400 });
     }
+    // Sin buzón no hay nada que configurar: el perfil se instalaría y el cliente de
+    // correo fallaría al autenticarse, que es una forma peor de decir "no lo tienes".
+    const fila = await getAlias(domain.id, alias);
+    if (!fila?.mailboxEnabled) {
+      return new Response(JSON.stringify({ error: "Esta máscara no tiene buzón IMAP" }), { status: 404 });
+    }
+
     const direccion = `${alias}@${domain.domain}`;
 
     const perfil = generarPerfilApple({
@@ -5567,6 +5600,171 @@ const app = new Elysia({ adapter: node() })
     });
   }, {
     detail: { tags: ["SMTP", "SDK"], summary: "Revoke an SMTP credential", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  // --- Buzones IMAP ---
+  //
+  // Calcado del flujo de credenciales SMTP de arriba: permiso `admin`, gate por plan,
+  // rate limit y **la contraseña se muestra una sola vez**. Aquí eso no es una
+  // comodidad sino la arquitectura: la entrega va con la credencial de administrador
+  // de Stalwart, así que la del buzón no se guarda en ningún lado.
+
+  .post("/api/domains/:id/alias/:alias/mailbox", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401 });
+    const limited = await rateLimitGuard(getIp(request), 5, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    const domain = access.domain;
+
+    const owner = await getUser(domain.ownerEmail);
+    if (!owner) return new Response(JSON.stringify({ error: "Cuenta no encontrada" }), { status: 404 });
+    const limits = getUserPlanLimits(owner);
+    if (!limits.mailboxes) {
+      return new Response(JSON.stringify({ error: "Los buzones IMAP son un add-on. Agrégalo desde tu panel." }), { status: 403 });
+    }
+
+    const aliasName = params.alias.toLowerCase();
+    const fila = await getAlias(domain.id, aliasName);
+    if (!fila) return new Response(JSON.stringify({ error: "Máscara no encontrada" }), { status: 404 });
+    if (fila.mailboxEnabled) {
+      return new Response(JSON.stringify({ error: "Esta máscara ya tiene buzón" }), { status: 409 });
+    }
+    // El comodín reenvía cualquier dirección; un buzón necesita una concreta.
+    if (aliasName === "*") {
+      return new Response(JSON.stringify({ error: "El catch-all no puede tener buzón: usa una máscara con nombre" }), { status: 400 });
+    }
+
+    // La cuota del add-on es del DOMINIO y se reparte entre sus buzones, que son
+    // ilimitados. Es el diferenciador aplicado al almacenamiento: se cobra por
+    // dominio, no por persona.
+    const yaRepartido = bytesDeBuzonesDelDominio(domain.id);
+    const libre = limits.mailboxBytes - yaRepartido;
+    if (libre <= 0) {
+      return new Response(JSON.stringify({ error: "Ya repartiste todo el almacenamiento de este dominio. Agrega otro add-on de buzón o reduce la cuota de un buzón existente." }), { status: 400 });
+    }
+    // Sin cuota pedida, se le da lo que queda libre.
+    const quotaBytes = libre;
+
+    const creado = await crearBuzon({ localPart: aliasName, domain: domain.domain, quotaBytes });
+    if (!creado.ok) {
+      log("error", "admin", "No se pudo crear el buzón IMAP", { domainId: domain.id, alias: aliasName, error: creado.error });
+      return new Response(JSON.stringify({ error: creado.error }), { status: 502 });
+    }
+
+    marcarBuzon(domain.id, aliasName, { accountId: creado.valor.accountId, quotaBytes });
+
+    return new Response(JSON.stringify({
+      email: creado.valor.email,
+      password: creado.valor.password, // Sólo se muestra aquí; no se guarda.
+      quotaBytes,
+      imap: { host: IMAP_HOST, port: 993, security: "SSL/TLS" },
+      smtp: { host: IMAP_HOST, port: 465, security: "SSL/TLS" },
+    }), { status: 201, headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Mailbox"], summary: "Create an IMAP mailbox for an alias", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .post("/api/domains/:id/alias/:alias/mailbox/password", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401 });
+    const limited = await rateLimitGuard(getIp(request), 5, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const fila = await getAlias(access.domain.id, params.alias.toLowerCase());
+    if (!fila?.mailboxEnabled || !fila.mailboxAccountId) {
+      return new Response(JSON.stringify({ error: "Esta máscara no tiene buzón" }), { status: 404 });
+    }
+
+    // Se puede regenerar sin la contraseña vieja porque el correo NO está cifrado por
+    // usuario. Con cifrado esto sería imposible: la vieja es lo que descifra la llave
+    // privada, y un panel que no la pida destruye el correo en silencio.
+    const r = await cambiarPassword(fila.mailboxAccountId);
+    if (!r.ok) return new Response(JSON.stringify({ error: r.error }), { status: 502 });
+
+    return new Response(JSON.stringify({ password: r.valor.password }), {
+      headers: { "content-type": "application/json" },
+    });
+  }, {
+    detail: { tags: ["Mailbox"], summary: "Regenerate a mailbox password", security: [{ cookieAuth: [] }] },
+  })
+
+  .get("/api/domains/:id/alias/:alias/mailbox/export", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401 });
+
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const aliasName = params.alias.toLowerCase();
+    const fila = await getAlias(access.domain.id, aliasName);
+    if (!fila?.mailboxEnabled || !fila.mailboxAccountId) {
+      return new Response(JSON.stringify({ error: "Esta máscara no tiene buzón" }), { status: 404 });
+    }
+
+    // Formato mbox, que es lo que importan Thunderbird, Apple Mail y casi todo lo demás.
+    // Va en streaming porque un buzón de 10 GB no cabe en memoria, y por eso NO se puede
+    // devolver un error a media descarga: lo que falle se anota en el log.
+    const accountId = fila.mailboxAccountId;
+    const cuerpo = new ReadableStream({
+      async start(controlador) {
+        const enc = new TextEncoder();
+        try {
+          for await (const crudo of exportarBuzon(accountId)) {
+            // La línea "From " separa mensajes en mbox, así que hay que escapar la que
+            // venga dentro del cuerpo o el archivo se parte en mensajes falsos.
+            const cuerpoEscapado = crudo.replace(/^From /gm, ">From ");
+            controlador.enqueue(enc.encode(`From MAILER-DAEMON ${new Date().toUTCString()}\n${cuerpoEscapado}\n\n`));
+          }
+        } catch (err) {
+          log("error", "admin", "Falló la exportación del buzón", { domainId: access.domain.id, alias: aliasName, error: String(err) });
+        }
+        controlador.close();
+      },
+    });
+
+    return new Response(cuerpo, {
+      headers: {
+        "content-type": "application/mbox",
+        "content-disposition": `attachment; filename="${aliasName}-${access.domain.domain}.mbox"`,
+        "cache-control": "private, no-store",
+      },
+    });
+  }, {
+    detail: { tags: ["Mailbox"], summary: "Download the whole mailbox as mbox", security: [{ cookieAuth: [] }] },
+  })
+
+  .delete("/api/domains/:id/alias/:alias/mailbox", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401 });
+
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+
+    const aliasName = params.alias.toLowerCase();
+    const fila = await getAlias(access.domain.id, aliasName);
+    if (!fila?.mailboxEnabled || !fila.mailboxAccountId) {
+      return new Response(JSON.stringify({ error: "Esta máscara no tiene buzón" }), { status: 404 });
+    }
+    // Sin destinos ni buzón, el alias dejaría de hacer nada con el correo que llega.
+    if (!fila.destinations.length) {
+      return new Response(JSON.stringify({ error: "Agrega un destino de reenvío antes de quitar el buzón, o borra la máscara entera" }), { status: 400 });
+    }
+
+    // Borrar la cuenta BORRA EL CORREO. El orden importa: si Stalwart falla, la fila
+    // se queda marcada y el barrido de huérfanas no la cuenta de más.
+    const r = await borrarBuzon(fila.mailboxAccountId, `${aliasName}@${access.domain.domain}`);
+    if (!r.ok) return new Response(JSON.stringify({ error: r.error }), { status: 502 });
+
+    desmarcarBuzon(access.domain.id, aliasName);
+    return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Mailbox"], summary: "Delete an alias mailbox and its mail", security: [{ cookieAuth: [] }] },
   })
 
   // --- SES bounce/complaint events ---

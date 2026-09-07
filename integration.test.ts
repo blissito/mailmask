@@ -238,7 +238,7 @@ describe("Add-ons API", () => {
     const res = await req("/api/addons", { headers: { cookie: cookie! } });
     assert.equal(res.status, 200);
     const data = await res.json();
-    assert.deepEqual(Object.keys(data.catalog).sort(), ["domain", "sends100", "sends25"]);
+    assert.deepEqual(Object.keys(data.catalog).sort(), ["domain", "mailbox", "sends100", "sends25"]);
     assert.ok(Array.isArray(data.mine));
   });
 
