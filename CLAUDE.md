@@ -155,6 +155,27 @@ acaba vendiendo bajo costo. Un `TransferPrice` de cero o en otra moneda se **rec
 se toma por una ganga. Ojo con el rango: `.design` cuesta $64 USD y hay TLDs de hasta $480,
 así que el margen es porcentual y no una cantidad fija.
 
+**Tres cosas que sólo se vieron probando contra dominios reales** (7-sep-2026, antes de la
+primera transferencia con cliente):
+
+1. **RDAP fallaba siempre.** `rdap.org` está detrás de Cloudflare y sin `User-Agent` contesta
+   **403 con HTML**; el `JSON.parse` reventaba y todos los requisitos degradaban a "?" — que
+   es el fail-open que yo mismo escribí, así que no se notaba. Con UA responde 200 y dice
+   registrador, edad y candado. Lección: un fail-open que nunca se ejercita es un apagado.
+2. **Un `UNTRANSFERABLE` de AWS se mostraba como "?"** y dejaba pagar. Ahora es `ok: false`.
+   `brendago.design` da exactamente eso: tiene `server transfer prohibited`, que lo pone el
+   registro y el cliente no puede quitar, así que hoy **no se puede transferir**.
+3. **El inventario de DNS salía incompleto y distinto en cada corrida.** Se disparaban ~150
+   consultas simultáneas contra el servidor autoritativo del cliente, que empezaba a
+   descartarlas. Con `brendago.design`: 4-5 registros e inestable. Ahora hay tope de 6
+   simultáneas, `tries: 2` (un UDP perdido no es "no existe") y presupuesto de 45 s: **12
+   registros, idénticos en tres corridas**. Además, para un dominio que ya está en la cuenta
+   se le pasan los nombres que ya conocemos —los CNAME de DKIM llevan un token aleatorio que
+   ninguna heurística adivina—, y eran justo los que faltaban: sin ellos, mover el dominio le
+   habría roto la firma DKIM al cliente en silencio. Y un corte por tiempo ya no devuelve el
+   inventario vacío (que el cliente aprobaría creyendo que su zona no tenía nada), sino lo que
+   alcanzó con `truncado: true`.
+
 **Transfer-out** no es opcional: sin él, ofrecer migración entrante es asimétrico. El auth
 code va **por correo y no en la respuesta** —entregarlo es entregar el dominio— con un enlace
 de 30 minutos y un solo uso. `AutoRenew` se apaga sólo cuando la salida se confirma de

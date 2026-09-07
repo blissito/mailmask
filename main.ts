@@ -6503,9 +6503,17 @@ const app = new Elysia({ adapter: node() })
     const { checkDomainReadiness } = await import("./domain-transfer.js");
     const { snapshotDns } = await import("./dns-import.js");
 
+    // Si el dominio ya está en la cuenta, conocemos sus tokens de DKIM: esos nombres llevan
+    // un token aleatorio que ninguna heurística adivina.
+    const { getDomainByName: buscarDominio } = await import("./db.js");
+    const conocido = await buscarDominio(d);
+    const extra = conocido
+      ? [...(conocido.dkimTokens ?? []).map((t: string) => `${t}._domainkey`), "_amazonses"]
+      : [];
+
     const [listo, inventario] = await Promise.all([
       checkDomainReadiness(d),
-      snapshotDns(d).catch(() => ({ found: [], nameservers: [], warning: "No pudimos leer tu DNS actual." })),
+      snapshotDns(d, extra).catch(() => ({ found: [], nameservers: [], warning: "No pudimos leer tu DNS actual." })),
     ]);
 
     return Response.json({
@@ -6548,7 +6556,11 @@ const app = new Elysia({ adapter: node() })
 
     const inventario = Array.isArray(b.dnsRecords) && b.dnsRecords.length
       ? { found: b.dnsRecords as never[] }
-      : await snapshotDns(d).catch(() => ({ found: [] as never[] }));
+      : await snapshotDns(d, await (async () => {
+        const { getDomainByName: buscar } = await import("./db.js");
+        const c = await buscar(d);
+        return c ? [...(c.dkimTokens ?? []).map((t: string) => `${t}._domainkey`), "_amazonses"] : [];
+      })()).catch(() => ({ found: [] as never[] }));
 
     const reg = createDomainRegistration({
       domainName: d,

@@ -49,7 +49,9 @@ export async function checkDomainReadiness(domain: string): Promise<{ listo: boo
     const t = await checkTransferability(domain);
     requisitos.push({
       clave: "aws",
-      ok: t.transferable ? true : null,
+      // Un UNTRANSFERABLE de AWS es un NO, no un "quién sabe": dejarlo pasar significa
+      // cobrarle al cliente una transferencia que no puede ocurrir.
+      ok: t.transferable ? true : false,
       texto: "El registrador actual permite la transferencia",
       ayuda: t.motivo ?? undefined,
     });
@@ -61,17 +63,27 @@ export async function checkDomainReadiness(domain: string): Promise<{ listo: boo
   // 2. RDAP: edad y candado. Es HTTP puro, no hace falta una librería de WHOIS.
   let edadOk: boolean | null = null;
   let lockOk: boolean | null = null;
+  let lockServidor = false;
   let registrador: string | null = null;
   try {
     const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(domain)}`, {
-      headers: { accept: "application/rdap+json" },
-      signal: AbortSignal.timeout(8000),
+      headers: {
+        accept: "application/rdap+json",
+        // Sin User-Agent, Cloudflare contesta 403 con una página HTML y el JSON.parse
+        // revienta. La consulta fallaba SIEMPRE y todos los requisitos salían como "?".
+        "user-agent": "MailMask/1.0 (+https://www.mailmask.studio)",
+      },
+      signal: AbortSignal.timeout(12_000),
+      redirect: "follow",
     });
-    if (res.ok) {
+    if (res.ok && (res.headers.get("content-type") ?? "").includes("json")) {
       const j: any = await res.json();
       const alta = (j.events ?? []).find((e: any) => e.eventAction === "registration")?.eventDate;
       if (alta) edadOk = Date.now() - Date.parse(alta) > 60 * 864e5;
       const estados: string[] = j.status ?? [];
+      // `server transfer prohibited` no lo puede quitar el cliente desde su panel: lo pone
+      // el registro. Se distingue del `client…`, que sí depende de él.
+      lockServidor = estados.some((e) => /server transfer prohibited/i.test(e));
       lockOk = !estados.some((e) => /transfer prohibited/i.test(e));
       registrador = (j.entities ?? []).find((e: any) => (e.roles ?? []).includes("registrar"))?.vcardArray?.[1]
         ?.find((v: any[]) => v[0] === "fn")?.[3] ?? null;
@@ -93,7 +105,9 @@ export async function checkDomainReadiness(domain: string): Promise<{ listo: boo
     ok: lockOk,
     texto: "El candado de transferencia está desactivado",
     ayuda: lockOk === false
-      ? "Entra a tu registrador actual y desactiva el 'transfer lock' o 'bloqueo de transferencia'."
+      ? (lockServidor
+        ? "El bloqueo lo puso el registro del dominio, no tu registrador: suele pasar los primeros 60 días o tras un cambio de titular. Hay que esperar a que caiga."
+        : "Entra a tu registrador actual y desactiva el 'transfer lock' o 'bloqueo de transferencia'.")
       : undefined,
   });
   // Estos dos no se pueden comprobar desde fuera: los confirma el cliente.

@@ -258,3 +258,31 @@ describe("normalizarTxt", () => {
     assert.equal(normalizarTxt('di "hola"'), '"di \\"hola\\""');
   });
 });
+
+describe("enTandas (freno de consultas DNS)", () => {
+  it("respeta el tope de simultáneas y conserva el orden", async () => {
+    // Sin freno se disparaban ~150 consultas de golpe contra el servidor autoritativo del
+    // cliente; empezaba a descartarlas y el inventario salía incompleto y distinto en cada
+    // corrida. Con brendago.design eso era la diferencia entre 4 registros y 12.
+    const { enTandas } = await import("./dns-import.ts");
+    let vivas = 0;
+    let pico = 0;
+
+    const tareas = Array.from({ length: 25 }, (_, i) => async () => {
+      vivas++;
+      pico = Math.max(pico, vivas);
+      await new Promise((r) => setTimeout(r, 5));
+      vivas--;
+      return i;
+    });
+
+    const salida = await enTandas(tareas, 6);
+    assert.ok(pico <= 6, `se dispararon ${pico} a la vez`);
+    assert.deepEqual(salida, [...Array(25).keys()], "se perdió el orden de los resultados");
+  });
+
+  it("no se atora si no hay tareas", async () => {
+    const { enTandas } = await import("./dns-import.ts");
+    assert.deepEqual(await enTandas([], 6), []);
+  });
+});

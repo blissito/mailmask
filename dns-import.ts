@@ -28,13 +28,36 @@ const NOMBRES = [
 const TIPOS_APEX: RRSetTipo[] = ["A", "AAAA", "MX", "TXT", "CAA"];
 const TIPOS_SUB: RRSetTipo[] = ["A", "AAAA", "CNAME", "TXT"];
 
-const TIEMPO_CONSULTA_MS = 2000;
-const TIEMPO_TOTAL_MS = 10_000;
+const TIEMPO_CONSULTA_MS = 4000;
+const TIEMPO_TOTAL_MS = 45_000;
+/**
+ * Consultas simultáneas. Sin freno se disparaban ~150 de golpe contra el servidor
+ * autoritativo del cliente: parece un abuso, empieza a descartar y el inventario sale
+ * incompleto — y con distinto contenido en cada corrida. Es lo peor que puede pasar aquí,
+ * porque de esta lista depende que no se le caiga el sitio al mover el dominio.
+ */
+const CONCURRENCIA = 6;
 
 function resolver(servidores: string[]): Resolver {
-  const r = new Resolver({ timeout: TIEMPO_CONSULTA_MS, tries: 1 });
+  // `tries: 2` porque un UDP perdido no es "no existe": con 1 intento, un paquete caído
+  // borra un registro del inventario sin que nadie se entere.
+  const r = new Resolver({ timeout: TIEMPO_CONSULTA_MS, tries: 2 });
   r.setServers(servidores);
   return r;
+}
+
+/** Ejecuta con un tope de simultáneas, en vez de soltarlo todo a la vez. */
+export async function enTandas<T>(tareas: (() => Promise<T>)[], limite: number): Promise<T[]> {
+  const salida: T[] = [];
+  let i = 0;
+  const obreros = Array.from({ length: Math.min(limite, tareas.length) }, async () => {
+    while (i < tareas.length) {
+      const mio = i++;
+      salida[mio] = await tareas[mio]();
+    }
+  });
+  await Promise.all(obreros);
+  return salida;
 }
 
 async function consultar(r: Resolver, nombre: string, tipo: RRSetTipo): Promise<RRSet | null> {
@@ -92,6 +115,8 @@ export interface Inventario {
   found: RRSet[];
   nameservers: string[];
   warning: string;
+  /** true si la consulta se cortó por tiempo: el inventario está incompleto de seguro. */
+  truncado?: boolean;
 }
 
 /**
@@ -100,7 +125,7 @@ export interface Inventario {
  * Pregunta a los nameservers autoritativos actuales y no al resolver del sistema: así se lee
  * la zona tal como está, sin la copia con TTL que tenga en medio cualquier caché.
  */
-export async function snapshotDns(domain: string): Promise<Inventario> {
+export async function snapshotDns(domain: string, nombresExtra: string[] = []): Promise<Inventario> {
   const apex = domain.toLowerCase().replace(/\.$/, "");
   const ns = await nameserversActuales(apex);
 
@@ -113,31 +138,38 @@ export async function snapshotDns(domain: string): Promise<Inventario> {
   }
   const r = resolver(servidores);
 
-  const tareas: Promise<RRSet | null>[] = [];
-  for (const t of TIPOS_APEX) tareas.push(consultar(r, apex, t));
-  for (const sub of NOMBRES) {
-    for (const t of TIPOS_SUB) tareas.push(consultar(r, `${sub}.${apex}`, t));
+  const tareas: (() => Promise<RRSet | null>)[] = [];
+  for (const t of TIPOS_APEX) tareas.push(() => consultar(r, apex, t));
+  // Los nombres que ya conocemos por la base valen más que la heurística: los CNAME de DKIM
+  // de SES llevan un token aleatorio (`fj4k2…._domainkey`) que ninguna lista puede adivinar.
+  // Sin esto, el inventario de un dominio nuestro perdía su propia firma DKIM.
+  for (const sub of [...new Set([...NOMBRES, ...nombresExtra])]) {
+    for (const t of TIPOS_SUB) tareas.push(() => consultar(r, `${sub}.${apex}`, t));
   }
 
-  const corte = new Promise<null[]>((res) => setTimeout(() => res([]), TIEMPO_TOTAL_MS));
-  const resultados = await Promise.race([Promise.allSettled(tareas), corte]);
+  // Un corte a medias devolvía el inventario VACÍO, que es peor que uno incompleto: el
+  // cliente lo aprobaría creyendo que su zona no tenía nada. Ahora se conserva lo que sí
+  // alcanzó a responder y se avisa.
+  let truncado = false;
+  const corte = new Promise<"corte">((res) => setTimeout(() => { truncado = true; res("corte"); }, TIEMPO_TOTAL_MS));
+  const resultados = await Promise.race([enTandas(tareas, CONCURRENCIA), corte]);
 
-  const found: RRSet[] = [];
-  if (Array.isArray(resultados)) {
-    for (const x of resultados as PromiseSettledResult<RRSet | null>[]) {
-      if (x && typeof x === "object" && "status" in x && x.status === "fulfilled" && x.value) found.push(x.value);
-    }
-  }
+  const found: RRSet[] = Array.isArray(resultados)
+    ? (resultados as (RRSet | null)[]).filter((x): x is RRSet => !!x)
+    : [];
 
   // Los NS y el SOA del apex son del proveedor viejo: no se copian.
   const limpio = found.filter((x) => !(x.name === apex && (x.type === "NS" || (x.type as string) === "SOA")));
 
-  log("info", "route53", "DNS snapshot", { domain: apex, encontrados: limpio.length, ns: ns.length });
+  log("info", "route53", "DNS snapshot", { domain: apex, encontrados: limpio.length, ns: ns.length, extra: nombresExtra.length });
 
   return {
     found: limpio,
     nameservers: ns,
-    warning: `Encontramos ${limpio.length} registro(s). No podemos garantizar que sean todos: revisa en tu proveedor actual si falta alguno antes de cambiar los nameservers, porque lo que no esté aquí dejará de funcionar.`,
+    warning: truncado
+      ? `La consulta a tu DNS actual tardó demasiado y quedó a medias: encontramos ${limpio.length} registro(s), pero seguro faltan. Vuelve a intentarlo y compara con tu proveedor actual antes de cambiar los nameservers.`
+      : `Encontramos ${limpio.length} registro(s). No podemos garantizar que sean todos: revisa en tu proveedor actual si falta alguno antes de cambiar los nameservers, porque lo que no esté aquí dejará de funcionar.`,
+    truncado,
   };
 }
 
