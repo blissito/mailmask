@@ -171,9 +171,27 @@ export function extractPlainBody(raw: string): string {
       return decodePartBody(part).trim();
     }
   }
-  // Fallback: return raw body after headers
+  // Sin parte de texto (correo sólo HTML, típico de transaccionales): se decodifica
+  // la parte HTML y se le quitan las etiquetas. Antes se devolvía el cuerpo crudo,
+  // en quoted-printable, y la Bandeja lo pintaba tal cual (`=3D`, `=` de corte).
+  for (const part of parts) {
+    if (part.contentType.toLowerCase().includes("text/html")) {
+      return htmlATexto(decodePartBody(part));
+    }
+  }
+  if (parts.length === 1) return decodePartBody(parts[0]).trim();
   const idx = raw.indexOf("\r\n\r\n");
   return idx === -1 ? raw : raw.slice(idx + 4).trim();
+}
+
+function htmlATexto(html: string): string {
+  return html
+    .replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, "")
+    .replace(/<br\s*\/?>|<\/(p|div|tr|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export function extractHtmlBody(raw: string): string {
@@ -446,7 +464,12 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
   }
 
   const receipt = notification.receipt;
-  const from = notification.mail.source;
+  // El remitente que ve la gente es el del encabezado `From:`. `mail.source` es el
+  // sobre (Return-Path), que en Mailchimp, SendGrid o TikTok es un buzón de rebotes
+  // tipo `bounces+123-user=dominio@em.proveedor.com` — la Bandeja lo mostraba como
+  // si fuera un rebote.
+  const headerFrom = notification.mail.commonHeaders?.from?.[0];
+  const from = (headerFrom?.match(/<([^>]+)>/)?.[1] ?? headerFrom ?? notification.mail.source).trim();
   const subject = notification.mail.commonHeaders?.subject ?? "(sin asunto)";
 
   if (receipt?.spamVerdict?.status === "FAIL" || receipt?.virusVerdict?.status === "FAIL") {

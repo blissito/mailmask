@@ -193,7 +193,11 @@ async function loadDomains() {
     `<option value="${esc(d.id)}">${esc(d.domain)}</option>`
   ).join("");
 
-  selectedDomainId = domains[0].id;
+  // Al recargar se vuelve al dominio donde estabas, no al primero de la lista.
+  let recordado = null;
+  try { recordado = localStorage.getItem("bandeja.domainId"); } catch {}
+  selectedDomainId = domains.some(d => d.id === recordado) ? recordado : domains[0].id;
+  sel.value = selectedDomainId;
   await loadAliasesForCompose();
   await loadConversations();
   connectSSE(selectedDomainId);
@@ -726,8 +730,9 @@ function cuerpoMensaje(item) {
     ? `<div class="mesa-msg-aviso">${esc(AVISOS_CUERPO[item.bodyDegraded])}</div>`
     : "";
   if (item.bodyDegraded) return aviso + (item.body ? esc(item.body) : "");
-  if (item.body) return esc(item.body);
-  if (!item.html) return "";
+  // El HTML manda cuando existe: en un correo sólo-HTML el `body` es texto derivado
+  // (etiquetas fuera) y se ve peor que el original en el iframe.
+  if (!item.html) return item.body ? esc(item.body) : "";
   // srcdoc escapado: el HTML del correo viaja como atributo, no como marcado.
   return `<iframe class="mesa-msg-html" sandbox referrerpolicy="no-referrer" srcdoc="${esc(item.html)}"></iframe>`;
 }
@@ -1150,6 +1155,7 @@ function setupListeners() {
 
   document.getElementById("domain-select").addEventListener("change", (e) => {
     selectedDomainId = e.target.value;
+    try { localStorage.setItem("bandeja.domainId", selectedDomainId); } catch {}
     activeConv = null;
     selectedIdx = -1;
     unreadIds.clear();
