@@ -14,16 +14,21 @@ import {
   countMessages,
   contarSinIndexar,
   deleteFtsForConversation,
+  createCourtesyAddon,
 } from "./db.ts";
 import { ftsDisponible } from "./pg.ts";
 
 const sufijo = () => Math.random().toString(36).slice(2, 10);
 
 /** Crea un dominio con dueño propio, para que dos dominios no compartan nada. */
-async function dominioNuevo() {
+async function dominioNuevo(activado = false) {
   const email = `busqueda-${sufijo()}@ejemplo.com`;
   await createUser(email, "hash-de-prueba");
-  return createDomain(email, `${sufijo()}.ejemplo.com`, ["dkim-prueba"], `verify-${sufijo()}`);
+  const d = createDomain(email, `${sufijo()}.ejemplo.com`, ["dkim-prueba"], `verify-${sufijo()}`);
+  // Un dominio gratis sólo muestra 7 días de Bandeja: las pruebas que siembran fechas
+  // viejas necesitan el dominio activado, que conserva el historial completo.
+  if (activado) createCourtesyAddon({ userEmail: email, kind: "domain", domainId: d.id, currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString() });
+  return d;
 }
 
 /** Conversación con un mensaje entrante ya indexado. */
@@ -156,7 +161,7 @@ describe("Búsqueda en el cuerpo de los correos", () => {
 
 describe("Paginación por keyset", () => {
   it("recorre todo sin duplicados ni huecos", async () => {
-    const dom = await dominioNuevo();
+    const dom = await dominioNuevo(true);
     const total = 120;
     const base = Date.parse("2026-01-01T00:00:00.000Z");
     for (let i = 0; i < total; i++) {
@@ -189,7 +194,7 @@ describe("Paginación por keyset", () => {
   });
 
   it("el cursor sobrevive a dos conversaciones con la misma fecha exacta", async () => {
-    const dom = await dominioNuevo();
+    const dom = await dominioNuevo(true);
     const mismaFecha = "2026-02-02T02:02:02.000Z";
     for (let i = 0; i < 5; i++) {
       await createConversation({
@@ -219,7 +224,7 @@ describe("Paginación por keyset", () => {
   });
 
   it("nextCursor es null en la última página", async () => {
-    const dom = await dominioNuevo();
+    const dom = await dominioNuevo(true);
     await conversacionCon(dom.id, "Única", "texto");
     const p = listConversationsPage(dom.id, { limit: 50 });
     assert.equal(p.items.length, 1);
@@ -227,13 +232,13 @@ describe("Paginación por keyset", () => {
   });
 
   it("un cursor corrupto no truena: devuelve la primera página", async () => {
-    const dom = await dominioNuevo();
+    const dom = await dominioNuevo(true);
     await conversacionCon(dom.id, "Algo", "texto");
     assert.doesNotThrow(() => listConversationsPage(dom.id, { cursor: "no-es-base64-!!!" }));
   });
 
   it("excluye las borradas y las muestra sólo con status=deleted", async () => {
-    const dom = await dominioNuevo();
+    const dom = await dominioNuevo(true);
     const conv = await conversacionCon(dom.id, "Se borra", "texto");
     const { softDeleteConversation } = await import("./db.ts");
     await softDeleteConversation(dom.id, conv.id);
@@ -243,7 +248,7 @@ describe("Paginación por keyset", () => {
   });
 
   it("listConversationAliases ve todos los aliases, no sólo los de la primera página", async () => {
-    const dom = await dominioNuevo();
+    const dom = await dominioNuevo(true);
     await conversacionCon(dom.id, "1", "a", "ventas@x.com");
     await conversacionCon(dom.id, "2", "b", "soporte@x.com");
     await conversacionCon(dom.id, "3", "c", "ventas@x.com");
@@ -254,7 +259,7 @@ describe("Paginación por keyset", () => {
 
 describe("listMessages: el tramo reciente sin romper a los llamadores viejos", () => {
   it("sin opts devuelve el hilo entero en orden ascendente", async () => {
-    const dom = await dominioNuevo();
+    const dom = await dominioNuevo(true);
     const conv = await conversacionCon(dom.id, "Hilo", "primero");
     const base = Date.parse("2026-03-01T00:00:00.000Z");
     for (let i = 1; i <= 4; i++) {
@@ -273,7 +278,7 @@ describe("listMessages: el tramo reciente sin romper a los llamadores viejos", (
   });
 
   it("con limit devuelve el tramo MÁS RECIENTE, en orden ascendente", async () => {
-    const dom = await dominioNuevo();
+    const dom = await dominioNuevo(true);
     // Sin el helper: éste crea su mensaje con la fecha de hoy, que sería el más
     // reciente de todos y enturbiaría lo que se quiere comprobar.
     const conv = await createConversation({
@@ -306,7 +311,7 @@ describe("listMessages: el tramo reciente sin romper a los llamadores viejos", (
   });
 
   it("respeta el createdAt que le pasan, no la hora de insercion", async () => {
-    const dom = await dominioNuevo();
+    const dom = await dominioNuevo(true);
     const conv = await conversacionCon(dom.id, "Fechas", "cuerpo");
     const fecha = "2020-07-07T07:07:07.000Z";
     const msg = await addMessage({

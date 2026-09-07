@@ -108,6 +108,7 @@
         <span id="detail-status" class="text-xs px-2 py-1 rounded-full whitespace-nowrap"></span>
         <button id="btn-delete-domain" class="ml-auto text-xs text-red-400 hover:text-red-300 border border-red-400/30 hover:border-red-300/50 px-3 py-1 rounded transition-colors whitespace-nowrap">Eliminar</button>
       </div>
+      <div id="detail-activation" class="mb-6"></div>
 
       <!-- Tabs: en móvil se deslizan a lo ancho -->
       <div class="flex gap-1 border-b border-zinc-800 mb-6 overflow-x-auto whitespace-nowrap -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -204,8 +205,8 @@
           No hay miembros. Invita a tu equipo para gestionar este dominio.
         </div>
         <div id="members-upgrade" class="hidden text-center py-8">
-          <p class="text-zinc-500 mb-3">Tu plan no incluye miembros de equipo.</p>
-          <a href="/#pricing" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Actualiza tu plan</a>
+          <p class="text-zinc-500 mb-3">Invitar a tu equipo viene con el dominio activado — personas ilimitadas.</p>
+          <button type="button" data-action="open-addons" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Activar dominio · $99/mes</button>
         </div>
       </div>
 
@@ -236,8 +237,8 @@
           <pre id="webhooks-snippet" class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-xs font-mono text-zinc-300"></pre>
         </div>
         <div id="webhooks-upgrade" class="hidden text-center py-8">
-          <p class="text-zinc-500 mb-3">Los webhooks requieren plan Equipo.</p>
-          <a href="/#pricing" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Actualiza a Equipo</a>
+          <p class="text-zinc-500 mb-3">Los webhooks vienen con el dominio activado.</p>
+          <button type="button" data-action="open-addons" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Activar dominio · $99/mes</button>
         </div>
       </div>
 
@@ -252,8 +253,8 @@
           No hay credenciales SMTP. Genera una para enviar desde tu dominio.
         </div>
         <div id="smtp-upgrade" class="hidden text-center py-8">
-          <p class="text-zinc-500 mb-3">SMTP relay no disponible en tu plan.</p>
-          <a href="/#pricing" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Actualiza a Equipo</a>
+          <p class="text-zinc-500 mb-3">El relay SMTP viene con el dominio activado.</p>
+          <button type="button" data-action="open-addons" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Activar dominio · $99/mes</button>
         </div>
       </div>
     </div>
@@ -264,10 +265,10 @@
   <div id="modal-addons" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
     <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
       <div class="flex items-start justify-between mb-1">
-        <h3 class="text-lg font-bold">Add-ons</h3>
+        <h3 class="text-lg font-bold">Activar y ampliar <span id="addons-domain" class="font-mono text-mask-400 text-base"></span></h3>
         <button type="button" class="btn-cancel-modal text-zinc-500 hover:text-zinc-300 text-2xl leading-none" data-modal="modal-addons">&times;</button>
       </div>
-      <p class="text-sm text-zinc-400 mb-5">Se agregan a tu plan actual y se cobran aparte, mes a mes. Los cancelas cuando quieras.</p>
+      <p class="text-sm text-zinc-400 mb-5">Todo cuesta $99 al mes y es por dominio. Se cobra aparte, mes a mes; lo cancelas cuando quieras.</p>
       <div id="addons-list" class="space-y-3"></div>
       <div id="addons-error" class="text-red-400 text-sm mt-3 hidden"></div>
     </div>

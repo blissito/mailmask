@@ -73,9 +73,11 @@ describe("SDK ↔ servidor: contrato", () => {
     const comoFetch = (async (url: string | URL | Request, init?: RequestInit) =>
       app.fetch(new Request(url as string, init))) as unknown as typeof fetch;
 
-    const alta = async (correo: string, conEnvios: boolean, plan = "basico") => {
+    // `plan` null = cuenta GRATIS (el caso normal desde el 7-sep-2026). Un plan viejo
+    // vigente activa todos los dominios del dueño (legado).
+    const alta = async (correo: string, conEnvios: boolean, plan: string | null = null) => {
       dbmod.createUser(correo, await (await import("./auth.ts")).hashPassword("password123"));
-      await dbmod.updateUserSubscription(correo, {
+      if (plan) await dbmod.updateUserSubscription(correo, {
         plan,
         status: "active",
         mpSubscriptionId: `sub-${correo}`,
@@ -101,7 +103,8 @@ describe("SDK ↔ servidor: contrato", () => {
     const otro = `sdk-noenvios-${suffix}@example.com`;
     sinEnvios = await alta(otro, false);
 
-    // Básico no tiene reglas ni SMTP: para probar esos recursos hace falta Equipo.
+    // El dominio gratis no tiene reglas, webhooks ni SMTP: para eso hace falta un
+    // dominio activado — aquí, vía una suscripción legado vigente.
     dev = await alta(devEmail, false, "equipo");
     const devDom = dbmod.createDomain(devEmail, `sdk-dev-${suffix}.com`, ["dk"], "vf");
     devDomainId = devDom.id;
@@ -182,7 +185,7 @@ describe("SDK ↔ servidor: contrato", () => {
     sqlite.prepare("UPDATE domains SET verified = 1 WHERE id = ?").run(dom.id);
     await assert.rejects(
       () => sinEnvios.send.send(dom.id, { to: "a@example.com", subject: "x", body: "x" }),
-      (err: MailMaskError) => err.status === 403 && /add-on/i.test(err.message)
+      (err: MailMaskError) => err.status === 403 && /dominio activado/i.test(err.message)
     );
   });
 
@@ -288,10 +291,10 @@ describe("SDK ↔ servidor: contrato", () => {
       () => dev.smtp.revoke(devDomainId, "no-existe"),
       (err: MailMaskError) => err.status === 404
     );
-    // Básico no tiene SMTP relay: 403, no un error opaco
+    // El dominio gratis no tiene SMTP relay: 403, no un error opaco
     await assert.rejects(
       () => mm.smtp.create(domainId, "x"),
-      (err: MailMaskError) => err.status === 403 && /Equipo/.test(err.message)
+      (err: MailMaskError) => err.status === 403 && /activado/.test(err.message)
     );
   });
 
@@ -378,7 +381,7 @@ describe("SDK ↔ servidor: contrato", () => {
     await assert.rejects(() => mm.suppressions.remove(domainId, victima), (err: MailMaskError) => err.status === 404);
   });
 
-  it("webhooks: Equipo crea, Básico recibe 403, URL privada 400", async () => {
+  it("webhooks: activado crea, gratis recibe 403, URL privada 400", async () => {
     await assert.rejects(
       () => mm.webhooks.create(domainId, { url: "https://example.com/hook", events: ["email.sent"] }),
       (err: MailMaskError) => err.status === 403

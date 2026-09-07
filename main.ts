@@ -47,7 +47,12 @@ import {
   updateUserSubscription,
   getUserBySubscriptionId,
   extendSubscriptionPeriod,
-  getUserPlanLimits,
+  derechosDeDominio,
+  derechosPorDominioId,
+  listEffectiveAddonsForDomain,
+  ADDONS_FOR_SALE,
+  DOMINIO_ACTIVADO,
+  DOMINIO_GRATIS,
   marcarBuzon,
   desmarcarBuzon,
   bytesDeBuzonesDelDominio,
@@ -111,7 +116,6 @@ import {
   getBulkJob,
   updateBulkJob,
   listPendingBulkJobs,
-  PLAN_MESA_LIMITS,
   softDeleteConversation,
   restoreConversation,
   listAllUsers,
@@ -162,7 +166,6 @@ import {
   setMessageDelivery,
   addLog,
   isLegacyPlan,
-  PLANS_FOR_SALE,
   getMonthlyForwards,
 } from "./db.js";
 import { emitEvent, listWebhooks, getWebhook, createWebhook, updateWebhook, deleteWebhook, enqueuePing, listDeliveries, WEBHOOK_EVENTS, MAX_WEBHOOKS_PER_DOMAIN } from "./webhooks.js";
@@ -407,10 +410,9 @@ async function discardSentFiles(keys: string[]): Promise<void> {
 }
 
 /** Normaliza y valida una lista de direcciones de Cc/Bcc. */
-/** Días de retención de logs del dueño del dominio (los agentes heredan el plan del dueño). */
-async function ownerLogDays(ownerEmail: string): Promise<number> {
-  const owner = await getUser(ownerEmail);
-  return owner ? getUserPlanLimits(owner).logDays : 30;
+/** Días de retención de logs de un dominio, según sus derechos (gratis 7, activado 90). */
+async function ownerLogDays(domainId: string): Promise<number> {
+  return derechosPorDominioId(domainId)?.logDays ?? DOMINIO_GRATIS.logDays;
 }
 
 /**
@@ -803,14 +805,10 @@ async function requireBandeja(
   const domain = await getDomain(domainId);
   if (!domain) return { ok: false, res: jsonErr("Dominio no encontrado", 404) };
 
-  const user = (await getUser(auth.email))!;
-  const plan = user?.subscription?.plan ?? "basico";
-  if (opts?.mesaActions) {
-    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
-    if (!mesaLimits.mesaActions) {
-      return { ok: false, res: jsonErr(`Tu plan no permite ${opts.accion ?? "esta acción"}`, 403) };
-    }
-  }
+  // Responder, asignar, anotar y cerrar están en TODAS las cuentas, gratis incluidas:
+  // lo que se vende es el correo nuevo, el equipo y los buzones, no la Bandeja.
+  const derechos = derechosPorDominioId(domainId)!;
+  const plan = derechos.activado ? "activado" : derechos.esGratis ? "gratis" : "bloqueado";
 
   const isOwner = domain.ownerEmail === auth.email;
   let role = "owner";
@@ -1300,36 +1298,34 @@ const app = new Elysia({ adapter: node() })
         status: 401,
       });
     const domains = await listUserDomains(user.email);
-    const limits = getUserPlanLimits(user);
 
-    // Build usage data
-    const aliasesPerDomain = await Promise.all(
-      domains.map(async (d) => ({
+    // Todo es POR DOMINIO: derechos, add-ons y uso. La cuenta ya no tiene "plan".
+    const porDominio = await Promise.all(domains.map(async (d) => {
+      const derechos = derechosDeDominio(d, user);
+      return {
+        id: d.id,
         domain: d.domain,
-        domainId: d.id,
-        current: await countAliases(d.id),
-        limit: limits.aliases,
-      })),
-    );
-    const rulesPerDomain = await Promise.all(
-      domains.map(async (d) => ({
-        domain: d.domain,
-        domainId: d.id,
-        current: await countRules(d.id),
-        limit: limits.rules,
-      })),
-    );
-    const sendsPerDomain = await Promise.all(
-      domains.map(async (d) => ({
-        domain: d.domain,
-        domainId: d.id,
-        current: await getSendCount(d.id),
-        limit: limits.sends,
-      })),
-    );
+        derechos,
+        addons: listEffectiveAddonsForDomain(d.id),
+        uso: {
+          aliases: { current: await countAliases(d.id), limit: derechos.aliases },
+          rules: { current: await countRules(d.id), limit: derechos.rules ? 25 : 0 },
+          sends: { current: await getSendCount(d.id), limit: derechos.sends },
+          forwards: { current: getMonthlyForwards(d.id), limit: derechos.monthlyForwards },
+          mailboxBytes: { current: bytesDeBuzonesDelDominio(d.id), limit: derechos.mailboxBytes },
+        },
+      };
+    }));
+    // Formas viejas que app.js todavía lee; se van con la migración de la app.
+    const aliasesPerDomain = porDominio.map((d) => ({ domain: d.domain, domainId: d.id, ...d.uso.aliases }));
+    const rulesPerDomain = porDominio.map((d) => ({ domain: d.domain, domainId: d.id, ...d.uso.rules }));
+    const sendsPerDomain = porDominio.map((d) => ({ domain: d.domain, domainId: d.id, ...d.uso.sends }));
 
     const referralStats = getReferralStats(user.email);
-    const forwards = { current: getMonthlyForwards(user.email), limit: limits.monthlyForwards };
+    const forwards = {
+      current: porDominio.reduce((t, d) => t + d.uso.forwards.current, 0),
+      limit: porDominio.reduce((t, d) => t + d.uso.forwards.limit, 0),
+    };
 
     // Issue CSRF cookie if user doesn't have one (e.g., existing session before CSRF was deployed)
     const cookies = parseCookies(request.headers.get("cookie"));
@@ -1353,15 +1349,16 @@ const app = new Elysia({ adapter: node() })
           // "Basico" sin acento.
           planLabel: planLabel(user.subscription?.plan),
         },
-        limits,
+        porDominio,
         addons: listAddons(user.email),
         // Para que el resumen pueda sumar el cobro real sin pedir otro endpoint.
         planPriceCents: planPriceCents(user.subscription?.plan),
         addonCatalog: ADDONS,
+        addonsForSale: ADDONS_FOR_SALE,
         lastOrder: getLastOrder(user.email),
         emailVerified: user.emailVerified ?? false,
         usage: {
-          domains: { current: domains.length, limit: limits.domains },
+          domains: { current: domains.length, limit: null },
           aliasesPerDomain,
           rulesPerDomain,
           sendsPerDomain,
@@ -1598,13 +1595,18 @@ const app = new Elysia({ adapter: node() })
 
     const domains = await listUserDomains(user.email);
     const fullUser = (await getUser(user.email))!;
-    const limits = getUserPlanLimits(fullUser);
     const counts = getForwardCounts(domains.map(d => d.id));
-    const enriched = domains.map(d => ({
-      ...d,
-      monthlyForwards: counts.get(d.id) ?? 0,
-      forwardPerHour: limits.forwardPerHour,
-    }));
+    const enriched = domains.map(d => {
+      const derechos = derechosDeDominio(d, fullUser);
+      return {
+        ...d,
+        monthlyForwards: counts.get(d.id) ?? 0,
+        forwardPerHour: derechos.forwardPerHour,
+        activado: derechos.activado,
+        esGratis: derechos.esGratis,
+        bloqueado: derechos.bloqueado,
+      };
+    });
     return new Response(JSON.stringify(enriched), {
       headers: { "content-type": "application/json" },
     });
@@ -1628,25 +1630,11 @@ const app = new Elysia({ adapter: node() })
     const verifyBlock = await checkEmailVerified(auth.email);
     if (verifyBlock) return verifyBlock;
 
-    // Check plan limits
-    const limits = getUserPlanLimits(user);
-    if (limits.domains === 0) {
-      return new Response(
-        JSON.stringify({
-          error: "Necesitas un plan activo para agregar dominios",
-        }),
-        { status: 402 },
-      );
-    }
+    // Ya no hay cupo de dominios: el primero es gratis y del segundo en adelante el
+    // dominio nace `bloqueado` (se guarda en la Bandeja, no reenvía) hasta activarlo.
+    // La respuesta lo avisa para que la app abra el checkout de inmediato.
     const currentCount = await countUserDomains(user.email);
-    if (currentCount >= limits.domains) {
-      return new Response(
-        JSON.stringify({
-          error: `Tu plan permite máximo ${limits.domains} dominio(s). Puedes agregar el add-on de dominio extra o subir de plan.`,
-        }),
-        { status: 400 },
-      );
-    }
+    const requiereActivacion = currentCount >= 1 && !user.subscription;
 
     const { domain } = body;
 
@@ -1708,6 +1696,8 @@ const app = new Elysia({ adapter: node() })
     // Return DNS records the customer needs to configure
     return new Response(
       JSON.stringify({
+        // El 2.º dominio nace bloqueado: la app abre el checkout de activación con esto.
+        requiereActivacion,
         domain: newDomain,
         dnsRecords: {
           mx: {
@@ -1861,10 +1851,10 @@ const app = new Elysia({ adapter: node() })
     // 6. Plan
     const ownerUser = getUser(domain.ownerEmail);
     if (ownerUser) {
-      const limits = getUserPlanLimits(ownerUser);
-      checks.plan = limits.domains > 0
-        ? { ok: true, detail: `Plan ${ownerUser.plan || "basico"} activo` }
-        : { ok: false, detail: "Plan sin dominios disponibles" };
+      const derechos = derechosDeDominio(domain, ownerUser);
+      checks.plan = !derechos.bloqueado
+        ? { ok: true, detail: derechos.activado ? "Dominio activado" : "Dominio gratis" }
+        : { ok: false, detail: "Dominio sin activar: el correo se guarda pero no se reenvía" };
     } else {
       checks.plan = { ok: false, detail: "Usuario propietario no encontrado" };
     }
@@ -2047,12 +2037,14 @@ const app = new Elysia({ adapter: node() })
     const verifyBlock = await checkEmailVerified(auth.email);
     if (verifyBlock) return verifyBlock;
 
-    const aliasLimits = getUserPlanLimits(fullUser);
+    const aliasLimits = derechosDeDominio(domain, fullUser);
     const count = await countAliases(domain.id);
     if (count >= aliasLimits.aliases) {
       return new Response(
         JSON.stringify({
-          error: `Tu plan permite máximo ${aliasLimits.aliases} máscaras por dominio`,
+          error: aliasLimits.activado
+            ? `Máximo ${aliasLimits.aliases} máscaras por dominio`
+            : `El dominio gratis permite ${aliasLimits.aliases} máscaras. Activa el dominio para tener ilimitadas.`,
         }),
         { status: 400 },
       );
@@ -2244,15 +2236,13 @@ const app = new Elysia({ adapter: node() })
     }
     const domain = access.domain;
 
-    const ruleLimits = getUserPlanLimits(fullUser);
+    const ruleLimits = derechosDeDominio(domain, fullUser);
+    if (!ruleLimits.rules) {
+      return new Response(JSON.stringify({ error: "Las reglas vienen con el dominio activado." }), { status: 403 });
+    }
     const existingRules = await listRules(domain.id);
-    if (existingRules.length >= ruleLimits.rules) {
-      return new Response(
-        JSON.stringify({
-          error: `Tu plan permite máximo ${ruleLimits.rules} reglas por dominio`,
-        }),
-        { status: 400 },
-      );
+    if (existingRules.length >= 25) {
+      return new Response(JSON.stringify({ error: "Máximo 25 reglas por dominio" }), { status: 400 });
     }
 
     const {
@@ -2491,217 +2481,10 @@ const app = new Elysia({ adapter: node() })
 
   // --- Billing ---
 
-  .post("/api/billing/guest-checkout", async ({ body: { plan = "basico", billing = "monthly", coupon, email: rawEmail }, request }) => {
-    const ip = getIp(request);
-    const limited = await rateLimitGuard(ip, 5, 60_000);
-    if (limited) return limited;
-
-    const payerEmail = typeof rawEmail === "string" ? rawEmail.toLowerCase().trim() : "";
-    if (!payerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail)) {
-      return new Response(JSON.stringify({ error: "Ingresa tu email para continuar" }), {
-        status: 400,
-        headers: { "content-type": "application/json" },
-      });
-    }
-
-    const planKey = plan as keyof typeof PLANS;
-    if (!PLANS[planKey] || isLegacyPlan(planKey)) {
-      return new Response(JSON.stringify({ error: "Plan inválido" }), {
-        status: 400,
-      });
-    }
-    const isYearly = billing === "yearly";
-
-    // Validate coupon
-    const couponCode = typeof coupon === "string" ? coupon.toUpperCase().trim() : undefined;
-    const couponData = couponCode ? await getCoupon(couponCode) : null;
-    const activeCoupon = couponData && couponData.plan === planKey ? couponData : undefined;
-
-    const token = crypto.randomUUID();
-    await createPendingCheckout(token, isYearly ? `${planKey}:yearly` : planKey);
-
-    const { PreApproval } = await import("mercadopago");
-    const mpAccessToken = process.env.MP_ACCESS_TOKEN;
-    if (!mpAccessToken) {
-      return new Response(
-        JSON.stringify({ error: "MercadoPago no configurado" }),
-        { status: 500 },
-      );
-    }
-
-    const preApproval = new PreApproval({ accessToken: mpAccessToken });
-    const backUrl = getMainDomainUrl() + "/landing?success=1";
-
-    try {
-      const billingLabel = isYearly ? "Anual" : "Mensual";
-      const couponSuffix = activeCoupon && couponCode ? ` [${couponCode}]` : "";
-      const amount = activeCoupon
-        ? activeCoupon.fixedPrice / 100
-        : isYearly ? PLANS[planKey].yearlyPrice / 100 : PLANS[planKey].price / 100;
-      if (amount < 1) {
-        return new Response(JSON.stringify({ error: "El monto del cupón es inválido. Contacta soporte." }), { status: 400, headers: { "content-type": "application/json" } });
-      }
-      // deno-lint-ignore no-explicit-any
-      const mpBody: any = {
-        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)} (${billingLabel})${couponSuffix}`,
-        auto_recurring: {
-          frequency: isYearly ? 12 : 1,
-          frequency_type: "months",
-          transaction_amount: amount,
-          currency_id: "MXN",
-          ...(isYearly ? {} : {
-            free_trial: {
-              frequency: 1,
-              frequency_type: "months",
-            },
-          }),
-        },
-        payer_email: payerEmail,
-        back_url: backUrl,
-        external_reference: token,
-        notification_url: `${getMainDomainUrl()}/api/webhooks/mercadopago`,
-      };
-      const result = await preApproval.create({ body: mpBody });
-
-      // Mark single-use coupon as used AFTER successful MP call
-      if (activeCoupon?.singleUse && couponCode) {
-        await markCouponUsed(couponCode);
-      }
-
-      return new Response(JSON.stringify({ init_point: result.init_point }), {
-        headers: { "content-type": "application/json" },
-      });
-    } catch (err: any) {
-      const errDetail = err?.cause ?? err?.message ?? JSON.stringify(err);
-      log("error", "billing", "MP guest-checkout error", { error: errDetail, amount });
-      return new Response(
-        JSON.stringify({ error: "Error al crear suscripción en MercadoPago" }),
-        {
-          status: 500,
-          headers: { "content-type": "application/json" },
-        },
-      );
-    }
-  }, {
-    body: t.Object({
-      plan: t.Optional(t.String()),
-      billing: t.Optional(t.String()),
-      coupon: t.Optional(t.String()),
-      email: t.Optional(t.String()),
-    }),
-    detail: { tags: ["Billing"], summary: "Create guest checkout session via MercadoPago" },
-  })
-
-  .post("/api/billing/checkout", async ({ body: { plan = "basico", billing = "monthly", coupon, payerEmail: rawPayerEmail }, request }) => {
-    const ip = getIp(request);
-    const limited = await rateLimitGuard(ip, 5, 60_000);
-    if (limited) return limited;
-
-    const user = await getAuthUser(request);
-    if (!user)
-      return new Response(JSON.stringify({ error: "No autenticado" }), {
-        status: 401,
-      });
-
-    // MercadoPago exige que `payer_email` sea el correo de la cuenta de MP de quien
-    // paga: si no coincide, el checkout muere con "Tu e-mail no coincide con el de la
-    // suscripción" y no hay forma de omitir el campo (es obligatorio en la API). Por eso
-    // se pregunta aparte, con el correo de MailMask como default. `external_reference`
-    // sigue siendo `user.email`, que es lo que usa el webhook para vincular.
-    const payerEmail = typeof rawPayerEmail === "string" && rawPayerEmail.trim()
-      ? rawPayerEmail.toLowerCase().trim()
-      : user.email;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail)) {
-      return new Response(JSON.stringify({ error: "El correo de MercadoPago no es válido" }), {
-        status: 400,
-        headers: { "content-type": "application/json" },
-      });
-    }
-
-    const planKey = plan as keyof typeof PLANS;
-    if (!PLANS[planKey] || isLegacyPlan(planKey)) {
-      return new Response(JSON.stringify({ error: "Plan inválido" }), {
-        status: 400,
-      });
-    }
-    const isYearly = billing === "yearly";
-
-    // Validate coupon
-    const couponCode = typeof coupon === "string" ? coupon.toUpperCase().trim() : undefined;
-    const couponData2 = couponCode ? await getCoupon(couponCode) : null;
-    const activeCoupon = couponData2 && couponData2.plan === planKey ? couponData2 : undefined;
-
-    const { PreApproval } = await import("mercadopago");
-    const mpAccessToken = process.env.MP_ACCESS_TOKEN;
-    if (!mpAccessToken) {
-      return new Response(
-        JSON.stringify({ error: "MercadoPago no configurado" }),
-        { status: 500 },
-      );
-    }
-
-    const preApproval = new PreApproval({ accessToken: mpAccessToken });
-    const backUrl = getMainDomainUrl() + "/app?billing=success";
-
-    try {
-      const billingLabel = isYearly ? "Anual" : "Mensual";
-      const couponSuffix = activeCoupon && couponCode ? ` [${couponCode}]` : "";
-      const amount = activeCoupon
-        ? activeCoupon.fixedPrice / 100
-        : isYearly ? PLANS[planKey].yearlyPrice / 100 : PLANS[planKey].price / 100;
-      if (amount < 1) {
-        return new Response(JSON.stringify({ error: "El monto del cupón es inválido. Contacta soporte." }), { status: 400, headers: { "content-type": "application/json" } });
-      }
-      // deno-lint-ignore no-explicit-any
-      const mpBody: any = {
-        reason: `MailMask — Plan ${planKey.charAt(0).toUpperCase() + planKey.slice(1)} (${billingLabel})${couponSuffix}`,
-        auto_recurring: {
-          frequency: isYearly ? 12 : 1,
-          frequency_type: "months",
-          transaction_amount: amount,
-          currency_id: "MXN",
-          ...(isYearly ? {} : {
-            free_trial: {
-              frequency: getUserReferredBy(user.email) ? 2 : 1,
-              frequency_type: "months",
-            },
-          }),
-        },
-        payer_email: payerEmail,
-        back_url: backUrl,
-        external_reference: user.email,
-        notification_url: `${getMainDomainUrl()}/api/webhooks/mercadopago`,
-      };
-      const result = await preApproval.create({ body: mpBody });
-
-      // Mark single-use coupon as used AFTER successful MP call
-      if (activeCoupon?.singleUse && couponCode) {
-        await markCouponUsed(couponCode);
-      }
-
-      return new Response(JSON.stringify({ init_point: result.init_point }), {
-        headers: { "content-type": "application/json" },
-      });
-    } catch (err: any) {
-      const detail = String(err?.message ?? err?.cause ?? err);
-      log("error", "billing", "MP checkout error", { error: detail });
-      const msg = detail.includes("same user")
-        ? "No puedes suscribirte con la misma cuenta del proveedor de pagos. Usa otra cuenta de MercadoPago."
-        : "Error al crear suscripción en MercadoPago";
-      return new Response(
-        JSON.stringify({ error: msg }),
-        { status: 500, headers: { "content-type": "application/json" } },
-      );
-    }
-  }, {
-    body: t.Object({
-      plan: t.Optional(t.String()),
-      billing: t.Optional(t.String()),
-      coupon: t.Optional(t.String()),
-      payerEmail: t.Optional(t.String()),
-    }),
-    detail: { tags: ["Billing"], summary: "Create authenticated checkout session via MercadoPago", security: [{ cookieAuth: [] }] },
-  })
+  // Los checkouts de plan (`/api/billing/guest-checkout` y `/api/billing/checkout`) se
+  // eliminaron el 7-sep-2026: ya no se vende ningún plan. Lo que se compra son add-ons
+  // por dominio en `/api/addons/checkout`. El webhook de abajo conserva las ramas de
+  // plan sólo para RENOVAR preapprovals viejos.
 
   .post("/api/webhooks/mercadopago", async ({ request }) => {
     // Validate HMAC signature
@@ -3025,13 +2808,12 @@ const app = new Elysia({ adapter: node() })
               if (!plan) {
                 const amount = sub.auto_recurring?.transaction_amount ?? 0;
                 // Legado: montos viejos por compatibilidad. Los nuevos se derivan de PLANS.
+                // Sólo montos legado. NUNCA 99: los tres add-ons a la venta cuestan $99 y
+                // un preapproval que perdiera su `addon:` se activaría como plan.
                 const amountToPlan: Record<number, PlanKey> = {
+                  49: "basico", 490: "basico", 299: "equipo", 2990: "equipo",
                   449: "freelancer", 999: "developer", 4490: "freelancer", 9990: "developer",
                 };
-                for (const key of PLANS_FOR_SALE) {
-                  amountToPlan[PLANS[key].price / 100] = key;
-                  amountToPlan[PLANS[key].yearlyPrice / 100] = key;
-                }
                 plan = amountToPlan[amount];
               }
 
@@ -3487,9 +3269,9 @@ const app = new Elysia({ adapter: node() })
       status: "cancelled",
     });
 
-    // Cascada: sin plan base los add-ons no otorgan nada (getUserPlanLimits devuelve
-    // ceros), así que hay que apagar el cobro o le seguiríamos cargando $99/mes.
-    for (const addon of listEffectiveAddons(auth.email)) {
+    // Los add-ons son independientes del plan desde el 7-sep-2026: cancelar una
+    // suscripción legado no los apaga. Sólo se cancelan los que el propio usuario pida.
+    for (const addon of [] as typeof listEffectiveAddons extends (...a: any) => infer R ? R : never) {
       try {
         if (addon.mpPreapprovalId) await cancelMpPreapproval(addon.mpPreapprovalId, mpAccessToken);
         updateAddon(addon.id, { status: "cancelled", cancelledAt: new Date().toISOString() });
@@ -3566,7 +3348,7 @@ const app = new Elysia({ adapter: node() })
   .get("/api/addons", async ({ request }) => {
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
-    return new Response(JSON.stringify({ catalog: ADDONS, mine: listAddons(auth.email) }), {
+    return new Response(JSON.stringify({ catalog: ADDONS, forSale: ADDONS_FOR_SALE, mine: listAddons(auth.email) }), {
       headers: { "content-type": "application/json" },
     });
   }, {
@@ -3580,11 +3362,16 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
 
-    const { kind, payerEmail: rawPayerEmail } = addonBody;
+    const { kind, domainId, payerEmail: rawPayerEmail } = addonBody;
     if (!(kind in ADDONS)) {
       return new Response(JSON.stringify({ error: "Add-on inválido" }), { status: 400 });
     }
     const addonKind = kind as AddonKind;
+
+    // Todo add-on es de UN dominio, y sólo el dueño (o un admin suyo) lo compra.
+    const accesoDominio = await checkDomainAccess(auth.email, domainId, "admin");
+    if (!accesoDominio) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    const dominio = accesoDominio.domain;
 
     // Mismo motivo que en /api/billing/checkout: `payer_email` tiene que ser el correo
     // de la cuenta de MercadoPago del pagador, no el de MailMask.
@@ -3598,31 +3385,22 @@ const app = new Elysia({ adapter: node() })
     const user = await getUser(auth.email);
     if (!user) return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404 });
 
-    const limits = getUserPlanLimits(user);
-    if (limits.domains === 0) {
-      return new Response(JSON.stringify({ error: "Necesitas un plan activo para comprar add-ons" }), { status: 402 });
-    }
-
-    if (addonKind.startsWith("sends")) {
-      // Se mira el plan base, no `limits.sends`: ese ya suma los add-ons y un Básico
-      // con envíos activos parecería "incluirlos" y recibiría 400 en vez del 409.
-      const basePlanKey = user.subscription?.plan as keyof typeof PLANS | undefined;
-      if (basePlanKey && PLANS[basePlanKey] && PLANS[basePlanKey].sends > 0) {
-        return new Response(JSON.stringify({ error: "Tu plan ya incluye envío de emails" }), { status: 400 });
+    const derechos = derechosDeDominio(dominio, user);
+    if (addonKind === "domain") {
+      if (derechos.activado) {
+        return new Response(JSON.stringify({ error: "Este dominio ya está activado" }), { status: 409 });
       }
-      const existing = listEffectiveAddons(auth.email).find((a) => a.kind.startsWith("sends"));
-      if (existing) {
-        return new Response(JSON.stringify({ error: "Ya tienes un add-on de envíos activo. Cancélalo antes de cambiarlo." }), { status: 409 });
-      }
-      // Los `pending` también bloquean: sin esto, dos pestañas o un F5 en el paso de
-      // MercadoPago crean dos suscripciones y se le cobra dos veces por un beneficio
-      // que de todos modos no se acumula.
+      // Un `pending` reciente también bloquea: dos pestañas o un F5 en MercadoPago
+      // crearían dos suscripciones para el mismo dominio.
       const pending = listAddons(auth.email).find((a) =>
-        a.kind.startsWith("sends") && a.status === "pending" &&
+        a.kind === "domain" && a.domainId === dominio.id && a.status === "pending" &&
         Date.now() - new Date(a.createdAt).getTime() < 30 * 60_000);
       if (pending) {
-        return new Response(JSON.stringify({ error: "Ya tienes una compra de envíos en curso. Termínala o espera unos minutos." }), { status: 409 });
+        return new Response(JSON.stringify({ error: "Ya hay una activación en curso para este dominio. Termínala o espera unos minutos." }), { status: 409 });
       }
+    } else if (!derechos.activado) {
+      // Los bloques de espacio y de envíos sólo tienen sentido sobre un dominio activado.
+      return new Response(JSON.stringify({ error: "Primero activa el dominio ($99/mes); después le sumas bloques." }), { status: 402 });
     }
 
     const mpAccessToken = process.env.MP_ACCESS_TOKEN;
@@ -3630,7 +3408,7 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Billing no configurado" }), { status: 500 });
     }
 
-    const addon = createAddon(auth.email, addonKind);
+    const addon = createAddon(auth.email, addonKind, dominio.id);
     try {
       const { default: MercadoPagoConfig, PreApproval } = await import("mercadopago").then((m) => ({
         default: m.MercadoPagoConfig,
@@ -3642,7 +3420,7 @@ const app = new Elysia({ adapter: node() })
           // Sin la palabra "Plan": el webhook tiene un regex /Plan (\w+)/i que activaría
           // un plan por accidente. Salimos antes por el prefijo addon:, pero no hay razón
           // para dejar la mina puesta.
-          reason: `MailMask — Add-on ${ADDONS[addonKind].label}`,
+          reason: `MailMask — ${ADDONS[addonKind].label} · ${dominio.domain}`,
           auto_recurring: {
             frequency: 1,
             frequency_type: "months",
@@ -3667,8 +3445,8 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Error creando la suscripción del add-on" }), { status: 500 });
     }
   }, {
-    body: t.Object({ kind: t.String(), payerEmail: t.Optional(t.String()) }),
-    detail: { tags: ["Billing"], summary: "Start add-on subscription checkout", security: [{ cookieAuth: [] }] },
+    body: t.Object({ kind: t.String(), domainId: t.String(), payerEmail: t.Optional(t.String()) }),
+    detail: { tags: ["Billing"], summary: "Start add-on subscription checkout for a domain", security: [{ cookieAuth: [] }] },
   })
 
   .post("/api/addons/:id/cancel", async ({ request, params }) => {
@@ -3770,17 +3548,16 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(ip, 20, 60_000);
     if (limited) return limited;
     const user = (await getUser(auth.email))!;
-    const limits = getUserPlanLimits(user);
-
-    if (limits.sends === 0 || !limits.sendsUnlocked) {
-      return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails. Agrega el add-on de envíos." }), { status: 403 });
-    }
 
     const access = await checkDomainAccess(auth.email, params.id, "write");
     if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     }
     const domain = access.domain;
+    const limits = derechosDeDominio(domain, await getUser(domain.ownerEmail));
+    if (limits.sends === 0 || !limits.sendsUnlocked) {
+      return new Response(JSON.stringify({ error: "El correo nuevo viene con el dominio activado ($99/mes)." }), { status: 403 });
+    }
     if (!domain.verified) {
       return new Response(JSON.stringify({ error: "Dominio no verificado" }), { status: 400 });
     }
@@ -3976,8 +3753,8 @@ const app = new Elysia({ adapter: node() })
     const access = await checkDomainAccess(auth.email, params.id, "write");
     if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     const owner = await getUser(access.domain.ownerEmail);
-    if (!owner || !getUserPlanLimits(owner).webhooks) {
-      return new Response(JSON.stringify({ error: "Los webhooks requieren plan Equipo" }), { status: 403 });
+    if (!derechosDeDominio(access.domain, owner).webhooks) {
+      return new Response(JSON.stringify({ error: "Los webhooks vienen con el dominio activado." }), { status: 403 });
     }
     const bad = validateWebhookInput(whBody.url, whBody.events);
     if (bad) return new Response(JSON.stringify({ error: bad }), { status: 400 });
@@ -4051,17 +3828,16 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
     const user = (await getUser(auth.email))!;
-    const limits = getUserPlanLimits(user);
-
-    if (limits.sends === 0 || !limits.sendsUnlocked) {
-      return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails. Agrega el add-on de envíos." }), { status: 403 });
-    }
 
     const access = await checkDomainAccess(auth.email, params.id, "write");
     if (!access) {
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     }
     const domain = access.domain;
+    const limits = derechosDeDominio(domain, await getUser(domain.ownerEmail));
+    if (limits.sends === 0 || !limits.sendsUnlocked) {
+      return new Response(JSON.stringify({ error: "El correo nuevo viene con el dominio activado ($99/mes)." }), { status: 403 });
+    }
     if (!domain.verified) {
       return new Response(JSON.stringify({ error: "Dominio no verificado" }), { status: 400 });
     }
@@ -4426,16 +4202,9 @@ const app = new Elysia({ adapter: node() })
       body: textBody,
     });
 
-    const user = (await getUser(auth.email))!;
-    const plan = user.subscription?.plan ?? "basico";
-    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
-    if (!mesaLimits.mesaActions) {
-      return new Response(JSON.stringify({ error: "Tu plan no permite escribir desde Mesa" }), { status: 403 });
-    }
-
-    const limits = getUserPlanLimits(user);
+    const limits = derechosDeDominio(domain, await getUser(domain.ownerEmail));
     if (limits.sends === 0 || !limits.sendsUnlocked) {
-      return new Response(JSON.stringify({ error: "Tu plan no incluye envío de emails. Agrega el add-on de envíos." }), { status: 403 });
+      return new Response(JSON.stringify({ error: "Redactar correo nuevo viene con el dominio activado ($99/mes)." }), { status: 403 });
     }
     if (!domain.verified) {
       return new Response(JSON.stringify({ error: "Dominio no verificado" }), { status: 400 });
@@ -5000,7 +4769,7 @@ const app = new Elysia({ adapter: node() })
         inReplyTo: lastRef,
         references: conv.threadReferences.join(" "),
       });
-      logOutbound(domain.id, fromAddress, recipient, `Re: ${conv.subject}`, withImages.html ?? rendered.text, sesMessageId, (await ownerLogDays(domain.ownerEmail)));
+      logOutbound(domain.id, fromAddress, recipient, `Re: ${conv.subject}`, withImages.html ?? rendered.text, sesMessageId, (await ownerLogDays(domain.id)));
 
       // Ya salió con imágenes y adjuntos dentro: las copias en S3 sobran.
       await discardSentImages(withImages.inlineImages);
@@ -5405,16 +5174,10 @@ const app = new Elysia({ adapter: node() })
     }
     const domain = access.domain;
 
-    const user = (await getUser(auth.email))!;
-    const plan = user.subscription?.plan ?? "basico";
-    const mesaLimits = PLAN_MESA_LIMITS[plan as keyof typeof PLAN_MESA_LIMITS] ?? PLAN_MESA_LIMITS.basico;
-    if (mesaLimits.agents === 0) {
-      return new Response(JSON.stringify({ error: "Tu plan no incluye agentes" }), { status: 403 });
-    }
-
-    const currentAgents = await countAgents(domain.id);
-    if (currentAgents >= mesaLimits.agents) {
-      return new Response(JSON.stringify({ error: `Límite de agentes alcanzado (${mesaLimits.agents})` }), { status: 400 });
+    // Personas ilimitadas en el dominio activado; el gratis es de una sola persona.
+    const derechosEquipo = derechosDeDominio(domain, await getUser(domain.ownerEmail));
+    if (derechosEquipo.agentes === 0) {
+      return new Response(JSON.stringify({ error: "Invitar a tu equipo viene con el dominio activado ($99/mes, personas ilimitadas)." }), { status: 403 });
     }
 
     const { email, name, role = "agent" } = inviteBody;
@@ -5530,9 +5293,9 @@ const app = new Elysia({ adapter: node() })
 
     const owner = await getUser(access.domain.ownerEmail);
     if (!owner) return new Response(JSON.stringify({ error: "Cuenta no encontrada" }), { status: 404 });
-    const limits = getUserPlanLimits(owner);
+    const limits = derechosDeDominio(access.domain, owner);
     if (!limits.smtpRelay) {
-      return new Response(JSON.stringify({ error: "SMTP relay no disponible en tu plan. Actualiza a Equipo." }), { status: 403 });
+      return new Response(JSON.stringify({ error: "El relay SMTP viene con el dominio activado." }), { status: 403 });
     }
 
     const label = (smtpBody.label ?? "").trim();
@@ -5621,9 +5384,9 @@ const app = new Elysia({ adapter: node() })
 
     const owner = await getUser(domain.ownerEmail);
     if (!owner) return new Response(JSON.stringify({ error: "Cuenta no encontrada" }), { status: 404 });
-    const limits = getUserPlanLimits(owner);
+    const limits = derechosDeDominio(domain, owner);
     if (!limits.mailboxes) {
-      return new Response(JSON.stringify({ error: "Los buzones IMAP son un add-on. Agrégalo desde tu panel." }), { status: 403 });
+      return new Response(JSON.stringify({ error: "Los buzones IMAP vienen con el dominio activado ($99/mes)." }), { status: 403 });
     }
 
     const aliasName = params.alias.toLowerCase();
@@ -5643,7 +5406,7 @@ const app = new Elysia({ adapter: node() })
     const yaRepartido = bytesDeBuzonesDelDominio(domain.id);
     const libre = limits.mailboxBytes - yaRepartido;
     if (libre <= 0) {
-      return new Response(JSON.stringify({ error: "Ya repartiste todo el almacenamiento de este dominio. Agrega otro add-on de buzón o reduce la cuota de un buzón existente." }), { status: 400 });
+      return new Response(JSON.stringify({ error: "Ya repartiste todo el almacenamiento de este dominio. Agrega un bloque de +50 GB o reduce la cuota de un buzón existente." }), { status: 400 });
     }
     // Sin cuota pedida, se le da lo que queda libre.
     const quotaBytes = libre;
@@ -6013,7 +5776,6 @@ const app = new Elysia({ adapter: node() })
     return new Response(JSON.stringify({
       ...safe,
       domains: domainsWithAliases,
-      limits: getUserPlanLimits(target),
       addons: listAddons(target.email),
     }), { headers: { "content-type": "application/json" } });
   }, {
@@ -6211,24 +5973,8 @@ const app = new Elysia({ adapter: node() })
     if (limited) return limited;
 
     const user = (await getUser(auth.email))!;
-    const sub = user.subscription;
-    if (!sub || sub.status !== "active") {
-      return new Response(JSON.stringify({ error: "Necesitas un plan activo para registrar dominios" }), { status: 402, headers: { "content-type": "application/json" } });
-    }
-
-    // Este endpoint COBRA antes de registrar, así que el tope se valida aquí: sin esto un
-    // Básico podía pagar por dominios que su plan no admite y habría que reembolsar.
-    // Se cuentan también los registros en curso para que dos compras simultáneas no se
-    // cuelen por el mismo hueco.
-    const regLimits = getUserPlanLimits(user);
-    const enCurso = getDomainRegistrationsByUser(auth.email)
-      .filter((r: { status: string }) => ["pending_payment", "paid", "registering"].includes(r.status)).length;
-    const yaTiene = await countUserDomains(auth.email);
-    if (yaTiene + enCurso >= regLimits.domains) {
-      return new Response(JSON.stringify({
-        error: `Tu plan permite máximo ${regLimits.domains} dominio(s). Agrega el add-on de dominio extra o sube de plan antes de registrar uno nuevo.`,
-      }), { status: 400, headers: { "content-type": "application/json" } });
-    }
+    // Ya no hay cupo de dominios: el registrado nacerá gratis (si es el primero) o
+    // bloqueado hasta activarlo. Registrar cobra el dominio, no el servicio.
 
     const { domain } = regBody;
     if (!domain || typeof domain !== "string") {
@@ -6447,8 +6193,6 @@ const app = new Elysia({ adapter: node() })
     if (limited) return limited;
     const user = getUser(auth.email);
     if (!user) return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
-    const limits = getUserPlanLimits(user);
-    if (!limits.api) return new Response(JSON.stringify({ error: "Tu plan no incluye acceso a la API" }), { status: 403, headers: { "content-type": "application/json" } });
     const { name } = body as { name: string };
     if (!name || typeof name !== "string" || name.length > 50) return new Response(JSON.stringify({ error: "Nombre inválido" }), { status: 400, headers: { "content-type": "application/json" } });
     const { apiKey, plaintextKey } = await createApiKey(auth.email, name.trim());
@@ -6463,8 +6207,6 @@ const app = new Elysia({ adapter: node() })
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
     const user = getUser(auth.email);
     if (!user) return new Response(JSON.stringify({ error: "Usuario no encontrado" }), { status: 404, headers: { "content-type": "application/json" } });
-    const limits = getUserPlanLimits(user);
-    if (!limits.api) return new Response(JSON.stringify({ error: "Tu plan no incluye acceso a la API" }), { status: 403, headers: { "content-type": "application/json" } });
     const keys = listApiKeys(auth.email);
     return new Response(JSON.stringify(keys), { headers: { "content-type": "application/json" } });
   }, {
@@ -6509,7 +6251,8 @@ programar("* * * * *", async () => {
     // convivir con envíos sueltos. Sin esto el bulk vacía la lista sin mirar la cuota.
     const jobDomain = await getDomain(job.domainId);
     const jobOwner = jobDomain ? await getUser(jobDomain.ownerEmail) : null;
-    const jobLimit = jobOwner ? getUserPlanLimits(jobOwner).sends : 0;
+    const jobDerechos = jobDomain ? derechosDeDominio(jobDomain, jobOwner) : null;
+    const jobLimit = jobDerechos?.sendsUnlocked ? jobDerechos.sends : 0;
 
     // Sin cuota el job no puede avanzar nunca: hay que fallarlo, no dejarlo latiendo.
     // Pasa si el dominio se borró, si el dueño ya no existe, o si la suscripción venció
@@ -6528,7 +6271,7 @@ programar("* * * * *", async () => {
     // por lote, no por destinatario: antes se mandaba `job.html` también como parte
     // text/plain y quien leyera en modo texto recibía el marcado.
     const bulkRendered = resolveEmailBody({ html: job.html });
-    const bulkLogDays = jobOwner ? getUserPlanLimits(jobOwner).logDays : 30;
+    const bulkLogDays = jobDerechos?.logDays ?? DOMINIO_GRATIS.logDays;
 
     for (const recipient of batch) {
       // Check suppression

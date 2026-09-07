@@ -29,7 +29,7 @@
 // sin abrir SQLite ni correr migraciones. `ses.ts` se importa perezosamente dentro de
 // `sendTemplate` por lo mismo — arrastra `pg.ts` y el SDK de AWS, y renderizar un
 // correo no tiene por qué hacer eso.
-import { PLANS, ADDONS, planLabel, addonLabel } from "./plans.js";
+import { PLANS, ADDONS, planLabel, addonLabel, LEGACY_ADDONS } from "./plans.js";
 
 export const ALERT_FROM = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
 // `ALERT_FROM_EMAIL` puede venir como dirección pelada o ya con display name
@@ -798,7 +798,7 @@ export const TEMPLATE_FIXTURES: Record<string, () => Email> = {
   subscriptionMigration: () => subscriptionMigration({
     planLabel: "Básico", planStart: "2026-09-28T00:00:00.000Z",
     planLink: "https://www.mercadopago.com.mx/subscriptions/checkout?preapproval_id=abc",
-    sendsLabel: ADDONS.sends25.label, sendsStart: "2026-09-18T00:00:00.000Z",
+    sendsLabel: LEGACY_ADDONS.sends25.label, sendsStart: "2026-09-18T00:00:00.000Z",
     sendsLink: "https://www.mercadopago.com.mx/subscriptions/checkout?preapproval_id=def",
   }),
   migrationDone: () => migrationDone({ planLabel: "Básico", nextChargeAt: "2026-09-28T00:00:00.000Z" }),

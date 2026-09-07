@@ -305,8 +305,13 @@ export const addons = sqliteTable("addons", {
   // cancelar al cliente y el cron de apagado no la toca.
   source: text("source").notNull().default("purchase"),
   courtesyNote: text("courtesy_note"),
+  // Desde el 7-sep-2026 los add-ons son POR DOMINIO: `domain` = "este dominio está
+  // activado", `storage50` y `sends100` suman a ese dominio. Nullable porque las filas
+  // anteriores (sends25, mailbox, domain-como-cupo) no lo tenían: son legado del usuario.
+  domainId: text("domain_id"),
 }, (table) => [
   index("idx_addons_user_status").on(table.userEmail, table.status),
+  index("idx_addons_domain_status").on(table.domainId, table.status),
 ]);
 
 // Libro mayor de facturación. Append-only: nunca se hace UPDATE ni DELETE sobre una

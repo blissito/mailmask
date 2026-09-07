@@ -186,7 +186,7 @@ describe("Auth", () => {
 // --- Domains ---
 
 describe("Domains", () => {
-  it("POST /api/domains — no plan 402", async () => {
+  it("POST /api/domains — el 1.º es gratis; el 2.º nace con requiereActivacion", async () => {
     const loginRes = await jsonPost("/api/auth/login", {
       email: `test-reg-${suffix}@example.com`,
       password: "password123",
@@ -194,9 +194,19 @@ describe("Domains", () => {
     const { cookie, csrfToken } = extractCookies(loginRes);
     await loginRes.body?.cancel();
 
-    const res = await jsonPost("/api/domains", { domain: "test.com" }, cookie!, csrfToken);
-    assert.equal(res.status, 402);
-    await res.body?.cancel();
+    const r1 = await jsonPost("/api/domains", { domain: `free-${suffix}.com` }, cookie!, csrfToken);
+    // Sin AWS en pruebas el alta puede fallar en SES (500) o pasar (201): lo que se fija es
+    // que YA NO es 402 — una cuenta sin plan puede agregar su dominio.
+    assert.notEqual(r1.status, 402);
+    const d1 = r1.status === 201 ? await r1.json() : null;
+    if (d1) assert.equal(d1.requiereActivacion, false);
+    else await r1.body?.cancel();
+
+    if (d1) {
+      const r2 = await jsonPost("/api/domains", { domain: `second-${suffix}.com` }, cookie!, csrfToken);
+      if (r2.status === 201) assert.equal((await r2.json()).requiereActivacion, true);
+      else await r2.body?.cancel();
+    }
   });
 });
 
@@ -210,13 +220,8 @@ describe("Add-ons API", () => {
 
   before(async () => {
     sqlite.prepare("DELETE FROM rate_limits").run();
+    // Cuenta GRATIS: sin suscripción. Es el caso normal del modelo nuevo.
     createUser(email, await hashPassword("password123"));
-    await updateUserSubscription(email, {
-      plan: "basico",
-      status: "active",
-      mpSubscriptionId: `sub-addon-api-${suffix}`,
-      currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString(),
-    });
     const loginRes = await jsonPost("/api/auth/login", { email, password: "password123" });
     ({ cookie, csrfToken } = extractCookies(loginRes));
     await loginRes.body?.cancel();
@@ -226,54 +231,60 @@ describe("Add-ons API", () => {
     sqlite.prepare("UPDATE domains SET verified = 1 WHERE id = ?").run(domainId);
   });
 
-  it("básico sin add-on no puede enviar", async () => {
+  it("el dominio gratis no inicia correo", async () => {
     const res = await jsonPost(`/api/domains/${domainId}/send`,
       { to: "alguien@example.com", subject: "hola", body: "texto" }, cookie!, csrfToken);
     assert.equal(res.status, 403);
     const data = await res.json();
-    assert.match(data.error, /add-on de envíos/i);
+    assert.match(data.error, /dominio activado/i);
   });
 
-  it("GET /api/addons devuelve catálogo", async () => {
+  it("GET /api/addons devuelve el catálogo de tres a $99", async () => {
     const res = await req("/api/addons", { headers: { cookie: cookie! } });
     assert.equal(res.status, 200);
     const data = await res.json();
-    assert.deepEqual(Object.keys(data.catalog).sort(), ["domain", "mailbox", "sends100", "sends25"]);
+    assert.deepEqual(Object.keys(data.catalog).sort(), ["domain", "sends100", "storage50"]);
+    assert.deepEqual(data.forSale, ["domain", "storage50", "sends100"]);
     assert.ok(Array.isArray(data.mine));
   });
 
   it("rechaza un kind inválido", async () => {
-    const res = await jsonPost("/api/addons/checkout", { kind: "gratis" }, cookie!, csrfToken);
+    const res = await jsonPost("/api/addons/checkout", { kind: "gratis", domainId }, cookie!, csrfToken);
     assert.equal(res.status, 400);
     await res.body?.cancel();
   });
 
-  it("no permite un segundo add-on de envíos", async () => {
-    const a = createAddon(email, "sends100");
-    const { updateAddon } = await import("./db.ts");
-    updateAddon(a.id, { status: "active", currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString() });
-
-    const res = await jsonPost("/api/addons/checkout", { kind: "sends25" }, cookie!, csrfToken);
-    assert.equal(res.status, 409);
+  it("un bloque sobre un dominio sin activar da 402; activado, suma", async () => {
+    const res = await jsonPost("/api/addons/checkout", { kind: "sends100", domainId }, cookie!, csrfToken);
+    assert.equal(res.status, 402);
     await res.body?.cancel();
 
-    // …y con el add-on activo el gate de envío ya deja pasar
+    const { updateAddon } = await import("./db.ts");
+    const a = createAddon(email, "domain", domainId);
+    updateAddon(a.id, { status: "active", currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString() });
+    const s = createAddon(email, "sends100", domainId);
+    updateAddon(s.id, { status: "active", currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString() });
+
+    // …y /me lo cuenta por dominio: 50 del dominio activado + 100 del bloque
     const me = await req("/api/auth/me", { headers: { cookie: cookie! } });
     const data = await me.json();
-    assert.equal(data.limits.sendsUnlocked, true);
-    assert.equal(data.limits.sends, 100);
-    assert.equal(data.addons.length, 1);
+    const d = data.porDominio.find((x: { id: string }) => x.id === domainId);
+    assert.equal(d.derechos.activado, true);
+    assert.equal(d.derechos.sendsUnlocked, true);
+    assert.equal(d.derechos.sends, 150);
+    assert.equal(data.addons.length, 2);
   });
 
-  it("redactar sin add-on da 403", async () => {
-    // Este usuario ya tiene sends100 activo del test anterior, así que se usa uno limpio.
+  it("activar dos veces el mismo dominio da 409", async () => {
+    const res = await jsonPost("/api/addons/checkout", { kind: "domain", domainId }, cookie!, csrfToken);
+    assert.equal(res.status, 409);
+    await res.body?.cancel();
+  });
+
+  it("redactar desde un dominio gratis da 403", async () => {
     const e2 = `compose-nolimit-${suffix}@example.com`;
     sqlite.prepare("DELETE FROM rate_limits").run();
     createUser(e2, await hashPassword("password123"));
-    await updateUserSubscription(e2, {
-      plan: "basico", status: "active", mpSubscriptionId: `sub-cnl-${suffix}`,
-      currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString(),
-    });
     const lr = await jsonPost("/api/auth/login", { email: e2, password: "password123" });
     const { cookie: c2, csrfToken: t2 } = extractCookies(lr);
     await lr.body?.cancel();
@@ -286,7 +297,7 @@ describe("Add-ons API", () => {
       domainId: d2.id, to: "cliente@example.com", subject: "Hola", body: "texto", fromAlias: "hola",
     }, c2!, t2);
     assert.equal(res.status, 403);
-    assert.match((await res.json()).error, /add-on de envíos/i);
+    assert.match((await res.json()).error, /dominio activado/i);
   });
 
   it("cancelar un add-on inexistente da 404", async () => {
@@ -300,7 +311,7 @@ describe("Add-ons API", () => {
     // no impide el POST, y una clienta con una cortesía llegó a tener ese botón enfrente.
     const { createCourtesyAddon } = await import("./db.ts");
     const { addon } = createCourtesyAddon({
-      userEmail: email, kind: "domain",
+      userEmail: email, kind: "storage50", domainId,
       currentPeriodEnd: new Date(Date.now() + 400 * 864e5).toISOString(),
       note: "regalo de prueba", grantedBy: "test",
     });
@@ -1490,21 +1501,25 @@ describe("Bandeja: redactar", () => {
     assert.equal(res.status, 422);
   });
 
-  it("respeta el tope diario del add-on", async () => {
-    // El add-on de este usuario es de 25/día. Se llena el contador a mano: ningún test
-    // de esta suite llega a enviar, así que la fila del día no existe todavía.
+  it("respeta el tope diario del dominio", async () => {
+    // El tope lo dicta `derechosDeDominio` (50 del dominio activado + lo que sumen los
+    // add-ons). Se lee de /api/auth/me y se llena el contador a mano: ningún test de
+    // esta suite llega a enviar, así que la fila del día no existe todavía.
+    const me = await (await req("/api/auth/me", { headers: { cookie: cookie! } })).json();
+    const tope: number = me.porDominio.find((d: { id: string }) => d.id === domainId).derechos.sends;
+    assert.ok(tope > 0, "el dominio de esta suite debe poder enviar");
     const day = new Date().toISOString().slice(0, 10);
     const expires = new Date(Date.now() + 3 * 864e5).toISOString();
     sqlite.prepare(
       "INSERT OR REPLACE INTO send_counts (domain_id, month, count, expires_at) VALUES (?,?,?,?)",
-    ).run(domainId, day, 25, expires);
+    ).run(domainId, day, tope, expires);
 
     const res = await compose({ subject: "Uno de más" });
     assert.equal(res.status, 429);
     assert.match((await res.json()).error, /Límite diario/i);
 
     // La cuota rechazada se devuelve: no queda consumida de más.
-    assert.equal(getSendCount(domainId), 25);
+    assert.equal(getSendCount(domainId), tope);
   });
 
   it("un dominio sin verificar no puede redactar", async () => {

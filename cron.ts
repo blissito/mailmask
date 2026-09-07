@@ -5,8 +5,8 @@ import { log } from "./logger.js";
 import { db } from "./pg.js";
 import { tokens, emailLogs, forwardQueue, rateLimits, sendCounts, bulkJobs, users, addons } from "./schema.js";
 import { lte, and, eq, inArray, isNotNull, gt, sql as rawSql } from "drizzle-orm";
-import { purgeDeletedConversations, wakeSnoozedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, createDomain, listEffectiveAddons, updateAddon, recordOrder, addonLabel } from "./db.js";
-import { sendTemplate, expiryWarning, addonShutdown } from "./emails.js";
+import { purgeDeletedConversations, purgarConversacionesGratis, wakeSnoozedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, createDomain, listEffectiveAddons, updateAddon, recordOrder, addonLabel } from "./db.js";
+import { sendTemplate, expiryWarning } from "./emails.js";
 import { reconcilePendingAddons } from "./addon-sync.js";
 import { deliverPending, purgeOldDeliveries } from "./webhooks.js";
 import { notifyBandeja } from "./sse-hub.js";
@@ -119,96 +119,12 @@ programar("*/15 * * * *", async () => {
   }
 });
 
-// Diario 4:00 UTC — apagar add-ons cuyo plan base ya expiró.
-// Sin esto MercadoPago sigue cobrando el add-on mientras getUserPlanLimits devuelve cero:
-// se le cobra al cliente por algo que no recibe.
+// Diario 4:00 UTC — limpieza de entregas de webhooks.
+// Aquí vivía el apagado de add-ons "cuyo plan base expiró". Desde el 7-sep-2026 los
+// add-ons son independientes de cualquier plan (todas las cuentas son gratis y se compra
+// por dominio), así que ese barrido cancelaría en MercadoPago compras legítimas. Fuera.
 programar("0 4 * * *", async () => {
   try { purgeOldDeliveries(7); } catch (err) { log("warn", "webhook", "purge failed", { error: String(err) }); }
-  const mpToken = process.env.MP_ACCESS_TOKEN;
-  try {
-    const now = new Date().toISOString();
-    const vencidos = await db.select({ email: users.email })
-      .from(users)
-      .where(and(isNotNull(users.subPeriodEnd), lte(users.subPeriodEnd, now)));
-
-    let apagados = 0;
-    for (const u of vencidos) {
-      // Se acumulan por usuario para mandar un solo correo al final, no uno por add-on:
-      // quien tenga tres se llevaría tres avisos idénticos.
-      const cancelados: string[] = [];
-      let periodEnd: string | null = null;
-
-      for (const addon of listEffectiveAddons(u.email)) {
-        // Las cortesías no se apagan. No hay nada que cancelar en MercadoPago —no
-        // tienen preapproval— y destruir un regalo porque el plan base venció es
-        // irreversible y además injusto: si el plan vuelve, el regalo debería seguir.
-        if (addon.isCourtesy) {
-          log("info", "billing", "Add-on de cortesía conservado pese al plan expirado", { email: u.email, addonId: addon.id, kind: addon.kind });
-          continue;
-        }
-        try {
-          if (addon.mpPreapprovalId && mpToken) {
-            const res = await fetch(`https://api.mercadopago.com/preapproval/${addon.mpPreapprovalId}`, {
-              method: "PUT",
-              headers: { Authorization: `Bearer ${mpToken}`, "Content-Type": "application/json" },
-              body: JSON.stringify({ status: "cancelled" }),
-              signal: AbortSignal.timeout(10_000),
-            });
-            if (!res.ok) throw new Error(`MP ${res.status}: ${await res.text()}`);
-          }
-          updateAddon(addon.id, { status: "cancelled", cancelledAt: new Date().toISOString() });
-          recordOrder({
-            userEmail: u.email,
-            kind: "cancellation",
-            subject: "addon",
-            subjectId: addon.id,
-            subjectKey: addon.kind,
-            description: addonLabel(addon.kind),
-            periodEnd: addon.currentPeriodEnd ?? null,
-            mpPreapprovalId: addon.mpPreapprovalId ?? null,
-            note: "El plan base expiró",
-            eventKey: `addon-cancel:${addon.id}`,
-          });
-          cancelados.push(addonLabel(addon.kind));
-          periodEnd = periodEnd ?? addon.currentPeriodEnd ?? null;
-          apagados++;
-          log("info", "billing", "Add-on cancelado: el plan base expiró", { email: u.email, addonId: addon.id, kind: addon.kind });
-        } catch (err) {
-          log("error", "billing", "No se pudo cancelar add-on de plan expirado", { email: u.email, addonId: addon.id, error: String(err) });
-        }
-      }
-
-      // El buzón NO se borra al vencer el plan. Con un buzón sin reenvío, lo que hay
-      // dentro es el único ejemplar del correo de esa persona: se congela en solo
-      // lectura 30 días para que pueda descargarlo, y hasta entonces no se toca.
-      if (cancelados.some((c) => c === addonLabel("mailbox"))) {
-        const hasta = new Date(Date.now() + 30 * 86400_000).toISOString();
-        for (const b of buzonesDelUsuario(u.email)) {
-          if (b.graceUntil) continue; // Ya estaba en gracia; no se reinicia el reloj.
-          try {
-            await congelarBuzon(b.accountId);
-            fijarGraciaBuzon(b.domainId, b.alias, hasta);
-            log("info", "billing", "Buzón congelado con 30 días de gracia", { email: u.email, buzon: `${b.alias}@${b.domain}` });
-          } catch (err) {
-            log("error", "billing", "No se pudo congelar el buzón", { email: u.email, buzon: `${b.alias}@${b.domain}`, error: String(err) });
-          }
-        }
-      }
-
-      // Antes esto pasaba en silencio: al cliente se le acababa la capacidad de envío
-      // sin una sola explicación.
-      if (cancelados.length) {
-        try {
-          await sendTemplate(u.email, addonShutdown({ addonLabels: cancelados, planEndedAt: periodEnd }));
-        } catch (err) {
-          log("error", "billing", "No se pudo avisar del apagado de add-ons", { email: u.email, error: String(err) });
-        }
-      }
-    }
-    if (apagados > 0) log("info", "cron", "Add-ons apagados por plan expirado", { count: apagados });
-  } catch (err) {
-    log("error", "cron", "Expired add-on cleanup failed", { error: String(err) });
-  }
 });
 
 // Diario 5:00 UTC — reconciliar MercadoPago contra la base.
@@ -526,5 +442,25 @@ programar("15 7 * * *", async () => {
     } catch (err) {
       log("error", "cron", "Fallo borrando un buzón con gracia vencida", { buzon: `${b.alias}@${b.domain}`, error: String(err) });
     }
+  }
+});
+
+
+// Diario 3:30 UTC — retención del dominio gratis: la Bandeja muestra 7 días, guarda 30
+// (activar el dominio los recupera) y a los 30 se borran DE VERDAD, S3 e índice incluidos.
+// Después de esto no hay "recuperable al pagar": los 30 días son duros, y la landing lo
+// dice así. Va aparte de la papelera de 15 días a propósito: son promesas distintas.
+programar("30 3 * * *", async () => {
+  try {
+    const { s3Keys, borradas } = purgarConversacionesGratis(30);
+    for (const { s3Bucket, s3Key } of s3Keys) {
+      try { await deleteEmailFromS3(s3Bucket, s3Key); }
+      catch (err) { log("warn", "cron", "No se pudo borrar el objeto de S3 de un hilo purgado", { s3Key, error: String(err) }); }
+    }
+    // Una pestaña abierta mostraría hilos ya borrados hasta recargar.
+    for (const c of borradas) notifyBandeja(c.domainId, "conv_deleted", { conversationId: c.id, actor: "sistema" });
+    if (borradas.length) log("info", "cron", "Retención del gratis aplicada", { hilos: borradas.length, objetosS3: s3Keys.length });
+  } catch (err) {
+    log("error", "cron", "Falló la retención del dominio gratis", { error: String(err) });
   }
 });

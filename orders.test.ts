@@ -9,7 +9,8 @@ import {
   generateOrderNumber,
   chargeEventKey,
   createCourtesyAddon,
-  getUserPlanLimits,
+  derechosDeDominio,
+  createDomain,
   getUser,
   listEffectiveAddons,
   PLANS,
@@ -110,46 +111,56 @@ describe("Libro mayor: folios y listado", () => {
 
 describe("Cortesías", () => {
   const email = `courtesy-${crypto.randomUUID()}@test.com`;
-  before(() => seedUser(email, "basico"));
+  let domainId = "";
+  before(() => {
+    seedUser(email, "basico");
+    // Sin suscripción vigente: así la prueba mide la cortesía y no el legado.
+    sqlite.prepare("UPDATE users SET sub_plan = NULL, sub_status = NULL, sub_period_end = NULL WHERE email = ?").run(email);
+    domainId = createDomain(email, `c-${crypto.randomUUID().slice(0, 8)}.test`, ["dk"], "vf").id;
+  });
 
   it("otorga add-on y asiento en el libro mayor", () => {
     const { addon, order } = createCourtesyAddon({
-      userEmail: email, kind: "domain", currentPeriodEnd: FUTURE,
+      userEmail: email, kind: "domain", domainId, currentPeriodEnd: FUTURE,
       note: "compensación", grantedBy: "test",
     });
 
     assert.equal(addon.source, "courtesy");
     assert.equal(addon.isCourtesy, true);
     assert.equal(addon.status, "active");
-    // El precio de la fila es 0 porque de ahí sale el "+$79/mes" del dashboard...
+    assert.equal(addon.domainId, domainId);
+    // El precio de la fila es 0 porque de ahí sale el "$0" del dashboard...
     assert.equal(addon.priceCents, 0);
     // ...pero el valor del regalo no se pierde: vive en el asiento.
     assert.equal(order?.kind, "courtesy");
     assert.equal(order?.amountCents, 0);
-    assert.equal(order?.listPriceCents, 7900); // ADDONS.domain.price
+    assert.equal(order?.listPriceCents, 9900); // ADDONS.domain.price
     assert.equal(order?.grantedBy, "test");
   });
 
-  it("otorga exactamente el mismo cupo que un add-on pagado", () => {
-    // Fija la afirmación de que getUserPlanLimits no distingue regalo de compra. Si
+  it("otorga exactamente lo mismo que un dominio pagado", () => {
+    // Fija la afirmación de que derechosDeDominio no distingue regalo de compra. Si
     // alguien "arregla" eso, las cortesías dejan de servir para lo único que existen.
-    const limits = getUserPlanLimits(getUser(email)!);
-    assert.equal(limits.domains, PLANS.basico.domains + 1);
+    const r = derechosDeDominio({ id: domainId, ownerEmail: email }, getUser(email));
+    assert.equal(r.activado, true);
+    assert.equal(r.sendsUnlocked, true);
   });
 
-  it("un kind futuro desconocido no revienta y no otorga cupo de más", () => {
+  it("un kind futuro desconocido no revienta y no activa nada", () => {
     const otro = `courtesy-future-${crypto.randomUUID()}@test.com`;
     seedUser(otro, "basico");
+    sqlite.prepare("UPDATE users SET sub_plan = NULL, sub_status = NULL, sub_period_end = NULL WHERE email = ?").run(otro);
+    const d = createDomain(otro, `cf-${crypto.randomUUID().slice(0, 8)}.test`, ["dk"], "vf");
     const { addon } = createCourtesyAddon({
-      userEmail: otro, kind: "seats5", currentPeriodEnd: FUTURE,
+      userEmail: otro, kind: "seats5", domainId: d.id, currentPeriodEnd: FUTURE,
       label: "5 asientos", listPriceCents: 19900,
     });
     assert.equal(addon.kind as string, "seats5");
     assert.equal(listEffectiveAddons(otro).length, 1);
 
-    const limits = getUserPlanLimits(getUser(otro)!);
-    assert.equal(limits.domains, PLANS.basico.domains, "un kind desconocido no da dominios");
-    assert.equal(limits.sendsUnlocked, false);
+    const r = derechosDeDominio({ id: d.id, ownerEmail: otro }, getUser(otro));
+    assert.equal(r.activado, false, "un kind desconocido no activa el dominio");
+    assert.equal(r.sendsUnlocked, false);
   });
 });
 

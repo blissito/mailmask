@@ -42,35 +42,58 @@ export const PLANS = {
 export const LEGACY_PLANS: ReadonlySet<string> = new Set(["freelancer", "developer", "pro", "agencia"]);
 export function isLegacyPlan(plan?: string | null): boolean { return LEGACY_PLANS.has(plan ?? ""); }
 /** Planes que se pueden comprar hoy. */
-export const PLANS_FOR_SALE = ["basico", "equipo"] as const;
+export const PLANS_FOR_SALE = [] as const;
 
-// --- Add-ons ---
-
-// Se compran encima del plan base. El de envíos se compra una vez y desbloquea el envío
-// en todos los dominios del usuario; el tope sigue aplicando por dominio y por día,
-// que es como ya se llavea sendCounts. El de dominio es cupo acumulable y no incluye envíos.
-// El de buzón es **por dominio** y trae una bolsa de almacenamiento que se reparte
-// entre TODOS los buzones de ese dominio, con buzones ilimitados. Es el diferenciador
-// aplicado al correo: Google cobra por persona, ForwardEmail por buzón, MailMask por
-// dominio — un equipo de cinco crea cinco buzones y paga lo mismo que uno.
+// --- Catálogo de venta (7-sep-2026) ---
 //
-// No va incluido en ningún plan a propósito. Meter un recurso sin medidor en una cuota
-// fija ya salió caro una vez (el reenvío ilimitado, que es por lo que existe
-// `monthlyForwards`), y el almacenamiento tiene la misma forma: crece solo, nunca baja,
-// y no se puede purgar sin avisar. Nace con cuota explícita.
+// Ya no hay planes. Toda cuenta es gratis y se compran tres cosas, todas a $99/mes y
+// POR DOMINIO (cada add-on lleva `domainId`):
+//   domain    → "este dominio está activado": equipo ilimitado, buzones, envío, 10 GB.
+//   storage50 → +50 GB al pozo de ese dominio. Acumulable.
+//   sends100  → +100 correos nuevos al día en ese dominio. Acumulable.
+//
+// Por qué por dominio y no por persona: es el diferenciador entero ("Google cobra por
+// persona, MailMask por dominio"). Por qué nada va "incluido" sin medidor: el reenvío
+// ilimitado ya salió caro una vez (por eso existe `monthlyForwards`), y el disco y los
+// envíos tienen la misma forma — crecen solos. Todo lo que escala con el costo se vende
+// en bloques del mismo precio.
+//
+// `PLANS` de arriba queda SOLO para etiquetar suscripciones legado (`planLabel`) y para
+// que el webhook de MercadoPago siga renovando los preapprovals viejos. No se venden.
 export const ADDONS = {
-  sends25:  { price: 49_00, sends: 25,  label: "Envíos 25/día" },
-  sends100: { price: 99_00, sends: 100, label: "Envíos 100/día" },
-  domain:   { price: 79_00, domains: 1, label: "Dominio extra" },
-  mailbox:  { price: 99_00, mailboxBytes: 10 * 1024 * 1024 * 1024, label: "Buzón IMAP 10 GB" },
+  domain:    { price: 99_00, label: "Dominio activado" },
+  storage50: { price: 99_00, bytes: 50 * 1024 * 1024 * 1024, label: "+50 GB de buzón" },
+  sends100:  { price: 99_00, sends: 100, label: "+100 envíos al día" },
+} as const;
+
+// Add-ons de antes del 7-sep-2026. Si una cuenta los tiene, se respetan (sin `domainId`,
+// aplican a todos sus dominios); no se venden. `domain` viejo (cupo de dominio extra) se
+// migró a "dominio activado" asignándole un `domainId` con scripts/migrar-modelo-99.ts.
+export const LEGACY_ADDONS = {
+  sends25: { price: 49_00, sends: 25, label: "Envíos 25/día" },
+  mailbox: { price: 99_00, bytes: 10 * 1024 * 1024 * 1024, label: "Buzón IMAP 10 GB" },
 } as const;
 
 export type AddonKind = keyof typeof ADDONS;
 export type PlanKey = keyof typeof PLANS;
 
-// Nombre para mostrar. Existe porque `plan.charAt(0).toUpperCase() + plan.slice(1)`
-// sobre el enum daba "Basico" sin acento, en los correos y en el dashboard. Cubre los
-// cinco planes: un cliente con un plan legado (`pro`, `agencia`) veía `undefined`.
+/** Precio en centavos de cualquier add-on, incluidos los legado. */
+export function addonPriceCents(kind: string): number | null {
+  return (ADDONS as Record<string, { price?: number }>)[kind]?.price
+    ?? (LEGACY_ADDONS as Record<string, { price?: number }>)[kind]?.price
+    ?? null;
+}
+
+// Etiqueta de cualquier cosa cobrable. `kind` no se valida: una cortesía de un add-on
+// que se invente mañana tiene que poder etiquetarse hoy, aunque sea con su propia llave.
+export function addonLabel(kind: string): string {
+  return (ADDONS as Record<string, { label?: string }>)[kind]?.label
+    ?? (LEGACY_ADDONS as Record<string, { label?: string }>)[kind]?.label
+    ?? kind;
+}
+
+// Nombre para mostrar de una suscripción legado. Cubre los seis planes viejos: un
+// cliente con `pro` o `agencia` veía `undefined`.
 export function planLabel(plan?: string | null): string {
   return (PLANS as Record<string, { label?: string }>)[plan ?? ""]?.label ?? "Sin plan";
 }
@@ -79,12 +102,26 @@ export function planPriceCents(plan?: string | null): number {
   return (PLANS as Record<string, { price?: number }>)[plan ?? ""]?.price ?? 0;
 }
 
-// Etiqueta de cualquier cosa cobrable. `kind` no se valida contra ADDONS: un add-on
-// que se invente mañana tiene que poder etiquetarse hoy, aunque sea con su propia llave.
-export function addonLabel(kind: string): string {
-  return (ADDONS as Record<string, { label?: string }>)[kind]?.label ?? kind;
-}
+/** Los tres add-ons a la venta, en el orden de la página de precios. */
+export const ADDONS_FOR_SALE = ["domain", "storage50", "sends100"] as const;
 
-export function addonPriceCents(kind: string): number | null {
-  return (ADDONS as Record<string, { price?: number }>)[kind]?.price ?? null;
-}
+/** Lo que trae un dominio activado sin add-ons extra. Es la tabla de precios en código. */
+export const DOMINIO_ACTIVADO = {
+  aliases: 1000,           // "ilimitadas" en la página
+  sends: 50,
+  mailboxBytes: 10 * 1024 * 1024 * 1024,
+  forwardPerHour: 1000,
+  monthlyForwards: 10_000,
+  logDays: 90,
+} as const;
+
+/** Lo que trae el único dominio gratis de una cuenta. */
+export const DOMINIO_GRATIS = {
+  aliases: 5,
+  sends: 0,
+  forwardPerHour: 100,
+  monthlyForwards: 1_000,
+  logDays: 7,
+  retencionDias: 7,        // la Bandeja muestra 7 días
+  purgaDias: 30,           // y borra a los 30
+} as const;

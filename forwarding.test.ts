@@ -412,8 +412,9 @@ describe("processInbound", () => {
     deleteRule(fwdDomainId, rule.id);
   });
 
-  it("expired subscription → skip forwarding", async () => {
-    // Create a separate domain with expired owner
+  it("expired subscription → el 1.º dominio sigue gratis y reenvía; el 2.º queda bloqueado", async () => {
+    // Antes "sin plan" apagaba el reenvío entero. Desde el 7-sep-2026 el primer dominio
+    // de toda cuenta es gratis y reenvía; lo único que se frena es el 2.º sin activar.
     const expSuffix = `exp-${Date.now()}`;
     const expEmail = `expired-${expSuffix}@example.com`;
     const hash = await hashPassword("testpass123");
@@ -436,7 +437,19 @@ describe("processInbound", () => {
     }));
 
     assert.equal(result.action, "processed");
-    assert.equal(result.details, "forwarded=0 discarded=0");
+    assert.match(result.details, /forwarded=1/, "el dominio gratis reenvía aunque el plan viejo haya vencido");
+
+    // El 2.º dominio de la misma cuenta, sin activar: se guarda en la Bandeja y no se reenvía.
+    const dom2 = createDomain(expEmail, `${expSuffix}-b.test`, ["dkim1"], "v1");
+    updateDomain(dom2.id, { verified: true });
+    createAlias(dom2.id, "info", ["dest@example.com"]);
+    const r2 = await processInbound(makeSnsNotification({
+      from: "sender@test.com", to: `info@${expSuffix}-b.test`, subject: "Bloqueado", messageId: `blk-${crypto.randomUUID()}`,
+    }));
+    assert.match(r2.details, /discarded=1/);
+    const dbm = await import("./db.ts");
+    const log = dbm.listLogs(dom2.id, 5).find((l: { error?: string }) => /sin activar/i.test(l.error ?? ""));
+    assert.ok(log, "el log debe decir que el dominio está sin activar");
   });
 
   it("saveToMesa threading: 2 emails same thread → single conversation", async () => {
@@ -516,12 +529,8 @@ describe("processInbound edge cases", () => {
 
   before(async () => {
     const hash = await hashPassword("testpass123");
+    // Cuenta gratis, sin suscripción: el dominio gratis reenvía con 100/hora.
     createUser(rlEmail, hash);
-    updateUserSubscription(rlEmail, {
-      plan: "basico",
-      status: "active",
-      currentPeriodEnd: new Date(Date.now() + 365 * 86400000).toISOString(),
-    });
     const domain = createDomain(rlEmail, rlDomain, ["dkim1"], "verify1");
     rlDomainId = domain.id;
     updateDomain(domain.id, { verified: true });
@@ -529,7 +538,7 @@ describe("processInbound edge cases", () => {
   });
 
   it("rate-limited domain discards email", async () => {
-    // basico plan has 100/hr limit — burn through it
+    // el dominio gratis tiene 100/hora — se agotan a mano
     for (let i = 0; i < 100; i++) {
       checkRateLimit(`fwd:${rlDomainId}`, 100, 3600_000);
     }
@@ -555,26 +564,26 @@ describe("processInbound edge cases", () => {
     const capSuffix = `cap-${Date.now()}`;
     const capDomain = `${capSuffix}.test`;
     const capEmail = `owner-${capSuffix}@example.com`;
+    // Cuenta gratis: el tope es por DOMINIO y de 1,000 al mes.
     createUser(capEmail, await hashPassword("testpass123"));
-    updateUserSubscription(capEmail, { plan: "basico", status: "active", currentPeriodEnd: new Date(Date.now() + 365 * 86400000).toISOString() });
     const d = createDomain(capEmail, capDomain, ["dkim1"], "verify1");
     updateDomain(d.id, { verified: true });
     createAlias(d.id, "info", ["dest@example.com"]);
 
     const dbm = await import("./db.ts");
-    // Básico: 3,000 al mes. Se llena a mano el contador.
-    for (let i = 0; i < 3000; i++) dbm.incrementMonthlyForwards(capEmail);
-    assert.equal(dbm.getMonthlyForwards(capEmail), 3000);
+    // Gratis: 1,000 al mes. Se llena a mano el contador, que ahora se llavea por dominio.
+    for (let i = 0; i < 1000; i++) dbm.incrementMonthlyForwards(d.id);
+    assert.equal(dbm.getMonthlyForwards(d.id), 1000);
 
     const result = await processInbound(makeSnsNotification({
       from: "sender@external.com", to: `info@${capDomain}`, subject: "Cap", messageId: `cap-${crypto.randomUUID()}`,
     }));
     assert.match(result.details, /discarded=1/);
-    assert.equal(dbm.getMonthlyForwards(capEmail), 3000, "al tope no se sigue contando");
+    assert.equal(dbm.getMonthlyForwards(d.id), 1000, "al tope no se sigue contando");
     const log = dbm.listLogs(d.id, 5).find((l: { error?: string }) => /Tope mensual/.test(l.error ?? ""));
     assert.ok(log, "el log debe explicar que fue el tope mensual");
     // El aviso de tope es de una sola vez por mes
-    assert.equal(dbm.claimOnce("fwd-cap-reached", `${capEmail}:${new Date().toISOString().slice(0, 7)}`), false);
+    assert.equal(dbm.claimOnce("fwd-cap-reached", `${d.id}:${new Date().toISOString().slice(0, 7)}`), false);
   });
 
   it("S3 fetch failure enqueues retry with S3 coords", async () => {

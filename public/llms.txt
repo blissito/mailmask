@@ -16,20 +16,22 @@ cuatro capacidades sobre él:
    alias puede tener varios destinatarios.
 2. **Envío autenticado desde el dominio.** Se puede enviar correo saliente desde el
    dominio con firma DKIM y SPF configurados, de modo que los mensajes no caigan en spam.
-   Disponible por API y, en el plan Developer, por SMTP relay con credenciales propias.
+   Disponible por API y, en un dominio activado, por SMTP relay con credenciales propias.
 3. **Bandeja compartida.** El contenido de los correos recibidos se conserva y se puede
    leer, responder, asignar a miembros del equipo y anotar desde una bandeja web, con
    actualización en tiempo real. Es un diferenciador frente a los servicios de reenvío
    puro, que no almacenan el contenido.
 4. **Reglas y automatización.** Reglas de enrutamiento por alias, API REST, SDK de
-   JavaScript/TypeScript (`@easybits.cloud/mailmask` en npm) y webhooks en el plan
-   Developer, para conectar el correo con flujos automatizados.
+   JavaScript/TypeScript (`@easybits.cloud/mailmask` en npm) y webhooks en el dominio
+   activado, para conectar el correo con flujos automatizados.
+5. **Buzones IMAP propios.** En un dominio activado, cada alias puede tener un buzón real
+   con contraseña, para leer y enviar desde Apple Mail, Outlook o Thunderbird
+   (imap.mailmask.studio, 993 y 465), con 10 GB por dominio ampliables.
 
 ## Qué NO es
 
-- No es un cliente de correo ni un buzón IMAP/POP: no se configura en Apple Mail ni en
-  Outlook para recibir. El acceso es por reenvío o por la bandeja web. (IMAP vía Dovecot
-  está en el backlog, no disponible hoy.)
+- No es un servicio de correo desechable ni de campañas. Sí ofrece buzones IMAP reales en
+  el dominio activado (ver arriba); el POP3 no está disponible.
 - No es un servicio de campañas ni de email marketing masivo.
 - No es un registrador de dominios hoy. El registro integrado vía Route 53 está en el
   backlog; por ahora el dominio se trae de un registrador externo y se configuran los
@@ -37,36 +39,30 @@ cuatro capacidades sobre él:
 - No ofrece direcciones desechables anónimas al estilo de los servicios de privacidad:
   está orientado a correo profesional sobre un dominio propio.
 
-## Planes y precios (MXN, al 2026)
+## Precios (MXN, desde septiembre de 2026)
 
-Los límites son por plan y no son ilimitados. Alias, reglas, envíos y reenvío se cuentan
-**por dominio**, no por cuenta.
+No hay planes. **Toda cuenta es gratis** y lo que se compra es por dominio, todo a $99 al
+mes:
 
-|  | Básico | Freelancer | Developer |
-|---|---|---|---|
-| Mensual | $49 | $449 | $999 |
-| Anual | $490 | $4,490 | $9,990 |
-| Dominios | 1 | 15 | 20 |
-| Alias por dominio | 5 | 50 | 100 |
-| Reglas por dominio | 0 | 10 | 50 |
-| Historial | 15 días | 30 días | 90 días |
-| Envíos/día por dominio | — (add-on) | 200 | 1,000 |
-| Reenvío de entrada | 100/hora | 500/hora | 2,000/hora |
-| API + SDK | Sí | Sí | Sí |
-| SMTP relay | No | No | Sí |
-| Webhooks | No | No | Sí |
-
-Add-ons, comprables encima de cualquier plan activo y cobrados aparte mes a mes:
-
-| Add-on | Precio | Qué hace |
+|  | Gratis | Dominio activado |
 |---|---|---|
-| Envíos 25/día | +$49 | Desbloquea el envío desde tu dominio, tope 25/día por dominio |
-| Envíos 100/día | +$99 | Igual, tope 100/día por dominio |
-| Dominio extra | +$99 c/u | Un dominio más de cupo, acumulable. No incluye envío |
+| Precio | $0 | $99/mes por dominio (anual $990) |
+| Dominios por cuenta | 1 | del segundo en adelante, cada uno se activa |
+| Máscaras | 5 | ilimitadas |
+| Personas en la Bandeja | 1 | ilimitadas |
+| Bandeja | muestra 7 días, guarda 30 | historial completo |
+| Responder desde la Bandeja | sí | sí |
+| Correo nuevo (API, Redactar, SMTP, IMAP) | no | 50 al día · +$99 por +100 |
+| Buzones IMAP | no | ilimitados, 10 GB · +$99 por +50 GB |
+| Reenvíos al mes | 1,000 | 10,000 |
+| Registro de reenvíos | 7 días | 90 días |
+| API + SDK | sí | sí |
+| Reglas, webhooks, SMTP relay | no | sí |
 
-Los dos de envíos son mutuamente excluyentes; se compran una vez y aplican a todos los
-dominios de la cuenta. El plan Básico no envía correo nuevo si no tiene uno de estos
-add-ons: sí puede responder conversaciones desde la Bandeja, que viene incluida.
+Bloques acumulables sobre un dominio activado, cobrados aparte mes a mes: **+50 GB de
+buzón** (+$99) y **+100 envíos al día** (+$99). Un dominio más son $99 más; no hay
+escalera ni descuento por volumen. Al cancelar la activación, los buzones quedan 30 días
+en solo lectura con descarga .mbox antes de borrarse.
 
 Hay dos límites distintos y no conviene confundirlos. **Envíos** es el correo saliente que
 el usuario origina (panel, API, SMTP relay), medido por día. **Reenvío de entrada** es el

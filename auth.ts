@@ -1,4 +1,4 @@
-import { getUser, getUserByApiKey, getUserPlanLimits, type User } from "./db.js";
+import { getUser, getUserByApiKey, type User } from "./db.js";
 import { checkRateLimit } from "./rate-limit.js";
 
 const encoder = new TextEncoder();
@@ -127,9 +127,8 @@ export async function getAuthUser(request: Request): Promise<{ email: string } |
     if (!rl.allowed) return null;
     const user = await getUserByApiKey(key);
     if (!user) return null;
-    // Verify plan allows API access
-    const limits = getUserPlanLimits(user);
-    if (!limits.api) return null;
+    // La API es para todas las cuentas, gratis incluidas (7-sep-2026): lo que se vende
+    // es el dominio activado, y cada endpoint mira los derechos de SU dominio.
     return { email: user.email };
   }
 

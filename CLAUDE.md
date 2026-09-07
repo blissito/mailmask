@@ -79,9 +79,8 @@ Override with env vars `S3_BUCKET` and `S3_BACKUP_BUCKET` respectively.
 - **Auth**: JWT in HttpOnly cookie named `token`, verified via `verifyJwt()` from `auth.ts`
 - **Login con Google** (sep-2026): `GET /api/auth/google` → `GET /api/auth/google/callback`, OAuth 2.0 con authorization code y scope `openid email`. La cuenta es **una por correo**: entrar con Google en un correo que ya tiene contraseña es la misma fila, y quien nace con Google recibe un hash aleatorio y puede fijar contraseña con "olvidé mi contraseña". Google deja `emailVerified` en true. El `state` va en `tokens` (kind `oauth-state`, 10 min, un solo uso) y carga `ref` y `coupon`. Env: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`; las URIs de redirección (prod y `http://localhost:8000`) están en la consola de Google Cloud. **No uses `Response.redirect()` en rutas**: sus headers son inmutables y `onAfterHandle` revienta con `TypeError: immutable`; construye el 302 a mano. Dominio verificado en Search Console con TXT en Route 53 (junto al SPF: un UPSERT de TXT debe conservar los valores previos).
 - **Tema del sitio público** (sep-2026, dirección "lucha libre": crema + rojo de máscara + dorado sólo en la máscara, titulares en Bricolage Grotesque 800; el verde `mask-*` queda para la app y para estados OK): landing, pricing, login y registro usan tokens semánticos (`bg-bg`, `bg-bg-elev`, `text-fg`, `text-fg-muted`, `border-line`, `text-accent-text`, `bg-accent`) definidos en `public/css/input.css` y expuestos en `tailwind.config.ts`. Claro por default; `public/js/theme.js` (en `<head>`, sin `defer`) aplica `data-theme` guardado en `localStorage` y sin elección manda `prefers-color-scheme`. Piezas repetidas: `.btn-primary`, `.btn-secondary`, `.card`, `.mock`, `.chip`, `.eyebrow`, `.faq`. **No uses `zinc-*` en esas cuatro páginas.** Desde el 6-sep-2026 **`/bandeja` también usa los tokens**: sus 14 variables `--mesa-*` derivan de `--bg`, `--bg-elev`, `--bg-inset`, `--line`, `--fg*`, así que hereda el tema claro/oscuro y lleva `theme.js` en su `<head>`. El acento de la app sigue siendo el verde `mask-*` a propósito —es el "esto va bien"— y el rojo de máscara se queda en el sitio público. **`/app` sigue con zinc** (205 clases en el HTML): migrarla es otro trabajo. Fuentes Inter + JetBrains Mono desde Google Fonts (la CSP ya lo permite). El video de Brenda en la home es lite-embed: thumbnail local y `frame-src` con `youtube-nocookie.com`.
-- **Plans**: Defined in `db.ts` as `PLANS` constant (basico, freelancer, developer; legacy: pro, agencia)
-- **Add-ons**: `ADDONS` en `db.ts` (`sends25` $49, `sends100` $99, `domain` $99 c/u). Tabla `addons`, preapproval propio de MP con `external_reference: "addon:{id}"`. `getUserPlanLimits()` los suma; `sendsUnlocked` es el flag que decide si se puede enviar. **Básico tiene `sends: 0`**: no envía correo nuevo sin add-on, pero sí responde desde la Bandeja (`mesaActions: true` para todos los planes).
-- **Límites**: se cuentan **por dominio**, no por cuenta (`getSendCount()` y el rate limit de forwarding se llavean con `domainId`). Son dos distintos: `sends` (saliente que origina el usuario, por día) y `forwardPerHour` (reenvío de entrada, el caso de uso principal, un orden de magnitud mayor). Falta un tope mensual — ver `monthlyForwards` en el backlog, pendiente de revisitar.
+- **Precios (7-sep-2026)**: no hay planes. `ADDONS` en `plans.ts` = `domain`, `storage50`, `sends100`, todos $99 y **por dominio** (`addons.domain_id`). `PLANS` sólo etiqueta suscripciones legado. Todo límite sale de `derechosDeDominio()` en `db.ts`; ver la sección "Modelo de precios".
+- **Límites**: se cuentan **por dominio** (`getSendCount()`, el rate limit de forwarding y `monthlyForwards` se llavean con `domainId`). Son dos distintos: `sends` (saliente que origina el usuario, por día) y `forwardPerHour`/`monthlyForwards` (reenvío de entrada, el caso de uso principal).
 - **Regex de usuario**: las reglas con `match: "regex"` pasan por `revisarPatron()` de `regex-guard.ts` al guardarse (POST y PUT de reglas), y el texto se acota con `acotarTexto()` antes de evaluarlo en `forwarding.ts`. Es la única defensa posible: en tiempo de evaluación no se puede interrumpir un `RegExp.test()` porque es síncrono — el `setTimeout` que había alrededor devolvía a los 20 s con un tope de 50 ms. Explicado para el público en `/blog/que-es-redos-expresiones-regulares`.
 - **Recursos SES por dominio**: un dominio necesita tres cosas en SES —identidad, regla de recepción en el rule set y config set— y "verificado" sólo mira la identidad. Sin la regla, SES contesta `550 5.1.1 mailbox unavailable` a todo y MailMask no se entera. `ensureDomainInbound()` en `ses.ts` reconcilia base contra SES al arrancar y en `POST /api/domains/:id/verify`. Nació de brendago.design (sep-2026): el DELETE limpió SES, la fila revivió de un respaldo y la reparación manual de agosto sólo devolvió la identidad. El config set lleva además un **event destination** al tópico `SNS_OUTBOUND_TOPIC_ARN` (rebotes y quejas → `/api/webhooks/ses-events`, firmado igual que el de entrada); sin ese secret la lista de supresión no se alimenta nunca. `ensureConfigSetEventDestination()` rellena el destino en sets viejos.
 - **Lista de supresión**: la alimenta el webhook de eventos (rebote `Permanent` y queja), se consulta y edita por API (`/api/domains/:id/suppressions`, reason `manual`) y la aplican **los tres envíos del usuario (incluidos cc/bcc) y también el reenvío** (`doForward` en `forwarding.ts` descarta con `status: "discarded"` y lo anota en el log del dominio). Insistir a un buzón que rebotó Permanent daña la reputación del dominio en SES.
@@ -158,6 +157,59 @@ La clave del sitio es pública y vive en el HTML; la secreta es `TURNSTILE_SECRE
 
 ## TODO
 
+## Modelo de precios: gratis + $99 por dominio (construido el 7-sep-2026)
+
+Se tira el modelo de planes. **Todas las cuentas son gratis** y se compran tres cosas,
+todas a $99/mes y **por dominio** (los add-ons pasan a llevar `domainId`):
+
+| | Gratis | Dominio activado |
+|---|---|---|
+| Precio | $0 | **$99/mes** (anual $990) |
+| Máscaras | 5 | ilimitadas |
+| Personas en la Bandeja | 1 | ilimitadas |
+| Bandeja | 7 días visibles, 30 guardados (recuperables al pagar), luego se borra | completo |
+| Responder desde la Bandeja | sí | sí |
+| Correo nuevo (API, Redactar, SMTP, Apple Mail) | no | **50/día** · +$99 por +100 |
+| Buzones IMAP | no | ilimitados, 10 GB · +$99 por +50 GB |
+| Reenvíos al mes (`monthlyForwards`, pasa a ser por dominio) | 1,000 | 10,000 |
+| Reglas, webhooks, SMTP relay | no | sí |
+| Al cancelar | — | 30 días solo lectura + descarga `.mbox` |
+
+Por qué: el ancla correcta no es ForwardEmail ($3 USD por reenviar) sino Google ($140 por
+persona) y Help Scout ($25 USD por asiento); "$99 por dominio, todo incluido, personas
+ilimitadas" es la frase entera. El plan gratis existe para que el MX apunte aquí: ése es el
+foso. Los 50 envíos: hoy los contadores salientes están vacíos; 50 a mano es ilimitado y
+deja que el bloque de +100 tenga sentido para quien manda por API.
+
+Reglas de migración: **nadie que pague hoy paga más, nadie pierde una cortesía.** Brenda
+(Básico $49 + sends25 $49 = $98) queda en $99 con un dominio pagado y `denik.me` de
+cortesía; su `sends25` se cancela en MP (ya viene incluido). Los tres de Básico: cortesía.
+Equipo desaparece (cero clientes).
+
+Hueco a cerrar ANTES de publicar el tope de envíos: **Apple Mail manda por el 465 de
+Stalwart directo a SES**, sin pasar por el contador de la app. El límite por dominio debe
+aplicarse también en la cola de salida de Stalwart, o "50/día" es ficción.
+
+**Cómo está hecho.** Una sola función, `derechosDeDominio(domain, owner)` en `db.ts`,
+contesta "¿qué puede ESTE dominio?": `activado` (add-on `domain` vigente con su
+`domainId`, o suscripción legado vigente del dueño — mientras MP le cobre lo de antes,
+todos sus dominios cuentan como activados), `esGratis` (el dominio **más antiguo** del
+dueño sin activar; el único gratis) o `bloqueado` (el 2.º sin pagar: se guarda en la
+Bandeja, no se reenvía). `getUserPlanLimits` y `PLAN_MESA_LIMITS` ya no existen. Los
+add-ons llevan `domain_id` (migración 0016); los viejos sin él (`sends25`, `mailbox`)
+son legado del usuario y suman en todos sus dominios. `monthlyForwards` se llavea
+`fwd:<domainId>`. La retención del gratis es **un corte en la consulta**
+(`corteRetencion` en lista, búsqueda y no-leídos) y un cron a las 3:30 que borra a los
+30 días con `purgarConversacionesGratis` (S3 + FTS incluidos). Los checkouts de plan
+(`/api/billing/checkout`, `guest-checkout`) se eliminaron; el webhook conserva las ramas
+de plan sólo para renovar preapprovals viejos y **su fallback por monto ya no conoce
+el 99**. Migración de datos: `scripts/migrar-modelo-99.ts` (dry-run por defecto) asigna
+las cortesías `domain` viejas a dominios concretos y aborta si algún dominio verificado
+quedara bloqueado.
+
+Deuda anotada: el tope de envíos **no** cubre el 465 de Stalwart (Apple Mail manda a SES
+sin pasar por la app); hasta cerrarlo, "+100 envíos" no debe venderse como comprable.
+
 ## Buzones IMAP (7-sep-2026)
 
 **Stalwart corre en producción** en una caja permanente de EasyBits (`sb_4ba99ed3-…`, template `mail-svc`, `persistent` y `protected`), con 993 y 465 alcanzables desde fuera por el router SNI, certificado ACME DNS-01 contra Route 53 y salida por SES (SPF y DKIM en verde). Un alias puede tener **buzón**, **reenvío**, o los dos; y un buzón sin reenvío es lo que convierte a MailMask en reemplazo de Gmail y no en una capa encima.
@@ -186,6 +238,51 @@ El 6-sep el hostname quedó mapeado al **465** (submission, TLS implícito), as�
 Todo el estado durable son **6.1 MB**, y `stalwart --export` lo vuelca en 20 s y 840 KB. El dump es KV por subespacio, **independiente del backend**. ⚠️ `--import` **se niega a escribir sobre una base no vacía** y el servidor debe estar **detenido** para exportar o importar.
 
 **No mover el store a Postgres hoy.** Se puede (es backend de primera clase), pero con `SearchStore: Default` sobre Postgres el índice de texto **trunca los cuerpos a 650 KB** por el límite de `tsvector` — y `IMAP SEARCH BODY` es justo lo que validó el spike. Sería una regresión. La respuesta correcta el día que quieras dos máquinas, no antes.
+
+### Los cuerpos viven en Tigris, no en AWS (7-sep-2026)
+
+El blob store de Stalwart apunta a **Tigris** (`mailmask-buzones`, endpoint
+`https://fly.storage.tigris.dev`, `keyPrefix: buzones/`, región `Custom` con
+`customEndpoint`/`customRegion`), no al S3 de AWS. Razón: la caja está fuera de AWS y cada
+cuerpo que Apple Mail baja era **egreso a $0.09 USD/GB**; Tigris cobra $0.02/GB y **cero
+egreso a cualquier destino**. `inbound/`, `domain-assets/` y los respaldos siguen en AWS
+porque SES sólo escribe ahí. Las llaves están en `.env` como `TIGRIS_*`; la app no las usa.
+Los 170 objetos previos se copiaron con las mismas llaves antes de cambiar el apuntador.
+
+⚠️ **Nunca corras `fly storage create` dentro de este repo.** Con `fly.toml` presente
+engancha el bucket a la app y **sobrescribe `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/
+`AWS_REGION`** con las de Tigris y reinicia producción. Pasó el 7-sep: dos minutos con SES
+roto (`Startup repair failed: InvalidClientTokenId`). Créalo desde un directorio sin
+`fly.toml`, con `--name`.
+
+### 🔴 Stalwart se baneó a sí mismo (7-sep-2026)
+
+Todo el tráfico externo entra por el proxy de EasyBits con **una sola IP** (`172.20.0.1`).
+Un escáner de internet pidió `/wp-json/` y Stalwart (`security.scan-ban`) baneó esa IP
+**sin caducidad** — o sea, a todos los clientes, JMAP incluido: el depósito estuvo muerto
+de 01:48 a 03:04 y el cron de salud lo cazó. Arreglo: `x:BlockedIp/set destroy` +
+`x:AllowedIp/set create {address: "172.20.0.1"}` **y reiniciar**: la lista de bloqueo vive
+en memoria y el cambio por API no la recarga. Pendiente de fondo: que el proxy pase la IP
+real (PROXY protocol en el L4, `X-Forwarded-For` de confianza en HTTP); mientras, la
+protección anti-escaneo de Stalwart es inútil y peligrosa a la vez.
+
+### 🔴 La caja no se sabe reconstruir (7-sep-2026)
+
+El template `mail-svc` **no trae Stalwart** — su Dockerfile dice "lo instala el operador"—,
+no hay ningún release (`currentReleaseId` vacío), y ni el binario (104 MB), ni `lego`
+(68 MB), ni las unidades de systemd están en los `dataPaths`. **Hoy hay datos y nada con
+qué leerlos.** Falta `scripts/stalwart-bootstrap.sh` (binarios, usuario `stalwart`,
+directorios con su dueño, units) y un **simulacro cronometrado en una caja desechable**:
+crear, bootstrap, restaurar el dump, comprobar IMAP, destruir. Sin ese número, el
+respaldo es una promesa.
+
+Respaldo consistente: `systemctl stop stalwart` + `--export` cuesta **22 s de caída** y da
+840 KB en 19 subespacios. El reenvío y la Bandeja no se enteran (van por SES). Falta
+comprobar que **restaura** (`--import` en un store vacío) y automatizarlo con `programar()`.
+
+**No recrear la caja para cambiar de tier.** En `mail-svc` el tier es `custom` (2 vCPU,
+2 GB): "bajar a micro" da la misma VM. Y recrear cambia el `sandboxId`, que se lleva por
+delante `l4:…:993`, `l4:…:465` y el mapeo de dominio al 8080 — no migran solos.
 
 ### Sigue pendiente
 

@@ -127,16 +127,19 @@ import {
   planPriceCents,
   addonLabel,
   addonPriceCents,
+  LEGACY_ADDONS, ADDONS_FOR_SALE, DOMINIO_ACTIVADO, DOMINIO_GRATIS,
 } from "./plans.js";
 import type { AddonKind, PlanKey } from "./plans.js";
 
-export { PLANS, ADDONS, planLabel, planPriceCents, addonLabel, addonPriceCents, LEGACY_PLANS, isLegacyPlan, PLANS_FOR_SALE };
+export { PLANS, ADDONS, LEGACY_ADDONS, ADDONS_FOR_SALE, DOMINIO_ACTIVADO, DOMINIO_GRATIS, planLabel, planPriceCents, addonLabel, addonPriceCents, LEGACY_PLANS, isLegacyPlan, PLANS_FOR_SALE };
 export type { AddonKind, PlanKey };
 
 export interface Addon {
   id: string;
   userEmail: string;
-  kind: AddonKind;
+  kind: string;
+  /** Dominio al que aplica. Sin él es un add-on legado del usuario (aplica a todos). */
+  domainId?: string;
   status: "pending" | "active" | "cancelled" | "expired";
   mpPreapprovalId?: string;
   priceCents: number;
@@ -756,7 +759,8 @@ function rowToAddon(r: typeof addons.$inferSelect): Addon {
   return {
     id: r.id,
     userEmail: r.userEmail,
-    kind: r.kind as AddonKind,
+    kind: r.kind,
+    domainId: r.domainId ?? undefined,
     status: r.status as Addon["status"],
     mpPreapprovalId: r.mpPreapprovalId ?? undefined,
     priceCents: r.priceCents,
@@ -794,17 +798,30 @@ export function getAddonByMpId(mpPreapprovalId: string): Addon | null {
   return r ? rowToAddon(r) : null;
 }
 
-export function createAddon(userEmail: string, kind: AddonKind): Addon {
+export function createAddon(userEmail: string, kind: string, domainId?: string): Addon {
+  const price = addonPriceCents(kind);
+  if (price === null) throw new Error(`Add-on desconocido: ${kind}`);
   const r = db.insert(addons).values({
     userEmail,
     kind,
+    domainId: domainId ?? null,
     status: "pending",
-    priceCents: ADDONS[kind].price,
+    priceCents: price,
   }).returning().get();
   return rowToAddon(r);
 }
 
-export function updateAddon(id: string, patch: Partial<Pick<Addon, "status" | "mpPreapprovalId" | "currentPeriodEnd" | "cancelledAt" | "source" | "courtesyNote">>): void {
+/** Add-ons vigentes de UN dominio (los que llevan su `domainId`). */
+export function listEffectiveAddonsForDomain(domainId: string): Addon[] {
+  const now = new Date();
+  return db.select().from(addons).where(eq(addons.domainId, domainId)).all().map(rowToAddon).filter((a) => {
+    if (a.status === "active") return true;
+    if (a.status === "cancelled" && a.currentPeriodEnd) return new Date(a.currentPeriodEnd) >= now;
+    return false;
+  });
+}
+
+export function updateAddon(id: string, patch: Partial<Pick<Addon, "status" | "mpPreapprovalId" | "currentPeriodEnd" | "cancelledAt" | "source" | "courtesyNote" | "domainId">>): void {
   db.update(addons).set(patch).where(eq(addons.id, id)).run();
 }
 
@@ -949,6 +966,7 @@ export function listOrdersForSubject(subject: OrderSubject, subjectId: string): 
 export function createCourtesyAddon(input: {
   userEmail: string;
   kind: string;
+  domainId?: string;
   currentPeriodEnd: string;
   label?: string;
   listPriceCents?: number;
@@ -956,14 +974,13 @@ export function createCourtesyAddon(input: {
   grantedBy?: string;
 }): { addon: Addon; order: Order | null } {
   const label = input.label ?? addonLabel(input.kind);
-  const listPrice = input.listPriceCents
-    ?? (ADDONS as Record<string, { price?: number }>)[input.kind]?.price
-    ?? null;
+  const listPrice = input.listPriceCents ?? addonPriceCents(input.kind);
 
   const run = sqlite.transaction(() => {
     const row = db.insert(addons).values({
       userEmail: input.userEmail,
       kind: input.kind,
+      domainId: input.domainId ?? null,
       status: "active",
       priceCents: 0,
       currentPeriodEnd: input.currentPeriodEnd,
@@ -991,59 +1008,138 @@ export function createCourtesyAddon(input: {
   return run();
 }
 
-export function getUserPlanLimits(user: User): { domains: number; aliases: number; rules: number; logDays: number; sends: number; sendsUnlocked: boolean; api: boolean; webhooks: boolean; forwardPerHour: number; smtpRelay: boolean; monthlyForwards: number; mailboxes: boolean; mailboxBytes: number } {
-  const sub = user.subscription;
-  if (sub && (sub.status === "active" || sub.status === "cancelled")) {
-    if (sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) < new Date()) {
-      return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, sendsUnlocked: false, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false, monthlyForwards: 0, mailboxes: false, mailboxBytes: 0 };
-    }
-    const plan = PLANS[sub.plan];
-    const active = listEffectiveAddons(user.email);
-    // sends100 gana sobre sends25 si por alguna razón hay ambos.
-    const sendsAddon = active.find((a) => a.kind === "sends100") ?? active.find((a) => a.kind === "sends25");
-    const extraDomains = active.filter((a) => a.kind === "domain").length;
-    // El buzón se compra por dominio y es acumulable: cada add-on suma su bolsa de
-    // almacenamiento. Ningún plan lo incluye — ver el porqué en `ADDONS` de plans.ts.
-    const mailboxAddons = active.filter((a) => a.kind === "mailbox").length;
-    // Math.max para que un add-on viejo de 25 no *reduzca* los envíos de un plan mayor.
-    const sends = sendsAddon ? Math.max(plan.sends, (ADDONS[sendsAddon.kind] as { sends: number }).sends) : plan.sends;
-    return {
-      domains: plan.domains + extraDomains,
-      aliases: plan.aliases,
-      rules: plan.rules,
-      logDays: plan.logDays,
-      sends,
-      sendsUnlocked: sub.plan !== "basico" || !!sendsAddon,
-      api: plan.api,
-      webhooks: plan.webhooks,
-      forwardPerHour: plan.forwardPerHour,
-      smtpRelay: plan.smtpRelay,
-      monthlyForwards: plan.monthlyForwards,
-      mailboxes: mailboxAddons > 0,
-      mailboxBytes: mailboxAddons * (ADDONS.mailbox as { mailboxBytes: number }).mailboxBytes,
-    };
-  }
-  return { domains: 0, aliases: 0, rules: 0, logDays: 0, sends: 0, sendsUnlocked: false, api: false, webhooks: false, forwardPerHour: 0, smtpRelay: false, monthlyForwards: 0, mailboxes: false, mailboxBytes: 0 };
+// --- Derechos por dominio (7-sep-2026) ---
+//
+// Antes todo se llaveaba por cuenta (`getUserPlanLimits(user)`) y NO tener plan era el
+// caso de castigo: `forwarding.ts` bloqueaba el reenvío entero. Con cuentas gratis eso
+// mataría al producto. Ahora la pregunta es siempre "¿qué puede ESTE dominio?", y hay
+// una sola función que la contesta.
+//
+//   activado  = tiene add-on `domain` vigente con su domainId, o su dueño conserva una
+//               suscripción legado vigente (Brenda: mientras MP le cobre lo de antes,
+//               todos sus dominios cuentan como activados — nadie paga más).
+//   esGratis  = no activado y es el dominio MÁS ANTIGUO de su dueño: el único gratis.
+//   bloqueado = no activado y no es el gratis: el 2.º dominio sin pagar. Su correo se
+//               guarda en la Bandeja pero no se reenvía.
+export interface DerechosDominio {
+  activado: boolean;
+  esGratis: boolean;
+  bloqueado: boolean;
+  legado: boolean;
+  aliases: number;
+  /** null = ilimitados. */
+  agentes: number | null;
+  mesaActions: boolean;
+  sends: number;
+  sendsUnlocked: boolean;
+  mailboxes: boolean;
+  mailboxBytes: number;
+  forwardPerHour: number;
+  monthlyForwards: number;
+  logDays: number;
+  /** Días que la Bandeja muestra; null = todo. */
+  retencionDias: number | null;
+  rules: boolean;
+  webhooks: boolean;
+  smtpRelay: boolean;
+  api: boolean;
+  addons: Addon[];
 }
 
-// --- Reenvíos por mes, por cuenta ---
+function suscripcionLegadoVigente(owner: User | null | undefined): boolean {
+  const sub = owner?.subscription;
+  if (!sub || !(sub.status === "active" || sub.status === "cancelled")) return false;
+  if (sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) < new Date()) return false;
+  return true;
+}
+
+/** El primer dominio que creó la cuenta: ése es el gratis. */
+export function dominioMasAntiguo(ownerEmail: string): string | null {
+  const r = db.select({ id: domains.id }).from(domains)
+    .where(eq(domains.ownerEmail, ownerEmail)).orderBy(asc(domains.createdAt)).limit(1).get();
+  return r?.id ?? null;
+}
+
+export function derechosDeDominio(domain: { id: string; ownerEmail: string }, owner?: User | null): DerechosDominio {
+  const propios = listEffectiveAddonsForDomain(domain.id);
+  // Los add-ons sin dominio son de antes: aplican a todos los dominios del dueño.
+  const legado = listEffectiveAddons(domain.ownerEmail).filter((a) => !a.domainId);
+  const todos = [...propios, ...legado];
+
+  const legadoVigente = suscripcionLegadoVigente(owner);
+  const activado = legadoVigente || propios.some((a) => a.kind === "domain");
+  const esGratis = !activado && dominioMasAntiguo(domain.ownerEmail) === domain.id;
+  const bloqueado = !activado && !esGratis;
+
+  const cuenta = (kind: string) => todos.filter((a) => a.kind === kind).length;
+  const sendsExtra = cuenta("sends100") * 100 + cuenta("sends25") * 25;
+  const bytesExtra = cuenta("storage50") * ADDONS.storage50.bytes + cuenta("mailbox") * LEGACY_ADDONS.mailbox.bytes;
+
+  if (activado) {
+    return {
+      activado, esGratis: false, bloqueado: false, legado: legadoVigente,
+      aliases: DOMINIO_ACTIVADO.aliases,
+      agentes: null,
+      mesaActions: true,
+      sends: DOMINIO_ACTIVADO.sends + sendsExtra,
+      sendsUnlocked: true,
+      mailboxes: true,
+      mailboxBytes: DOMINIO_ACTIVADO.mailboxBytes + bytesExtra,
+      forwardPerHour: DOMINIO_ACTIVADO.forwardPerHour,
+      monthlyForwards: DOMINIO_ACTIVADO.monthlyForwards,
+      logDays: DOMINIO_ACTIVADO.logDays,
+      retencionDias: null,
+      rules: true, webhooks: true, smtpRelay: true, api: true,
+      addons: todos,
+    };
+  }
+  return {
+    activado, esGratis, bloqueado, legado: false,
+    aliases: DOMINIO_GRATIS.aliases,
+    agentes: 0,
+    mesaActions: true,
+    // Un add-on de envíos legado sobre un dominio gratis sigue valiendo lo que se pagó.
+    sends: sendsExtra,
+    sendsUnlocked: sendsExtra > 0,
+    mailboxes: false,
+    mailboxBytes: 0,
+    forwardPerHour: DOMINIO_GRATIS.forwardPerHour,
+    monthlyForwards: DOMINIO_GRATIS.monthlyForwards,
+    logDays: DOMINIO_GRATIS.logDays,
+    retencionDias: DOMINIO_GRATIS.retencionDias,
+    rules: false, webhooks: false, smtpRelay: false, api: true,
+    addons: todos,
+  };
+}
+
+/** Atajo por id: carga dominio y dueño. null si el dominio no existe. */
+export function derechosPorDominioId(domainId: string): DerechosDominio | null {
+  const d = db.select().from(domains).where(eq(domains.id, domainId)).get();
+  if (!d) return null;
+  const u = db.select().from(users).where(eq(users.email, d.ownerEmail)).get();
+  return derechosDeDominio({ id: d.id, ownerEmail: d.ownerEmail }, u ? rowToUser(u) : null);
+}
+
+// --- Reenvíos por mes, POR DOMINIO ---
 //
-// Reusa `send_counts` con una llave sintética: domain_id = "fwd:<correo>" y month = YYYY-MM.
-// Un correo entrante cuenta una vez aunque el alias tenga varios destinos.
-const fwdKey = (email: string) => `fwd:${email.toLowerCase()}`;
+// Reusa `send_counts` con una llave sintética: domain_id = "fwd:<domainId>" y
+// month = YYYY-MM. Antes era por cuenta ("fwd:<correo>"); con precio por dominio el tope
+// tiene que ser por dominio. Un correo entrante cuenta una vez aunque el alias tenga
+// varios destinos.
+const fwdKey = (domainId: string) => `fwd:${domainId}`;
 const monthKey = () => new Date().toISOString().slice(0, 7);
 
-export function incrementMonthlyForwards(userEmail: string): number {
+export function incrementMonthlyForwards(domainId: string): number {
   const expiresAt = new Date(Date.now() + 45 * 86400_000).toISOString();
-  const rows = db.insert(sendCounts).values({ domainId: fwdKey(userEmail), month: monthKey(), count: 1, expiresAt })
+  const rows = db.insert(sendCounts).values({ domainId: fwdKey(domainId), month: monthKey(), count: 1, expiresAt })
     .onConflictDoUpdate({ target: [sendCounts.domainId, sendCounts.month], set: { count: rawSql`${sendCounts.count} + 1` } })
     .returning().all();
   return rows[0].count;
 }
 
-export function getMonthlyForwards(userEmail: string): number {
+export function getMonthlyForwards(domainId: string): number {
   const row = db.select().from(sendCounts)
-    .where(and(eq(sendCounts.domainId, fwdKey(userEmail)), eq(sendCounts.month, monthKey()))).get();
+    .where(and(eq(sendCounts.domainId, fwdKey(domainId)), eq(sendCounts.month, monthKey()))).get();
   return row?.count ?? 0;
 }
 
@@ -1457,31 +1553,56 @@ export function restoreConversation(domainId: string, id: string): boolean {
   return result.changes > 0;
 }
 
-export function purgeDeletedConversations(days: number): { s3Bucket: string; s3Key: string }[] {
-  const cutoff = new Date(Date.now() - days * 24 * 3600_000).toISOString();
-  // Collect S3 keys from messages belonging to conversations that will be purged
+/**
+ * Borra de verdad las conversaciones que cumplan `where` (SQL sobre el alias `c`).
+ * Hace las CUATRO cosas: llaves de S3 para el llamador, índice FTS (no cae con el
+ * CASCADE: messages_fts es una tabla virtual sin claves foráneas), la fila (el CASCADE
+ * se lleva messages, notes y conversation_reads), y devuelve las llaves para borrar los
+ * objetos fuera de la transacción. Todo borrado de conversaciones pasa por aquí para
+ * que nadie olvide la FTS, que es justo lo que se olvida.
+ */
+function purgarConversaciones(where: string, params: unknown[]): { s3Bucket: string; s3Key: string }[] {
   const s3Rows = sqlite.prepare(`
     SELECT m.s3_bucket, m.s3_key FROM messages m
     JOIN conversations c ON m.conversation_id = c.id
-    WHERE c.deleted_at IS NOT NULL AND c.deleted_at < ?
+    WHERE ${where}
       AND m.s3_bucket IS NOT NULL AND m.s3_key IS NOT NULL
-  `).all(cutoff) as any[];
+  `).all(...params) as any[];
   const s3Keys = s3Rows.map((r: any) => ({ s3Bucket: r.s3_bucket, s3Key: r.s3_key }));
 
-  // El índice de búsqueda no cae con el CASCADE: messages_fts es una tabla
-  // virtual sin claves foráneas. Se poda a mano o quedan huérfanos que harían
-  // aparecer en resultados hilos que ya no existen.
-  const convsAPurgar = sqlite.prepare(
-    `SELECT id FROM conversations WHERE deleted_at IS NOT NULL AND deleted_at < ?`
-  ).all(cutoff) as { id: string }[];
-  for (const c of convsAPurgar) deleteFtsForConversation(c.id);
-
-  // Delete conversations (CASCADE handles messages + notes)
-  db.delete(conversations)
-    .where(and(isNotNull(conversations.deletedAt), lt(conversations.deletedAt, cutoff)))
-    .run();
-
+  const ids = sqlite.prepare(`SELECT c.id FROM conversations c WHERE ${where}`).all(...params) as { id: string }[];
+  for (const c of ids) deleteFtsForConversation(c.id);
+  sqlite.prepare(`DELETE FROM conversations WHERE id IN (SELECT c.id FROM conversations c WHERE ${where})`).run(...params);
   return s3Keys;
+}
+
+export function purgeDeletedConversations(days: number): { s3Bucket: string; s3Key: string }[] {
+  const cutoff = new Date(Date.now() - days * 24 * 3600_000).toISOString();
+  return purgarConversaciones(`c.deleted_at IS NOT NULL AND c.deleted_at < ?`, [cutoff]);
+}
+
+/**
+ * Retención del dominio gratis: a los 30 días el correo se borra de verdad. Sólo toca
+ * dominios sin activar (los activados conservan todo). Devuelve las llaves de S3 y los
+ * ids borrados, para avisar por SSE.
+ */
+export function purgarConversacionesGratis(dias: number): { s3Keys: { s3Bucket: string; s3Key: string }[]; borradas: { id: string; domainId: string }[] } {
+  const cutoff = new Date(Date.now() - dias * 24 * 3600_000).toISOString();
+  const candidatas = sqlite.prepare(`
+    SELECT c.id, c.domain_id AS domainId FROM conversations c
+    WHERE c.last_message_at < ?
+  `).all(cutoff) as { id: string; domainId: string }[];
+  // El corte lo decide `derechosPorDominioId`, que es la única autoridad: aquí no se
+  // adivina por add-ons ni por planes.
+  const porDominio = new Map<string, boolean>();
+  const borradas = candidatas.filter((c) => {
+    if (!porDominio.has(c.domainId)) porDominio.set(c.domainId, derechosPorDominioId(c.domainId)?.retencionDias != null);
+    return porDominio.get(c.domainId)!;
+  });
+  if (!borradas.length) return { s3Keys: [], borradas: [] };
+  const marcadores = borradas.map(() => "?").join(",");
+  const s3Keys = purgarConversaciones(`c.id IN (${marcadores})`, borradas.map((c) => c.id));
+  return { s3Keys, borradas };
 }
 
 // --- Messages ---
@@ -1773,17 +1894,6 @@ export function getAgentInvite(token: string): { domainId: string; email: string
 export function deleteAgentInvite(token: string): void {
   db.delete(tokens).where(and(eq(tokens.token, token), eq(tokens.kind, "agent-invite"))).run();
 }
-
-// --- Plan limits extension for Mesa/agents ---
-
-export const PLAN_MESA_LIMITS = {
-  basico:     { mesaActions: true,  agents: 0 },
-  equipo:     { mesaActions: true,  agents: 5 },
-  freelancer: { mesaActions: true,  agents: 3 },
-  developer:  { mesaActions: true,  agents: 10 },
-  pro:        { mesaActions: true,  agents: 3 },
-  agencia:    { mesaActions: true,  agents: 10 },
-} as const;
 
 // --- Admin: list all users ---
 
@@ -2447,6 +2557,10 @@ export function searchConversations(
   if (opts?.status) { filtros.push(`AND c.status = ?`); extra.push(opts.status); }
   if (opts?.assignedTo) { filtros.push(`AND c.assigned_to = ?`); extra.push(opts.assignedTo); }
   if (opts?.to) { filtros.push(`AND c."to" = ?`); extra.push(opts.to); }
+  // Sin este corte, buscar devolvería con snippet los hilos que la lista oculta: una
+  // fuga del contenido que se supone fuera de la ventana gratis.
+  const corte = corteRetencion(domainId);
+  if (corte) { filtros.push(`AND c.last_message_at >= ?`); extra.push(corte); }
 
   if (ftsDisponible) {
     const match = sanitizarConsultaFts(consulta);
@@ -2558,6 +2672,12 @@ export interface PaginaConversaciones {
   nextCursor: string | null;
 }
 
+/** Fecha ISO desde la que un dominio gratis ve su Bandeja (7 días); null = todo. */
+export function corteRetencion(domainId: string): string | null {
+  const dias = derechosPorDominioId(domainId)?.retencionDias ?? null;
+  return dias ? new Date(Date.now() - dias * 86400_000).toISOString() : null;
+}
+
 export function listConversationsPage(
   domainId: string,
   opts?: { status?: string; assignedTo?: string; to?: string; limit?: number; cursor?: string; forAgent?: string }
@@ -2566,6 +2686,12 @@ export function listConversationsPage(
 
   const filtros: string[] = [];
   const params: any[] = [domainId];
+
+  // Dominio gratis: la Bandeja muestra 7 días. Es un corte en la consulta, no en los
+  // datos — activar el dominio devuelve los 30 que siguen guardados. `last_message_at`
+  // es justo la columna del cursor keyset, así que recorta la cola sin romper páginas.
+  const corte = corteRetencion(domainId);
+  if (corte) { filtros.push(`AND c.last_message_at >= ?`); params.push(corte); }
 
   // status=deleted es un modo especial, igual que en listConversations.
   if (opts?.status === "deleted") {
@@ -2782,12 +2908,15 @@ export function markConversationRead(domainId: string, conversationId: string, a
 }
 
 export function countUnread(domainId: string, agentEmail: string): number {
+  // Mismo corte que la lista: si no, el contador diría "3" sobre una bandeja vacía.
+  const corte = corteRetencion(domainId);
   const row = sqlite.prepare(`
     SELECT COUNT(*) AS n FROM conversations c
     LEFT JOIN conversation_reads r ON r.conversation_id = c.id AND r.agent_email = ?
     WHERE c.domain_id = ? AND c.deleted_at IS NULL AND c.status = 'open'
       AND (r.last_read_at IS NULL OR r.last_read_at < c.last_message_at)
-  `).get(agentEmail, domainId) as { n: number };
+      ${corte ? "AND c.last_message_at >= ?" : ""}
+  `).get(...(corte ? [agentEmail, domainId, corte] : [agentEmail, domainId])) as { n: number };
   return row?.n ?? 0;
 }
 

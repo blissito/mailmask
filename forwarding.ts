@@ -1,4 +1,4 @@
-import { getDomainByName, getAlias, isSuppressed, listAliases, listRules, addLog, bumpAliasStats, getUser, getUserPlanLimits, incrementMonthlyForwards, getMonthlyForwards, claimOnce, planLabel, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, indexMessage, type Rule, type ForwardQueueItem } from "./db.js";
+import { getDomainByName, getAlias, isSuppressed, listAliases, listRules, addLog, bumpAliasStats, getUser, derechosDeDominio, incrementMonthlyForwards, getMonthlyForwards, claimOnce, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, indexMessage, type Rule, type ForwardQueueItem } from "./db.js";
 import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchEmailHeadersFromS3, sendFromDomain } from "./ses.js";
 import { sendTemplate, firstEmailReceived, forwardCapWarning, forwardCapReached } from "./emails.js";
 import { checkRateLimit } from "./rate-limit.js";
@@ -485,19 +485,13 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     const domain = await getDomainByName(domainName);
     if (!domain || !domain.verified) continue;
 
-    // Check owner's plan — block forwarding if expired/no plan
-    let logDays = 15; // default
-    let forwardPerHour = 100; // default
+    // Derechos de ESTE dominio. Ya no existe "sin plan": el gratis reenvía con sus
+    // topes. Lo único que se frena es el 2.º dominio sin activar (`bloqueado`), y aun
+    // así el correo se guarda en la Bandeja más abajo — sólo no se reenvía.
     const owner = await getUser(domain.ownerEmail);
-    if (owner) {
-      const planLimits = getUserPlanLimits(owner);
-      if (planLimits.domains === 0) {
-        log("info", "forwarding", "Forwarding blocked: no active plan", { ownerEmail: domain.ownerEmail });
-        continue;
-      }
-      if (planLimits.logDays > 0) logDays = planLimits.logDays;
-      forwardPerHour = planLimits.forwardPerHour;
-    }
+    const derechos = derechosDeDominio(domain, owner);
+    const logDays = derechos.logDays;
+    const forwardPerHour = derechos.forwardPerHour;
 
     // Rate limit: per-domain forwarding
     const rlResult = checkRateLimit(`fwd:${domain.id}`, forwardPerHour, 3600_000);
@@ -586,20 +580,32 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     const matched = alias?.enabled ? alias : (catchAll?.enabled ? catchAll : null);
 
     if (matched) {
-      // Tope mensual por cuenta: el correo ya quedó en la Bandeja (arriba); lo que se
+      // Dominio bloqueado (el 2.º sin activar): ya quedó en la Bandeja; no se reenvía.
+      if (derechos.bloqueado) {
+        await addLog({
+          domainId: domain.id, timestamp: new Date().toISOString(),
+          from, to: recipient, subject,
+          status: "discarded", forwardedTo: "", sizeBytes: rawContent.length,
+          error: "Dominio sin activar: guardado en la Bandeja, no reenviado",
+        }, logDays);
+        discarded++;
+        continue;
+      }
+
+      // Tope mensual POR DOMINIO: el correo ya quedó en la Bandeja (arriba); lo que se
       // frena es el reenvío al buzón externo, que es la mitad del costo y lo que un
       // ataque a un catch-all infla sin límite.
       //
       // Un alias que sólo GUARDA (buzón IMAP, sin destinos) no gasta cuota: lo que el
       // tope acota es el envío por SES, y guardar en el buzón no manda ningún correo.
       if (owner && matched.destinations.length > 0) {
-        const cap = getUserPlanLimits(owner).monthlyForwards;
-        const used = getMonthlyForwards(owner.email);
+        const cap = derechos.monthlyForwards;
+        const used = getMonthlyForwards(domain.id);
         const month = new Date().toISOString().slice(0, 7);
         if (cap > 0 && used >= cap) {
-          if (claimOnce("fwd-cap-reached", `${owner.email}:${month}`)) {
-            sendTemplate(owner.email, forwardCapReached({ cap, plan: planLabel(owner.subscription?.plan) })).catch(() => {});
-            await sendAlert("fwd-monthly-cap", `Monthly forward cap reached: ${owner.email} (${cap}/mo)`);
+          if (claimOnce("fwd-cap-reached", `${domain.id}:${month}`)) {
+            sendTemplate(owner.email, forwardCapReached({ cap, plan: derechos.activado ? `${domainName} (activado)` : `${domainName} (gratis)` })).catch(() => {});
+            await sendAlert("fwd-monthly-cap", `Monthly forward cap reached: ${domainName} (${cap}/mo)`);
           }
           await addLog({
             domainId: domain.id, timestamp: new Date().toISOString(),
@@ -610,9 +616,9 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
           discarded++;
           continue;
         }
-        const after = incrementMonthlyForwards(owner.email);
-        if (cap > 0 && after >= Math.ceil(cap * 0.8) && claimOnce("fwd-cap-warn", `${owner.email}:${month}`)) {
-          sendTemplate(owner.email, forwardCapWarning({ used: after, cap, plan: planLabel(owner.subscription?.plan) })).catch(() => {});
+        const after = incrementMonthlyForwards(domain.id);
+        if (cap > 0 && after >= Math.ceil(cap * 0.8) && claimOnce("fwd-cap-warn", `${domain.id}:${month}`)) {
+          sendTemplate(owner.email, forwardCapWarning({ used: after, cap, plan: derechos.activado ? `${domainName} (activado)` : `${domainName} (gratis)` })).catch(() => {});
         }
       }
       for (const dest of matched.destinations) {

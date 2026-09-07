@@ -77,11 +77,9 @@ function toggleBilling() {
   toggle.className = "relative w-14 h-7 " + (isYearly ? "bg-accent" : "bg-line") + " rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-mask-500";
   labelM.className = "text-sm font-semibold " + (isYearly ? "text-fg-subtle" : "text-fg");
   labelY.className = "text-sm font-semibold " + (isYearly ? "text-fg" : "text-fg-subtle");
-  badge.textContent = isYearly ? "2 meses gratis" : "Primer mes gratis";
+  badge.textContent = isYearly ? "2 meses gratis" : "2 meses gratis al año";
 
   document.querySelectorAll(".pricing-card[data-plan]").forEach((card) => {
-    // Skip coupon card — applyCouponToCard handles it
-    if (loadedCoupon && card.dataset.plan === loadedCoupon.plan) return;
 
     const price = card.querySelector(".plan-price");
     const period = card.querySelector(".plan-period");
@@ -113,132 +111,9 @@ function toggleBilling() {
     { opacity: 1, transform: "scale(1)" },
   ], { duration: 250, easing: "ease-out", fill: "forwards" });
 
-  // Re-apply coupon price after toggle overwrites it
-  applyCouponToCard();
 }
 
-// `mode` distingue los dos usos del mismo modal:
-//   "guest" — invitado sin cuenta: el correo sirve para crear la cuenta Y como payer_email.
-//   "mp"    — ya tiene sesión: solo pedimos el correo de su cuenta de MercadoPago, porque
-//             MP rechaza el pago si el payer_email no es el de la cuenta con la que paga
-//             ("Tu e-mail no coincide con el de la suscripción") y el campo es obligatorio
-//             en su API, así que no hay forma de omitirlo.
-function showEmailModal(plan, billing, btn, mode = "guest") {
-  const modal = document.getElementById("email-modal");
-  const input = document.getElementById("email-modal-input");
-  const error = document.getElementById("email-modal-error");
-  const title = document.getElementById("email-modal-title");
-  const hint = document.getElementById("email-modal-hint");
-  if (mode === "mp") {
-    title.textContent = "Tu correo de MercadoPago";
-    hint.textContent = "Debe ser el correo de la cuenta de MercadoPago con la que vas a pagar. Si no coincide, MercadoPago rechaza el pago.";
-    input.value = _loggedInUser?.email ?? "";
-  } else {
-    title.textContent = "Tu email para continuar";
-    hint.textContent = "Usaremos este email para tu cuenta y recibos. Debe ser el de tu cuenta de MercadoPago.";
-    input.value = "";
-  }
-  error.textContent = "";
-  modal.dataset.mode = mode;
-  modal.dataset.plan = plan;
-  modal.dataset.billing = billing;
-  modal._btn = btn;
-  if (modal.classList.contains("hidden")) { modal.classList.remove("hidden"); lockBodyScroll(); }
-  setTimeout(() => input.focus(), 100);
-}
-
-function hideEmailModal() {
-  const el = document.getElementById("email-modal");
-  if (el.classList.contains("hidden")) return;
-  el.classList.add("hidden");
-  unlockBodyScroll();
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("email-modal-close")?.addEventListener("click", hideEmailModal);
-  document.getElementById("email-modal")?.addEventListener("click", (e) => {
-    if (e.target === e.currentTarget) hideEmailModal();
-  });
-  document.getElementById("email-modal-form")?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const modal = document.getElementById("email-modal");
-    const input = document.getElementById("email-modal-input");
-    const error = document.getElementById("email-modal-error");
-    const email = input.value.trim();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      error.textContent = "Ingresa un email válido";
-      return;
-    }
-    error.textContent = "";
-    const btn = modal._btn;
-    hideEmailModal();
-    if (modal.dataset.mode === "mp") {
-      await doAuthCheckout(modal.dataset.plan, modal.dataset.billing, btn, email);
-    } else {
-      await doCheckout(modal.dataset.plan, modal.dataset.billing, btn, email);
-    }
-  });
-});
-
-async function startCheckout(plan, billing, btn) {
-  if (_loggedInUser) {
-    // Con sesión igual preguntamos el correo: el de MailMask no tiene por qué ser el de
-    // su cuenta de MercadoPago, y MP rechaza el pago si no coinciden.
-    showEmailModal(plan, billing, btn, "mp");
-  } else {
-    showEmailModal(plan, billing, btn);
-  }
-}
-
-async function doAuthCheckout(plan, billing, btn, payerEmail) {
-  btn.disabled = true;
-  btn.textContent = "Redirigiendo...";
-  try {
-    const coupon = new URLSearchParams(location.search).get("coupon") || undefined;
-    const res = await fetch("/api/billing/checkout", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ plan, billing: (loadedCoupon && plan === loadedCoupon.plan) ? "monthly" : billing, coupon, payerEmail }),
-    });
-    const data = await res.json();
-    if (data.init_point) {
-      location.href = data.init_point;
-    } else {
-      alert(data.error || "Error al iniciar el pago");
-      btn.disabled = false;
-      btn.textContent = "Empezar";
-    }
-  } catch {
-    alert("Error de conexión");
-    btn.disabled = false;
-    btn.textContent = "Empezar";
-  }
-}
-
-async function doCheckout(plan, billing, btn, email) {
-  btn.disabled = true;
-  btn.textContent = "Redirigiendo...";
-  try {
-    const coupon = new URLSearchParams(location.search).get("coupon") || undefined;
-    const res = await fetch("/api/billing/guest-checkout", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ plan, billing: (loadedCoupon && plan === loadedCoupon.plan) ? "monthly" : billing, coupon, email }),
-    });
-    const data = await res.json();
-    if (data.init_point) {
-      location.href = data.init_point;
-    } else {
-      alert(data.error || "Error al iniciar el pago");
-      btn.disabled = false;
-      btn.textContent = "Empezar";
-    }
-  } catch {
-    alert("Error de conexión");
-    btn.disabled = false;
-    btn.textContent = "Empezar";
-  }
-}
+// El checkout de plan desapareció el 7-sep-2026: todo se compra por dominio desde la app.
 
 // --- Calculadora: la asimetría de precio ---
 // Workspace escala con personas; MailMask con dominios. Antes cada slider alimentaba
@@ -251,7 +126,6 @@ async function doCheckout(plan, billing, btn, email) {
 
   const $ = (id) => document.getElementById(id);
   const GW_POR_PERSONA = 140; // Business Starter, precio oficial en México (sep-2026)
-  const ENVIOS = 49;      // add-on de envíos, para comparar equivalente con Workspace
   const MAX_U = 20;
 
   // Geometría del SVG
@@ -259,19 +133,16 @@ async function doCheckout(plan, billing, btn, email) {
   const px = (u) => L + ((u - 1) / (MAX_U - 1)) * (W - L - R);
   const money = (n) => "$" + n.toLocaleString("es-MX");
 
-  // `base` es lo que cuesta recibir y responder — el "desde $49" del encabezado.
-  // `conEnvio` suma el add-on solo donde hace falta: Equipo ya incluye iniciar
-  // correos, así que ahí las dos cifras coinciden. Dominio extra: $79 en ambos planes.
-  const DOMINIO_EXTRA = 79;
+  // Modelo del 7-sep-2026: el primer dominio es gratis y cada dominio activado cuesta
+  // $99 con todo incluido — personas ilimitadas, así que la línea de MailMask es plana
+  // respecto a las personas. `base` es recibir y responder; `conEnvio` incluye iniciar
+  // correos, que viene con el dominio activado. Con un dominio gratis, iniciar correos
+  // exige activarlo ($99); con dominios activados, ya va incluido.
+  const DOMINIO = 99;
   function precioMailMask(d) {
-    if (d === 1) return { base: 49, conEnvio: 49 + ENVIOS, plan: "Básico · 1 dominio" };
-    if (d === 2) {
-      const b = 49 + DOMINIO_EXTRA;
-      return { base: b, conEnvio: b + ENVIOS, plan: "Básico + 1 dominio extra" };
-    }
-    if (d <= 5) return { base: 299, conEnvio: 299, plan: "Equipo · hasta 5 dominios" };
-    const b = 299 + (d - 5) * DOMINIO_EXTRA;
-    return { base: b, conEnvio: b, plan: `Equipo + ${d - 5} dominio${d - 5 > 1 ? "s" : ""} extra` };
+    if (d === 1) return { base: 0, conEnvio: DOMINIO, plan: "1 dominio gratis" };
+    const b = d * DOMINIO;
+    return { base: b, conEnvio: b, plan: `${d} dominios activados · $99 c/u` };
   }
 
   function dibujarGrid(maxY) {
@@ -337,8 +208,8 @@ async function doCheckout(plan, billing, btn, email) {
     $("calc-mm-price").textContent = money(mm.base);
     $("calc-mm-plan").textContent = mm.plan;
     $("calc-mm-envio").textContent = mm.conEnvio > mm.base
-      ? `+$${ENVIOS} si además quieres iniciar correos`
-      : "Incluye iniciar correos";
+      ? `$${DOMINIO} si además quieres iniciar correos, equipo y buzones`
+      : "Incluye iniciar correos, equipo ilimitado y buzones";
 
     const ahorro = Math.max(0, (gw - mm.base) * 12);
     $("calc-savings").textContent = money(ahorro);
@@ -376,188 +247,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Bind billing toggle and checkout buttons
 document.getElementById("billing-toggle")?.addEventListener("click", toggleBilling);
-document.querySelectorAll(".checkout-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const plan = btn.closest("[data-plan]").dataset.plan;
-    startCheckout(plan, currentBilling, btn);
-  });
-});
+// Los cupones de plan desaparecieron con los planes (7-sep-2026).
 
-// --- Coupon display ---
-let loadedCoupon = null;
-
-function applyCouponToCard() {
-  if (!loadedCoupon) return;
-  const card = document.querySelector(`.pricing-card[data-plan="${loadedCoupon.plan}"]`);
-  if (!card) return;
-
-  const priceEl = card.querySelector(".plan-price");
-  const displayPrice = Math.round(loadedCoupon.fixedPrice / 100);
-  if (priceEl) {
-    const originalPrice = currentBilling === "yearly" ? card.dataset.yearly : card.dataset.monthly;
-    priceEl.innerHTML = `<span class="line-through text-fg-subtle text-2xl mr-2">$${originalPrice}</span>$${displayPrice.toLocaleString("es-MX")}`;
-  }
-
-  // Lock period label to /mes since coupon is monthly
-  const periodEl = card.querySelector(".plan-period");
-  if (periodEl) periodEl.textContent = "/mes";
-}
-
-(async () => {
-  const couponCode = new URLSearchParams(location.search).get("coupon");
-  if (!couponCode) return;
-  try {
-    const res = await fetch(`/api/coupons/${encodeURIComponent(couponCode)}`);
-    if (!res.ok) return;
-    loadedCoupon = await res.json();
-    const card = document.querySelector(`.pricing-card[data-plan="${loadedCoupon.plan}"]`);
-    if (!card) return;
-
-    applyCouponToCard();
-
-    // Add coupon badge
-    const badgeEl = document.createElement("div");
-    badgeEl.className = "absolute -top-3 right-4 bg-accent text-white text-xs font-bold px-3 py-1 rounded-full";
-    badgeEl.textContent = loadedCoupon.description;
-    card.style.position = "relative";
-    card.appendChild(badgeEl);
-
-    // Highlight card border
-    card.classList.add("!border-accent");
-  } catch { /* ignore */ }
-})();
-
-// Video de Brenda: lite embed. El iframe de YouTube se carga cuando la sección
-// entra en pantalla, en silencio y en bucle (los navegadores sólo permiten
-// autoplay sin audio); el usuario activa el sonido con los controles del player.
-// Si el usuario da clic antes, arranca con audio. Thumbnail local para no abrir
-// img-src en la CSP; frame-src sí permite youtube-nocookie.com.
-(() => {
-  const box = document.getElementById("brenda-video");
-  if (!box) return;
-  const id = box.dataset.videoId;
-  let loaded = false;
-  const load = (muted) => {
-    if (loaded) return;
-    loaded = true;
-    // Arranca en 1:12, donde Brenda entra en materia.
-    const q = (muted ? "autoplay=1&mute=1&loop=1&playlist=" + encodeURIComponent(id) : "autoplay=1") + "&start=72";
-    const iframe = document.createElement("iframe");
-    iframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?${q}&rel=0&playsinline=1`;
-    iframe.title = "Brenda cuenta cómo usa MailMask";
-    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-    iframe.allowFullscreen = true;
-    iframe.className = "absolute inset-0 h-full w-full";
-    box.replaceChildren(iframe);
-  };
-  document.getElementById("brenda-play")?.addEventListener("click", () => load(false));
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  new IntersectionObserver((entries, obs) => {
-    if (entries.some((e) => e.isIntersecting)) { load(true); obs.disconnect(); }
-  }, { threshold: 0.5 }).observe(box);
-})();
-
-// --- Demo animada de la Bandeja (hero) ---
-// Un guion en bucle: llega el correo de Ana, se asigna, se responde (tecleado), sale
-// firmado con DKIM, se deja una nota interna y se resuelve. Con prefers-reduced-motion
-// no arranca y la maqueta queda en su estado final, que es el markup tal cual.
-(() => {
-  const root = document.getElementById("hero-demo");
-  if (!root || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const q = (k) => root.querySelector(`[data-demo="${k}"]`);
-  const el = {
-    count: q("count"), ana: q("ana"), luis: q("luis"), assign: q("assign"), detail: q("detail"),
-    subject: q("subject"), from: q("from"), status: q("status"), msg: q("msg"), reply: q("reply"),
-    typed: q("typed"), note: q("note"), dkim: q("dkim"), anaTime: q("ana-time"),
-  };
-  const caret = root.querySelector(".demo-caret");
-  const REPLY = el.typed.textContent;
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const on = (...xs) => xs.forEach((x) => x && x.classList.add("on"));
-  const off = (...xs) => xs.forEach((x) => x && x.classList.remove("on"));
-  let running = true;
-  document.addEventListener("visibilitychange", () => { running = !document.hidden; });
-
-  const setCount = (n) => {
-    el.count.textContent = String(n);
-    el.count.classList.add("bump");
-    setTimeout(() => el.count.classList.remove("bump"), 250);
-  };
-  const showDetail = async (subject, from, msgText) => {
-    el.detail.classList.add("swap");
-    await sleep(300);
-    el.subject.textContent = subject;
-    el.from.textContent = from;
-    el.msg.textContent = msgText;
-    el.status.textContent = "Abierto";
-    el.status.className = "chip chip-ok flex-shrink-0";
-    off(el.reply, el.note, el.dkim);
-    el.detail.classList.remove("swap");
-    await sleep(120);
-    on(el.msg);
-  };
-  const type = async (text) => {
-    el.typed.textContent = "";
-    caret.classList.remove("off");
-    for (let i = 0; i < text.length; i++) {
-      if (!running) { await sleep(400); i--; continue; }
-      el.typed.textContent += text[i];
-      await sleep(text[i] === " " ? 34 : 22 + Math.random() * 30);
-    }
-    caret.classList.add("off");
-  };
-
-  async function scene() {
-    root.classList.add("is-live");
-    // Estado inicial: Ana todavía no ha escrito; leemos a Luis.
-    off(el.ana, el.assign, el.reply, el.note, el.dkim);
-    el.ana.classList.remove("done", "on");
-    el.status.classList.remove("chip-done");
-    setCount(3);
-    on(el.luis);
-    await showDetail("Re: Factura pendiente de agosto", "Luis Ramírez <luis@proveedor.mx> → cobranza@tuempresa.com",
-      "Buen día, ¿me confirman si ya quedó programado el pago de la factura 0821? Gracias.");
-    await sleep(1600);
-
-    // Llega Ana.
-    el.anaTime.textContent = "ahora";
-    on(el.ana); setCount(4);
-    await sleep(1400);
-
-    // La abrimos y la asignamos.
-    off(el.luis); el.ana.classList.add("on");
-    await showDetail("Cotización para proyecto web", "Ana García <ana@cliente.com> → ventas@tuempresa.com",
-      "Hola, me interesa una cotización para rediseñar nuestra página. ¿Podrían enviarme información de sus paquetes?");
-    await sleep(900);
-    on(el.assign);
-    await sleep(700);
-
-    // Respondemos desde ventas@, tecleado.
-    el.typed.textContent = "";
-    on(el.reply);
-    await sleep(350);
-    await type(REPLY);
-    await sleep(400);
-    on(el.dkim);
-    await sleep(900);
-
-    // Nota interna y resolver.
-    on(el.note);
-    await sleep(1400);
-    el.status.textContent = "Resuelto";
-    el.status.className = "chip chip-done flex-shrink-0";
-    el.ana.classList.add("done");
-    el.anaTime.textContent = "hace 1m";
-    setCount(3);
-    await sleep(2600);
-  }
-
-  (async () => {
-    // Espera a que el hero haya entrado (la maqueta trae fade-up de 0.7s).
-    await sleep(900);
-    for (;;) {
-      if (!running) { await sleep(500); continue; }
-      await scene();
-    }
-  })();
-})();

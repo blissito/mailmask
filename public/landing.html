@@ -74,15 +74,15 @@
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Cloud-based",
         "url": "https://www.mailmask.studio",
-        "description": "Email profesional en tu dominio con reenvío, envío autenticado DKIM+SPF, bandeja compartida, REST API y SMTP relay.",
+        "description": "Correo de tu dominio para todo tu equipo: gratis para empezar y $99 MXN al mes por dominio con todo incluido — bandeja compartida, buzones IMAP, envío autenticado DKIM+SPF, REST API y SMTP relay. Personas ilimitadas.",
         "offers": {
           "@type": "AggregateOffer",
-          "lowPrice": "49",
-          "highPrice": "999",
+          "lowPrice": "0",
+          "highPrice": "99",
           "priceCurrency": "MXN",
-          "offerCount": 3
+          "offerCount": 2
         },
-        "featureList": ["REST API", "SMTP Relay", "Email Forwarding", "DKIM/SPF Authentication", "Shared Inbox", "Webhooks (upcoming)"]
+        "featureList": ["Shared Inbox", "IMAP Mailboxes", "Email Forwarding", "DKIM/SPF Authentication", "REST API", "SMTP Relay", "Webhooks"]
       }
     </script>
     <script type="application/ld+json">
@@ -98,7 +98,7 @@
           "height": 630
         },
         "image": "https://www.mailmask.studio/img/og-image.png",
-        "description": "Email profesional en tu dominio: máscaras de correo con reenvío al buzón que ya usas, envío autenticado con DKIM y SPF, bandeja compartida para equipos, API REST y SMTP relay. Sin administrar servidores de correo y sin pagar licencia por buzón. Desde $49 MXN al mes.",
+        "description": "Correo profesional en tu propio dominio, para todo tu equipo. Gratis para empezar: apunta tu dominio y ya recibes correo. Por $99 MXN al mes por dominio: bandeja compartida con historial completo, buzones IMAP para Apple Mail y Outlook, envío firmado con DKIM y SPF, API y SMTP. Personas ilimitadas: se cobra por dominio, no por persona.",
         "sameAs": [
           "https://x.com/HectorBlisS",
           "https://github.com/HectorBlisS",
@@ -120,26 +120,43 @@
         "@context": "https://schema.org",
         "@type": "Product",
         "name": "MailMask",
-        "description": "Email profesional en tu dominio con reenvío, envío autenticado DKIM+SPF y bandeja integrada.",
+        "description": "Correo de tu dominio para todo tu equipo. Gratis para empezar; $99 MXN al mes por dominio con todo incluido y personas ilimitadas.",
         "brand": { "@type": "Organization", "name": "MailMask" },
         "offers": [
           {
             "@type": "Offer",
-            "name": "Básico",
-            "price": "49",
+            "name": "Gratis",
+            "description": "Un dominio, reenvío, 5 máscaras y Bandeja con 7 días de historial.",
+            "price": "0",
             "priceCurrency": "MXN",
-            "priceValidUntil": "2026-12-31",
             "availability": "https://schema.org/InStock",
             "url": "https://www.mailmask.studio/#pricing"
           },
           {
             "@type": "Offer",
-            "name": "Equipo",
-            "price": "299",
+            "name": "Dominio activado",
+            "description": "Todo para un dominio: bandeja compartida con personas ilimitadas, buzones IMAP con 10 GB, 50 correos nuevos al día, reglas, webhooks, SMTP y API.",
+            "price": "99",
             "priceCurrency": "MXN",
-            "priceValidUntil": "2026-12-31",
+            "priceValidUntil": "2027-12-31",
             "availability": "https://schema.org/InStock",
             "url": "https://www.mailmask.studio/#pricing"
+          },
+          {
+            "@type": "Offer",
+            "name": "+50 GB de buzón",
+            "price": "99",
+            "priceCurrency": "MXN",
+            "availability": "https://schema.org/InStock",
+            "url": "https://www.mailmask.studio/pricing"
+          },
+          {
+            "@type": "Offer",
+            "name": "+100 envíos al día",
+            "price": "99",
+            "priceCurrency": "MXN",
+            "availability": "https://schema.org/InStock",
+            "url": "https://www.mailmask.studio/pricing"
           }
         ]
       }
@@ -154,7 +171,7 @@
             "name": "¿Qué es una máscara de email?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Una máscara (alias) es una dirección como ventas@tudominio.com que reenvía los emails a tu inbox personal (Gmail, Outlook, etc.). No necesitas crear cuentas de correo nuevas."
+              "text": "Una máscara (alias) es una dirección como ventas@tudominio.com que reenvía los emails a tu inbox personal (Gmail, Outlook, etc.), o que guarda su correo en un buzón propio si activas el dominio. Tú decides si creas cuentas nuevas o sigues leyendo donde ya lees."
             }
           },
           {
@@ -170,7 +187,7 @@
             "name": "¿Puedo enviar emails desde mi dominio?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Sí, y sale firmado con tu dominio. Responder desde la Bandeja está incluido en todos los planes; para iniciar un correo nuevo, Básico necesita el add-on de envíos (+$49 o +$99 al mes) y Equipo ya lo trae. Al agregar tu dominio, MailMask configura DKIM y SPF automáticamente — Gmail y Outlook muestran \"firmado por tudominio.com\" junto al remitente, lo que mejora la entregabilidad y evita que tus emails caigan en spam."
+              "text": "Sí, y sale firmado con tu dominio. Responder desde la Bandeja está incluido también en la cuenta gratis; iniciar correos nuevos viene con el dominio activado ($99 al mes): 50 al día, y bloques de +100 por $99. Al agregar tu dominio, MailMask configura DKIM y SPF automáticamente — Gmail y Outlook muestran \"firmado por tudominio.com\" junto al remitente, lo que mejora la entregabilidad y evita que tus emails caigan en spam."
             }
           },
           {
@@ -178,7 +195,7 @@
             "name": "¿Qué pasa con mis emails si cancelo?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Al cancelar, mantienes acceso hasta el fin del periodo pagado. Después el reenvío se detiene; los correos que ya te reenviamos siguen en tu inbox. Si tienes buzón IMAP, queda en solo lectura 30 días para que descargues todo en formato .mbox antes de borrarse."
+              "text": "Al cancelar la activación, mantienes todo hasta el fin del periodo pagado. Después el dominio vuelve a ser gratis (si es tu primero) y sigue reenviando; los correos que ya te reenviamos siguen en tu inbox. Si tenías buzones IMAP, quedan en solo lectura 30 días para que descargues todo en formato .mbox antes de borrarse."
             }
           },
           {
@@ -187,6 +204,14 @@
             "acceptedAnswer": {
               "@type": "Answer",
               "text": "No leemos tus emails. Se procesan automáticamente para reenviarlos a tu destino. Si usas la Bandeja, el contenido se guarda en nuestra infraestructura de AWS y conservamos el historial completo de tus conversaciones; puedes eliminar las que quieras cuando quieras. Usamos Amazon SES, la misma infraestructura que usan miles de empresas."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "¿Qué incluye la cuenta gratis y qué pasa a los 7 días?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Un dominio, 5 máscaras que reenvían a donde ya lees tu correo (hasta 1,000 al mes), y la Bandeja para leer y responder. La Bandeja muestra los últimos 7 días; los guardamos 30 por si activas el dominio y quieres el historial completo, y a los 30 se borran de verdad. Lo que ya reenviamos a tu inbox es tuyo y se queda."
             }
           },
           {
@@ -202,7 +227,7 @@
             "name": "¿MailMask reemplaza a Gmail o Outlook?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Sí, si tú quieres. La Bandeja es un lugar completo de trabajo: ahí llega el correo de tu dominio, guarda el historial de cada conversación, respondes y escribes correos nuevos, sin que nada pase por Gmail. Y si prefieres no cambiar tu rutina, tampoco tienes que hacerlo: MailMask reenvía a donde ya lees tu correo. Muchos usan las dos cosas. Y si prefieres leer en Apple Mail, Outlook o Thunderbird, también: el add-on de buzón te da IMAP en tu propio dominio, con su contraseña, sin pasar por Gmail."
+              "text": "Sí, si tú quieres. La Bandeja es un lugar completo de trabajo: ahí llega el correo de tu dominio, guarda el historial de cada conversación, respondes y escribes correos nuevos, sin que nada pase por Gmail. Y si prefieres no cambiar tu rutina, tampoco tienes que hacerlo: MailMask reenvía a donde ya lees tu correo. Muchos usan las dos cosas. Y si prefieres leer en tu app de escritorio, también: el dominio activado te da buzones IMAP en tu propio dominio, cada uno con su contraseña, sin pasar por Gmail."
             }
           },
           {
@@ -210,7 +235,7 @@
             "name": "¿En qué se diferencia de Google Workspace?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Google Workspace cobra por usuario ($140 MXN al mes cada uno). Si necesitas 5 direcciones de correo, pagas 5 licencias. Con MailMask creas todas las que tu plan permita por una sola cuota, cada una reenvía a varios destinos. Además envías desde tu dominio sin pagar por buzón: desde la Bandeja con un botón, por API, o con credenciales SMTP en el plan Equipo. Pagas por dominio, no por usuario."
+              "text": "Google Workspace cobra por usuario ($140 MXN al mes cada uno). Si necesitas 5 personas con correo, pagas 5 licencias: $700. Con MailMask un dominio activado cuesta $99 al mes y entran las personas que sean — buzones ilimitados, Bandeja compartida sin límite de asientos, máscaras ilimitadas. Cada una puede reenviar a uno o varios destinos o guardar su propio correo. Pagas por dominio, no por persona."
             }
           },
           {
@@ -218,7 +243,7 @@
             "name": "¿Puedo enviar emails desde mi dominio con un cliente de correo?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Sí, y sin configurar nada: desde el navegador. En la Bandeja recibes, respondes y escribes correos nuevos con el botón Redactar, saliendo como ventas@tudominio.com. ¿Y si prefieres Outlook, Thunderbird o Apple Mail? Para enviar desde ahí también: el plan Equipo incluye credenciales SMTP que pones como servidor de salida, con DKIM y SPF. Y para recibir en ellos: el add-on de buzón (+$99 al mes por dominio, 10 GB) te da IMAP en imap.mailmask.studio, con buzones ilimitados repartiendo esos 10 GB. También puedes seguir reenviando al buzón que ya usas, o las dos cosas."
+              "text": "Sí, y sin configurar nada: desde el navegador. En la Bandeja recibes, respondes y escribes correos nuevos con el botón Redactar, saliendo como ventas@tudominio.com. ¿Y si prefieres Outlook, Thunderbird o Apple Mail? Para enviar desde ahí también: el dominio activado incluye credenciales SMTP que pones como servidor de salida, con DKIM y SPF. Y para recibir en ellos: buzones IMAP ilimitados con 10 GB en imap.mailmask.studio (y +50 GB por $99 cuando hagan falta). También puedes seguir reenviando al buzón que ya usas, o las dos cosas."
             }
           }
         ]
@@ -262,22 +287,22 @@
     <section class="max-w-6xl mx-auto px-5 pt-32 pb-16 md:pt-40 md:pb-24">
       <div class="grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-12 lg:gap-14 items-center">
         <div class="animate-fade-up opacity-0">
-          <p class="eyebrow mb-5 flex items-center gap-2"><span class="inline-block h-px w-6 bg-[rgb(var(--gold))]"></span>Email con tu dominio · desde $49 MXN/mes</p>
+          <p class="eyebrow mb-5 flex items-center gap-2"><span class="inline-block h-px w-6 bg-[rgb(var(--gold))]"></span>Correo con tu dominio · gratis para empezar</p>
           <h1 class="text-[2.6rem] leading-[1.05] sm:text-5xl md:text-[3.4rem] font-semibold tracking-tight">
-            Google cobra por persona.<br />
-            <span class="text-fg-muted">MailMask, por dominio.</span>
+            Correo de tu dominio,<br />
+            <span class="text-fg-muted">para todo tu equipo.</span>
           </h1>
           <p class="mt-6 text-lg text-fg-muted max-w-lg leading-relaxed">
-            Alias como <span class="font-mono text-[0.95em] text-fg">ventas@</span> y <span class="font-mono text-[0.95em] text-fg">soporte@</span>, reenvío a donde ya lees tu correo, bandeja compartida para tu equipo y envío firmado con DKIM y SPF. Un precio por dominio, no por buzón.
+            Apunta tu dominio y ya recibes correo, gratis. Cuando quieras al equipo entero —bandeja compartida, buzones en Apple Mail u Outlook, envío firmado— son <strong class="font-semibold text-accent-text">$99 al mes por dominio, todo incluido, personas ilimitadas</strong>.
           </p>
           <div class="mt-8 flex flex-col sm:flex-row gap-3">
             <a href="/register" class="btn-primary group">
-              Configura tu dominio
+              Empieza gratis
               <svg class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5-5 5M6 12h12"/></svg>
             </a>
-            <a href="#pricing" class="btn-secondary">Ver precios</a>
+            <a href="#pricing" class="btn-secondary">Ver qué incluye</a>
           </div>
-          <p class="mt-4 text-sm text-fg-subtle">Primer mes gratis · Pago con MercadoPago · Sin tarjeta para probar</p>
+          <p class="mt-4 text-sm text-fg-subtle">Sin tarjeta para empezar · Un dominio gratis · $99/mes por dominio cuando lo actives</p>
         </div>
 
         <!-- Maqueta de la Bandeja (datos ficticios). landing.js la anima en bucle:
@@ -569,91 +594,74 @@
     <section id="pricing" class="max-w-6xl mx-auto px-5 py-20 border-t border-line">
       <p class="eyebrow mb-3">05 — Precio</p>
       <div class="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 lg:gap-16 items-end mb-12">
-        <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight">Precios simples. Un dominio, un precio.</h2>
+        <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight">Gratis para empezar. $99 por dominio para todo lo demás.</h2>
         <div>
-          <p class="text-lg text-fg-muted leading-relaxed">Sin contratos ni letras chiquitas. Cancela cuando quieras. <strong class="font-semibold text-accent-text">Los miembros de tu equipo no cuestan nada extra.</strong></p>
+          <p class="text-lg text-fg-muted leading-relaxed">Un solo número. Sin planes que comparar, sin letras chiquitas, sin cobro por persona. <strong class="font-semibold text-accent-text">Tu equipo entero cabe en el mismo precio.</strong></p>
         </div>
       </div>
 
-      <!-- Billing toggle -->
+      <!-- Billing toggle: sólo afecta al dominio activado -->
       <div class="flex items-center justify-center gap-3 mb-12">
         <span id="label-monthly" class="text-sm font-semibold text-fg">Mensual</span>
         <button id="billing-toggle" class="relative w-14 h-7 bg-line rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent">
           <span id="toggle-dot" class="absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform"></span>
         </button>
         <span id="label-yearly" class="text-sm font-semibold text-fg-muted">Anual</span>
-        <span id="promo-badge" class="text-xs bg-accent/10 text-accent-text font-bold px-2 py-1 rounded-full">Primer mes gratis</span>
+        <span id="promo-badge" class="text-xs bg-accent/10 text-accent-text font-bold px-2 py-1 rounded-full">2 meses gratis al año</span>
       </div>
 
       <div class="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-        <!-- Básico -->
-        <div
-          class="pricing-card card p-8 flex flex-col"
-          data-plan="basico" data-monthly="49" data-yearly="490" data-savings="98"
-        >
-          <h3 class="font-semibold text-lg">Básico</h3>
-          <p class="text-sm text-fg-muted mt-1">Tu dominio, tú solo. Recibe en el buzón que ya usas.</p>
+        <!-- Gratis -->
+        <div class="card p-8 flex flex-col">
+          <h3 class="font-semibold text-lg">Gratis</h3>
+          <p class="text-sm text-fg-muted mt-1">Tu dominio recibe correo desde hoy. Sin tarjeta.</p>
           <div class="mt-4">
-            <span class="plan-price text-4xl font-semibold tracking-tight">$49</span>
-            <span class="plan-period text-fg-muted">/mes</span>
+            <span class="text-4xl font-semibold tracking-tight">$0</span>
+            <span class="text-fg-muted">/mes</span>
           </div>
-          <p class="plan-savings text-xs text-accent-text mt-1 hidden"></p>
-          <p class="plan-per-domain text-xs text-fg-muted mt-1">1 dominio</p>
+          <p class="text-xs text-fg-muted mt-1">1 dominio por cuenta</p>
           <ul class="mt-6 mb-8 space-y-3 text-sm text-fg">
-            <li>✓ 10 máscaras: hola@, ventas@, facturas@… al buzón que elijas</li>
-            <li>✓ Bandeja web para leer y responder desde tu dominio</li>
+            <li>✓ 5 máscaras: hola@, ventas@, facturas@… al buzón que elijas</li>
+            <li>✓ Reenvío hasta 1,000 correos al mes</li>
+            <li>✓ Bandeja para leer y <strong class="font-semibold">responder</strong> desde tu dominio</li>
             <li>✓ Entrega fuera de spam (DKIM + SPF automáticos)</li>
-            <li>✓ Bandeja con el historial completo · registro de reenvíos 15 días</li>
             <li>✓ API REST + SDK</li>
-            <li class="text-fg-muted">+ Iniciar correos nuevos: <a href="/pricing#addons" class="text-accent-text hover:underline">add-on desde $49</a></li>
-            <li class="text-fg-muted">+ Dominio extra: $79/mes c/u</li>
+            <li class="text-fg-muted">La Bandeja muestra 7 días; guarda 30 por si activas</li>
           </ul>
-          <button
-            class="checkout-btn mt-auto block w-full text-center btn-secondary w-full disabled:opacity-50"
-          >
-            Empezar
-          </button>
+          <a href="/register" class="mt-auto block w-full text-center btn-secondary">Empieza gratis</a>
         </div>
 
-        <!-- Equipo (FEATURED) -->
+        <!-- Dominio activado (FEATURED) -->
         <div
           class="pricing-card card !border-accent p-8 relative flex flex-col"
-          data-plan="equipo" data-monthly="299" data-yearly="2,990" data-savings="598"
+          data-plan="dominio" data-monthly="99" data-yearly="990" data-savings="198"
         >
-          <span
-            class="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-white text-xs font-bold px-3 py-1 rounded-full"
-            >PARA EQUIPOS</span
-          >
-          <h3 class="font-semibold text-lg">Equipo</h3>
-          <p class="text-sm text-fg-muted mt-1">Agencias y negocios con varios dominios y gente que atiende.</p>
+          <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent text-white text-xs font-bold px-3 py-1 rounded-full">TODO INCLUIDO</span>
+          <h3 class="font-semibold text-lg">Dominio activado</h3>
+          <p class="text-sm text-fg-muted mt-1">Tu equipo entero, tus buzones, tu correo saliente. Por dominio.</p>
           <div class="mt-4">
-            <span class="plan-price text-4xl font-semibold tracking-tight">$299</span>
+            <span class="plan-price text-4xl font-semibold tracking-tight">$99</span>
             <span class="plan-period text-fg-muted">/mes</span>
           </div>
           <p class="plan-savings text-xs text-accent-text mt-1 hidden"></p>
-          <p class="plan-per-domain text-xs text-accent-text mt-1">5 dominios incluidos — extra $79 c/u</p>
+          <p class="plan-per-domain text-xs text-accent-text mt-1">por dominio · personas ilimitadas</p>
           <ul class="mt-6 mb-8 space-y-3 text-sm text-fg">
-            <li>✓ Bandeja compartida: 5 personas por dominio, asignación y notas</li>
-            <li>✓ Envía como tu@dominio: 200 correos al día por dominio</li>
-            <li>✓ Máscaras ilimitadas</li>
-            <li>✓ Reglas de enrutado y webhooks</li>
-            <li>✓ SMTP relay para tu SaaS o sistema</li>
-            <li>✓ Bandeja con el historial completo · registro de reenvíos 90 días</li>
+            <li>✓ <strong class="font-semibold">Bandeja compartida sin límite de personas</strong>: asignar, notas, historial completo</li>
+            <li>✓ <strong class="font-semibold">Buzones IMAP ilimitados</strong> con 10 GB: Apple Mail, Outlook, Thunderbird</li>
+            <li>✓ Envía como tu@dominio: 50 correos nuevos al día</li>
+            <li>✓ Máscaras ilimitadas · reenvío hasta 10,000 al mes</li>
+            <li>✓ Reglas, webhooks y SMTP relay para tu sistema</li>
             <li>✓ API REST + SDK y soporte por email</li>
+            <li class="text-fg-muted">+$99 por cada 50 GB más · +$99 por cada 100 envíos más al día</li>
           </ul>
-          <button
-            class="checkout-btn mt-auto block w-full text-center btn-primary w-full disabled:opacity-50"
-          >
-            Empezar
-          </button>
+          <a href="/register" class="mt-auto block w-full text-center btn-primary">Empieza gratis y actívalo cuando quieras</a>
         </div>
       </div>
 
       <p class="text-center text-sm text-fg-muted mt-8">
-        Todos los precios en MXN. Pago con MercadoPago.<br/>
-        Reenvío incluido hasta 3,000 correos al mes en Básico y 30,000 en Equipo. ¿Más? <a href="mailto:hola@mailmask.studio" class="text-accent-text hover:underline">Escríbenos</a>.<br/>
-        ¿Solo te falta enviar o un dominio más? <a href="/pricing#addons" class="text-accent-text hover:underline">Add-ons desde $49 →</a><br/>
-        Anual: Básico $490/año (ahorras $98) · Equipo $2,990/año (ahorras $598)
+        Todos los precios en MXN. Pago con MercadoPago, mes a mes, cancelas cuando quieras.<br/>
+        Un dominio más son $99 más. ¿Más de 10 dominios? <a href="mailto:hola@mailmask.studio" class="text-accent-text hover:underline">Escríbenos</a>.<br/>
+        Anual: $990 por dominio (ahorras $198).
       </p>
     <!-- Calculator: la asimetría de precio -->
     <div id="calculadora" class="max-w-4xl mx-auto mt-16">
@@ -706,7 +714,7 @@
         <div class="border-2 border-accent rounded-2xl p-4 bg-bg-elev ">
           <p class="text-xs text-fg-muted uppercase tracking-wide mb-1">MailMask</p>
           <p id="calc-mm-price" class="text-2xl font-semibold text-accent-text">$49</p>
-          <p id="calc-mm-plan" class="text-xs text-fg-muted mt-1">Básico · 1 dominio</p>
+          <p id="calc-mm-plan" class="text-xs text-fg-muted mt-1">1 dominio gratis</p>
           <p id="calc-mm-envio" class="text-xs text-accent-text mt-1">+$49 si además quieres iniciar correos</p>
         </div>
         <div class="border border-line rounded-2xl p-4 bg-bg-elev">
@@ -739,30 +747,28 @@
         >
           <div class="text-fg-muted">1 dominio, 1 persona</div>
           <div class="text-center">$140 MXN/mes</div>
-          <div class="text-center text-accent-text font-semibold">$49 MXN/mes</div>
+          <div class="text-center text-accent-text font-semibold">Gratis</div>
         </div>
         <div
           class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
         >
           <div class="text-fg-muted">1 dominio, 5 personas</div>
           <div class="text-center">$700 MXN/mes</div>
-          <div class="text-center text-accent-text font-semibold">$299 MXN/mes</div>
+          <div class="text-center text-accent-text font-semibold">$99 MXN/mes</div>
         </div>
         <div
           class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
         >
           <div class="text-fg-muted">5 dominios, 5 personas c/u</div>
           <div class="text-center">$3,500 MXN/mes</div>
-          <div class="text-center text-accent-text font-semibold">$299 MXN/mes</div>
+          <div class="text-center text-accent-text font-semibold">$495 MXN/mes</div>
         </div>
         <div
           class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
         >
           <div class="text-fg-muted">Máscaras (alias)</div>
           <div class="text-center text-fg-muted">1 por usuario</div>
-          <div class="text-center text-fg font-semibold">
-            Incluidas en Equipo
-          </div>
+          <div class="text-center text-fg font-semibold">Ilimitadas</div>
         </div>
         <div
           class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
@@ -776,16 +782,14 @@
         >
           <div class="text-fg-muted">Reglas de routing</div>
           <div class="text-center text-fg-muted">Limitadas</div>
-          <div class="text-center text-fg font-semibold">
-            Incluidas en Equipo
-          </div>
+          <div class="text-center text-fg font-semibold">Ilimitadas</div>
         </div>
         <div
           class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
         >
           <div class="text-fg-muted">Envío desde tu dominio</div>
           <div class="text-center text-fg-muted">Solo con licencia</div>
-          <div class="text-center text-fg font-semibold">Incluido en Equipo o add-on</div>
+          <div class="text-center text-fg font-semibold">Incluido: 50 al día</div>
         </div>
         <div
           class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
@@ -799,7 +803,7 @@
         >
           <div class="text-fg-muted">Dominio extra</div>
           <div class="text-center text-fg-muted">Licencia completa por usuario</div>
-          <div class="text-center text-fg font-semibold">+$79 MXN/mes</div>
+          <div class="text-center text-fg font-semibold">+$99 MXN/mes, todo incluido</div>
         </div>
         <div
           class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
@@ -824,8 +828,9 @@
           </summary>
           <p>
             Una máscara (alias) es una dirección como ventas@tudominio.com que
-            reenvía los emails a tu inbox personal (Gmail, Outlook, etc.). No
-            necesitas crear cuentas de correo nuevas.
+            reenvía los emails a tu inbox personal (Gmail, Outlook, etc.), o que
+            guarda su correo en un buzón propio si activas el dominio. Tú decides
+            si creas cuentas nuevas o sigues leyendo donde ya lees.
           </p>
         </details>
         <details class="group">
@@ -845,7 +850,7 @@
             <span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span>
           </summary>
           <p>
-            Sí, y sale firmado con tu dominio. Responder desde la Bandeja está incluido en todos los planes; para iniciar un correo nuevo, Básico necesita el add-on de envíos (+$49 o +$99 al mes) y Equipo ya lo trae.
+            Sí, y sale firmado con tu dominio. Responder desde la Bandeja está incluido también en la cuenta gratis; iniciar correos nuevos viene con el dominio activado ($99 al mes): 50 al día, y bloques de +100 por $99.
             Al agregar tu dominio, MailMask configura DKIM y SPF automáticamente —
             Gmail y Outlook muestran "firmado por tudominio.com" junto al remitente,
             lo que mejora la entregabilidad y evita que tus emails caigan en spam.
@@ -857,9 +862,11 @@
             <span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span>
           </summary>
           <p>
-            Al cancelar, mantienes acceso hasta el fin del periodo pagado.
-            Después, el reenvío se detiene pero no pierdes emails anteriores (ya
-            están en tu inbox).
+            Al cancelar la activación, mantienes todo hasta el fin del periodo pagado.
+            Después el dominio vuelve a ser gratis (si es tu primero) y sigue reenviando;
+            los correos que ya te reenviamos siguen en tu inbox. Si tenías buzones IMAP,
+            quedan en solo lectura 30 días para que descargues todo en formato
+            <span class="font-mono text-[0.95em]">.mbox</span> antes de borrarse.
           </p>
         </details>
         <details class="group">
@@ -873,6 +880,18 @@
             infraestructura de AWS y conservamos el historial completo de tus
             conversaciones; puedes eliminar las que quieras cuando quieras. Usamos Amazon SES, la
             misma infraestructura que usan miles de empresas.
+          </p>
+        </details>
+        <details class="group">
+          <summary>
+            ¿Qué incluye la cuenta gratis y qué pasa a los 7 días?
+            <span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span>
+          </summary>
+          <p>
+            Un dominio, 5 máscaras que reenvían a donde ya lees tu correo (hasta 1,000 al
+            mes), y la Bandeja para leer y responder. La Bandeja muestra los últimos 7 días;
+            los guardamos 30 por si activas el dominio y quieres el historial completo, y a
+            los 30 se borran de verdad. Lo que ya reenviamos a tu inbox es tuyo y se queda.
           </p>
         </details>
         <details class="group">
@@ -905,9 +924,9 @@
             —el equipo atiende clientes en la Bandeja y lo personal se reenvía a Gmail.
           </p>
           <p>
-            Y si prefieres leer en tu app de escritorio, también:
-            el <strong class="text-fg">add-on de buzón</strong> te da IMAP en tu propio
-            dominio, con su contraseña, sin pasar por Gmail.
+            Y si prefieres leer en tu app de escritorio, también: el dominio activado
+            te da <strong class="text-fg">buzones IMAP</strong> en tu propio dominio, cada
+            uno con su contraseña, sin pasar por Gmail.
           </p>
         </details>
         <details class="group">
@@ -917,13 +936,12 @@
           </summary>
           <p>
             Google Workspace cobra por usuario ($140 MXN al mes cada uno). Si
-            necesitas 5 direcciones de correo para tu negocio, pagas 5
-            licencias. Con MailMask creas todas las direcciones que tu plan
-            permita por una sola cuota — y cada una puede reenviar a uno o
-            varios destinos a la vez (Gmail, Outlook, el correo de tu equipo,
-            donde quieras). Además envías desde tu dominio sin pagar por buzón:
-            desde la Bandeja con un botón, por API, o con credenciales SMTP en el plan
-            Equipo. Pagas por dominio, no por usuario.
+            necesitas 5 personas con correo, pagas 5 licencias: $700. Con MailMask
+            un dominio activado cuesta $99 al mes y entran las personas que sean —
+            buzones ilimitados, Bandeja compartida sin límite de asientos, máscaras
+            ilimitadas. Cada una puede reenviar a uno o varios destinos (Gmail,
+            Outlook, el correo de tu equipo) o guardar su propio correo. Pagas por
+            dominio, no por persona.
           </p>
         </details>
         <details class="group">
@@ -939,15 +957,15 @@
           </p>
           <p>
             ¿Y si prefieres Outlook, Thunderbird o Apple Mail? Para <strong class="text-fg">enviar</strong>
-            desde ahí, también: el plan Equipo incluye credenciales SMTP que pones como
+            desde ahí, también: el dominio activado incluye credenciales SMTP que pones como
             servidor de salida, con DKIM y SPF.
           </p>
           <p>
-            Y para <strong class="text-fg">recibir</strong> en ellos: el
-            <strong class="text-fg">add-on de buzón</strong> (+$99 al mes por dominio,
-            10 GB) te da IMAP en <span class="font-mono text-[0.95em]">imap.mailmask.studio</span>,
-            con buzones ilimitados repartiendo esos 10 GB. También puedes seguir
-            reenviando al buzón que ya usas, o las dos cosas.
+            Y para <strong class="text-fg">recibir</strong> en ellos: el dominio activado
+            trae <strong class="text-fg">buzones IMAP ilimitados</strong> con 10 GB en
+            <span class="font-mono text-[0.95em]">imap.mailmask.studio</span> (y +50 GB por $99
+            cuando hagan falta). También puedes seguir reenviando al buzón que ya usas,
+            o las dos cosas.
           </p>
         </details>
       </div>
@@ -1006,23 +1024,6 @@
         © 2026 by <a href="https://fixter.org" target="_blank" rel="noopener" class="hover:text-fg underline decoration-dotted transition-colors">fixter.org</a>
       </p>
     </footer>
-    <!-- Email modal for guest checkout -->
-    <div id="email-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div class="card p-6 w-full max-w-sm mx-4 shadow-2xl">
-        <div class="flex justify-between items-center mb-4">
-          <h3 id="email-modal-title" class="text-lg font-semibold text-fg">Tu email para continuar</h3>
-          <button id="email-modal-close" class="text-fg-muted hover:text-fg text-xl leading-none">&times;</button>
-        </div>
-        <form id="email-modal-form">
-          <input id="email-modal-input" type="email" placeholder="tu@email.com" required
-            class="w-full px-4 py-3 bg-bg border border-line rounded-lg text-fg placeholder-fg-subtle focus:outline-none focus:border-accent transition-colors" />
-          <p id="email-modal-error" class="text-red-500 text-sm mt-1"></p>
-          <button type="submit" class="btn-primary mt-4 w-full">Continuar al pago</button>
-        </form>
-        <p id="email-modal-hint" class="text-fg-muted text-xs mt-3 text-center">Usaremos este email para tu cuenta y recibos.</p>
-      </div>
-    </div>
-
     <script src="/js/landing.js" defer></script>
   </body>
 </html>

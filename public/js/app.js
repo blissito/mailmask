@@ -28,6 +28,21 @@ let currentUser = null;
 let domains = [];
 let selectedDomain = null;
 
+// Todo es POR DOMINIO desde el 7-sep-2026: derechos, add-ons y uso vienen en
+// currentUser.porDominio. Ya no existe "el plan de la cuenta".
+function porDominio(id) {
+  return (currentUser?.porDominio ?? []).find(d => d.id === id) ?? null;
+}
+function derechosDe(id) {
+  return porDominio(id)?.derechos ?? { activado: false, esGratis: true, bloqueado: false, aliases: 5, agentes: 0, sends: 0, sendsUnlocked: false, mailboxes: false, mailboxBytes: 0, rules: false, webhooks: false, smtpRelay: false };
+}
+function estadoDominio(id) {
+  const r = derechosDe(id);
+  return r.activado ? "activado" : r.bloqueado ? "bloqueado" : "gratis";
+}
+const money = (c) => `$${(c / 100).toLocaleString("es-MX")}`;
+const GB = 1024 * 1024 * 1024;
+
 // Todo lo que depende de /api/auth/me se pinta desde aquí. Antes `refreshUsage` no
 // llamaba a `renderBillingBanner`, así que cancelar un add-on dejaba el estado de
 // facturación viejo en pantalla — con el resumen de cobro eso ya no es cosmético: el
@@ -48,13 +63,11 @@ function renderHello() {
   const saludo = h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches";
   const nombre = (currentUser.email || "").split("@")[0].split(/[._+-]/)[0];
   const quien = nombre ? nombre.charAt(0).toUpperCase() + nombre.slice(1) : "";
-  const sub = currentUser.subscription;
-  const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
-  const activo = sub && (sub.status === "active" || sub.status === "cancelled") && periodEnd && periodEnd >= new Date();
   const pendientes = domains.filter(d => !d.verified).length;
+  const bloqueados = domains.filter(d => estadoDominio(d.id) === "bloqueado").length;
   let estado;
-  if (!activo) estado = "Tu cuenta no tiene plan activo: el correo no se está reenviando.";
-  else if (domains.length === 0) estado = "Agrega tu primer dominio para empezar a recibir correo.";
+  if (domains.length === 0) estado = "Agrega tu dominio para empezar a recibir correo. El primero es gratis.";
+  else if (bloqueados > 0) estado = `${bloqueados === 1 ? "Un dominio guarda correo pero no reenvía" : `${bloqueados} dominios guardan correo pero no reenvían`}: actívalo por $99 al mes.`;
   else if (pendientes > 0) estado = `${pendientes === 1 ? "Un dominio espera" : `${pendientes} dominios esperan`} configuración DNS.`;
   else estado = `${domains.length === 1 ? "Tu dominio recibe" : "Tus dominios reciben"} con normalidad. Nada pendiente.`;
   const hoy = new Date().toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
@@ -66,78 +79,56 @@ function renderHello() {
     <span class="today num">${esc(hoy)}</span>`;
 }
 
-// --- Tarjeta de plan: precio, próximo cargo, uso y add-ons, todo en un lugar ---
+// --- Tarjeta de cuenta: qué dominio está en qué estado, y cuánto se cobra al mes ---
+//
+// Ya no hay "plan". Cada dominio es gratis o está activado ($99/mes), y sobre el activado
+// se suman bloques de +50 GB y +100 envíos, a $99 cada uno. La tarjeta lo dice por dominio.
 function renderPlanCard() {
   const el = document.getElementById("plan-card");
   if (!el || !currentUser) return;
+  const lista = currentUser.porDominio ?? [];
   const sub = currentUser.subscription;
   const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
-  const usable = sub && (sub.status === "active" || sub.status === "cancelled") && periodEnd && periodEnd >= new Date();
-  if (!usable) {
-    el.innerHTML = `
-      <div class="app-card plan-card">
-        <div class="plan-h"><h3>Sin plan activo</h3></div>
-        <div class="next">Elige un plan para reenviar correo desde tu dominio.</div>
-        <div class="foot"><a href="/pricing" class="app-link">Ver planes</a></div>
-      </div>`;
-    return;
-  }
-
-  const now = new Date();
-  const catalog = currentUser.addonCatalog ?? {};
-  const effective = (currentUser.addons ?? []).filter(a =>
-    a.status === "active" || (a.status === "cancelled" && a.currentPeriodEnd && new Date(a.currentPeriodEnd) >= now));
-  const money = (c) => `$${(c / 100).toLocaleString("es-MX")}`;
+  const legadoVigente = sub && (sub.status === "active" || sub.status === "cancelled") && periodEnd && periodEnd >= new Date();
   const fecha = (d) => d.toLocaleDateString("es-MX", { day: "numeric", month: "long" });
-  const total = (currentUser.planPriceCents ?? 0) + effective.reduce((s, a) => s + (a.isCourtesy ? 0 : (a.priceCents ?? 0)), 0);
 
-  const u = currentUser.usage;
-  const totalAliases = u ? u.aliasesPerDomain.reduce((s, a) => s + a.current, 0) : 0;
-  const sendsToday = u ? (u.sendsPerDomain ?? []).reduce((s, d) => s + d.current, 0) : 0;
-  const sendsLimit = currentUser.limits?.sends ?? 0;
-  const sendsUnlocked = currentUser.limits?.sendsUnlocked ?? false;
-  const totalForwards = domains.reduce((s, d) => s + (d.monthlyForwards ?? 0), 0);
-  const pct = (a, b) => b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0;
-  const meter = (label, cur, lim, note) => `
-    <div class="meter">
-      <div class="l"><span>${label}</span><span class="num">${cur.toLocaleString("es-MX")} de ${lim.toLocaleString("es-MX")}</span></div>
-      <div class="bar"><i class="${cur >= lim ? "full" : ""}" style="width:${pct(cur, lim)}%"></i></div>
-      ${note ? `<div class="note">${note}</div>` : ""}
-    </div>`;
+  const efectivo = (a) => a.status === "active" || (a.status === "cancelled" && a.currentPeriodEnd && new Date(a.currentPeriodEnd) >= new Date());
+  let total = legadoVigente ? (currentUser.planPriceCents ?? 0) : 0;
+  for (const a of (currentUser.addons ?? []).filter(efectivo)) total += a.isCourtesy ? 0 : (a.priceCents ?? 0);
 
-  const lines = effective.map(a => {
-    const label = catalog[a.kind]?.label ?? a.kind;
-    const right = a.isCourtesy ? "cortesía" : (a.currentPeriodEnd ? `cobra ${new Date(a.currentPeriodEnd).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}` : money(a.priceCents ?? 0));
-    return `<div class="${a.isCourtesy ? "gift" : ""}"><span>${esc(label)}</span><span>${esc(right)}</span></div>`;
+  const filas = lista.map(d => {
+    const r = d.derechos;
+    const estado = r.activado ? (r.legado ? "activado · plan anterior" : "activado") : r.bloqueado ? "sin activar" : "gratis";
+    const extras = (d.addons ?? []).filter(a => a.kind !== "domain");
+    const cortesia = (d.addons ?? []).some(a => a.kind === "domain" && a.isCourtesy);
+    const detalle = r.activado
+      ? [cortesia ? "cortesía" : null, extras.length ? `${extras.length} bloque${extras.length === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ")
+      : r.bloqueado ? "guarda, no reenvía" : `${r.aliases} máscaras · 7 días de Bandeja`;
+    return `
+      <div class="meter">
+        <div class="l"><span>${esc(d.domain)}</span><span class="num">${esc(estado)}</span></div>
+        ${detalle ? `<div class="note">${esc(detalle)}</div>` : ""}
+      </div>`;
   }).join("");
 
   el.innerHTML = `
     <div class="app-card plan-card">
       <div class="plan-h">
-        <h3>Plan ${esc(sub.planLabel ?? sub.plan)}</h3>
-        <span class="price num">${money(currentUser.planPriceCents ?? 0)} <small>MXN / mes</small></span>
+        <h3>Tu cuenta</h3>
+        <span class="price num">${money(total)} <small>MXN / mes</small></span>
       </div>
-      <div class="next">${sub.status === "cancelled"
-        ? `Cancelado · el servicio termina el <b>${fecha(periodEnd)}</b>`
-        : `Cubierto hasta el <b>${fecha(periodEnd)}</b> · MercadoPago`}</div>
-      <div class="meters">
-        ${u ? meter("Dominios", u.domains.current, u.domains.limit) : ""}
-        ${u ? meter("Alias", totalAliases, (currentUser.limits?.aliases ?? 0) * Math.max(1, u.domains.limit), "por dominio") : ""}
-        ${sendsUnlocked
-          ? meter("Envíos hoy", sendsToday, sendsLimit, "por dominio, al día")
-          : `<div class="meter"><div class="l"><span>Envíos</span><span>no incluidos</span></div><div class="note"><button id="usage-addon-cta" class="app-link" style="font-size:12px">Activar envíos →</button></div></div>`}
-        <div class="meter"><div class="l"><span>Reenvíos este mes</span><span class="num">${totalForwards.toLocaleString("es-MX")}</span></div><div class="note">límite ${(currentUser.limits?.forwardPerHour ?? 0).toLocaleString("es-MX")} por hora y dominio</div></div>
-      </div>
-      ${lines || total !== (currentUser.planPriceCents ?? 0) ? `<div class="lines">${lines}<div class="total"><span>Total al mes</span><span>${money(total)} MXN</span></div></div>` : ""}
+      <div class="next">${lista.length === 0
+        ? "Tu primer dominio es gratis. Actívalo cuando quieras al equipo entero: $99 al mes."
+        : legadoVigente
+          ? `Plan anterior <b>${esc(sub.planLabel ?? sub.plan)}</b> ${sub.status === "cancelled" ? "termina" : "cubierto hasta"} el <b>${fecha(periodEnd)}</b> — mientras dure, todos tus dominios cuentan como activados.`
+          : "Cada dominio activado: $99 al mes, todo incluido, personas ilimitadas."}</div>
+      <div class="meters">${filas}</div>
       <div class="foot">
         <button data-action="show-orders" class="app-link">Historial de pagos</button>
-        <button id="btn-addons" class="app-link">Add-ons</button>
-        <a href="/pricing" class="app-link">Cambiar plan</a>
-        ${sub.status === "active" ? `<button id="btn-cancel-sub" class="danger">Cancelar</button>` : ""}
+        <a href="/pricing" class="app-link">Qué incluye</a>
+        ${legadoVigente && sub.status === "active" ? `<button id="btn-cancel-sub" class="danger">Cancelar plan anterior</button>` : ""}
       </div>
     </div>`;
-  document.getElementById("usage-addon-cta")?.addEventListener("click", showAddonsModal);
-  document.getElementById("btn-addons")?.addEventListener("click", showAddonsModal);
   document.getElementById("btn-cancel-sub")?.addEventListener("click", cancelSubscription);
 }
 
@@ -232,73 +223,23 @@ function renderVerifyBanner() {
 function renderBillingBanner() {
   const container = document.getElementById("billing-banner");
   if (!container) return;
-
+  // Sin plan no hay nada que atender: el primer dominio es gratis. Sólo avisa cuando
+  // una suscripción ANTERIOR está por terminar, porque sus dominios volverán a la
+  // regla normal (el primero gratis, los demás requieren activación).
   const sub = currentUser.subscription;
-  const planName = sub?.planLabel ?? PLAN_LABELS[sub?.plan] ?? "Ninguno";
   const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
   const isExpired = periodEnd && periodEnd < new Date();
-  const isActive = sub && sub.status === "active" && !isExpired;
   const isCancelledWithAccess = sub && sub.status === "cancelled" && periodEnd && !isExpired;
-
-  if (isActive) {
-    // Con plan activo no hay nada que atender: el plan vive en la tarjeta lateral.
-    container.innerHTML = "";
-  } else if (false) {
+  if (isCancelledWithAccess && domains.length > 1) {
     container.innerHTML = `
-      <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <span class="w-2 h-2 rounded-full bg-green-400"></span>
-          <span class="text-sm text-zinc-300">Plan ${esc(planName)}</span>
-          <span class="text-xs text-zinc-500">hasta ${periodEnd ? periodEnd.toLocaleDateString("es-MX") : "—"}</span>
-        </div>
-        <div class="flex items-center gap-4">
-          <button id="btn-addons" class="text-xs text-mask-400 hover:text-mask-300 transition-colors">Add-ons</button>
-          <a href="/pricing" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Cambiar plan</a>
-          <button id="btn-cancel-sub" class="text-xs text-zinc-500 hover:text-red-400 transition-colors">Cancelar</button>
-        </div>
+      <div class="bg-yellow-900/20 border border-yellow-800/50 rounded-xl px-4 py-3 text-sm text-yellow-400">
+        Tu plan anterior termina el ${periodEnd.toLocaleDateString("es-MX")}. Después, tu primer dominio sigue gratis y los demás necesitan activarse ($99/mes cada uno).
       </div>`;
-    document.getElementById("btn-cancel-sub")?.addEventListener("click", cancelSubscription);
-    document.getElementById("btn-addons")?.addEventListener("click", showAddonsModal);
-  } else if (isCancelledWithAccess) {
-    container.innerHTML = `
-      <div class="bg-yellow-900/20 border border-yellow-800/50 rounded-xl px-4 py-3 flex items-center justify-between">
-        <span class="text-sm text-yellow-400">Plan ${esc(planName)} se cancela el ${periodEnd.toLocaleDateString("es-MX")}</span>
-        <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-          Reactivar
-        </button>
-      </div>`;
-    document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
-  } else if (isExpired) {
-    container.innerHTML = `
-      <div class="bg-red-900/20 border border-red-800/50 rounded-xl px-4 py-3 flex items-center justify-between">
-        <span class="text-sm text-red-400">Tu plan expiró</span>
-        <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-          Reactivar
-        </button>
-      </div>`;
-    document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
   } else {
-    container.innerHTML = `
-      <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 flex items-center justify-between">
-        <span class="text-sm text-zinc-400">Sin plan activo</span>
-        <button id="btn-checkout" class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-          ${getCheckoutLabel()}
-        </button>
-      </div>`;
-    document.getElementById("btn-checkout")?.addEventListener("click", startCheckout);
+    container.innerHTML = "";
   }
-
-  // Disable add-domain when no plan
   const addDomainBtn = document.getElementById("btn-add-domain");
-  if (addDomainBtn) {
-    if (!isActive && !isCancelledWithAccess) {
-      addDomainBtn.classList.add("opacity-50", "pointer-events-none");
-      addDomainBtn.title = "Necesitas un plan activo";
-    } else {
-      addDomainBtn.classList.remove("opacity-50", "pointer-events-none");
-      addDomainBtn.title = "";
-    }
-  }
+  if (addDomainBtn) { addDomainBtn.classList.remove("opacity-50", "pointer-events-none"); addDomainBtn.title = ""; }
 }
 
 // --- Resumen de cobro ---
@@ -309,36 +250,22 @@ function renderBillingBanner() {
 function renderBillingSummary() {
   const el = document.getElementById("billing-summary");
   if (!el) return;
-
+  const catalog = currentUser?.addonCatalog ?? {};
+  const now = new Date();
+  const efectivo = (a) => a.status === "active" || (a.status === "cancelled" && a.currentPeriodEnd && new Date(a.currentPeriodEnd) >= now);
   const sub = currentUser?.subscription;
   const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
-  const usable = sub && (sub.status === "active" || sub.status === "cancelled")
-    && periodEnd && periodEnd >= new Date();
-  if (!usable) { el.innerHTML = ""; return; }
+  const legadoVigente = sub && (sub.status === "active" || sub.status === "cancelled") && periodEnd && periodEnd >= now;
 
-  const now = new Date();
-  const catalog = currentUser.addonCatalog ?? {};
-  const effective = (currentUser.addons ?? []).filter(a =>
-    a.status === "active" ||
-    (a.status === "cancelled" && a.currentPeriodEnd && new Date(a.currentPeriodEnd) >= now));
-
-  const lines = [{
-    label: `Plan ${sub.planLabel ?? sub.plan}`,
-    cents: currentUser.planPriceCents ?? 0,
-    gift: false,
-  }];
-  for (const a of effective) {
-    const label = catalog[a.kind]?.label ?? a.kind;
-    lines.push({
-      label: a.isCourtesy ? `${label} (cortesía)` : label,
-      // Una cortesía suma cero al total. Ése es el punto entero de la sección.
-      cents: a.isCourtesy ? 0 : (a.priceCents ?? 0),
-      gift: !!a.isCourtesy,
-    });
+  const lines = [];
+  if (legadoVigente) lines.push({ label: `Plan anterior · ${sub.planLabel ?? sub.plan}`, cents: currentUser.planPriceCents ?? 0, gift: false });
+  for (const a of (currentUser?.addons ?? []).filter(efectivo)) {
+    const dom = domains.find(d => d.id === a.domainId)?.domain;
+    const label = `${catalog[a.kind]?.label ?? a.kind}${dom ? ` · ${dom}` : ""}`;
+    lines.push({ label: a.isCourtesy ? `${label} (cortesía)` : label, cents: a.isCourtesy ? 0 : (a.priceCents ?? 0), gift: !!a.isCourtesy });
   }
+  if (!lines.length) { el.innerHTML = ""; return; }
   const total = lines.reduce((sum, l) => sum + l.cents, 0);
-  const money = (c) => `$${(c / 100).toLocaleString("es-MX")}`;
-
   const aviso = renderLastOrderStrip();
 
   el.innerHTML = `
@@ -358,11 +285,6 @@ function renderBillingSummary() {
       <div class="flex items-center justify-between border-t border-zinc-800 mt-2 pt-2">
         <span class="text-sm font-semibold text-zinc-100">Total</span>
         <span class="text-sm font-semibold text-zinc-100">${money(total)} MXN/mes</span>
-      </div>
-      <div class="text-xs text-zinc-400 mt-2">
-        ${sub.status === "cancelled"
-          ? `Cancelada — el servicio termina el ${periodEnd.toLocaleDateString("es-MX")}`
-          : `Próximo cargo el ${periodEnd.toLocaleDateString("es-MX")}`}
       </div>
     </div>`;
 }
@@ -525,14 +447,19 @@ function renderStats() {
 // --- Add-ons ---
 
 const ADDON_COPY = {
-  sends25:  { desc: "Desbloquea el envío desde tu dominio, con tope de 25 correos al día por dominio." },
-  sends100: { desc: "Desbloquea el envío desde tu dominio, con tope de 100 correos al día por dominio." },
-  domain:   { desc: "Un dominio más en tu cuenta, con sus máscaras y su bandeja. Puedes agregar varios. No incluye envío." },
+  domain:    { desc: "Todo para este dominio: equipo ilimitado en la Bandeja, buzones IMAP, 50 correos nuevos al día, 10 GB, reglas, webhooks y SMTP." },
+  storage50: { desc: "50 GB más para los buzones de este dominio. Cuantas veces quieras." },
+  sends100:  { desc: "100 correos nuevos más al día en este dominio. Cuantas veces quieras." },
 };
 
-async function showAddonsModal() {
+// Los add-ons son POR DOMINIO. El modal siempre se abre para uno concreto.
+async function showAddonsModal(domainId) {
+  domainId = domainId || selectedDomain?.id || domains[0]?.id;
+  const dom = domains.find(d => d.id === domainId);
   const list = document.getElementById("addons-list");
   const err = document.getElementById("addons-error");
+  const titulo = document.getElementById("addons-domain");
+  if (titulo) titulo.textContent = dom?.domain ?? "";
   err.classList.add("hidden");
   list.innerHTML = `<div class="text-zinc-500 text-sm">Cargando…</div>`;
   showModal("modal-addons");
@@ -544,38 +471,24 @@ async function showAddonsModal() {
     err.classList.remove("hidden");
     return;
   }
-  const { catalog, mine } = await res.json();
-
-  // Un add-on cancelado sigue valiendo hasta que termina el periodo pagado, así que
-  // cuenta como activo para no ofrecer una compra duplicada.
+  const { catalog, forSale, mine } = await res.json();
   const now = new Date();
-  const effective = (mine ?? []).filter(a =>
-    a.status === "active" ||
-    (a.status === "cancelled" && a.currentPeriodEnd && new Date(a.currentPeriodEnd) >= now));
-  const hasSends = effective.some(a => a.kind.startsWith("sends"));
-  const planIncludesSends = currentUser?.subscription?.plan !== "basico";
+  const propios = (mine ?? []).filter(a => a.domainId === domainId);
+  const effective = propios.filter(a => a.status === "active" || (a.status === "cancelled" && a.currentPeriodEnd && new Date(a.currentPeriodEnd) >= now));
+  const r = derechosDe(domainId);
 
-  // Un pago recién hecho vive en `pending` hasta que MercadoPago avisa (o hasta que el
-  // cron de reconciliación lo alcanza). Sin esto el usuario volvía del checkout y veía
-  // el botón "Agregar" intacto, como si su pago no hubiera existido.
-  const pendingByKind = (mine ?? []).filter(a => a.status === "pending");
-
-  list.innerHTML = Object.entries(catalog).map(([kind, info]) => {
+  list.innerHTML = (forSale ?? Object.keys(catalog)).map((kind) => {
+    const info = catalog[kind];
     const owned = effective.filter(a => a.kind === kind);
-    const pending = pendingByKind.filter(a => a.kind === kind);
-    const isSends = kind.startsWith("sends");
-    const blocked = isSends && (hasSends || planIncludesSends);
-    const blockedWhy = planIncludesSends
-      ? "Tu plan ya incluye envíos"
-      : "Ya tienes un add-on de envíos";
+    // Un pago recién hecho vive en `pending` hasta que MercadoPago avisa (o hasta que el
+    // cron de reconciliación lo alcanza). Sin esto el usuario volvía del checkout y veía
+    // el botón intacto, como si su pago no hubiera existido.
+    const pending = propios.filter(a => a.kind === kind && a.status === "pending" && Date.now() - new Date(a.createdAt).getTime() < 30 * 60_000);
+    const esDominio = kind === "domain";
+    const bloqueado = !esDominio && !r.activado;
 
-    // Una línea por unidad, no una por tipo. Antes se miraba `owned[0]` y se imprimía
-    // un solo precio de catálogo para toda la tarjeta: con dos dominios, uno pagado y
-    // otro de cortesía, no había forma de que dijera la verdad.
     const ownedRows = owned.map(a => {
       if (a.isCourtesy) {
-        // Sin precio y sin Cancelar, por construcción. La tarjeta vieja decía
-        // "+$99 MXN/mes" sobre un regalo y ofrecía un botón para destruirlo.
         return `
           <div class="flex flex-wrap items-center gap-2 text-xs mt-2">
             <span class="inline-flex items-center gap-1 bg-mask-900/40 border border-mask-700/50 text-mask-400 rounded-full px-2 py-0.5">Cortesía</span>
@@ -583,49 +496,46 @@ async function showAddonsModal() {
           </div>`;
       }
       const cancelled = a.status === "cancelled";
-      // El precio de la fila, no el de catálogo: un precio heredado debe mostrar lo
-      // que el cliente de verdad paga.
       const precio = `$${((a.priceCents ?? info.price) / 100).toLocaleString("es-MX")} MXN/mes`;
       return `
         <div class="flex flex-wrap items-center gap-2 text-xs mt-2">
-          <span class="${cancelled ? "text-yellow-400" : "text-mask-400"}">${cancelled
-            ? `Termina el ${new Date(a.currentPeriodEnd).toLocaleDateString("es-MX")}`
-            : "Activo"}</span>
+          <span class="${cancelled ? "text-yellow-400" : "text-mask-400"}">${cancelled ? `Termina el ${new Date(a.currentPeriodEnd).toLocaleDateString("es-MX")}` : "Activo"}</span>
           <span class="text-zinc-400">· ${precio}</span>
           ${cancelled ? "" : `<button data-action="cancel-addon" data-addon-id="${esc(a.id)}" class="text-zinc-400 hover:text-red-400 transition-colors">Cancelar</button>`}
         </div>`;
     }).join("");
-
     const pendingRows = pending.map(() => `
       <div class="flex flex-wrap items-center gap-2 text-xs mt-2">
         <span class="inline-flex items-center gap-1 bg-yellow-900/30 border border-yellow-700/40 text-yellow-400 rounded-full px-2 py-0.5">Procesando tu pago…</span>
         <span class="text-zinc-400">se activa en unos minutos</span>
       </div>`).join("");
 
+    let accion;
+    if (pending.length) accion = `<div class="text-[11px] text-zinc-400 max-w-[8rem]">Pago en proceso</div>`;
+    else if (esDominio && r.activado) accion = `<div class="text-[11px] text-mask-400 max-w-[8rem]">${r.legado ? "Incluido en tu plan anterior" : "Activado"}</div>`;
+    else if (bloqueado) accion = `<div class="text-[11px] text-zinc-400 max-w-[8rem]">Primero activa el dominio</div>`;
+    else accion = `<button data-action="buy-addon" data-kind="${esc(kind)}" data-domain-id="${esc(domainId)}"
+                 class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                 ${esDominio ? "Activar" : owned.length ? "Agregar otro" : "Agregar"}
+               </button>`;
+
     return `
-      <div class="border border-zinc-800 rounded-lg p-4 flex items-start justify-between gap-4">
+      <div class="border ${esDominio ? "border-mask-700/60" : "border-zinc-800"} rounded-lg p-4 flex items-start justify-between gap-4">
         <div class="flex-1 min-w-0">
           <div class="font-semibold text-zinc-100">${esc(info.label)}</div>
           <div class="text-sm text-zinc-400 mt-1">${esc(ADDON_COPY[kind]?.desc ?? "")}</div>
           ${ownedRows}${pendingRows}
         </div>
         <div class="text-right shrink-0">
-          <div class="text-xl font-bold">+$${(info.price / 100).toLocaleString("es-MX")}</div>
-          <div class="text-[11px] text-zinc-400 mb-2">MXN/mes${kind === "domain" ? " c/u" : ""}</div>
-          ${pending.length
-            ? `<div class="text-[11px] text-zinc-400 max-w-[8rem]">Pago en proceso</div>`
-            : blocked && !owned.length
-            ? `<div class="text-[11px] text-zinc-400 max-w-[8rem]">${blockedWhy}</div>`
-            : `<button data-action="buy-addon" data-kind="${esc(kind)}"
-                 class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors">
-                 ${owned.length ? "Agregar otro" : "Agregar"}
-               </button>`}
+          <div class="text-xl font-bold">${esDominio ? "" : "+"}$${(info.price / 100).toLocaleString("es-MX")}</div>
+          <div class="text-[11px] text-zinc-400 mb-2">MXN/mes</div>
+          ${accion}
         </div>
       </div>`;
   }).join("");
 }
 
-async function buyAddon(kind) {
+async function buyAddon(kind, domainId) {
   const payerEmail = await askMpEmail();
   if (!payerEmail) return;
   const err = document.getElementById("addons-error");
@@ -633,7 +543,7 @@ async function buyAddon(kind) {
   const res = await fetch("/api/addons/checkout", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ kind, payerEmail }),
+    body: JSON.stringify({ kind, domainId, payerEmail }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.init_point) {
@@ -656,8 +566,15 @@ async function cancelAddon(id) {
     return;
   }
   await refreshUsage();
-  await showAddonsModal();
+  const addon = (currentUser?.addons ?? []).find(a => a.id === id);
+  await showAddonsModal(addon?.domainId);
 }
+
+// Cualquier botón "Activar" / "+50 GB" de la app abre el modal del dominio que toca.
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-action='open-addons']");
+  if (b) showAddonsModal(b.dataset.domainId);
+});
 
 // --- Referral credit banner ---
 function renderReferralBanner() {
@@ -788,21 +705,7 @@ async function loadCoupon() {
   } catch { /* ignore */ }
 }
 
-// El único lugar que no puede tomar la etiqueta del servidor: el cupón se lee antes de
-// iniciar sesión, así que no hay /api/auth/me del cual sacarla.
-const PLAN_LABELS = {
-  basico: "Básico", equipo: "Equipo",
-  freelancer: "Freelancer", developer: "Developer", pro: "Pro", agencia: "Agencia",
-};
-
-function getCheckoutLabel() {
-  if (activeCoupon) {
-    const name = PLAN_LABELS[activeCoupon.plan] ?? activeCoupon.plan;
-    const price = Math.round(activeCoupon.fixedPrice / 100);
-    return `Activar Plan ${name} — $${price}/mes`;
-  }
-  return "Activar Plan — $49/mes";
-}
+// Ya no hay checkout de plan: lo que se compra son add-ons por dominio (buyAddon).
 
 // Pide el correo de la cuenta de MercadoPago y resuelve con él (o con null si cancelan).
 // Existe porque MP exige que `payer_email` sea el correo de la cuenta con la que se paga
@@ -842,34 +745,8 @@ function askMpEmail() {
   });
 }
 
-async function startCheckout() {
-  const payerEmail = await askMpEmail();
-  if (!payerEmail) return;
-  const btn = document.getElementById("btn-checkout");
-  if (btn) { btn.textContent = "Redirigiendo..."; btn.disabled = true; }
-  try {
-    const coupon = new URLSearchParams(location.search).get("coupon") || undefined;
-    const plan = activeCoupon ? activeCoupon.plan : "basico";
-    const res = await fetch("/api/billing/checkout", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ plan, billing: "monthly", coupon, payerEmail }),
-    });
-    const data = await res.json();
-    if (data.init_point) {
-      window.location.href = data.init_point;
-    } else {
-      showToast(data.error || "Error al iniciar pago", true);
-      if (btn) { btn.textContent = getCheckoutLabel(); btn.disabled = false; }
-    }
-  } catch {
-    showToast("Error de conexión", true);
-    if (btn) { btn.textContent = getCheckoutLabel(); btn.disabled = false; }
-  }
-}
-
 async function cancelSubscription() {
-  if (!confirm("¿Estás seguro de que quieres cancelar tu suscripción? Perderás acceso a las funciones de tu plan.")) return;
+  if (!confirm("¿Cancelar tu plan anterior? Al terminar el periodo pagado, tu primer dominio sigue gratis y los demás necesitarán activarse ($99/mes cada uno).")) return;
   try {
     const res = await fetch("/api/billing/cancel", { method: "POST" });
     const data = await res.json();
@@ -995,14 +872,7 @@ function renderDomains() {
     empty.classList.remove("hidden");
     if (header) header.classList.add("hidden");
 
-    const emptyBtn = document.getElementById("btn-add-domain-empty");
-    if (emptyBtn) {
-      const sub = currentUser?.subscription;
-      const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
-      const isExpired = periodEnd && periodEnd < new Date();
-      const hasActivePlan = sub && (sub.status === "active" || sub.status === "cancelled") && !isExpired;
-      emptyBtn.classList.toggle("hidden", !hasActivePlan);
-    }
+    document.getElementById("btn-add-domain-empty")?.classList.remove("hidden");
     return;
   }
 
@@ -1014,14 +884,16 @@ function renderDomains() {
     const verified = d.verified;
     const fwds = d.monthlyForwards ?? 0;
     const n = aliasCount(d.id);
+    const estado = estadoDominio(d.id);
+    const chip = estado === "activado" ? `<span class="tag">Activado</span>` : estado === "bloqueado" ? `<span class="tag" style="color:#fbbf24;border-color:#fbbf2466">Sin activar</span>` : `<span class="tag">Gratis</span>`;
     const detalle = verified
-      ? `${n != null ? `<em>${n} alias</em> · ` : ""}verificado`
+      ? `${n != null ? `<em>${n} alias</em> · ` : ""}${estado === "bloqueado" ? "guarda, no reenvía" : "verificado"}`
       : `<em>Falta configurar DNS</em>`;
     return `
     <div class="dom" data-action="select-domain" data-domain-id="${esc(d.id)}">
       <span class="st ${verified ? "" : "pend"}"></span>
       <div class="min-w-0">
-        <div class="name">${esc(d.domain)}${d.registeredViaMailmask ? '<span class="tag">MailMask</span>' : ''}</div>
+        <div class="name">${esc(d.domain)}${chip}${d.registeredViaMailmask ? '<span class="tag">MailMask</span>' : ''}</div>
         <div class="sub">${detalle}</div>
       </div>
       <div class="k num">${verified
@@ -1049,6 +921,7 @@ async function selectDomain(id) {
   const statusEl = document.getElementById("detail-status");
   statusEl.textContent = selectedDomain.verified ? "Verificado" : "Pendiente DNS";
   statusEl.className = `text-xs px-2 py-1 rounded-full ${selectedDomain.verified ? 'bg-green-900/50 text-green-400' : 'bg-yellow-900/50 text-yellow-400'}`;
+  renderActivacion();
 
   document.getElementById("alias-domain-suffix").textContent = `@${selectedDomain.domain}`;
 
@@ -1065,6 +938,36 @@ async function selectDomain(id) {
   switchTab("aliases");
   await loadAliases();
   loadDomainHealth();
+}
+
+// Banda de activación bajo la cabecera del dominio: gratis, sin activar, o activado.
+function renderActivacion() {
+  const el = document.getElementById("detail-activation");
+  if (!el || !selectedDomain) return;
+  const r = derechosDe(selectedDomain.id);
+  const btn = (label, primario = true) => `<button data-action="open-addons" data-domain-id="${esc(selectedDomain.id)}" class="${primario ? "bg-mask-600 hover:bg-mask-700 text-white" : "bg-zinc-800 hover:bg-zinc-700 text-zinc-200"} text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">${label}</button>`;
+  if (r.activado) {
+    el.innerHTML = `
+      <div class="flex flex-wrap items-center gap-3 bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3">
+        <span class="text-sm text-mask-400 font-semibold">Dominio activado</span>
+        <span class="text-xs text-zinc-400">personas ilimitadas · buzones IMAP · ${r.sends} correos nuevos al día · ${Math.round((r.mailboxBytes ?? 0) / GB)} GB</span>
+        <span class="ml-auto">${btn("+50 GB · +100 envíos", false)}</span>
+      </div>`;
+  } else if (r.bloqueado) {
+    el.innerHTML = `
+      <div class="flex flex-wrap items-center gap-3 bg-yellow-900/20 border border-yellow-800/50 rounded-xl px-4 py-3">
+        <span class="text-sm text-yellow-400 font-semibold">Este dominio guarda el correo pero no lo reenvía</span>
+        <span class="text-xs text-zinc-400">Tu primer dominio es gratis; los demás se activan por $99 al mes.</span>
+        <span class="ml-auto">${btn("Activar dominio · $99/mes")}</span>
+      </div>`;
+  } else {
+    el.innerHTML = `
+      <div class="flex flex-wrap items-center gap-3 bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3">
+        <span class="text-sm text-zinc-200 font-semibold">Dominio gratis</span>
+        <span class="text-xs text-zinc-400">${r.aliases} máscaras · la Bandeja muestra 7 días · sin correo nuevo ni equipo</span>
+        <span class="ml-auto">${btn("Activar · $99/mes")}</span>
+      </div>`;
+  }
 }
 
 function goBack() {
@@ -1459,10 +1362,7 @@ async function loadMembers() {
   const upgrade = document.getElementById("members-upgrade");
   const inviteBtn = document.getElementById("btn-invite-member");
 
-  const sub = currentUser?.subscription;
-  const plan = sub?.plan ?? "basico";
-  const agentLimits = { basico: 0, freelancer: 3, developer: 10 };
-  const limit = agentLimits[plan] ?? 0;
+  const limit = derechosDe(selectedDomain?.id).agentes === 0 ? 0 : Infinity;
 
   if (limit === 0) {
     list.innerHTML = "";
@@ -1940,11 +1840,7 @@ async function loadSmtpCredentials() {
   const empty = document.getElementById("smtp-empty");
   const upgrade = document.getElementById("smtp-upgrade");
 
-  const sub = currentUser?.subscription;
-  const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
-  const isExpired = periodEnd && periodEnd < new Date();
-  const plan = sub && (sub.status === "active" || sub.status === "cancelled") && !isExpired ? sub.plan : null;
-  const smtpAllowed = plan && ["equipo", "developer", "pro", "agencia"].includes(plan);
+  const smtpAllowed = derechosDe(selectedDomain?.id).smtpRelay;
 
   if (!smtpAllowed) {
     list.innerHTML = "";
@@ -2225,11 +2121,7 @@ async function loadWebhooks() {
   const upgrade = document.getElementById("webhooks-upgrade");
   if (!selectedDomain) return;
 
-  const sub = currentUser?.subscription;
-  const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
-  const isExpired = periodEnd && periodEnd < new Date();
-  const plan = sub && (sub.status === "active" || sub.status === "cancelled") && !isExpired ? sub.plan : null;
-  if (!plan || !["equipo", "developer", "agencia"].includes(plan)) {
+  if (!derechosDe(selectedDomain?.id).webhooks) {
     list.innerHTML = "";
     empty.classList.add("hidden");
     upgrade.classList.remove("hidden");
@@ -2708,7 +2600,7 @@ function setupEventListeners() {
   // enganchar a los botones directamente)
   document.getElementById("addons-list")?.addEventListener("click", (e) => {
     const buy = e.target.closest("[data-action='buy-addon']");
-    if (buy) { buyAddon(buy.dataset.kind); return; }
+    if (buy) { buyAddon(buy.dataset.kind, buy.dataset.domainId); return; }
     const cancel = e.target.closest("[data-action='cancel-addon']");
     if (cancel) cancelAddon(cancel.dataset.addonId);
   });

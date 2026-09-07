@@ -55,7 +55,7 @@ let conversations = [];
 let selectedIdx = -1;
 let activeConv = null;
 let canDoActions = false; // false for basico plan
-let canCompose = false;   // redactar correo nuevo requiere el add-on de envíos
+let canCompose = false;   // redactar correo nuevo viene con el dominio activado
 let domainAliases = [];   // alias del dominio seleccionado, para el remitente
 let composerMode = "reply"; // "reply" | "note"
 
@@ -218,7 +218,7 @@ function updateComposeButton() {
   if (!btn) return;
   if (!canCompose) {
     btn.disabled = true;
-    btn.title = "Necesitas el add-on de envíos para escribir correos nuevos";
+    btn.title = "Activa el dominio ($99/mes) para escribir correos nuevos";
   } else if (domainAliases.length === 0) {
     btn.disabled = true;
     btn.title = "Crea un alias en este dominio para poder escribir";

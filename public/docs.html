@@ -179,7 +179,7 @@
 
       <!-- Autenticacion -->
       <h2 id="autenticacion" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Autenticaci&oacute;n</h2>
-      <p class="text-fg-muted mb-4">Para usar el SDK necesitas una <strong class="text-fg">API Key</strong>. Puedes crear una desde el <a href="/app" class="text-accent-text hover:underline">Dashboard</a> en la secci&oacute;n de API Keys. Disponible en <strong class="text-fg">todos los planes</strong> (B&aacute;sico, Freelancer y Developer).</p>
+      <p class="text-fg-muted mb-4">Para usar el SDK necesitas una <strong class="text-fg">API Key</strong>. Puedes crear una desde el <a href="/app" class="text-accent-text hover:underline">Dashboard</a> en la secci&oacute;n de API Keys. Disponible en <strong class="text-fg">todas las cuentas, gratis incluidas</strong>.</p>
       <p class="text-fg-muted mb-4">Las API keys tienen el prefijo <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">mk_</code> y solo se muestran una vez al crearlas. Gu&aacute;rdala en un lugar seguro.</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="kw">import</span> { MailMask } <span class="kw">from</span> <span class="str">"@easybits.cloud/mailmask"</span>;
 
@@ -232,7 +232,7 @@
 
       <!-- Reglas -->
       <h2 id="reglas" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Reglas</h2>
-      <p class="text-fg-muted mb-4">Las reglas permiten enrutar o filtrar emails autom&aacute;ticamente seg&uacute;n el destinatario, el remitente o el asunto. Disponible desde plan <strong class="text-fg">Freelancer</strong> (B&aacute;sico no incluye reglas).</p>
+      <p class="text-fg-muted mb-4">Las reglas permiten enrutar o filtrar emails autom&aacute;ticamente seg&uacute;n el destinatario, el remitente o el asunto. Vienen con el <strong class="text-fg">dominio activado</strong> (el dominio gratis no incluye reglas).</p>
       <ul class="text-fg-muted mb-4 list-disc pl-6 space-y-1 text-sm">
         <li><code class="text-accent-text">field</code>: <code class="text-fg">to</code>, <code class="text-fg">from</code> o <code class="text-fg">subject</code>.</li>
         <li><code class="text-accent-text">match</code>: <code class="text-fg">contains</code>, <code class="text-fg">equals</code> o <code class="text-fg">regex</code>. Un patr&oacute;n regex peligroso se rechaza con 400.</li>
@@ -261,7 +261,7 @@
       <p class="text-fg-muted mb-4">Env&iacute;a emails individuales o masivos desde cualquier alias activo de tu dominio. El cuerpo puede ir como <code class="text-accent-text">html</code>, <code class="text-accent-text">body</code> (texto plano) o <code class="text-accent-text">markdown</code>; <code class="text-accent-text">replyTo</code> es opcional.</p>
       <p class="text-fg-muted mb-4"><strong class="text-fg">La firma del dominio &mdash;y su logo&mdash; s&oacute;lo se a&ntilde;ade cuando mandas <code class="text-accent-text">markdown</code>.</strong> Con <code class="text-accent-text">html</code> o <code class="text-accent-text">body</code> el correo sale tal cual lo escribiste, sin firma: as&iacute; un correo transaccional que ya trae su propio pie no termina con dos firmas.</p>
       <ul class="text-fg-muted mb-4 list-disc pl-6 space-y-1 text-sm">
-        <li>B&aacute;sico no incluye env&iacute;os: sin el add-on de env&iacute;os responde <code class="text-fg">403</code>.</li>
+        <li>El dominio gratis no inicia correo nuevo: responde <code class="text-fg">403</code> hasta que se activa ($99/mes, 50 env&iacute;os al d&iacute;a y bloques de +100).</li>
         <li>El tope diario se cuenta por dominio; al alcanzarlo responde <code class="text-fg">429</code>.</li>
         <li>El HTML se limita a 100 KB (<code class="text-fg">413</code>): Gmail recorta mensajes m&aacute;s grandes.</li>
       </ul>
@@ -335,7 +335,7 @@ console.<span class="fn">log</span>(status.sent, status.failed, status.skippedSu
 <span class="kw">await</span> mm.suppressions.<span class="fn">remove</span>(<span class="str">"domain-id"</span>, <span class="str">"persona@example.com"</span>);</code></pre>
       <!-- Webhooks -->
       <h2 id="webhooks" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Webhooks</h2>
-      <p class="text-fg-muted mb-4">Recibe un <code class="text-fg">POST</code> en tu servidor cada vez que pasa algo en el dominio. Disponible en plan <strong class="text-fg">Equipo</strong>. La URL debe ser <code class="text-fg">https</code> y p&uacute;blica; m&aacute;ximo 10 webhooks por dominio.</p>
+      <p class="text-fg-muted mb-4">Recibe un <code class="text-fg">POST</code> en tu servidor cada vez que pasa algo en el dominio. Disponible en <strong class="text-fg">dominio activado</strong>. La URL debe ser <code class="text-fg">https</code> y p&uacute;blica; m&aacute;ximo 10 webhooks por dominio.</p>
       <ul class="text-fg-muted mb-4 list-disc pl-6 space-y-1 text-sm"><li><code class="text-fg">email.received</code>: lleg&oacute; correo a un alias. <code class="text-fg-subtle">data: { from, to, subject, alias, forwardedTo[], messageId }</code></li><li><code class="text-fg">email.sent</code>: saliste por <code class="text-fg">send</code> o <code class="text-fg">bulkSend</code>. <code class="text-fg-subtle">data: { to, cc?, subject, from, messageId, bulkJobId? }</code></li><li><code class="text-fg">email.delivered</code>: el servidor del destinatario acept&oacute; el correo. <code class="text-fg-subtle">data: { recipient, messageId, subject, smtpResponse, processingTimeMillis }</code></li><li><code class="text-fg">email.bounced</code>: rebote permanente; el destinatario entr&oacute; a la lista de supresi&oacute;n. <code class="text-fg-subtle">data: { recipient, reason, messageId, subject }</code></li><li><code class="text-fg">email.complained</code>: el destinatario marc&oacute; spam. Mismo <code class="text-fg">data</code> que el rebote.</li></ul>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Crear. El secret se muestra una sola vez: gu&aacute;rdalo.</span>
 <span class="kw">const</span> wh = <span class="kw">await</span> mm.webhooks.<span class="fn">create</span>(<span class="str">"domain-id"</span>, {
@@ -373,7 +373,7 @@ app.<span class="fn">post</span>(<span class="str">"/webhooks/mailmask"</span>, 
 
       <!-- SMTP -->
       <h2 id="smtp" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Credenciales SMTP</h2>
-      <p class="text-fg-muted mb-4">Crea credenciales SMTP para enviar emails desde tu c&oacute;digo o aplicaciones SaaS. Disponible en plan <strong class="text-fg">Equipo</strong>.</p>
+      <p class="text-fg-muted mb-4">Crea credenciales SMTP para enviar emails desde tu c&oacute;digo o aplicaciones SaaS. Disponible en <strong class="text-fg">dominio activado</strong>.</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Listar credenciales</span>
 <span class="kw">const</span> creds = <span class="kw">await</span> mm.smtp.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
 
