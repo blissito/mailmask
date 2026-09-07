@@ -684,10 +684,16 @@ async function openConversation(conv) {
     btnRestore.classList.add("mesa-hidden");
   }
 
-  // Load messages
+  // Load messages. Se vacía el visor ANTES del fetch: si no, el hilo anterior
+  // sigue pintado mientras llega el nuevo y parece que los correos se mezclan.
+  // Y si mientras tanto se abrió otro hilo (o cambió el dominio), esta
+  // respuesta ya no es la que va en pantalla.
+  document.getElementById("messages-container").innerHTML = "";
   const res = await fetch(`/api/bandeja/conversations/${conv.id}?domainId=${selectedDomainId}`);
+  if (activeConv !== conv) return;
   if (!res.ok) return;
   const data = await res.json();
+  if (activeConv !== conv) return;
 
   renderMessages(data.messages ?? [], data.notes ?? []);
   actualizarSeleccion();
@@ -1167,6 +1173,7 @@ function setupListeners() {
     updateTitle();
     document.getElementById("detail-empty").classList.remove("mesa-hidden");
     document.getElementById("detail-loaded").classList.add("mesa-hidden");
+    document.getElementById("messages-container").innerHTML = "";
     loadAliasesForCompose();
     loadConversations();
     connectSSE(selectedDomainId);
