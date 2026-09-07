@@ -242,6 +242,25 @@ programar("*/10 * * * *", async () => {
   }
 });
 
+// --- Tipo de cambio ---
+
+// Cada hora. Antes era una variable de entorno con respaldo 21 cuando el real era 16.89:
+// nadie actualiza un número así, y sobre él se calculaba el precio de todos los dominios.
+programar("7 * * * *", async () => {
+  try {
+    const { actualizarTipoDeCambio, lecturaRancia } = await import("./fx.js");
+    const lectura = await actualizarTipoDeCambio();
+    // Se avisa por quedarse sin dato fresco, no por un fallo suelto: las APIs públicas se
+    // caen y el máximo de 30 días aguanta de sobra un hueco de unas horas.
+    if (!lectura && lecturaRancia()) {
+      const { sendAlert } = await import("./ses.js");
+      await sendAlert("tipo-de-cambio", "Llevamos más de un día sin poder actualizar el tipo de cambio USD/MXN.\n\nEl precio de los dominios se está calculando sobre el último valor conocido. Revisa las fuentes en fx.ts.");
+    }
+  } catch (err) {
+    log("error", "cron", "Actualización del tipo de cambio falló", { error: String(err) });
+  }
+});
+
 // --- Dominios registrados: expiración, avisos y cobranza ---
 
 // 8:00 — la fecha de expiración y el AutoRenew los dice AWS, no nuestra base.

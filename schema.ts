@@ -5,6 +5,7 @@ import {
   primaryKey,
   unique,
   index,
+  real,
 } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
@@ -174,6 +175,19 @@ export const suppressions = sqliteTable("suppressions", {
   createdAt: text("created_at").$defaultFn(() => new Date().toISOString()).notNull(),
 }, (table) => [
   primaryKey({ columns: [table.domainId, table.email] }),
+]);
+
+// Tipo de cambio con historia. La historia importa: el precio de renovación se fija al
+// contratar y el monto de un PreApproval de MercadoPago no se puede cambiar después, así
+// que se cotiza sobre el peor tipo reciente y no sobre el de este segundo.
+export const fxRates = sqliteTable("fx_rates", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  pair: text("pair").notNull(),
+  rate: real("rate").notNull(),
+  source: text("source").notNull(),
+  fetchedAt: text("fetched_at").notNull(),
+}, (table) => [
+  index("idx_fx_pair_fetched").on(table.pair, table.fetchedAt),
 ]);
 
 export const tokens = sqliteTable("tokens", {

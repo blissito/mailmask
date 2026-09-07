@@ -2292,18 +2292,18 @@ export const TLD_PRICES: Record<string, {
   renewUsdCents: number; renewMxnCents: number;
   transferUsdCents: number; transferMxnCents: number;
 }> = {
-  ".com":     { awsUsdCents: 1600, userMxnCents: 39900, renewUsdCents: 1600, renewMxnCents: 39900, transferUsdCents: 1600, transferMxnCents: 39900 },
-  ".net":     { awsUsdCents: 1700, userMxnCents: 42900, renewUsdCents: 1700, renewMxnCents: 42900, transferUsdCents: 1700, transferMxnCents: 42900 },
-  ".org":     { awsUsdCents: 1600, userMxnCents: 39900, renewUsdCents: 1600, renewMxnCents: 39900, transferUsdCents: 1600, transferMxnCents: 39900 },
-  ".io":      { awsUsdCents: 7100, userMxnCents: 178900, renewUsdCents: 7100, renewMxnCents: 178900, transferUsdCents: 7100, transferMxnCents: 178900 },
-  ".co":      { awsUsdCents: 3800, userMxnCents: 95900, renewUsdCents: 3800, renewMxnCents: 95900, transferUsdCents: 3800, transferMxnCents: 95900 },
-  ".click":   { awsUsdCents: 300, userMxnCents: 11900, renewUsdCents: 300, renewMxnCents: 11900, transferUsdCents: 1000, transferMxnCents: 26900 },
-  ".link":    { awsUsdCents: 500, userMxnCents: 15900, renewUsdCents: 500, renewMxnCents: 15900, transferUsdCents: 1000, transferMxnCents: 26900 },
-  ".mx":      { awsUsdCents: 6700, userMxnCents: 168900, renewUsdCents: 6700, renewMxnCents: 168900, transferUsdCents: 6700, transferMxnCents: 168900 },
-  ".com.mx":  { awsUsdCents: 2900, userMxnCents: 72900, renewUsdCents: 2900, renewMxnCents: 72900, transferUsdCents: 2900, transferMxnCents: 72900 },
-  ".xyz":     { awsUsdCents: 1900, userMxnCents: 47900, renewUsdCents: 1900, renewMxnCents: 47900, transferUsdCents: 1900, transferMxnCents: 47900 },
-  ".info":    { awsUsdCents: 3000, userMxnCents: 75900, renewUsdCents: 3000, renewMxnCents: 75900, transferUsdCents: 3000, transferMxnCents: 75900 },
-  ".me":      { awsUsdCents: 3100, userMxnCents: 77900, renewUsdCents: 3100, renewMxnCents: 77900, transferUsdCents: 3100, transferMxnCents: 77900 },
+  ".com":     { awsUsdCents: 1600, userMxnCents: 32900, renewUsdCents: 1600, renewMxnCents: 32900, transferUsdCents: 1600, transferMxnCents: 32900 },
+  ".net":     { awsUsdCents: 1700, userMxnCents: 34900, renewUsdCents: 1700, renewMxnCents: 34900, transferUsdCents: 1700, transferMxnCents: 34900 },
+  ".org":     { awsUsdCents: 1600, userMxnCents: 32900, renewUsdCents: 1600, renewMxnCents: 32900, transferUsdCents: 1600, transferMxnCents: 32900 },
+  ".io":      { awsUsdCents: 7100, userMxnCents: 143900, renewUsdCents: 7100, renewMxnCents: 143900, transferUsdCents: 7100, transferMxnCents: 143900 },
+  ".co":      { awsUsdCents: 3800, userMxnCents: 76900, renewUsdCents: 3800, renewMxnCents: 76900, transferUsdCents: 3800, transferMxnCents: 76900 },
+  ".click":   { awsUsdCents: 300, userMxnCents: 10900, renewUsdCents: 300, renewMxnCents: 10900, transferUsdCents: 1000, transferMxnCents: 22900 },
+  ".link":    { awsUsdCents: 500, userMxnCents: 13900, renewUsdCents: 500, renewMxnCents: 13900, transferUsdCents: 1000, transferMxnCents: 22900 },
+  ".mx":      { awsUsdCents: 6700, userMxnCents: 135900, renewUsdCents: 6700, renewMxnCents: 135900, transferUsdCents: 6700, transferMxnCents: 135900 },
+  ".com.mx":  { awsUsdCents: 2900, userMxnCents: 58900, renewUsdCents: 2900, renewMxnCents: 58900, transferUsdCents: 2900, transferMxnCents: 58900 },
+  ".xyz":     { awsUsdCents: 1900, userMxnCents: 38900, renewUsdCents: 1900, renewMxnCents: 38900, transferUsdCents: 1900, transferMxnCents: 38900 },
+  ".info":    { awsUsdCents: 3000, userMxnCents: 60900, renewUsdCents: 3000, renewMxnCents: 60900, transferUsdCents: 3000, transferMxnCents: 60900 },
+  ".me":      { awsUsdCents: 3100, userMxnCents: 62900, renewUsdCents: 3100, renewMxnCents: 62900, transferUsdCents: 3100, transferMxnCents: 62900 },
 };
 
 export type DomainRegistrationStatus =

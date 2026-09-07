@@ -190,6 +190,17 @@ suyos: el dominio ya era de él.
    embudo el punto donde el cliente descubre que somos caros. `.click` y `.link` se salen del
    1.2 por el piso de $60: a ese margen dejarían menos que la comisión de MercadoPago.
 
+   **El tipo de cambio se actualiza solo cada hora** (`fx.ts`, tabla `fx_rates`, cron `7 * * * *`).
+   Antes era `process.env.USD_MXN ?? 21` y el real era **16.89**: nadie actualiza un número
+   así, y sobre él se calculaba el precio de todos los dominios. Tres cosas no obvias:
+   (1) se **cotiza sobre el máximo de los últimos 30 días**, no sobre el de este segundo,
+   porque cotizar de menos se paga durante todos los años que dure la suscripción y cotizar
+   de más sólo encarece el dominio un poco; (2) una lectura fuera de `[10, 40]` se
+   **descarta** — una API que contesta `1` vendería un `.io` de $71 USD en $85 MXN; (3) la
+   alerta salta por quedarse sin dato fresco (>26 h), no por un fallo suelto, porque las APIs
+   públicas se caen y el máximo de 30 días aguanta el hueco. Los 12 curados llevan precio a
+   mano y **no** se mueven solos; el tipo de cambio sólo afecta a los otros 401 TLD.
+
    ⚠️ **El monto de un PreApproval de MercadoPago no se puede cambiar después**: el precio de
    renovación se fija al contratar y tiene que aguantar años de tipo de cambio. Por eso el
    margen no baja de 1.2 aunque se pueda. **Los precios de AWS cambian: revísalos con ese

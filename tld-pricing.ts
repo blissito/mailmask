@@ -9,12 +9,7 @@
 // por un detalle de nuestra tabla interna.
 import { log } from "./logger.js";
 import { TLD_PRICES } from "./db.js";
-
-/**
- * Tipo de cambio para convertir el costo de AWS, que viene en USD. Vive en el entorno
- * porque un número clavado en el código envejece en silencio y acaba vendiendo bajo costo.
- */
-const USD_MXN = Number(process.env.USD_MXN ?? 21);
+import { tipoDeCambio } from "./fx.js";
 
 /**
  * Un dominio es una commodity con precio público: el cliente compara en diez segundos, así
@@ -41,7 +36,10 @@ export interface PrecioTld {
 }
 
 function alPrecioDeVenta(usdCents: number): number {
-  const costoMxn = (usdCents / 100) * USD_MXN;
+  // El tipo de cambio se actualiza cada hora y se cotiza sobre el máximo de los últimos 30
+  // días: el monto de un PreApproval de MercadoPago no se puede cambiar después, así que un
+  // dominio cotizado en un mínimo pasajero se cobraría bajo costo durante años.
+  const costoMxn = (usdCents / 100) * tipoDeCambio();
   const conMargen = Math.max(costoMxn * MARGEN, costoMxn + MARGEN_MINIMO_MXN);
   // Redondeo a decenas menos uno: $722 → $729. Hacia arriba, nunca hacia abajo, que es como
   // se acaba vendiendo por debajo del costo.
