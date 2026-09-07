@@ -103,7 +103,7 @@ function parseMimeParts(body: string, boundary: string): MimePart[] {
       }
     }
 
-    const encMatch = headers.match(/Content-Transfer-Encoding:\s*(\S+)/i);
+    const encMatch = headers.match(/^Content-Transfer-Encoding:[ \t]*(\S+)/im);
     const encoding = encMatch ? encMatch[1].trim().toLowerCase() : undefined;
 
     // Extract filename from Content-Disposition or Content-Type
@@ -139,7 +139,7 @@ function flattenMimeParts(raw: string): MimePart[] {
   }
 
   // Not multipart — single part
-  const encMatch = raw.slice(0, headerBodySplit).match(/Content-Transfer-Encoding:\s*(\S+)/i);
+  const encMatch = raw.slice(0, headerBodySplit).match(/^Content-Transfer-Encoding:[ \t]*(\S+)/im);
   return [{ headers: raw.slice(0, headerBodySplit), contentType, body, encoding: encMatch?.[1]?.trim().toLowerCase() }];
 }
 

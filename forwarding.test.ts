@@ -817,6 +817,24 @@ const NESTED_MULTIPART = [
 ].join("\r\n");
 
 describe("MIME parsing", () => {
+  it("single-part quoted-printable with DKIM h= listing content-transfer-encoding", () => {
+    // TikTok/SendGrid: sin multipart, y la firma DKIM menciona
+    // "content-transfer-encoding:content-type" antes del header real.
+    const raw = [
+      "DKIM-Signature: v=1; a=rsa-sha256; d=tiktok.com;",
+      "\th=content-transfer-encoding:content-type:date:from:subject:to;",
+      "\tb=abc==",
+      "Content-Transfer-Encoding: quoted-printable",
+      "Content-Type: text/html; charset=utf-8",
+      "From: TikTok <noreply@account.tiktok.com>",
+      "Subject: hola",
+      "",
+      "<p>Verifica tu correo electr=C3=B3nico <a href=3D\"https://x\">aqu=C3=AD</a></p>",
+    ].join("\r\n");
+    assert.equal(extractHtmlBody(raw), '<p>Verifica tu correo electrónico <a href="https://x">aquí</a></p>');
+    assert.equal(extractPlainBody(raw), "Verifica tu correo electrónico aquí");
+  });
+
   it("extractPlainBody handles nested multipart", () => {
     assert.equal(extractPlainBody(NESTED_MULTIPART), "Hello plain text");
   });
