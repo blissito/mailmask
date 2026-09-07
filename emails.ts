@@ -582,6 +582,37 @@ export function courtesyGranted(d: {
   };
 }
 
+/**
+ * Recuperación de carrito: quien empezó un checkout de plan que ya no existe (agosto
+ * 2026, Básico $49) y nunca lo terminó. Desde el 7-sep empezar es gratis, así que el
+ * mensaje no vende: le quita el motivo por el que se detuvo.
+ */
+export function carritoAbandonado(d: { nombre?: string | null; fechaIntento: string; planLabel: string; amountCents: number }): Email {
+  const saludo = d.nombre ? `Hola, ${d.nombre}.` : "Hola.";
+  const fecha = shortDate(d.fechaIntento);
+  const precio = money(d.amountCents);
+  return {
+    subject: cleanSubject("Lo que ibas a contratar en MailMask ahora es gratis"),
+    html: layout({
+      preheader: "Empezar ya no cuesta nada: agrega tu dominio y listo.",
+      heading: "Ya no hace falta pagar para empezar",
+      body: p(`${saludo} El ${fecha} empezaste a contratar el plan ${d.planLabel} de MailMask (${precio} al mes) y el pago se quedó a medias. No se te cobró nada.`)
+        + pRaw(`Desde entonces cambiamos el modelo: <strong style="color:${C.band};">MailMask es gratis para empezar</strong>. Agrega tu dominio, crea tus máscaras y recibe el correo en la Bandeja sin pagar nada y sin tarjeta.`)
+        + calloutBox("Cuando quieras más (máscaras ilimitadas, correo nuevo desde tu dominio, buzones IMAP y personas ilimitadas), son $99 MXN al mes por dominio, todo incluido.", "info")
+        + p("Tu cuenta sigue ahí, con tu correo verificado. Sólo falta el dominio."),
+      cta: { label: "Agregar mi dominio", url: `${baseUrl()}/app` },
+      footerNote: "Si algo te frenó aquella vez, responde este correo y te ayudo a configurarlo.",
+    }),
+    text: textBlock([
+      `${saludo} El ${fecha} empezaste a contratar el plan ${d.planLabel} de MailMask (${precio} al mes) y el pago se quedó a medias. No se te cobró nada.`,
+      "Desde entonces cambiamos el modelo: MailMask es gratis para empezar. Agrega tu dominio, crea tus máscaras y recibe el correo en la Bandeja sin pagar nada y sin tarjeta.",
+      "Cuando quieras más (máscaras ilimitadas, correo nuevo desde tu dominio, buzones IMAP y personas ilimitadas), son $99 MXN al mes por dominio, todo incluido.",
+      `Tu cuenta sigue ahí, con tu correo verificado. Sólo falta el dominio: ${baseUrl()}/app`,
+      "Si algo te frenó aquella vez, responde este correo y te ayudo a configurarlo.",
+    ]),
+  };
+}
+
 // --- Plantillas que no son de facturación ---
 
 export function verifyEmail(d: { verifyUrl: string }): Email {
@@ -806,6 +837,7 @@ export const TEMPLATE_FIXTURES: Record<string, () => Email> = {
     addonLabel: ADDONS.domain.label, until: "2027-12-31T00:00:00.000Z",
     listPriceCents: ADDONS.domain.price, note: "Compensación por la falla de cobro del 29 de julio",
   }),
+  carritoAbandonado: () => carritoAbandonado({ nombre: "Oswaldo", fechaIntento: "2026-08-26T18:32:06.000Z", planLabel: "Básico", amountCents: 4900 }),
   verifyEmail: () => verifyEmail({ verifyUrl: "https://www.mailmask.studio/api/auth/verify-email?token=abc" }),
   passwordReset: () => passwordReset({ resetUrl: "https://www.mailmask.studio/set-password?token=abc" }),
   mesaInvite: () => mesaInvite({
