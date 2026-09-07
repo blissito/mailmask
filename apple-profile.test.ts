@@ -44,7 +44,10 @@ describe("Perfil de Apple Mail", () => {
     // hace fallar la instalacion entera, no solo el envio.
     const p = generarPerfilApple(base);
     assert.ok(p.includes(`<key>OutgoingMailServerHostName</key><string>${IMAP_HOST}</string>`));
-    assert.ok(p.includes("<key>OutgoingPasswordSameAsIncoming</key><true/>"));
+    assert.ok(p.includes("<key>OutgoingMailServerAuthentication</key><string>EmailAuthPassword</string>"));
+    // El nombre exacto: sin el sufijo Password, Apple lo ignora y asume
+    // EmailAuthNone. Es lo que rompio el envio en la primera prueba real.
+    assert.ok(p.includes("<key>OutgoingPasswordSameAsIncomingPassword</key><true/>"));
   });
 
   it("con servidor de salida propio, pide su contraseña aparte", () => {
@@ -54,7 +57,7 @@ describe("Perfil de Apple Mail", () => {
     });
     assert.ok(p.includes("<key>OutgoingMailServerHostName</key><string>email-smtp.us-east-1.amazonaws.com</string>"));
     assert.ok(p.includes("<key>OutgoingMailServerPortNumber</key><integer>587</integer>"));
-    assert.ok(p.includes("<key>OutgoingPasswordSameAsIncoming</key><false/>"));
+    assert.ok(p.includes("<key>OutgoingPasswordSameAsIncomingPassword</key><false/>"));
   });
 
   it("nunca incluye la contraseña del buzón", () => {

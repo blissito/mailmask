@@ -98,7 +98,11 @@ export function generarPerfilApple(d: DatosPerfil): string {
       <key>OutgoingMailServerUseSSL</key><true/>
       <key>OutgoingMailServerAuthentication</key><string>EmailAuthPassword</string>
       <key>OutgoingMailServerUsername</key><string>${esc(salidaUsuario)}</string>
-      <key>OutgoingPasswordSameAsIncoming</key><${d.salida?.usuario ? "false" : "true"}/>
+      <!-- El nombre exacto de la clave es OutgoingPasswordSameAsIncomingPassword.
+           Escrito de otra forma Apple lo IGNORA en silencio, cae a pedir una
+           contraseña que nadie le dio, y el envío falla con "You must
+           authenticate first". -->
+      <key>OutgoingPasswordSameAsIncomingPassword</key><${d.salida?.usuario ? "false" : "true"}/>
 
       <key>PreventMove</key><false/>
       <key>PreventAppSheet</key><false/>

@@ -933,14 +933,23 @@ export async function deriveSesSmtpPassword(secretAccessKey: string, region: str
     return new Uint8Array(sig);
   }
 
-  // AWS SES SMTP password derivation algorithm
+  // Derivacion de la contrasena SMTP de SES: CINCO HMAC encadenados, y el byte de
+  // version solo se antepone al final — no entra en el HMAC.
+  //
+  // Aqui faltaban los dos ultimos pasos ("aws4_request" y "SendRawEmail") y en su
+  // lugar se hacia HMAC del byte de version. El resultado era una contrasena con
+  // pinta correcta que SES rechaza siempre con "535 Authentication Credentials
+  // Invalid": el relay SMTP del plan Equipo nunca funciono para nadie.
   const DATE = "11111111";
   const SERVICE = "ses";
+  const TERMINAL = "aws4_request";
+  const MESSAGE = "SendRawEmail";
 
   let signature = await hmacSha256(enc.encode("AWS4" + secretAccessKey), enc.encode(DATE));
   signature = await hmacSha256(signature, enc.encode(region));
   signature = await hmacSha256(signature, enc.encode(SERVICE));
-  signature = await hmacSha256(signature, new Uint8Array([VERSION]));
+  signature = await hmacSha256(signature, enc.encode(TERMINAL));
+  signature = await hmacSha256(signature, enc.encode(MESSAGE));
 
   // Prepend version byte and base64 encode
   const result = new Uint8Array(1 + signature.length);
