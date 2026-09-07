@@ -81,7 +81,7 @@ Cuenta gratis ($0, sin tarjeta):
 - DKIM + SPF automáticos, API REST y SDK.
 - Sin reglas, webhooks, SMTP relay ni buzones IMAP.
 
-Dominio activado — $99 MXN/mes por dominio, o $990 al año (2 meses gratis):
+Dominio activado — $99 MXN/mes por dominio, o $999 al año (ahorras $189):
 - Personas ilimitadas en la Bandeja compartida (asignar, notas, historial completo).
 - Buzones IMAP ilimitados con 10 GB compartidos por dominio (Apple Mail, Outlook, Thunderbird).
 - Envía como tu@dominio: 50 correos nuevos al día por dominio (API, Redactar, SMTP relay).

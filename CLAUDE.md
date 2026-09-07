@@ -178,7 +178,7 @@ todas a $99/mes y **por dominio** (los add-ons pasan a llevar `domainId`):
 
 | | Gratis | Dominio activado |
 |---|---|---|
-| Precio | $0 | **$99/mes** (anual $990) |
+| Precio | $0 | **$99/mes** (anual $999) |
 | Máscaras | 5 | ilimitadas |
 | Personas en la Bandeja | 1 | ilimitadas |
 | Bandeja | 7 días visibles, 30 guardados (recuperables al pagar), luego se borra | completo |

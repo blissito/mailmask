@@ -47,7 +47,7 @@ mes:
 
 |  | Gratis | Dominio activado |
 |---|---|---|
-| Precio | $0 | $99/mes por dominio (anual $990) |
+| Precio | $0 | $99/mes por dominio (anual $999) |
 | Dominios por cuenta | 1 | del segundo en adelante, cada uno se activa |
 | Máscaras | 5 | ilimitadas |
 | Personas en la Bandeja | 1 | ilimitadas |
