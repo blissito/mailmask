@@ -6906,6 +6906,38 @@ const app = new Elysia({ adapter: node() })
     if (!access) return jsonErr("Dominio no encontrado", 404);
     const d = access.domain;
 
+    // Puede haber una zona nuestra sin que la fila lo sepa: el backfill de la migración la
+    // copiaba de `domain_registrations`, y esa tabla sólo tiene fila si el dominio se compró
+    // por nuestro flujo. `mailmask.studio` se montó a mano y salía como "sin DNS" teniendo
+    // su zona. Se le pregunta a Route 53 por nombre, con freno para no gastar una llamada
+    // por vista en los dominios que de verdad no están en Route 53.
+    if (!d.hostedZoneId) {
+      const revisado = d.dnsCheckedAt ? Date.now() - Date.parse(d.dnsCheckedAt) : Infinity;
+      if (revisado > 6 * 3600_000) {
+        try {
+          const { findHostedZoneByName, getHostedZoneNameservers } = await import("./route53.js");
+          const zonaId = await findHostedZoneByName(d.domain);
+          if (zonaId) {
+            const ns = await getHostedZoneNameservers(zonaId);
+            updateDomain(d.id, {
+              hostedZoneId: zonaId,
+              dnsNameservers: ns,
+              dnsZoneStatus: "pending_delegation",
+              dnsCheckedAt: new Date().toISOString(),
+            });
+            d.hostedZoneId = zonaId;
+            d.dnsNameservers = ns;
+            d.dnsZoneStatus = "pending_delegation";
+            log("info", "route53", "Zona adoptada al vuelo", { domain: d.domain, hostedZoneId: zonaId });
+          } else {
+            updateDomain(d.id, { dnsCheckedAt: new Date().toISOString() });
+          }
+        } catch (err) {
+          log("warn", "route53", "No se pudo buscar la zona del dominio", { domain: d.domain, error: String(err) });
+        }
+      }
+    }
+
     if (!d.hostedZoneId) {
       // A propósito no es un 404: ante un 404 un agente abandona, ante una pista actúa.
       return Response.json({

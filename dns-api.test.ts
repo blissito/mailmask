@@ -12,6 +12,7 @@ const suffix = Date.now();
 // Zona de Route 53 en memoria, llaveada por `nombre|tipo`.
 let zona = new Map<string, { name: string; type: string; ttl: number; values: string[] }>();
 let zonasCreadas = 0;
+let zonaPorNombre = false;
 
 const sembrar = (name: string, type: string, values: string[], ttl = 300) =>
   zona.set(`${name}|${type}`, { name, type, ttl, values });
@@ -51,7 +52,9 @@ describe("API de DNS", () => {
                 }
                 return { ChangeInfo: { Id: "/change/C1" } };
               case "ListHostedZonesByName":
-                return { HostedZones: [] };
+                return zonaPorNombre
+                  ? { HostedZones: [{ Id: "/hostedzone/ZEXISTE", Name: `${i.DNSName}.`, Config: { PrivateZone: false } }] }
+                  : { HostedZones: [] };
               case "CreateHostedZone":
                 zonasCreadas++;
                 return { HostedZone: { Id: "/hostedzone/ZTEST" }, DelegationSet: { NameServers: ["ns-1.awsdns-01.com", "ns-2.awsdns-02.net"] } };
@@ -113,6 +116,7 @@ describe("API de DNS", () => {
     sqlite.prepare("DELETE FROM rate_limits").run();
     zona = new Map();
     zonasCreadas = 0;
+    zonaPorNombre = false;
   });
 
   const pedir = (ruta: string, init: RequestInit = {}) =>
@@ -122,7 +126,7 @@ describe("API de DNS", () => {
     }));
 
   const conZona = () => sqlite.prepare("UPDATE domains SET hosted_zone_id = 'ZTEST', dns_zone_status = 'pending_delegation' WHERE id = ?").run(domainId);
-  const sinZona = () => sqlite.prepare("UPDATE domains SET hosted_zone_id = NULL, dns_zone_status = 'none' WHERE id = ?").run(domainId);
+  const sinZona = () => sqlite.prepare("UPDATE domains SET hosted_zone_id = NULL, dns_zone_status = 'none', dns_checked_at = NULL WHERE id = ?").run(domainId);
 
   const upsert = (body: unknown) => pedir(`/api/domains/${domainId}/dns/records`, { method: "PUT", body: JSON.stringify(body) });
 
@@ -267,5 +271,34 @@ describe("API de DNS", () => {
   it("sin sesión, 401", async () => {
     const r = await app.fetch(new Request(`http://localhost/api/domains/${domainId}/dns`));
     assert.equal(r.status, 401);
+  });
+  it("adopta una zona que ya existe en Route 53 aunque la fila no la conozca", async () => {
+    // El backfill de la migración copiaba `hosted_zone_id` de `domain_registrations`, y esa
+    // tabla sólo tiene fila si el dominio se compró por nuestro flujo. `mailmask.studio` se
+    // montó a mano y salía como "sin DNS" teniendo su zona desde siempre.
+    sinZona();
+    zonaPorNombre = true;
+
+    const j = await (await pedir(`/api/domains/${domainId}/dns`)).json();
+    assert.equal(j.zone.hostedZoneId, "ZEXISTE");
+    assert.notEqual(j.zone.status, "none");
+    assert.equal(zonasCreadas, 0, "adoptar no debe crear una zona nueva");
+
+    // Y queda guardado, no se re-descubre en cada vista.
+    const fila = sqlite.prepare("SELECT hosted_zone_id FROM domains WHERE id = ?").get(domainId) as { hosted_zone_id: string };
+    assert.equal(fila.hosted_zone_id, "ZEXISTE");
+  });
+
+  it("si de verdad no hay zona, no vuelve a preguntar en cada vista", async () => {
+    sinZona();
+    zonaPorNombre = false;
+
+    assert.equal((await (await pedir(`/api/domains/${domainId}/dns`)).json()).zone.status, "none");
+    const marca = sqlite.prepare("SELECT dns_checked_at FROM domains WHERE id = ?").get(domainId) as { dns_checked_at: string };
+    assert.ok(marca.dns_checked_at, "no anotó cuándo revisó");
+
+    // La segunda vista cae dentro del freno de 6 h: no debe volver a llamar a AWS.
+    const j2 = await (await pedir(`/api/domains/${domainId}/dns`)).json();
+    assert.equal(j2.zone.status, "none");
   });
 });

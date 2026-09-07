@@ -94,6 +94,15 @@ Stripe y demás. El 409 devuelve `suggestedValues` con la fusión ya hecha para 
 reintente sin razonar. La salida legítima (mover el correo a otro proveedor) es borrar el
 dominio de MailMask.
 
+**La zona se adopta si ya existe.** `GET /dns` pregunta a Route 53 por nombre cuando la fila
+no tiene `hostedZoneId`, y guarda lo que encuentre (con freno de 6 h vía `dnsCheckedAt`, para
+no gastar una llamada por vista en los dominios que de verdad no están ahí). Hizo falta
+porque el backfill de la migración 0018 copiaba el id desde `domain_registrations`, y esa
+tabla **está vacía**: nadie ha registrado nunca por ese flujo. `mailmask.studio` tiene su
+zona desde siempre —se montó a mano— y salía como "sin DNS". La lección es la de siempre en
+este repo: un backfill que asume que el estado se creó por nuestro camino feliz se equivoca
+con todo lo que se hizo a mano antes.
+
 **Cobertura ampliada:** un dominio de fuera puede delegar sus nameservers a una hosted zone
 nuestra sin transferir el registro, y así tener el editor. `POST /dns/zone` **importa antes
 de enseñar los nameservers**, y si la importación o la fusión fallan borra la zona: media
