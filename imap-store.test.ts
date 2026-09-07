@@ -31,26 +31,15 @@ const CONFIG = {
 
 const CRUDO = "From: a@ejemplo.com\r\nTo: ventas@mailmask.studio\r\n\r\nhola";
 
-describe("Buzón IMAP: qué dominios entran", () => {
-  it("sólo los listados, y sin importar mayúsculas", async () => {
-    const m = await cargar({ ...CONFIG, IMAP_ENABLED_DOMAINS: "MailMask.Studio, otro.com" });
+describe("Buzón IMAP: cuándo aplica", () => {
+  it("con servidor configurado aplica a cualquier dominio: la decisión es por máscara", async () => {
+    const m = await cargar({ ...CONFIG });
     assert.equal(m.imapHabilitado("mailmask.studio"), true);
-    assert.equal(m.imapHabilitado("MAILMASK.STUDIO"), true);
-    assert.equal(m.imapHabilitado("otro.com"), true);
-    assert.equal(m.imapHabilitado("ajeno.com"), false);
+    assert.equal(m.imapHabilitado("cualquiera.com"), true);
   });
 
-  it("lista vacía significa NADIE, no todos", async () => {
-    // Es el default en producción: activar IMAP tiene que ser un acto explícito.
-    const m = await cargar({ ...CONFIG, IMAP_ENABLED_DOMAINS: "" });
-    assert.equal(m.imapHabilitado("mailmask.studio"), false);
-  });
-
-  it("sin credenciales no se activa aunque el dominio esté listado", async () => {
-    const m = await cargar({
-      STALWART_ADMIN_URL: undefined, STALWART_ADMIN_PASSWORD: undefined,
-      IMAP_ENABLED_DOMAINS: "mailmask.studio",
-    });
+  it("sin credenciales de administrador no aplica", async () => {
+    const m = await cargar({ STALWART_ADMIN_URL: undefined, STALWART_ADMIN_PASSWORD: undefined });
     assert.equal(m.imapHabilitado("mailmask.studio"), false);
   });
 });
@@ -115,7 +104,7 @@ describe("🔴 Cada correo va al buzón de SU destinatario", () => {
       "ventas@uno.com": "cuentaUno",
       "ventas@dos.com": "cuentaDos",
     });
-    const m = await cargar({ ...CONFIG, IMAP_ENABLED_DOMAINS: "uno.com, dos.com" });
+    const m = await cargar({ ...CONFIG });
 
     assert.equal(await m.depositarEnImap(CRUDO, "uno.com", "ventas@uno.com"), true);
     assert.equal(await m.depositarEnImap(CRUDO, "dos.com", "ventas@dos.com"), true);
@@ -128,7 +117,7 @@ describe("🔴 Cada correo va al buzón de SU destinatario", () => {
   it("un destinatario SIN buzón no se deposita en ningún lado", async () => {
     // Fail-closed: es lo que impide que el correo caiga en un buzón ajeno.
     const s = servidor({ "ventas@uno.com": "cuentaUno" });
-    const m = await cargar({ ...CONFIG, IMAP_ENABLED_DOMAINS: "uno.com" });
+    const m = await cargar({ ...CONFIG });
 
     assert.equal(await m.depositarEnImap(CRUDO, "uno.com", "nadie@uno.com"), false);
     assert.equal(s.importados.length, 0);
@@ -136,7 +125,7 @@ describe("🔴 Cada correo va al buzón de SU destinatario", () => {
 
   it("la dirección se resuelve sin importar mayúsculas", async () => {
     const s = servidor({ "ventas@uno.com": "cuentaUno" });
-    const m = await cargar({ ...CONFIG, IMAP_ENABLED_DOMAINS: "uno.com" });
+    const m = await cargar({ ...CONFIG });
 
     assert.equal(await m.depositarEnImap(CRUDO, "uno.com", "Ventas@UNO.com"), true);
     assert.equal(s.importados[0].accountId, "cuentaUno");
@@ -147,17 +136,17 @@ describe("🔴 El buzón nunca puede romper el reenvío", () => {
   const fetchReal = globalThis.fetch;
   afterEach(() => { globalThis.fetch = fetchReal; });
 
-  it("un dominio no habilitado devuelve false sin salir a la red", async () => {
+  it("sin servidor configurado devuelve false sin salir a la red", async () => {
     let llamadas = 0;
     globalThis.fetch = (async () => { llamadas++; return new Response("{}"); }) as typeof fetch;
-    const m = await cargar({ ...CONFIG, IMAP_ENABLED_DOMAINS: "otro.com" });
+    const m = await cargar({ STALWART_ADMIN_URL: undefined, STALWART_ADMIN_PASSWORD: undefined });
     assert.equal(await m.depositarEnImap(CRUDO, "mailmask.studio", "ventas@mailmask.studio"), false);
     assert.equal(llamadas, 0);
   });
 
   it("si el buzón está caído devuelve false, NO lanza", async () => {
     globalThis.fetch = (async () => { throw new Error("conexión rechazada"); }) as typeof fetch;
-    const m = await cargar({ ...CONFIG, IMAP_ENABLED_DOMAINS: "mailmask.studio" });
+    const m = await cargar({ ...CONFIG });
     // Si esto lanzara, el correo del cliente no se reenviaría por culpa de un
     // destino secundario. Es la razón de ser del try/catch de ese módulo.
     assert.equal(await m.depositarEnImap(CRUDO, "mailmask.studio", "ventas@mailmask.studio"), false);
@@ -165,7 +154,7 @@ describe("🔴 El buzón nunca puede romper el reenvío", () => {
 
   it("si el buzón responde error HTTP tampoco lanza", async () => {
     globalThis.fetch = (async () => new Response("no", { status: 500 })) as typeof fetch;
-    const m = await cargar({ ...CONFIG, IMAP_ENABLED_DOMAINS: "mailmask.studio" });
+    const m = await cargar({ ...CONFIG });
     assert.equal(await m.depositarEnImap(CRUDO, "mailmask.studio", "ventas@mailmask.studio"), false);
   });
 
@@ -174,7 +163,7 @@ describe("🔴 El buzón nunca puede romper el reenvío", () => {
     // durante los diez minutos del TTL, en silencio.
     let intentos = 0;
     globalThis.fetch = (async () => { intentos++; throw new Error("red"); }) as typeof fetch;
-    const m = await cargar({ ...CONFIG, IMAP_ENABLED_DOMAINS: "uno.com" });
+    const m = await cargar({ ...CONFIG });
 
     await m.depositarEnImap(CRUDO, "uno.com", "ventas@uno.com");
     await m.depositarEnImap(CRUDO, "uno.com", "ventas@uno.com");
@@ -185,7 +174,7 @@ describe("🔴 El buzón nunca puede romper el reenvío", () => {
     // Sin el tope global, los timeouts internos se suman y un buzón colgado
     // retrasaría el reenvío de un correo que no tiene nada que ver con IMAP.
     globalThis.fetch = (() => new Promise(() => {})) as unknown as typeof fetch;
-    const m = await cargar({ ...CONFIG, IMAP_ENABLED_DOMAINS: "mailmask.studio" });
+    const m = await cargar({ ...CONFIG });
     const t0 = Date.now();
     assert.equal(await m.depositarEnImap(CRUDO, "mailmask.studio", "ventas@mailmask.studio"), false);
     const ms = Date.now() - t0;

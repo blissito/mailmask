@@ -522,12 +522,6 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
         log("error", "forwarding", "Failed to save to Mesa", { error: String(err), domainId: domain.id });
       }
 
-      // Buzón IMAP, para los dominios que lo tengan activado. Es un destino MÁS:
-      // `depositarEnImap` se traga sus propios errores a propósito, porque el
-      // reenvío de abajo no puede depender de que el buzón esté vivo.
-      if (imapHabilitado(domainName)) {
-        await depositarEnImap(rawContent, domainName, recipient);
-      }
     }
 
     // Step 1: Check rules first (higher priority)
@@ -580,6 +574,13 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     const matched = alias?.enabled ? alias : (catchAll?.enabled ? catchAll : null);
 
     if (matched) {
+      // Buzón IMAP: sólo si ESTA máscara tiene buzón. Es un destino MÁS, no la fuente de
+      // verdad: `depositarEnImap` se traga sus propios errores a propósito, porque el
+      // reenvío de abajo no puede depender de que el buzón esté vivo.
+      if (rawContent && matched.mailboxEnabled && imapHabilitado(domainName)) {
+        await depositarEnImap(rawContent, domainName, recipient);
+      }
+
       // Dominio bloqueado (el 2.º sin activar): ya quedó en la Bandeja; no se reenvía.
       if (derechos.bloqueado) {
         await addLog({

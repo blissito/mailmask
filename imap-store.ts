@@ -12,19 +12,15 @@
 import { log } from "./logger.js";
 import { accountIdDe, importarMensaje, stalwartConfigurado } from "./stalwart.js";
 
-/** Dominios con buzón IMAP, separados por coma. Vacío = nadie. */
-function dominiosActivos(): Set<string> {
-  return new Set(
-    (process.env.IMAP_ENABLED_DOMAINS ?? "")
-      .split(",")
-      .map((d) => d.trim().toLowerCase())
-      .filter(Boolean)
-  );
-}
-
-export function imapHabilitado(domainName: string): boolean {
-  if (!stalwartConfigurado()) return false;
-  return dominiosActivos().has(domainName.toLowerCase());
+/**
+ * Hay servidor IMAP configurado. Ya no existe una lista de dominios habilitados: la
+ * decisión es POR MÁSCARA (`alias.mailboxEnabled`, que la pone la app al crear el
+ * buzón), y el depósito resuelve el buzón del destinatario y falla cerrado si no está.
+ * La lista `IMAP_ENABLED_DOMAINS` dejó fuera al primer dominio de cliente sin que nadie
+ * lo notara: la Bandeja recibía y el buzón no.
+ */
+export function imapHabilitado(_domainName?: string): boolean {
+  return stalwartConfigurado();
 }
 
 /** Segundos, no minutos: el reenvío es lo que no puede esperar. */
