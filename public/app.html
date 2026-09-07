@@ -10,8 +10,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/css/styles.css">
+  <!-- Sin defer: aplica el tema guardado antes del primer pintado, como en el sitio público. -->
+  <script src="/js/theme.js"></script>
 </head>
-<body class="bg-zinc-950 text-zinc-100 antialiased min-h-screen app-shell">
+<body class="site bg-bg text-fg antialiased min-h-screen app-shell">
   <div class="auth-bg" aria-hidden="true"><div class="auth-bg-grid"></div></div>
 
   <!-- Nav -->
@@ -46,6 +48,10 @@
         <a id="admin-link" href="/admin" class="hidden admin">Admin</a>
       </div>
       <div class="app-me">
+        <button type="button" data-theme-toggle class="theme-toggle inline-flex h-8 w-8 items-center justify-center rounded-full border border-line text-fg-muted hover:text-fg transition-colors" aria-label="Cambiar tema">
+            <svg class="h-4 w-4 sun" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path stroke-linecap="round" d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4l1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            <svg class="h-4 w-4 moon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+          </button>
         <span id="plan-badge" class="hidden app-pill"></span>
         <span id="user-email" class="app-mail"></span>
         <button id="btn-logout" class="app-out">Salir</button>
@@ -77,7 +83,7 @@
         <div id="empty-state" class="hidden text-center py-16 app-card">
           <div class="text-5xl mb-4">🎭</div>
           <h2 class="text-xl font-semibold mb-2">Agrega tu primer dominio</h2>
-          <p class="text-zinc-400 mb-6">Configura email profesional en tu dominio en 2 minutos.</p>
+          <p class="text-fg-muted mb-6">Configura email profesional en tu dominio en 2 minutos.</p>
           <button id="btn-add-domain-empty" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors">
             Agregar dominio
           </button>
@@ -103,33 +109,33 @@
     <!-- Domain detail (shown when a domain is selected) -->
     <div id="domain-detail" class="hidden mt-8">
       <div class="flex flex-wrap items-center gap-x-3 gap-y-2 mb-6">
-        <button id="btn-back" class="text-zinc-400 hover:text-zinc-200 transition-colors whitespace-nowrap">&larr; Volver</button>
+        <button id="btn-back" class="text-fg-muted hover:text-fg transition-colors whitespace-nowrap">&larr; Volver</button>
         <h2 id="detail-domain-name" class="text-lg sm:text-xl font-bold font-mono-app min-w-0 truncate"></h2>
         <span id="detail-status" class="text-xs px-2 py-1 rounded-full whitespace-nowrap"></span>
-        <button id="btn-delete-domain" class="ml-auto text-xs text-red-400 hover:text-red-300 border border-red-400/30 hover:border-red-300/50 px-3 py-1 rounded transition-colors whitespace-nowrap">Eliminar</button>
+        <button id="btn-delete-domain" class="ml-auto text-xs text-red-500 hover:text-red-300 border border-red-400/30 hover:border-red-300/50 px-3 py-1 rounded transition-colors whitespace-nowrap">Eliminar</button>
       </div>
       <div id="detail-activation" class="mb-6"></div>
 
       <!-- Tabs: en móvil se deslizan a lo ancho -->
-      <div class="flex gap-1 border-b border-zinc-800 mb-6 overflow-x-auto whitespace-nowrap -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div class="flex gap-1 border-b border-line mb-6 overflow-x-auto whitespace-nowrap -mx-4 px-4 sm:mx-0 sm:px-0">
         <button class="tab-btn active-tab px-4 py-2 text-sm font-semibold" data-tab="aliases">Alias</button>
-        <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="rules">Reglas</button>
-        <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="logs">Logs</button>
-        <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="dns">DNS</button>
-        <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="members">Miembros</button>
-        <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="smtp">SMTP</button>
-        <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500" data-tab="webhooks">Webhooks</button>
-        <button class="tab-btn px-4 py-2 text-sm font-semibold text-zinc-500 hidden" data-tab="apikeys" id="tab-btn-apikeys">API Keys</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="rules">Reglas</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="logs">Logs</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="dns">DNS</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="members">Miembros</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="smtp">SMTP</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="webhooks">Webhooks</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle hidden" data-tab="apikeys" id="tab-btn-apikeys">API Keys</button>
       </div>
 
       <!-- Tab: Aliases -->
       <div id="tab-aliases" class="tab-content">
         <div class="flex items-center justify-between mb-4">
           <h3 class="font-semibold">Alias</h3>
-          <button id="btn-add-alias" class="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors">+ Agregar alias</button>
+          <button id="btn-add-alias" class="text-sm bg-bg-inset hover:bg-line px-3 py-1.5 rounded-lg transition-colors">+ Agregar alias</button>
         </div>
         <div id="aliases-list" class="space-y-2"></div>
-        <div id="aliases-empty" class="hidden text-center py-8 text-zinc-500">
+        <div id="aliases-empty" class="hidden text-center py-8 text-fg-subtle">
           No hay alias. Crea uno para empezar a recibir email.
         </div>
       </div>
@@ -138,10 +144,10 @@
       <div id="tab-rules" class="tab-content hidden">
         <div class="flex items-center justify-between mb-4">
           <h3 class="font-semibold">Reglas de routing</h3>
-          <button id="btn-add-rule" class="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors">+ Agregar regla</button>
+          <button id="btn-add-rule" class="text-sm bg-bg-inset hover:bg-line px-3 py-1.5 rounded-lg transition-colors">+ Agregar regla</button>
         </div>
         <div id="rules-list" class="space-y-2"></div>
-        <div id="rules-empty" class="hidden text-center py-8 text-zinc-500">
+        <div id="rules-empty" class="hidden text-center py-8 text-fg-subtle">
           No hay reglas. Los emails se procesan solo por alias.
         </div>
       </div>
@@ -151,45 +157,45 @@
         <div class="flex items-center justify-between mb-4">
           <h3 class="font-semibold">Últimos emails</h3>
           <div id="logs-filter" class="flex gap-1 text-xs">
-            <button data-filter="all" class="px-2.5 py-1 rounded-md bg-zinc-800 text-zinc-100">Todos</button>
-            <button data-filter="in" class="px-2.5 py-1 rounded-md text-zinc-500 hover:text-zinc-300">Entrantes</button>
-            <button data-filter="out" class="px-2.5 py-1 rounded-md text-zinc-500 hover:text-zinc-300">Salientes</button>
+            <button data-filter="all" class="px-2.5 py-1 rounded-md bg-bg-inset text-fg">Todos</button>
+            <button data-filter="in" class="px-2.5 py-1 rounded-md text-fg-subtle hover:text-fg">Entrantes</button>
+            <button data-filter="out" class="px-2.5 py-1 rounded-md text-fg-subtle hover:text-fg">Salientes</button>
           </div>
         </div>
         <div class="overflow-x-auto">
           <table id="logs-list" class="w-full text-xs text-left"></table>
         </div>
-        <div id="logs-empty" class="hidden text-center py-8 text-zinc-500">
+        <div id="logs-empty" class="hidden text-center py-8 text-fg-subtle">
           No hay logs aún. Cuando recibas o envíes emails, aparecerán aquí.
         </div>
 
-        <div class="mt-10 border-t border-zinc-800 pt-6">
+        <div class="mt-10 border-t border-line pt-6">
           <div class="flex items-center justify-between mb-2">
             <h3 class="font-semibold">Lista de supresión</h3>
             <form id="suppression-form" class="flex gap-2">
-              <input id="suppression-email" type="email" placeholder="correo@ejemplo.com" class="bg-zinc-900 border border-zinc-700 rounded-md px-2.5 py-1 text-xs w-56 focus:outline-none focus:border-mask-400" required>
-              <button class="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1 rounded-md transition-colors">Bloquear</button>
+              <input id="suppression-email" type="email" placeholder="correo@ejemplo.com" class="bg-bg-elev border border-line rounded-md px-2.5 py-1 text-xs w-56 focus:outline-none focus:border-mask-400" required>
+              <button class="text-xs bg-bg-inset hover:bg-line px-3 py-1 rounded-md transition-colors">Bloquear</button>
             </form>
           </div>
-          <p class="text-xs text-zinc-500 mb-3">Direcciones que rebotaron o marcaron spam. MailMask no les vuelve a enviar ni reenviar: insistir daña la reputación del dominio. Quita una sólo si corregiste la dirección.</p>
+          <p class="text-xs text-fg-subtle mb-3">Direcciones que rebotaron o marcaron spam. MailMask no les vuelve a enviar ni reenviar: insistir daña la reputación del dominio. Quita una sólo si corregiste la dirección.</p>
           <div id="suppression-list" class="space-y-1"></div>
-          <div id="suppression-empty" class="hidden text-xs text-zinc-500 py-3">Nadie en la lista. Buena señal.</div>
+          <div id="suppression-empty" class="hidden text-xs text-fg-subtle py-3">Nadie en la lista. Buena señal.</div>
         </div>
       </div>
 
       <!-- Tab: DNS -->
       <div id="tab-dns" class="tab-content hidden">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <p class="text-sm text-zinc-400">Agrega estos registros en tu proveedor de DNS. Los tres primeros tipos son necesarios; SPF y DMARC mejoran la entrega.</p>
+          <p class="text-sm text-fg-muted">Agrega estos registros en tu proveedor de DNS. Los tres primeros tipos son necesarios; SPF y DMARC mejoran la entrega.</p>
           <div class="flex items-center gap-3">
             <span id="verify-result" class="text-sm"></span>
-            <button id="btn-verify-dns" class="bg-zinc-800 hover:bg-zinc-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm">
+            <button id="btn-verify-dns" class="bg-bg-inset hover:bg-line text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm">
               Verificar DNS
             </button>
           </div>
         </div>
 
-        <div class="border border-zinc-800 rounded-xl overflow-hidden">
+        <div class="border border-line rounded-xl overflow-hidden">
           <div id="dns-records"></div>
         </div>
       </div>
@@ -198,15 +204,15 @@
       <div id="tab-members" class="tab-content hidden">
         <div class="flex items-center justify-between mb-4">
           <h3 class="font-semibold">Miembros</h3>
-          <button id="btn-invite-member" class="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors">+ Invitar miembro</button>
+          <button id="btn-invite-member" class="text-sm bg-bg-inset hover:bg-line px-3 py-1.5 rounded-lg transition-colors">+ Invitar miembro</button>
         </div>
         <div id="members-list" class="space-y-2"></div>
-        <div id="members-empty" class="hidden text-center py-8 text-zinc-500">
+        <div id="members-empty" class="hidden text-center py-8 text-fg-subtle">
           No hay miembros. Invita a tu equipo para gestionar este dominio.
         </div>
         <div id="members-upgrade" class="hidden text-center py-8">
-          <p class="text-zinc-500 mb-3">Invitar a tu equipo viene con el dominio activado — personas ilimitadas.</p>
-          <button type="button" data-action="open-addons" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Activar dominio · $99/mes</button>
+          <p class="text-fg-subtle mb-3">Invitar a tu equipo viene con el dominio activado — personas ilimitadas.</p>
+          <button type="button" data-action="open-addons" class="text-mask-500 hover:text-mask-600 text-sm underline transition-colors">Activar dominio · $99/mes</button>
         </div>
       </div>
 
@@ -215,11 +221,11 @@
       <div id="tab-apikeys" class="tab-content hidden">
         <div class="flex items-center justify-between mb-4">
           <h3 class="font-semibold">API Keys</h3>
-          <button id="btn-add-apikey" class="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors">+ Crear key</button>
+          <button id="btn-add-apikey" class="text-sm bg-bg-inset hover:bg-line px-3 py-1.5 rounded-lg transition-colors">+ Crear key</button>
         </div>
-        <p class="text-sm text-zinc-400 mb-4">Usa API keys para acceder a la API de MailMask desde tu código. <a href="/docs" target="_blank" class="text-mask-400 hover:text-mask-300 underline">Ver docs</a></p>
+        <p class="text-sm text-fg-muted mb-4">Usa API keys para acceder a la API de MailMask desde tu código. <a href="/docs" target="_blank" class="text-mask-500 hover:text-mask-600 underline">Ver docs</a></p>
         <div id="apikeys-list" class="space-y-2"></div>
-        <div id="apikeys-empty" class="hidden text-center py-8 text-zinc-500">
+        <div id="apikeys-empty" class="hidden text-center py-8 text-fg-subtle">
           No hay API keys. Crea una para comenzar.
         </div>
       </div>
@@ -228,33 +234,33 @@
       <div id="tab-webhooks" class="tab-content hidden">
         <div class="flex items-center justify-between mb-4">
           <h3 class="font-semibold">Webhooks</h3>
-          <a href="/docs#webhooks" target="_blank" class="text-sm text-mask-400 hover:text-mask-300 underline">Ver docs</a>
+          <a href="/docs#webhooks" target="_blank" class="text-sm text-mask-500 hover:text-mask-600 underline">Ver docs</a>
         </div>
-        <p class="text-sm text-zinc-400 mb-4">Recibe un POST en tu servidor cuando llega, sale, se entrega o rebota un correo. Los webhooks se crean desde el SDK, porque el secreto tiene que quedar en tu código, no en una pantalla.</p>
+        <p class="text-sm text-fg-muted mb-4">Recibe un POST en tu servidor cuando llega, sale, se entrega o rebota un correo. Los webhooks se crean desde el SDK, porque el secreto tiene que quedar en tu código, no en una pantalla.</p>
         <div id="webhooks-list" class="space-y-3"></div>
         <div id="webhooks-empty" class="hidden">
-          <p class="text-zinc-500 text-sm mb-3">Este dominio no tiene webhooks. Crea uno con el SDK:</p>
-          <pre id="webhooks-snippet" class="bg-zinc-900 border border-zinc-800 rounded-lg p-4 overflow-x-auto text-xs font-mono text-zinc-300"></pre>
+          <p class="text-fg-subtle text-sm mb-3">Este dominio no tiene webhooks. Crea uno con el SDK:</p>
+          <pre id="webhooks-snippet" class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-xs font-mono text-fg"></pre>
         </div>
         <div id="webhooks-upgrade" class="hidden text-center py-8">
-          <p class="text-zinc-500 mb-3">Los webhooks vienen con el dominio activado.</p>
-          <button type="button" data-action="open-addons" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Activar dominio · $99/mes</button>
+          <p class="text-fg-subtle mb-3">Los webhooks vienen con el dominio activado.</p>
+          <button type="button" data-action="open-addons" class="text-mask-500 hover:text-mask-600 text-sm underline transition-colors">Activar dominio · $99/mes</button>
         </div>
       </div>
 
       <div id="tab-smtp" class="tab-content hidden">
         <div class="flex items-center justify-between mb-4">
           <h3 class="font-semibold">Credenciales SMTP</h3>
-          <button id="btn-add-smtp" class="text-sm bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg transition-colors">+ Generar credenciales</button>
+          <button id="btn-add-smtp" class="text-sm bg-bg-inset hover:bg-line px-3 py-1.5 rounded-lg transition-colors">+ Generar credenciales</button>
         </div>
-        <p class="text-sm text-zinc-400 mb-4">Envía emails desde tu dominio usando estas credenciales en tu aplicación o SaaS.</p>
+        <p class="text-sm text-fg-muted mb-4">Envía emails desde tu dominio usando estas credenciales en tu aplicación o SaaS.</p>
         <div id="smtp-list" class="space-y-2"></div>
-        <div id="smtp-empty" class="hidden text-center py-8 text-zinc-500">
+        <div id="smtp-empty" class="hidden text-center py-8 text-fg-subtle">
           No hay credenciales SMTP. Genera una para enviar desde tu dominio.
         </div>
         <div id="smtp-upgrade" class="hidden text-center py-8">
-          <p class="text-zinc-500 mb-3">El relay SMTP viene con el dominio activado.</p>
-          <button type="button" data-action="open-addons" class="text-mask-400 hover:text-mask-300 text-sm underline transition-colors">Activar dominio · $99/mes</button>
+          <p class="text-fg-subtle mb-3">El relay SMTP viene con el dominio activado.</p>
+          <button type="button" data-action="open-addons" class="text-mask-500 hover:text-mask-600 text-sm underline transition-colors">Activar dominio · $99/mes</button>
         </div>
       </div>
     </div>
@@ -263,27 +269,27 @@
   <!-- Modal: SMTP Label -->
   <!-- Modal: Add-ons -->
   <div id="modal-addons" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
       <div class="flex items-start justify-between mb-1">
-        <h3 class="text-lg font-bold">Activar y ampliar <span id="addons-domain" class="font-mono text-mask-400 text-base"></span></h3>
-        <button type="button" class="btn-cancel-modal text-zinc-500 hover:text-zinc-300 text-2xl leading-none" data-modal="modal-addons">&times;</button>
+        <h3 class="text-lg font-bold">Activar y ampliar <span id="addons-domain" class="font-mono text-mask-500 text-base"></span></h3>
+        <button type="button" class="btn-cancel-modal text-fg-subtle hover:text-fg text-2xl leading-none" data-modal="modal-addons">&times;</button>
       </div>
-      <p class="text-sm text-zinc-400 mb-5">Todo cuesta $99 al mes y es por dominio. Se cobra aparte, mes a mes; lo cancelas cuando quieras.</p>
+      <p class="text-sm text-fg-muted mb-5">Todo cuesta $99 al mes y es por dominio. Se cobra aparte, mes a mes; lo cancelas cuando quieras.</p>
       <div id="addons-list" class="space-y-3"></div>
-      <div id="addons-error" class="text-red-400 text-sm mt-3 hidden"></div>
+      <div id="addons-error" class="text-red-500 text-sm mt-3 hidden"></div>
     </div>
   </div>
 
   <div id="modal-smtp-label" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-md p-6">
       <h3 id="smtp-label-title" class="text-lg font-bold mb-4">Generar credenciales SMTP</h3>
       <form id="form-smtp-label">
-        <label class="block text-sm text-zinc-400 mb-1">Etiqueta (ej: "Outlook trabajo")</label>
+        <label class="block text-sm text-fg-muted mb-1">Etiqueta (ej: "Outlook trabajo")</label>
         <input type="text" name="label" required placeholder="Mi cliente de correo" maxlength="100"
-          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
-        <div id="smtp-label-error" class="text-red-400 text-sm mt-2 hidden"></div>
+          class="w-full bg-bg-inset border border-line rounded-lg px-4 py-3 text-fg placeholder-fg-subtle focus:border-red-500 focus:outline-none">
+        <div id="smtp-label-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
-          <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-smtp-label">Cancelar</button>
+          <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-smtp-label">Cancelar</button>
           <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Generar</button>
         </div>
       </form>
@@ -292,32 +298,32 @@
 
   <!-- Modal: SMTP Credentials (shown once) -->
   <div id="modal-smtp-creds" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto">
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto">
       <div class="flex items-start justify-between mb-1">
         <h3 class="text-lg font-bold">Credenciales SMTP</h3>
       </div>
-      <div class="flex items-center gap-2 mb-5 px-3 py-2 bg-yellow-900/30 border border-yellow-800/50 rounded-lg">
-        <svg class="text-yellow-400 shrink-0" style="width:16px;height:16px;min-width:16px" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+      <div class="flex items-center gap-2 mb-5 px-3 py-2 bg-amber-500/15 border border-amber-500/30 rounded-lg">
+        <svg class="text-amber-600 shrink-0" style="width:16px;height:16px;min-width:16px" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
         <span class="text-sm text-yellow-300">La contraseña solo se muestra una vez. Copia los datos antes de cerrar.</span>
       </div>
       <div id="smtp-creds-info"></div>
       <div class="flex justify-end mt-6">
-        <button type="button" id="btn-smtp-close" class="btn-cancel-modal bg-zinc-800 hover:bg-zinc-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors opacity-50 cursor-not-allowed" disabled data-modal="modal-smtp-creds">Listo, ya copié todo</button>
+        <button type="button" id="btn-smtp-close" class="btn-cancel-modal bg-bg-inset hover:bg-line text-white font-semibold px-4 py-2 rounded-lg transition-colors opacity-50 cursor-not-allowed" disabled data-modal="modal-smtp-creds">Listo, ya copié todo</button>
       </div>
     </div>
   </div>
 
   <!-- Modal: Create API Key -->
   <div id="modal-apikey-name" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-md p-6">
       <h3 class="text-lg font-bold mb-4">Crear API Key</h3>
       <form id="form-apikey-name">
-        <label class="block text-sm text-zinc-400 mb-1">Nombre (ej: "Mi app")</label>
+        <label class="block text-sm text-fg-muted mb-1">Nombre (ej: "Mi app")</label>
         <input type="text" name="name" required placeholder="Mi aplicación" maxlength="50"
-          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
-        <div id="apikey-name-error" class="text-red-400 text-sm mt-2 hidden"></div>
+          class="w-full bg-bg-inset border border-line rounded-lg px-4 py-3 text-fg placeholder-fg-subtle focus:border-red-500 focus:outline-none">
+        <div id="apikey-name-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
-          <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-apikey-name">Cancelar</button>
+          <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-apikey-name">Cancelar</button>
           <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear</button>
         </div>
       </form>
@@ -329,15 +335,15 @@
        coincide, el checkout muere con "Tu e-mail no coincide con el de la suscripción".
        El campo es obligatorio en su API, así que no se puede omitir: hay que preguntarlo. -->
   <div id="modal-mp-email" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-md p-6">
       <h3 class="text-lg font-bold mb-2">Tu correo de MercadoPago</h3>
-      <p class="text-sm text-zinc-400 mb-4">Debe ser el correo de la cuenta de MercadoPago con la que vas a pagar. Si no coincide, MercadoPago rechaza el pago.</p>
+      <p class="text-sm text-fg-muted mb-4">Debe ser el correo de la cuenta de MercadoPago con la que vas a pagar. Si no coincide, MercadoPago rechaza el pago.</p>
       <form id="form-mp-email">
         <input type="email" name="payerEmail" required placeholder="tu@correo.com"
-          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
-        <div id="mp-email-error" class="text-red-400 text-sm mt-2 hidden"></div>
+          class="w-full bg-bg-inset border border-line rounded-lg px-4 py-3 text-fg placeholder-fg-subtle focus:border-red-500 focus:outline-none">
+        <div id="mp-email-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
-          <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-mp-email">Cancelar</button>
+          <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-mp-email">Cancelar</button>
           <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Continuar al pago</button>
         </div>
       </form>
@@ -346,35 +352,35 @@
 
   <!-- Modal: Show API Key (once) -->
   <div id="modal-apikey-show" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg p-6">
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-lg p-6">
       <h3 class="text-lg font-bold mb-2">Tu API Key</h3>
       <div class="flex items-center gap-2 mb-3">
         <span class="text-sm text-yellow-300">Copia la key ahora. No se mostrará de nuevo.</span>
       </div>
-      <div class="flex items-center gap-2 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3">
-        <code id="apikey-value" class="text-sm text-zinc-100 flex-1 break-all"></code>
-        <button type="button" id="btn-copy-apikey" class="text-zinc-400 hover:text-zinc-200 shrink-0">
+      <div class="flex items-center gap-2 bg-bg-inset border border-line rounded-lg px-4 py-3">
+        <code id="apikey-value" class="text-sm text-fg flex-1 break-all"></code>
+        <button type="button" id="btn-copy-apikey" class="text-fg-muted hover:text-fg shrink-0">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
         </button>
       </div>
       <div class="flex justify-end mt-6">
-        <button type="button" class="btn-cancel-modal bg-zinc-800 hover:bg-zinc-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors" data-modal="modal-apikey-show">Cerrar</button>
+        <button type="button" class="btn-cancel-modal bg-bg-inset hover:bg-line text-white font-semibold px-4 py-2 rounded-lg transition-colors" data-modal="modal-apikey-show">Cerrar</button>
       </div>
     </div>
   </div>
 
   <!-- Modal: Add domain (unified search + connect flow) -->
   <div id="modal-add-domain" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-2xl p-0 overflow-hidden max-h-[85vh] flex flex-col">
+    <div class="bg-bg-elev border border-line rounded-2xl w-full max-w-2xl p-0 overflow-hidden max-h-[85vh] flex flex-col">
       <!-- Header -->
       <div class="px-6 pt-6 pb-3 shrink-0">
         <div class="flex items-center justify-between mb-0.5">
           <h3 class="text-lg font-bold">Agregar dominio</h3>
-          <button type="button" class="btn-cancel-modal text-zinc-500 hover:text-zinc-300 transition-colors p-1" data-modal="modal-add-domain">
+          <button type="button" class="btn-cancel-modal text-fg-subtle hover:text-fg transition-colors p-1" data-modal="modal-add-domain">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
-        <p class="text-xs text-zinc-500">Busca un dominio para comprar o conecta uno que ya tengas.</p>
+        <p class="text-xs text-fg-subtle">Busca un dominio para comprar o conecta uno que ya tengas.</p>
       </div>
 
       <!-- Search bar -->
@@ -382,12 +388,12 @@
         <div id="add-domain-step-search">
           <div class="flex gap-2 items-center">
             <input type="text" id="add-domain-input" placeholder="miempresa.com" required
-              class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-zinc-100 placeholder-zinc-500 focus:border-mask-500 focus:outline-none text-sm">
+              class="flex-1 bg-bg-inset border border-line rounded-lg px-4 py-2.5 text-fg placeholder-fg-subtle focus:border-mask-500 focus:outline-none text-sm">
             <button type="button" id="btn-add-domain-search" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors whitespace-nowrap text-sm">
               Buscar
             </button>
           </div>
-          <div id="add-domain-error" class="text-red-400 text-sm mt-1.5 hidden"></div>
+          <div id="add-domain-error" class="text-red-500 text-sm mt-1.5 hidden"></div>
         </div>
       </div>
 
@@ -396,7 +402,7 @@
 
       <!-- Default: TLD grid (shown when no search yet) -->
       <div id="add-domain-tld-grid" class="px-6 pb-8 overflow-y-auto">
-        <p class="text-[10px] text-zinc-600 mb-4 uppercase tracking-widest font-semibold">Extensiones disponibles</p>
+        <p class="text-[10px] text-fg-subtle mb-4 uppercase tracking-widest font-semibold">Extensiones disponibles</p>
         <div id="add-domain-tld-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></div>
       </div>
     </div>
@@ -404,38 +410,38 @@
 
   <!-- Modal: Add alias -->
   <div id="modal-add-alias" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-md p-6">
       <h3 class="text-lg font-bold mb-4">Agregar alias</h3>
       <form id="form-add-alias">
         <div class="mb-4">
-          <label class="block text-sm text-zinc-400 mb-1">Alias (parte local)</label>
+          <label class="block text-sm text-fg-muted mb-1">Alias (parte local)</label>
           <div class="flex items-center gap-2">
             <input type="text" name="alias" required placeholder="ventas"
-              class="lowercase flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
-            <span id="alias-domain-suffix" class="text-zinc-500 text-sm">@dominio.com</span>
+              class="lowercase flex-1 bg-bg-inset border border-line rounded-lg px-4 py-3 text-fg placeholder-fg-subtle focus:border-red-500 focus:outline-none">
+            <span id="alias-domain-suffix" class="text-fg-subtle text-sm">@dominio.com</span>
           </div>
-          <p class="text-xs text-zinc-500 mt-1">Usa * para catch-all (recibir todo)</p>
+          <p class="text-xs text-fg-subtle mt-1">Usa * para catch-all (recibir todo)</p>
         </div>
         <div>
-          <label class="block text-sm text-zinc-400 mb-1">Destino(s)</label>
-          <div data-chips class="flex flex-wrap items-center gap-1.5 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-2 focus-within:border-mask-500 cursor-text">
+          <label class="block text-sm text-fg-muted mb-1">Destino(s)</label>
+          <div data-chips class="flex flex-wrap items-center gap-1.5 w-full bg-bg-inset border border-line rounded-lg px-2.5 py-2 focus-within:border-mask-500 cursor-text">
             <input type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="tu@gmail.com"
-              class="chips-input lowercase flex-1 min-w-[10rem] bg-transparent border-0 px-1.5 py-1 text-zinc-100 placeholder-zinc-500 focus:outline-none">
+              class="chips-input lowercase flex-1 min-w-[10rem] bg-transparent border-0 px-1.5 py-1 text-fg placeholder-fg-subtle focus:outline-none">
             <input type="hidden" name="destinations">
           </div>
-          <p class="text-xs text-zinc-500 mt-1">Enter o coma para agregar otro destino. Cada correo recibe una copia.</p>
+          <p class="text-xs text-fg-subtle mt-1">Enter o coma para agregar otro destino. Cada correo recibe una copia.</p>
         </div>
         <!-- Sólo en dominio activado: la máscara puede guardar su correo en vez de (o además de) reenviarlo. -->
-        <label id="add-alias-mailbox-row" class="hidden flex items-start gap-3 mt-4 p-3 rounded-lg border border-mask-700/50 bg-mask-900/20 cursor-pointer">
+        <label id="add-alias-mailbox-row" class="hidden flex items-start gap-3 mt-4 p-3 rounded-lg border border-mask-500/30 bg-mask-500/10 cursor-pointer">
           <input type="checkbox" name="mailbox" class="mt-1 accent-mask-500">
           <span class="text-sm">
-            <span class="text-zinc-100 font-semibold">Guardar el correo en un buzón IMAP</span>
-            <span class="block text-xs text-zinc-400 mt-0.5">Para leerlo en Apple Mail u Outlook. Con esto los destinos son opcionales: puedes reenviar además, o sólo guardar.</span>
+            <span class="text-fg font-semibold">Guardar el correo en un buzón IMAP</span>
+            <span class="block text-xs text-fg-muted mt-0.5">Para leerlo en Apple Mail u Outlook. Con esto los destinos son opcionales: puedes reenviar además, o sólo guardar.</span>
           </span>
         </label>
-        <div id="add-alias-error" class="text-red-400 text-sm mt-2 hidden"></div>
+        <div id="add-alias-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
-          <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-add-alias">Cancelar</button>
+          <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-add-alias">Cancelar</button>
           <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear alias</button>
         </div>
       </form>
@@ -446,33 +452,33 @@
   <!-- Buzón IMAP. La contraseña se muestra una sola vez: la entrega del correo va con
        la credencial de administrador del servidor, así que la del buzón no se guarda. -->
   <div id="modal-mailbox" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg p-6">
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-lg p-6">
       <h3 class="text-lg font-bold mb-1">Buzón IMAP</h3>
-      <p id="mailbox-title" class="font-mono text-sm text-mask-400 mb-4 break-all"></p>
+      <p id="mailbox-title" class="font-mono text-sm text-mask-500 mb-4 break-all"></p>
       <div id="mailbox-body"></div>
       <div class="flex justify-end mt-6">
-        <button type="button" class="btn-cancel-modal px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-mailbox">Cerrar</button>
+        <button type="button" class="btn-cancel-modal px-4 py-2 text-sm text-fg-muted hover:text-fg transition-colors" data-modal="modal-mailbox">Cerrar</button>
       </div>
     </div>
   </div>
 
   <div id="modal-edit-alias" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
-      <h3 class="text-lg font-bold mb-4">Editar alias <span id="edit-alias-name" class="font-mono text-mask-400"></span></h3>
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-md p-6">
+      <h3 class="text-lg font-bold mb-4">Editar alias <span id="edit-alias-name" class="font-mono text-mask-500"></span></h3>
       <form id="form-edit-alias">
         <input type="hidden" name="alias" />
         <div>
-          <label class="block text-sm text-zinc-400 mb-1">Destino(s)</label>
-          <div data-chips class="flex flex-wrap items-center gap-1.5 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-2 focus-within:border-mask-500 cursor-text">
+          <label class="block text-sm text-fg-muted mb-1">Destino(s)</label>
+          <div data-chips class="flex flex-wrap items-center gap-1.5 w-full bg-bg-inset border border-line rounded-lg px-2.5 py-2 focus-within:border-mask-500 cursor-text">
             <input type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="tu@gmail.com"
-              class="chips-input lowercase flex-1 min-w-[10rem] bg-transparent border-0 px-1.5 py-1 text-zinc-100 placeholder-zinc-500 focus:outline-none">
+              class="chips-input lowercase flex-1 min-w-[10rem] bg-transparent border-0 px-1.5 py-1 text-fg placeholder-fg-subtle focus:outline-none">
             <input type="hidden" name="destinations">
           </div>
-          <p class="text-xs text-zinc-500 mt-1">Enter o coma para agregar otro destino. Cada correo recibe una copia.</p>
+          <p class="text-xs text-fg-subtle mt-1">Enter o coma para agregar otro destino. Cada correo recibe una copia.</p>
         </div>
-        <div id="edit-alias-error" class="text-red-400 text-sm mt-2 hidden"></div>
+        <div id="edit-alias-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
-          <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-edit-alias">Cancelar</button>
+          <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-edit-alias">Cancelar</button>
           <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Guardar</button>
         </div>
       </form>
@@ -481,21 +487,21 @@
 
   <!-- Modal: Add rule -->
   <div id="modal-add-rule" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-md p-6">
       <h3 class="text-lg font-bold mb-4">Agregar regla</h3>
       <form id="form-add-rule">
         <div class="grid grid-cols-2 gap-3 mb-4">
           <div>
-            <label class="block text-sm text-zinc-400 mb-1">Campo</label>
-            <select name="field" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-zinc-100 focus:border-red-500 focus:outline-none">
+            <label class="block text-sm text-fg-muted mb-1">Campo</label>
+            <select name="field" class="w-full bg-bg-inset border border-line rounded-lg px-3 py-2.5 text-fg focus:border-red-500 focus:outline-none">
               <option value="from">De (from)</option>
               <option value="to">Para (to)</option>
               <option value="subject">Asunto (subject)</option>
             </select>
           </div>
           <div>
-            <label class="block text-sm text-zinc-400 mb-1">Condición</label>
-            <select name="match" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-zinc-100 focus:border-red-500 focus:outline-none">
+            <label class="block text-sm text-fg-muted mb-1">Condición</label>
+            <select name="match" class="w-full bg-bg-inset border border-line rounded-lg px-3 py-2.5 text-fg focus:border-red-500 focus:outline-none">
               <option value="contains">Contiene</option>
               <option value="equals">Es igual a</option>
               <option value="regex">Regex</option>
@@ -503,28 +509,28 @@
           </div>
         </div>
         <div class="mb-4">
-          <label class="block text-sm text-zinc-400 mb-1">Valor</label>
+          <label class="block text-sm text-fg-muted mb-1">Valor</label>
           <input type="text" name="value" required placeholder="@bancomer.com"
-            class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+            class="w-full bg-bg-inset border border-line rounded-lg px-4 py-3 text-fg placeholder-fg-subtle focus:border-red-500 focus:outline-none">
         </div>
         <div class="grid grid-cols-2 gap-3 mb-4">
           <div>
-            <label class="block text-sm text-zinc-400 mb-1">Acción</label>
-            <select name="action" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-zinc-100 focus:border-red-500 focus:outline-none">
+            <label class="block text-sm text-fg-muted mb-1">Acción</label>
+            <select name="action" class="w-full bg-bg-inset border border-line rounded-lg px-3 py-2.5 text-fg focus:border-red-500 focus:outline-none">
               <option value="forward">Reenviar</option>
               <option value="webhook">Webhook</option>
               <option value="discard">Descartar</option>
             </select>
           </div>
           <div>
-            <label class="block text-sm text-zinc-400 mb-1">Destino</label>
+            <label class="block text-sm text-fg-muted mb-1">Destino</label>
             <input type="text" name="target" placeholder="email o URL"
-              class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+              class="w-full bg-bg-inset border border-line rounded-lg px-4 py-3 text-fg placeholder-fg-subtle focus:border-red-500 focus:outline-none">
           </div>
         </div>
-        <div id="add-rule-error" class="text-red-400 text-sm mt-2 hidden"></div>
+        <div id="add-rule-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
-          <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-add-rule">Cancelar</button>
+          <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-add-rule">Cancelar</button>
           <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear regla</button>
         </div>
       </form>
@@ -533,30 +539,30 @@
 
   <!-- Modal: Invite member -->
   <div id="modal-invite-member" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-md p-6">
       <h3 class="text-lg font-bold mb-4">Invitar miembro</h3>
       <form id="form-invite-member">
         <div class="mb-4">
-          <label class="block text-sm text-zinc-400 mb-1">Nombre</label>
+          <label class="block text-sm text-fg-muted mb-1">Nombre</label>
           <input type="text" name="name" required placeholder="Juan Pérez"
-            class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+            class="w-full bg-bg-inset border border-line rounded-lg px-4 py-3 text-fg placeholder-fg-subtle focus:border-red-500 focus:outline-none">
         </div>
         <div class="mb-4">
-          <label class="block text-sm text-zinc-400 mb-1">Email</label>
+          <label class="block text-sm text-fg-muted mb-1">Email</label>
           <input type="email" name="email" required placeholder="juan@ejemplo.com"
-            class="lowercase w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+            class="lowercase w-full bg-bg-inset border border-line rounded-lg px-4 py-3 text-fg placeholder-fg-subtle focus:border-red-500 focus:outline-none">
         </div>
         <div class="mb-4">
-          <label class="block text-sm text-zinc-400 mb-1">Rol</label>
-          <select name="role" class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-zinc-100 focus:border-red-500 focus:outline-none">
+          <label class="block text-sm text-fg-muted mb-1">Rol</label>
+          <select name="role" class="w-full bg-bg-inset border border-line rounded-lg px-3 py-2.5 text-fg focus:border-red-500 focus:outline-none">
             <option value="agent">Miembro</option>
             <option value="admin">Admin</option>
           </select>
-          <p class="text-xs text-zinc-500 mt-1">Los admins pueden invitar y eliminar miembros.</p>
+          <p class="text-xs text-fg-subtle mt-1">Los admins pueden invitar y eliminar miembros.</p>
         </div>
-        <div id="invite-member-error" class="text-red-400 text-sm mt-2 hidden"></div>
+        <div id="invite-member-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
-          <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-invite-member">Cancelar</button>
+          <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-invite-member">Cancelar</button>
           <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Enviar invitación</button>
         </div>
       </form>
@@ -565,23 +571,23 @@
 
   <!-- Modal: Edit slug -->
   <div id="modal-edit-slug" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6">
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-md p-6">
       <h3 class="text-lg font-bold mb-4">Editar tu link de referido</h3>
       <form id="form-edit-slug">
-        <label class="block text-sm text-zinc-400 mb-1">Slug personalizado</label>
+        <label class="block text-sm text-fg-muted mb-1">Slug personalizado</label>
         <div class="flex items-center gap-2">
-          <span class="text-sm text-zinc-500">mailmask.studio/register?ref=</span>
+          <span class="text-sm text-fg-subtle">mailmask.studio/register?ref=</span>
           <input type="text" name="slug" required placeholder="mi-slug" minlength="3" maxlength="30" pattern="[a-z0-9-]+"
-            class="lowercase flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
+            class="lowercase flex-1 bg-bg-inset border border-line rounded-lg px-4 py-3 text-fg placeholder-fg-subtle focus:border-red-500 focus:outline-none">
         </div>
-        <p class="text-xs text-zinc-500 mt-1">3-30 caracteres: letras minúsculas, números y guiones</p>
-        <label class="block text-sm text-zinc-400 mb-1 mt-4">Tu nombre, como lo verá quien invites</label>
+        <p class="text-xs text-fg-subtle mt-1">3-30 caracteres: letras minúsculas, números y guiones</p>
+        <label class="block text-sm text-fg-muted mb-1 mt-4">Tu nombre, como lo verá quien invites</label>
         <input type="text" name="name" placeholder="Brenda" minlength="2" maxlength="40"
-          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-red-500 focus:outline-none">
-        <p class="text-xs text-zinc-500 mt-1">Opcional. En la página de registro dirá “Brenda te invitó a MailMask”.</p>
-        <div id="edit-slug-error" class="text-red-400 text-sm mt-2 hidden"></div>
+          class="w-full bg-bg-inset border border-line rounded-lg px-4 py-3 text-fg placeholder-fg-subtle focus:border-red-500 focus:outline-none">
+        <p class="text-xs text-fg-subtle mt-1">Opcional. En la página de registro dirá “Brenda te invitó a MailMask”.</p>
+        <div id="edit-slug-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
-          <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-edit-slug">Cancelar</button>
+          <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-edit-slug">Cancelar</button>
           <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Guardar</button>
         </div>
       </form>
@@ -589,14 +595,14 @@
   </div>
 
   <div id="modal-orders" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
-    <div class="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
       <div class="flex items-start justify-between mb-1">
         <h3 class="text-lg font-bold">Historial de pagos</h3>
-        <button type="button" class="btn-cancel-modal text-zinc-400 hover:text-zinc-200 text-2xl leading-none" data-modal="modal-orders">&times;</button>
+        <button type="button" class="btn-cancel-modal text-fg-muted hover:text-fg text-2xl leading-none" data-modal="modal-orders">&times;</button>
       </div>
-      <p class="text-sm text-zinc-400 mb-5">Tus cargos, cortesías y cancelaciones. ¿Necesitas factura? Escríbenos con el folio del cargo.</p>
+      <p class="text-sm text-fg-muted mb-5">Tus cargos, cortesías y cancelaciones. ¿Necesitas factura? Escríbenos con el folio del cargo.</p>
       <div id="orders-list" class="space-y-2"></div>
-      <div id="orders-error" class="text-red-400 text-sm mt-3 hidden"></div>
+      <div id="orders-error" class="text-red-500 text-sm mt-3 hidden"></div>
     </div>
   </div>
 

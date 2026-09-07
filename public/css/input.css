@@ -168,18 +168,18 @@
   .app-shell .num { @apply tabular-nums; }
   .font-mono-app { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; }
 
-  .app-top { @apply sticky top-0 z-30 border-b border-white/[0.07] bg-zinc-950/70 backdrop-blur; }
+  .app-top { @apply sticky top-0 z-30 border-b border-line bg-bg/80 backdrop-blur; }
   .app-top-in { @apply mx-auto flex w-full max-w-[1040px] items-center gap-2.5 px-4 py-2.5; }
   .app-brand { @apply flex flex-none items-center gap-2 text-[17px] font-bold; }
   .app-brand svg { @apply h-7 w-7; }
   .app-nav { @apply ml-1.5 flex flex-none gap-0.5; }
-  .app-nav a { @apply whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm text-zinc-400 hover:text-zinc-100; }
-  .app-nav a.on { @apply bg-white/[0.06] text-zinc-100; }
-  .app-nav a.admin { @apply text-mask-400; }
+  .app-nav a { @apply whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm text-fg-muted hover:text-fg; }
+  .app-nav a.on { @apply bg-bg-inset text-fg; }
+  .app-nav a.admin { @apply text-mask-500; }
   .app-me { @apply ml-auto flex min-w-0 flex-none items-center gap-2.5; }
-  .app-pill { @apply whitespace-nowrap rounded-full border border-mask-500/25 bg-mask-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.12em] text-mask-400; }
-  .app-mail { @apply max-w-[34vw] truncate text-[13px] text-zinc-400; }
-  .app-out { @apply flex-none px-1.5 py-1 text-[13px] text-zinc-500 hover:text-zinc-100; }
+  .app-pill { @apply whitespace-nowrap rounded-full border border-mask-500/25 bg-mask-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.12em] text-mask-500; }
+  .app-mail { @apply max-w-[34vw] truncate text-[13px] text-fg-muted; }
+  .app-out { @apply flex-none px-1.5 py-1 text-[13px] text-fg-subtle hover:text-fg; }
   @media (max-width: 640px) {
     .app-nav a:not(.on) { @apply hidden; }
     .app-mail { @apply hidden; }
@@ -192,50 +192,50 @@
   .app-page > div:empty { @apply hidden; }
   .app-hello { @apply flex flex-wrap items-end justify-between gap-4; }
   .app-hello h1 { @apply m-0 text-[26px] font-semibold; text-wrap: balance; }
-  .app-hello p { @apply mb-0 mt-1 text-zinc-400; }
-  .app-hello .today { @apply font-mono-app text-xs tracking-wide text-zinc-500; }
+  .app-hello p { @apply mb-0 mt-1 text-fg-muted; }
+  .app-hello .today { @apply font-mono-app text-xs tracking-wide text-fg-subtle; }
 
   .app-grid { @apply grid grid-cols-[minmax(0,1fr)] items-start gap-5 md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_320px]; }
   .app-grid > * { @apply min-w-0; }
   .app-section-h { @apply mb-2.5 flex items-baseline justify-between; }
-  .app-section-h h2 { @apply m-0 text-xs font-semibold uppercase tracking-[.1em] text-zinc-500; }
-  .app-link { @apply text-sm font-medium text-mask-400 hover:text-mask-100; }
-  .app-card { @apply rounded-[14px] border border-white/[0.08] bg-zinc-900/60 p-[18px]; }
+  .app-section-h h2 { @apply m-0 text-xs font-semibold uppercase tracking-[.1em] text-fg-subtle; }
+  .app-link { @apply text-sm font-medium text-mask-500 hover:text-mask-700; }
+  .app-card { @apply rounded-[14px] border border-line bg-bg-elev p-[18px]; }
 
-  .dom-list { @apply overflow-hidden rounded-[14px] border border-white/[0.12] bg-zinc-900/70 backdrop-blur-sm; }
-  .dom { @apply grid cursor-pointer grid-cols-[14px_minmax(0,1fr)_auto_18px] items-center gap-3.5 border-t border-white/[0.07] px-[18px] py-[15px] transition-colors first:border-t-0 hover:bg-white/[0.03]; }
+  .dom-list { @apply overflow-hidden rounded-[14px] border border-line bg-bg-elev backdrop-blur-sm; }
+  .dom { @apply grid cursor-pointer grid-cols-[14px_minmax(0,1fr)_auto_18px] items-center gap-3.5 border-t border-line px-[18px] py-[15px] transition-colors first:border-t-0 hover:bg-bg-inset; }
   .dom .st { @apply h-2 w-2 rounded-full bg-mask-400 ring-4 ring-mask-500/15; }
   .dom .st.pend { @apply bg-amber-500 ring-amber-500/15; }
   .dom .name { @apply font-mono-app truncate text-[15px] font-medium; }
-  .dom .name .tag { @apply ml-1.5 rounded-full bg-mask-500/15 px-1.5 py-px align-middle font-sans text-[10px] text-mask-400; }
-  .dom .sub { @apply mt-0.5 text-[12.5px] text-zinc-500; }
-  .dom .sub em { @apply not-italic text-zinc-400; }
+  .dom .name .tag { @apply ml-1.5 rounded-full bg-mask-500/15 px-1.5 py-px align-middle font-sans text-[10px] text-mask-500; }
+  .dom .sub { @apply mt-0.5 text-[12.5px] text-fg-subtle; }
+  .dom .sub em { @apply not-italic text-fg-muted; }
   .dom .k { @apply text-right; }
   .dom .k b { @apply block text-base font-semibold; }
-  .dom .k span { @apply text-[11px] uppercase tracking-[.06em] text-zinc-500; }
-  .dom .chev { @apply text-zinc-500; }
+  .dom .k span { @apply text-[11px] uppercase tracking-[.06em] text-fg-subtle; }
+  .dom .chev { @apply text-fg-subtle; }
 
   .plan-card .plan-h { @apply flex items-baseline justify-between gap-2; }
   .plan-card .plan-h h3 { @apply m-0 text-lg font-semibold; }
-  .plan-card .price { @apply whitespace-nowrap text-[15px] font-semibold text-zinc-400; }
-  .plan-card .price small { @apply text-xs font-normal text-zinc-500; }
-  .plan-card .next { @apply mt-1 text-[13px] text-zinc-500; }
-  .plan-card .next b { @apply font-medium text-zinc-400; }
+  .plan-card .price { @apply whitespace-nowrap text-[15px] font-semibold text-fg-muted; }
+  .plan-card .price small { @apply text-xs font-normal text-fg-subtle; }
+  .plan-card .next { @apply mt-1 text-[13px] text-fg-subtle; }
+  .plan-card .next b { @apply font-medium text-fg-muted; }
   .plan-card .meters { @apply mt-4 grid gap-3; }
   .meter .l { @apply flex justify-between text-[13px]; }
-  .meter .l span:last-child { @apply text-zinc-500; }
-  .meter .bar { @apply mt-1.5 h-[5px] overflow-hidden rounded-full bg-white/[0.07]; }
+  .meter .l span:last-child { @apply text-fg-subtle; }
+  .meter .bar { @apply mt-1.5 h-[5px] overflow-hidden rounded-full bg-line; }
   .meter .bar i { @apply block h-full rounded-full bg-mask-500 transition-[width] duration-300; }
   .meter .bar i.full { @apply bg-amber-500; }
-  .meter .note { @apply mt-1 text-xs text-zinc-500; }
-  .plan-card .lines { @apply mt-3.5 grid gap-1.5 border-t border-white/[0.07] pt-3 text-[13px]; }
-  .plan-card .lines div { @apply flex justify-between gap-2.5 text-zinc-400; }
-  .plan-card .lines div span:last-child { @apply font-mono-app whitespace-nowrap text-xs text-zinc-500; }
-  .plan-card .lines div.gift span { @apply text-mask-400; }
-  .plan-card .lines div.total { @apply border-t border-white/[0.07] pt-1.5 font-semibold text-zinc-100; }
-  .plan-card .lines div.total span:last-child { @apply font-sans text-[13px] text-zinc-100; }
+  .meter .note { @apply mt-1 text-xs text-fg-subtle; }
+  .plan-card .lines { @apply mt-3.5 grid gap-1.5 border-t border-line pt-3 text-[13px]; }
+  .plan-card .lines div { @apply flex justify-between gap-2.5 text-fg-muted; }
+  .plan-card .lines div span:last-child { @apply font-mono-app whitespace-nowrap text-xs text-fg-subtle; }
+  .plan-card .lines div.gift span { @apply text-mask-500; }
+  .plan-card .lines div.total { @apply border-t border-line pt-1.5 font-semibold text-fg; }
+  .plan-card .lines div.total span:last-child { @apply font-sans text-[13px] text-fg; }
   .plan-card .foot { @apply mt-3.5 flex flex-wrap gap-3.5 text-[13px]; }
-  .plan-card .foot .danger { @apply text-zinc-500 hover:text-red-400; }
+  .plan-card .foot .danger { @apply text-fg-subtle hover:text-red-500; }
 }
 
 /* Toggle de tema: en claro se ofrece la luna, en oscuro el sol. */
