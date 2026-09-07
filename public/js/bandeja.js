@@ -740,7 +740,9 @@ function cuerpoMensaje(item) {
   // (etiquetas fuera) y se ve peor que el original en el iframe.
   if (!item.html) return item.body ? esc(item.body) : "";
   // srcdoc escapado: el HTML del correo viaja como atributo, no como marcado.
-  return `<iframe class="mesa-msg-html" sandbox referrerpolicy="no-referrer" srcdoc="${esc(item.html)}"></iframe>`;
+  // `allow-same-origin` (sin `allow-scripts`) deja que el padre lo mida: dentro
+  // sigue sin correr JavaScript. El alto lo pone ajustarIframe.
+  return `<iframe class="mesa-msg-html" sandbox="allow-same-origin" referrerpolicy="no-referrer" srcdoc="${esc(item.html)}"></iframe>`;
 }
 
 function renderMessages(messages, notes) {
@@ -777,7 +779,75 @@ function renderMessages(messages, notes) {
   }).join("");
 
   // Scroll to bottom
+  container.querySelectorAll("iframe.mesa-msg-html").forEach(ajustarIframe);
   container.scrollTop = container.scrollHeight;
+}
+
+/**
+ * Alto del iframe = alto del correo. Lo que costó cuatro intentos:
+ *
+ * 1. Medir al insertarlo da 16 px: el documento es todavía un `about:blank`.
+ * 2. Medir con el iframe a alto 0 da 0: sin viewport no se maqueta nada.
+ * 3. Medir con el iframe MUY alto (2000 px) devuelve esos 2000 px, porque los
+ *    correos de plantilla llevan `height:100%` y rellenan el viewport que les
+ *    des. Fue lo que triplicó el alto de los de TikTok.
+ *
+ * La medición correcta es con un viewport BAJO: un `height:100%` colapsa a esa
+ * altura mínima, pero el contenido real desborda y `scrollHeight` lo delata.
+ * Por eso se mide a 40 px y el resultado es el alto verdadero del correo.
+ */
+const IFRAME_MEDIDA = 40;   // viewport bajo para medir
+const IFRAME_MAX = 5000;    // tope, por si un correo viene sin fin
+
+function ajustarIframe(iframe) {
+  let anterior = -1, intentos = 0, listo = false;
+
+  const medir = () => {
+    try {
+      const doc = iframe.contentDocument;
+      if (!doc || !doc.body) return 0;
+      return Math.max(doc.documentElement?.scrollHeight ?? 0, doc.body.scrollHeight ?? 0);
+    } catch { return 0; }
+  };
+
+  const aplicar = (h) => {
+    iframe.style.height = Math.min(Math.max(h, 120), IFRAME_MAX) + "px";
+  };
+
+  const fijar = (h) => {
+    if (listo) return;
+    listo = true;
+    aplicar(h);
+    iframe.classList.add("is-medido");
+    // Una imagen sin dimensiones puede llegar tarde y mover el alto. Se sigue
+    // midiendo, pero con el iframe ya en su tamaño hay que devolverlo al
+    // viewport bajo para que la medida no se quede clavada en el alto actual.
+    if (!("ResizeObserver" in window)) return;
+    try {
+      const doc = iframe.contentDocument;
+      if (!doc?.documentElement) return;
+      new ResizeObserver(() => {
+        const alto = iframe.getBoundingClientRect().height;
+        iframe.style.height = IFRAME_MEDIDA + "px";
+        const h2 = medir();
+        if (h2 > 0 && Math.abs(h2 - alto) > 4) aplicar(h2); else iframe.style.height = alto + "px";
+      }).observe(doc.documentElement);
+    } catch {}
+  };
+
+  const sondear = () => {
+    if (listo) return;
+    const h = medir();
+    let imgsListas = true;
+    try { imgsListas = [...(iframe.contentDocument?.images ?? [])].every((i) => i.complete); } catch {}
+    // Estable = el mismo alto dos veces seguidas, con las imágenes ya abajo.
+    if (h > 0 && h === anterior && imgsListas) return fijar(h);
+    anterior = h;
+    if (++intentos > 40) return fijar(h || 420); // ~4 s: con lo que haya
+    setTimeout(sondear, 100);
+  };
+
+  sondear();
 }
 
 // Separa "a@x.com, b@y.com" en lista. El servidor vuelve a validar cada dirección;
