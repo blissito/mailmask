@@ -7,6 +7,7 @@ import {
   listUserDomains, listAliases, listRules, updateUserSubscription,
   createPendingCheckout, createAddon, getAddonById, updateAddon,
   addSuppression, getConversation, listMessages, getSendCount,
+  getCampaignStats,
 } from "./db.ts";
 import { hashPassword, signJwt, generateCsrfToken } from "./auth.ts";
 import { sqlite } from "./pg.ts";
@@ -89,6 +90,41 @@ describe("Auth", () => {
     });
     assert.equal(res.status, 409);
     await res.body?.cancel();
+  });
+
+  it("POST /api/auth/register — guarda la campaña (utm) normalizada", async () => {
+    const email = `utm-${suffix}@example.com`;
+    const res = await jsonPost("/api/auth/register", {
+      email, password: "password123",
+      utm: { source: " Instagram ", medium: "social", campaign: `Lanzamiento-${suffix}` },
+    });
+    assert.equal(res.status, 201);
+    await res.body?.cancel();
+    const u = getUser(email);
+    assert.equal(u?.utmSource, "instagram");
+    assert.equal(u?.utmMedium, "social");
+    assert.equal(u?.utmCampaign, `lanzamiento-${suffix}`);
+    const fila = getCampaignStats().find((r) => r.campaign === `lanzamiento-${suffix}` && r.source === "instagram");
+    assert.ok(fila, "la campaña aparece en el reporte");
+    assert.equal(fila.registros, 1);
+    assert.equal(fila.conDominio, 0);
+  });
+
+  it("POST /api/auth/register — sin utm queda vacío y utm basura no rompe", async () => {
+    const email = `noutm-${suffix}@example.com`;
+    const res = await jsonPost("/api/auth/register", { email, password: "password123", utm: { source: "" } });
+    assert.equal(res.status, 201);
+    await res.body?.cancel();
+    assert.equal(getUser(email)?.utmCampaign, undefined);
+  });
+
+  it("GET /api/admin/campaigns — 403 sin admin", async () => {
+    const res = await jsonPost("/api/auth/register", { email: `noadmin-${suffix}@example.com`, password: "password123" });
+    const cookie = extractCookie(res);
+    await res.body?.cancel();
+    const r = await req("/api/admin/campaigns", { headers: { cookie: cookie! } });
+    assert.equal(r.status, 403);
+    await r.body?.cancel();
   });
 
   it("POST /api/auth/register — missing fields 422", async () => {

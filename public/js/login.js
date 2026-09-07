@@ -58,7 +58,20 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
   }
   const coupon = params.get("coupon");
   const a = document.getElementById("google-login");
-  if (a && coupon) a.href = "/api/auth/google?coupon=" + encodeURIComponent(coupon);
+  if (!a) return;
+  const q = new URLSearchParams();
+  if (coupon) q.set("coupon", coupon);
+  // Quien se registra con Google desde el login también viene de una campaña.
+  try {
+    const s = JSON.parse(localStorage.getItem("mailmask_utm") || "null");
+    if (s && s.at && Date.now() - s.at < 30 * 864e5) {
+      if (s.source) q.set("utm_source", s.source);
+      if (s.medium) q.set("utm_medium", s.medium);
+      if (s.campaign) q.set("utm_campaign", s.campaign);
+    }
+  } catch (e) {}
+  const qs = q.toString();
+  if (qs) a.href = "/api/auth/google?" + qs;
 })();
 
 // El formulario de contraseña va escondido: Google es el camino principal.

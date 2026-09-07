@@ -5,6 +5,17 @@ fetch("/api/auth/me").then(r => {
   }
 });
 
+// Campaña: lo que guardó analytics.js, o los utm_* de esta misma URL si cayó directo en /register.
+function leerUtm() {
+  try {
+    const s = JSON.parse(localStorage.getItem("mailmask_utm") || "null");
+    if (s && s.at && Date.now() - s.at < 30 * 864e5) return { source: s.source || undefined, medium: s.medium || undefined, campaign: s.campaign || undefined };
+  } catch (e) {}
+  const q = new URLSearchParams(location.search);
+  const utm = { source: q.get("utm_source") || undefined, medium: q.get("utm_medium") || undefined, campaign: q.get("utm_campaign") || undefined };
+  return utm.source || utm.medium || utm.campaign ? utm : undefined;
+}
+
 const _refParam = new URLSearchParams(location.search).get("ref");
 if (_refParam) {
   localStorage.setItem("mailmask_ref", _refParam);
@@ -50,11 +61,15 @@ document.getElementById("register-form").addEventListener("submit", async (e) =>
       password: form.password.value,
       ref,
       turnstileToken,
+      utm: leerUtm(),
     }),
   });
 
   if (res.ok) {
     localStorage.removeItem("mailmask_ref");
+    localStorage.removeItem("mailmask_utm");
+    // beacon: sobrevive a la redirección que sigue.
+    if (window.gtag) window.gtag("event", "sign_up", { method: "password", transport_type: "beacon" });
     const coupon = new URLSearchParams(location.search).get("coupon");
     window.location.href = "/app" + (coupon ? "?coupon=" + encodeURIComponent(coupon) : "");
   } else {
@@ -77,6 +92,10 @@ document.getElementById("register-form").addEventListener("submit", async (e) =>
   const coupon = new URLSearchParams(location.search).get("coupon");
   if (ref) q.set("ref", ref);
   if (coupon) q.set("coupon", coupon);
+  const utm = leerUtm() || {};
+  if (utm.source) q.set("utm_source", utm.source);
+  if (utm.medium) q.set("utm_medium", utm.medium);
+  if (utm.campaign) q.set("utm_campaign", utm.campaign);
   const qs = q.toString();
   if (qs) a.href = "/api/auth/google?" + qs;
 })();

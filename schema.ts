@@ -21,6 +21,10 @@ export const users = sqliteTable("users", {
   referralName: text("referral_name"),
   referredBy: text("referred_by"),
   paymentCount: integer("payment_count").notNull().default(0),
+  // De qué campaña vino (utm_* del primer toque en el sitio público). Sólo lectura en el admin.
+  utmSource: text("utm_source"),
+  utmMedium: text("utm_medium"),
+  utmCampaign: text("utm_campaign"),
 });
 
 export const domains = sqliteTable("domains", {

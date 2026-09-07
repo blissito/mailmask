@@ -47,6 +47,9 @@ export interface User {
   emailVerified?: boolean;
   verifyToken?: string;
   passwordChangedAt?: string; // ISO date
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
 }
 
 export interface Domain {
@@ -217,6 +220,9 @@ function rowToUser(r: typeof users.$inferSelect): User {
     createdAt: r.createdAt,
     emailVerified: r.emailVerified ?? false,
     passwordChangedAt: r.passwordChangedAt ?? undefined,
+    utmSource: r.utmSource ?? undefined,
+    utmMedium: r.utmMedium ?? undefined,
+    utmCampaign: r.utmCampaign ?? undefined,
   };
   if (r.subPlan) {
     user.subscription = {
@@ -2185,6 +2191,47 @@ export function getUserReferredBy(email: string): string | null {
 
 export function setUserReferredBy(email: string, referrerEmail: string): void {
   db.update(users).set({ referredBy: referrerEmail }).where(eq(users.email, email)).run();
+}
+
+export interface Utm { source?: string; medium?: string; campaign?: string }
+
+/** Normaliza lo que manda el cliente: minúsculas, 64 chars, vacío → null. */
+export function limpiarUtm(raw: unknown): Utm | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const pick = (k: string) => {
+    const v = typeof r[k] === "string" ? (r[k] as string).trim().toLowerCase().slice(0, 64) : "";
+    return v || undefined;
+  };
+  const utm = { source: pick("source"), medium: pick("medium"), campaign: pick("campaign") };
+  return utm.source || utm.medium || utm.campaign ? utm : null;
+}
+
+export function setUserUtm(email: string, utm: Utm | null): void {
+  if (!utm) return;
+  db.update(users).set({ utmSource: utm.source ?? null, utmMedium: utm.medium ?? null, utmCampaign: utm.campaign ?? null })
+    .where(eq(users.email, email)).run();
+}
+
+export interface CampaignStats {
+  campaign: string | null; source: string | null; medium: string | null;
+  registros: number; verificados: number; conDominio: number; primero: string; ultimo: string;
+}
+
+/** Registros, verificados y con dominio por campaña. El dominio se cuenta por existencia, no por número. */
+export function getCampaignStats(): CampaignStats[] {
+  const rows = sqlite.prepare(`
+    SELECT utm_campaign AS campaign, utm_source AS source, utm_medium AS medium,
+      COUNT(*) AS registros,
+      SUM(email_verified) AS verificados,
+      SUM(EXISTS(SELECT 1 FROM domains d WHERE d.owner_email = users.email)) AS conDominio,
+      MIN(created_at) AS primero, MAX(created_at) AS ultimo
+    FROM users
+    WHERE utm_campaign IS NOT NULL OR utm_source IS NOT NULL
+    GROUP BY utm_campaign, utm_source, utm_medium
+    ORDER BY ultimo DESC
+  `).all() as CampaignStats[];
+  return rows;
 }
 
 // --- Domain Registration (Route 53) ---

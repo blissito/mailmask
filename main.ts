@@ -146,6 +146,9 @@ import {
   incrementPaymentCount,
   getUserReferredBy,
   setUserReferredBy,
+  setUserUtm,
+  limpiarUtm,
+  getCampaignStats,
   recordReferralClick,
   // API Keys
   createApiKey,
@@ -1098,6 +1101,7 @@ const app = new Elysia({ adapter: node() })
     const hash = await hashPassword(password);
     await createUser(email, hash);
     generateReferralSlug(email);
+    setUserUtm(email, limpiarUtm(body.utm));
 
     // Handle referral
     const ref = body.ref;
@@ -1131,6 +1135,11 @@ const app = new Elysia({ adapter: node() })
       password: t.String({ minLength: 8 }),
       ref: t.Optional(t.String()),
       turnstileToken: t.Optional(t.String()),
+      utm: t.Optional(t.Object({
+        source: t.Optional(t.String({ maxLength: 200 })),
+        medium: t.Optional(t.String({ maxLength: 200 })),
+        campaign: t.Optional(t.String({ maxLength: 200 })),
+      })),
     }),
     detail: { tags: ["Auth"], summary: "Register a new user account" },
   })
@@ -1197,10 +1206,11 @@ const app = new Elysia({ adapter: node() })
     const state = crypto.randomUUID();
     const ref = typeof query.ref === "string" ? query.ref.slice(0, 64) : undefined;
     const coupon = typeof query.coupon === "string" ? query.coupon.slice(0, 64) : undefined;
+    const utm = limpiarUtm({ source: query.utm_source, medium: query.utm_medium, campaign: query.utm_campaign });
     await db.insert(tokensTable).values({
       token: state,
       kind: "oauth-state",
-      value: { ref, coupon },
+      value: { ref, coupon, ...(utm ? { utm } : {}) },
       expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
     });
     const params = new URLSearchParams({
@@ -1234,7 +1244,7 @@ const app = new Elysia({ adapter: node() })
       .where(eq(tokensTable.token, state)).get();
     if (!stateRow || stateRow.kind !== "oauth-state" || stateRow.expiresAt < new Date().toISOString()) return fail("google-state");
     db.delete(tokensTable).where(eq(tokensTable.token, state)).run();
-    const carried = (stateRow.value ?? {}) as { ref?: string; coupon?: string };
+    const carried = (stateRow.value ?? {}) as { ref?: string; coupon?: string; utm?: { source?: string; medium?: string; campaign?: string } | null };
 
     let idPayload: { email?: string; email_verified?: boolean; aud?: string; sub?: string };
     try {
@@ -1276,6 +1286,7 @@ const app = new Elysia({ adapter: node() })
       // "olvidé mi contraseña". El hash aleatorio no lo adivina nadie.
       await createUser(email, await hashPassword(crypto.randomUUID() + crypto.randomUUID()));
       generateReferralSlug(email);
+      setUserUtm(email, limpiarUtm(carried.utm));
       if (carried.ref) {
         const referrer = await getUserByReferralSlug(carried.ref);
         if (referrer && referrer.email !== email) {
@@ -5810,6 +5821,17 @@ const app = new Elysia({ adapter: node() })
     detail: { tags: ["Admin"], summary: "Trigger a manual backup", security: [{ cookieAuth: [] }] },
   })
 
+  // --- Admin: Campañas ---
+
+  .get("/api/admin/campaigns", async ({ request }) => {
+    const user = await getAuthUser(request);
+    if (!user || !isAdmin(user.email))
+      return new Response(JSON.stringify({ error: "Acceso denegado" }), { status: 403, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify(getCampaignStats()), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["Admin"], summary: "Registros y dominios por campaña (utm)", security: [{ cookieAuth: [] }] },
+  })
+
   // --- Admin: Users CRUD ---
 
   .get("/api/admin/users", async ({ request }) => {
@@ -5833,6 +5855,8 @@ const app = new Elysia({ adapter: node() })
         // el plan puesto a mano.
         mpSubscriptionId: u.subscription?.mpSubscriptionId ?? null,
         paying: !!u.subscription?.mpSubscriptionId,
+        utmCampaign: u.utmCampaign ?? null,
+        utmSource: u.utmSource ?? null,
       });
     }
     return new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } });

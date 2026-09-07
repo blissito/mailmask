@@ -64,8 +64,10 @@ function switchTab(tab) {
   document.getElementById("tab-backups").classList.toggle("hidden", tab !== "backups");
   document.getElementById("tab-users").classList.toggle("hidden", tab !== "users");
   document.getElementById("tab-coupons").classList.toggle("hidden", tab !== "coupons");
+  document.getElementById("tab-campaigns").classList.toggle("hidden", tab !== "campaigns");
   if (tab === "users" && !usersLoaded) loadUsers();
   if (tab === "coupons" && !couponsLoaded) loadCoupons();
+  if (tab === "campaigns" && !campaignsLoaded) loadCampaigns();
 }
 
 // --- Init ---
@@ -167,6 +169,48 @@ async function triggerBackup() {
 // --- Users ---
 
 let usersLoaded = false;
+
+// --- Campaigns ---
+
+let campaignsLoaded = false;
+
+async function loadCampaigns() {
+  const res = await fetch("/api/admin/campaigns");
+  if (!res.ok) return;
+  const rows = await res.json();
+  campaignsLoaded = true;
+  document.getElementById("campaigns-loading").classList.add("hidden");
+  const list = document.getElementById("campaigns-list");
+  list.classList.remove("hidden");
+  if (rows.length === 0) {
+    list.innerHTML = '<p class="text-zinc-500 text-sm py-4">Todavía no llega nadie con utm.</p>';
+    return;
+  }
+  const fecha = (iso) => iso ? new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short" }) : "—";
+  const pct = (n, d) => d ? Math.round((n / d) * 100) + "%" : "—";
+  list.innerHTML = `
+    <table class="w-full text-sm">
+      <thead class="text-xs text-zinc-500 uppercase tracking-wide">
+        <tr class="border-b border-zinc-800 text-left">
+          <th class="py-2 pr-4">Campaña</th><th class="py-2 pr-4">Fuente / medio</th>
+          <th class="py-2 pr-4 text-right">Registros</th><th class="py-2 pr-4 text-right">Verificados</th>
+          <th class="py-2 pr-4 text-right">Con dominio</th><th class="py-2 pr-4">Primero</th><th class="py-2">Último</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr class="border-b border-zinc-900">
+            <td class="py-2 pr-4 font-medium">${esc(r.campaign || "—")}</td>
+            <td class="py-2 pr-4 text-zinc-400">${esc(r.source || "—")} / ${esc(r.medium || "—")}</td>
+            <td class="py-2 pr-4 text-right">${r.registros}</td>
+            <td class="py-2 pr-4 text-right">${r.verificados} <span class="text-zinc-600">${pct(r.verificados, r.registros)}</span></td>
+            <td class="py-2 pr-4 text-right">${r.conDominio} <span class="text-zinc-600">${pct(r.conDominio, r.registros)}</span></td>
+            <td class="py-2 pr-4 text-zinc-400">${fecha(r.primero)}</td>
+            <td class="py-2 text-zinc-400">${fecha(r.ultimo)}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
 let allUsers = [];
 let selectedEmail = null;
 
@@ -206,6 +250,7 @@ function renderUsers(users) {
           ? '<span class="text-green-500" title="Suscripción real en MercadoPago">$ pagado</span>'
           : '<span class="text-amber-500" title="Plan puesto a mano, sin suscripción en MercadoPago">cortesía</span>'}
         <span>${u.domainsCount}d</span>
+        ${u.utmCampaign ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400" title="utm_source: ${esc(u.utmSource || "")}">${esc(u.utmCampaign)}</span>` : ""}
       </div>
     </div>
   `).join("");
