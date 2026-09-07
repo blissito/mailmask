@@ -948,6 +948,40 @@ async function selectDomain(id) {
   loadDomainHealth();
 }
 
+// Cuánto llevan usado los buzones del dominio. El almacenamiento crece solo y no
+// baja al borrar en la Bandeja (son almacenes distintos: la Bandeja va a S3, el
+// buzón a Stalwart), así que la barra es el único aviso antes de toparse.
+// El dato viene de `mailbox_used_bytes`, que es una CACHÉ reconciliada a diario:
+// por eso se dice desde cuándo y no se usa para cobrar.
+function barraAlmacenamiento(r) {
+  const total = r.mailboxBytes ?? 0;
+  if (!total) return "";
+  const usado = porDominio(selectedDomain.id)?.uso?.mailboxBytes?.current ?? 0;
+  const pct = Math.min(100, Math.round((usado / total) * 1000) / 10);
+  const apretado = pct >= 80;
+  const color = pct >= 95 ? "bg-red-500" : apretado ? "bg-amber-500" : "bg-accent";
+  const gb = (b) => {
+    const n = b / GB;
+    return n >= 10 ? Math.round(n) + " GB" : n >= 0.1 ? n.toFixed(1) + " GB" : Math.max(1, Math.round(b / (1024 * 1024))) + " MB";
+  };
+  return `
+    <div class="bg-bg-elev border border-line rounded-xl px-4 py-3 mt-2">
+      <div class="flex items-baseline gap-2 mb-2">
+        <span class="text-sm font-semibold text-fg">Almacenamiento de buzones</span>
+        <span class="text-xs text-fg-muted">${gb(usado)} de ${gb(total)}</span>
+        <span class="ml-auto text-xs ${apretado ? "text-amber-600 font-semibold" : "text-fg-muted"}">${pct}%</span>
+      </div>
+      <div class="h-2 rounded-full bg-bg-inset overflow-hidden">
+        <div class="h-full ${color} rounded-full transition-all" style="width:${Math.max(pct, 1)}%"></div>
+      </div>
+      <p class="text-xs text-fg-muted mt-2">
+        ${apretado
+          ? "Te queda poco espacio. Agrega un bloque de +50 GB por $99 al mes para no dejar de recibir."
+          : "Lo comparten todos los buzones del dominio. Borrar en la Bandeja no lo libera: para que baje hay que borrar en el buzón y vaciar su Papelera."}
+      </p>
+    </div>`;
+}
+
 // Banda de activación bajo la cabecera del dominio: gratis, sin activar, o activado.
 function renderActivacion() {
   const el = document.getElementById("detail-activation");
@@ -960,7 +994,8 @@ function renderActivacion() {
         <span class="text-sm text-accent-text font-semibold">Dominio activado</span>
         <span class="text-xs text-fg-muted">personas ilimitadas · buzones IMAP · ${r.sends} correos nuevos al día · ${Math.round((r.mailboxBytes ?? 0) / GB)} GB</span>
         <span class="ml-auto">${btn("+50 GB · +100 envíos", false)}</span>
-      </div>`;
+      </div>
+      ${barraAlmacenamiento(r)}`;
   } else if (r.bloqueado) {
     el.innerHTML = `
       <div class="flex flex-wrap items-center gap-3 bg-amber-500/15 border border-amber-500/30 rounded-xl px-4 py-3">
