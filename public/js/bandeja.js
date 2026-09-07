@@ -665,7 +665,7 @@ async function openConversation(conv) {
     btnDelete.classList.add("mesa-hidden");
     btnRestore.classList.remove("mesa-hidden");
   } else if (canDoActions) {
-    composer.classList.remove("mesa-hidden");
+    composer.classList.add("mesa-hidden");
     banner.classList.add("mesa-hidden");
     btnReply.classList.remove("mesa-hidden");
     btnAssign.classList.remove("mesa-hidden");
@@ -1206,11 +1206,7 @@ function setupListeners() {
   const btnMas = document.getElementById("btn-load-more");
   if (btnMas) btnMas.addEventListener("click", () => loadConversations({ append: true }));
 
-  document.getElementById("btn-reply").addEventListener("click", () => {
-    composerMode = "reply";
-    updateComposerMode();
-    replyEditor ? replyEditor.focus() : document.getElementById("composer-textarea").focus();
-  });
+  document.getElementById("btn-reply").addEventListener("click", () => abrirCompositor("reply"));
 
   document.getElementById("btn-assign").addEventListener("click", assignConversation);
   document.getElementById("bulk-all")?.addEventListener("click", () => {
@@ -1337,6 +1333,15 @@ function setupListeners() {
   }
 }
 
+// El compositor estorba para leer: nace plegado y se abre con Responder / Nota
+// (botón o tecla). Al cambiar de hilo o enviar vuelve a plegarse.
+function abrirCompositor(mode) {
+  composerMode = mode;
+  document.getElementById("composer").classList.remove("mesa-hidden");
+  updateComposerMode();
+  replyEditor ? replyEditor.focus() : document.getElementById("composer-textarea").focus();
+}
+
 function updateComposerMode() {
   const replyBtn = document.getElementById("mode-reply");
   const noteBtn = document.getElementById("mode-note");
@@ -1388,6 +1393,12 @@ function setupKeyboard() {
       // Blur composer
       if (isTyping) {
         e.target.blur();
+        return;
+      }
+      // Plegar el compositor antes de soltar el hilo
+      const comp = document.getElementById("composer");
+      if (comp && !comp.classList.contains("mesa-hidden")) {
+        comp.classList.add("mesa-hidden");
         return;
       }
       // Deselect conversation
@@ -1445,9 +1456,7 @@ function setupKeyboard() {
     }
     if (e.key === "r" && canDoActions) {
       e.preventDefault();
-      composerMode = "reply";
-      updateComposerMode();
-      replyEditor ? replyEditor.focus() : document.getElementById("composer-textarea").focus();
+      abrirCompositor("reply");
     }
     if (e.key === "c") {
       e.preventDefault();
@@ -1456,9 +1465,7 @@ function setupKeyboard() {
     }
     if (e.key === "n" && canDoActions) {
       e.preventDefault();
-      composerMode = "note";
-      updateComposerMode();
-      replyEditor ? replyEditor.focus() : document.getElementById("composer-textarea").focus();
+      abrirCompositor("note");
     }
     if (e.key === "a" && canDoActions) {
       e.preventDefault();

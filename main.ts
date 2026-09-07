@@ -951,9 +951,13 @@ const app = new Elysia({ adapter: node() })
         "permissions-policy",
         "camera=(), microphone=(), geolocation=(), payment=(self)",
       );
+      // En /bandeja el correo entrante se pinta en un <iframe sandbox srcdoc>, que
+      // hereda esta CSP: sin `https:` en img-src los logos y botones de cada
+      // correo salen rotos. Sólo imágenes, sólo ahí; scripts siguen bloqueados.
+      const imgSrc = new URL(request.url).pathname === "/bandeja" ? "img-src 'self' data: https:" : "img-src 'self' data: https://www.googletagmanager.com https://www.clarity.ms";
       response.headers.set(
         "content-security-policy",
-        "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.clarity.ms; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms https://challenges.cloudflare.com; connect-src 'self' https://www.formmy.app https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms; frame-src 'self' https://www.googletagmanager.com https://www.youtube-nocookie.com https://challenges.cloudflare.com",
+        `default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; ${imgSrc}; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms https://challenges.cloudflare.com; connect-src 'self' https://www.formmy.app https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms; frame-src 'self' https://www.googletagmanager.com https://www.youtube-nocookie.com https://challenges.cloudflare.com`,
       );
     }
     return response;
