@@ -305,8 +305,26 @@ delante `l4:…:993`, `l4:…:465` y el mapeo de dominio al 8080 — no migran s
 
 ### Sigue pendiente
 
-- **Re-medir el cociente índice/buzón con correo real** (50–100 KB, con HTML y adjuntos). Los 28 KB de metadatos por mensaje se midieron con correos de 2.5 KB y el índice crece con el texto, así que no se extrapola. El techo es blando: **+100 GB NVMe son $99/mes**.
-- El 587 no existe (el 143 con STARTTLS no se puede rutear por SNI: la conexión empieza en claro). Los clientes usan **465**.
+**Probado de punta a punta el 7-sep-2026 (madrugada), en producción:** máscara creada desde
+la app con buzón (`mijo@fancyfiles.app`, dominio creado solo en Stalwart) → perfil de Apple →
+envío desde Apple Mail por SES (firmado por el dominio) → respuesta de Gmail recibida en la
+Bandeja **y** en el buzón. Es el producto entero funcionando sobre un dominio de cliente.
+
+**Antes de vender el primer buzón, en este orden:**
+1. **SES Tenants** (un cliente no puede tumbar la reputación de todos). Verificar de entrada
+   si el tenant se puede indicar por SMTP; si no, Stalwart debe entregar a la app en vez de
+   a SES — un solo camino de salida que además da el contador de envíos y el log.
+2. **Contador del 465**: hoy lo que sale de Apple Mail no descuenta de los 50/día. Hasta
+   entonces "+100 envíos" no se publica como comprable.
+3. **Una compra real en MercadoPago** del add-on `domain` (nunca se ha ejercitado contra MP;
+   el webhook con `addon:` sí).
+4. **Bootstrap reproducible de la caja** + simulacro cronometrado, y comprobar que el dump
+   restaura. Sin eso, un incidente de disco es esta sesión otra vez.
+5. **Medir índice/GB de buzón** con correo real: decide si 10 GB por $99 y +50 GB por $99
+   se sostienen.
+6. Blog (25 posts con precios viejos), campañas por mes (+5,000/$99, aprobación manual),
+   borrar el secreto `IMAP_ENABLED_DOMAINS` en Fly, rotar `EASYBITS_API_KEY`,
+   `TURNSTILE_SECRET` y el admin de Stalwart (viajaron por el chat).
 
 ### 🔥 Contexto original del análisis (agosto 2026)
 - [ ] **Cerrar el hueco de recepción: cuánto cuesta y si AWS lo resuelve.** Hoy MailMask envía por SMTP pero **no ofrece IMAP ni POP**, así que nadie puede usar Outlook o Apple Mail como cliente completo: el correo entrante sigue cayendo en el buzón al que se reenvía. La landing lo prometía mal y ya se corrigió, pero el hueco de producto sigue ahí y es lo que separa "capa de reenvío" de "email profesional de verdad".
