@@ -84,7 +84,7 @@
           <div class="text-5xl mb-4">🎭</div>
           <h2 class="text-xl font-semibold mb-2">Agrega tu primer dominio</h2>
           <p class="text-fg-muted mb-6">Configura email profesional en tu dominio en 2 minutos.</p>
-          <button id="btn-add-domain-empty" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors">
+          <button id="btn-add-domain-empty" class="bg-accent hover:bg-accent/90 text-white font-semibold px-6 py-3 rounded-lg transition-colors">
             Agregar dominio
           </button>
         </div>
@@ -173,7 +173,7 @@
           <div class="flex items-center justify-between mb-2">
             <h3 class="font-semibold">Lista de supresión</h3>
             <form id="suppression-form" class="flex gap-2">
-              <input id="suppression-email" type="email" placeholder="correo@ejemplo.com" class="bg-bg-elev border border-line rounded-md px-2.5 py-1 text-xs w-56 focus:outline-none focus:border-mask-400" required>
+              <input id="suppression-email" type="email" placeholder="correo@ejemplo.com" class="bg-bg-elev border border-line rounded-md px-2.5 py-1 text-xs w-56 focus:outline-none focus:border-accent" required>
               <button class="text-xs bg-bg-inset hover:bg-line px-3 py-1 rounded-md transition-colors">Bloquear</button>
             </form>
           </div>
@@ -212,7 +212,7 @@
         </div>
         <div id="members-upgrade" class="hidden text-center py-8">
           <p class="text-fg-subtle mb-3">Invitar a tu equipo viene con el dominio activado — personas ilimitadas.</p>
-          <button type="button" data-action="open-addons" class="text-mask-500 hover:text-mask-600 text-sm underline transition-colors">Activar dominio · $99/mes</button>
+          <button type="button" data-action="open-addons" class="text-accent-text hover:text-accent text-sm underline transition-colors">Activar dominio · $99/mes</button>
         </div>
       </div>
 
@@ -223,7 +223,7 @@
           <h3 class="font-semibold">API Keys</h3>
           <button id="btn-add-apikey" class="text-sm bg-bg-inset hover:bg-line px-3 py-1.5 rounded-lg transition-colors">+ Crear key</button>
         </div>
-        <p class="text-sm text-fg-muted mb-4">Usa API keys para acceder a la API de MailMask desde tu código. <a href="/docs" target="_blank" class="text-mask-500 hover:text-mask-600 underline">Ver docs</a></p>
+        <p class="text-sm text-fg-muted mb-4">Usa API keys para acceder a la API de MailMask desde tu código. <a href="/docs" target="_blank" class="text-accent-text hover:text-accent underline">Ver docs</a></p>
         <div id="apikeys-list" class="space-y-2"></div>
         <div id="apikeys-empty" class="hidden text-center py-8 text-fg-subtle">
           No hay API keys. Crea una para comenzar.
@@ -234,7 +234,7 @@
       <div id="tab-webhooks" class="tab-content hidden">
         <div class="flex items-center justify-between mb-4">
           <h3 class="font-semibold">Webhooks</h3>
-          <a href="/docs#webhooks" target="_blank" class="text-sm text-mask-500 hover:text-mask-600 underline">Ver docs</a>
+          <a href="/docs#webhooks" target="_blank" class="text-sm text-accent-text hover:text-accent underline">Ver docs</a>
         </div>
         <p class="text-sm text-fg-muted mb-4">Recibe un POST en tu servidor cuando llega, sale, se entrega o rebota un correo. Los webhooks se crean desde el SDK, porque el secreto tiene que quedar en tu código, no en una pantalla.</p>
         <div id="webhooks-list" class="space-y-3"></div>
@@ -244,7 +244,7 @@
         </div>
         <div id="webhooks-upgrade" class="hidden text-center py-8">
           <p class="text-fg-subtle mb-3">Los webhooks vienen con el dominio activado.</p>
-          <button type="button" data-action="open-addons" class="text-mask-500 hover:text-mask-600 text-sm underline transition-colors">Activar dominio · $99/mes</button>
+          <button type="button" data-action="open-addons" class="text-accent-text hover:text-accent text-sm underline transition-colors">Activar dominio · $99/mes</button>
         </div>
       </div>
 
@@ -260,7 +260,7 @@
         </div>
         <div id="smtp-upgrade" class="hidden text-center py-8">
           <p class="text-fg-subtle mb-3">El relay SMTP viene con el dominio activado.</p>
-          <button type="button" data-action="open-addons" class="text-mask-500 hover:text-mask-600 text-sm underline transition-colors">Activar dominio · $99/mes</button>
+          <button type="button" data-action="open-addons" class="text-accent-text hover:text-accent text-sm underline transition-colors">Activar dominio · $99/mes</button>
         </div>
       </div>
     </div>
@@ -271,7 +271,7 @@
   <div id="modal-addons" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
     <div class="bg-bg-elev border border-line rounded-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
       <div class="flex items-start justify-between mb-1">
-        <h3 class="text-lg font-bold">Activar y ampliar <span id="addons-domain" class="font-mono text-mask-500 text-base"></span></h3>
+        <h3 class="text-lg font-bold">Activar y ampliar <span id="addons-domain" class="font-mono text-accent-text text-base"></span></h3>
         <button type="button" class="btn-cancel-modal text-fg-subtle hover:text-fg text-2xl leading-none" data-modal="modal-addons">&times;</button>
       </div>
       <p class="text-sm text-fg-muted mb-5">Todo cuesta $99 al mes y es por dominio. Se cobra aparte, mes a mes; lo cancelas cuando quieras.</p>
@@ -290,7 +290,7 @@
         <div id="smtp-label-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-smtp-label">Cancelar</button>
-          <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Generar</button>
+          <button type="submit" class="bg-accent hover:bg-accent/90 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Generar</button>
         </div>
       </form>
     </div>
@@ -324,7 +324,7 @@
         <div id="apikey-name-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-apikey-name">Cancelar</button>
-          <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear</button>
+          <button type="submit" class="bg-accent hover:bg-accent/90 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear</button>
         </div>
       </form>
     </div>
@@ -344,7 +344,7 @@
         <div id="mp-email-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-mp-email">Cancelar</button>
-          <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Continuar al pago</button>
+          <button type="submit" class="bg-accent hover:bg-accent/90 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Continuar al pago</button>
         </div>
       </form>
     </div>
@@ -388,8 +388,8 @@
         <div id="add-domain-step-search">
           <div class="flex gap-2 items-center">
             <input type="text" id="add-domain-input" placeholder="miempresa.com" required
-              class="flex-1 bg-bg-inset border border-line rounded-lg px-4 py-2.5 text-fg placeholder-fg-subtle focus:border-mask-500 focus:outline-none text-sm">
-            <button type="button" id="btn-add-domain-search" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors whitespace-nowrap text-sm">
+              class="flex-1 bg-bg-inset border border-line rounded-lg px-4 py-2.5 text-fg placeholder-fg-subtle focus:border-accent focus:outline-none text-sm">
+            <button type="button" id="btn-add-domain-search" class="bg-accent hover:bg-accent/90 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors whitespace-nowrap text-sm">
               Buscar
             </button>
           </div>
@@ -424,7 +424,7 @@
         </div>
         <div>
           <label class="block text-sm text-fg-muted mb-1">Destino(s)</label>
-          <div data-chips class="flex flex-wrap items-center gap-1.5 w-full bg-bg-inset border border-line rounded-lg px-2.5 py-2 focus-within:border-mask-500 cursor-text">
+          <div data-chips class="flex flex-wrap items-center gap-1.5 w-full bg-bg-inset border border-line rounded-lg px-2.5 py-2 focus-within:border-accent cursor-text">
             <input type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="tu@gmail.com"
               class="chips-input lowercase flex-1 min-w-[10rem] bg-transparent border-0 px-1.5 py-1 text-fg placeholder-fg-subtle focus:outline-none">
             <input type="hidden" name="destinations">
@@ -432,8 +432,8 @@
           <p class="text-xs text-fg-subtle mt-1">Enter o coma para agregar otro destino. Cada correo recibe una copia.</p>
         </div>
         <!-- Sólo en dominio activado: la máscara puede guardar su correo en vez de (o además de) reenviarlo. -->
-        <label id="add-alias-mailbox-row" class="hidden flex items-start gap-3 mt-4 p-3 rounded-lg border border-mask-500/30 bg-mask-500/10 cursor-pointer">
-          <input type="checkbox" name="mailbox" class="mt-1 accent-mask-500">
+        <label id="add-alias-mailbox-row" class="hidden flex items-start gap-3 mt-4 p-3 rounded-lg border border-accent/30 bg-accent/10 cursor-pointer">
+          <input type="checkbox" name="mailbox" class="mt-1 accent-accent">
           <span class="text-sm">
             <span class="text-fg font-semibold">Guardar el correo en un buzón IMAP</span>
             <span class="block text-xs text-fg-muted mt-0.5">Para leerlo en Apple Mail u Outlook. Con esto los destinos son opcionales: puedes reenviar además, o sólo guardar.</span>
@@ -442,7 +442,7 @@
         <div id="add-alias-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-add-alias">Cancelar</button>
-          <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear alias</button>
+          <button type="submit" class="bg-accent hover:bg-accent/90 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear alias</button>
         </div>
       </form>
     </div>
@@ -454,7 +454,7 @@
   <div id="modal-mailbox" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
     <div class="bg-bg-elev border border-line rounded-xl w-full max-w-lg p-6">
       <h3 class="text-lg font-bold mb-1">Buzón IMAP</h3>
-      <p id="mailbox-title" class="font-mono text-sm text-mask-500 mb-4 break-all"></p>
+      <p id="mailbox-title" class="font-mono text-sm text-accent-text mb-4 break-all"></p>
       <div id="mailbox-body"></div>
       <div class="flex justify-end mt-6">
         <button type="button" class="btn-cancel-modal px-4 py-2 text-sm text-fg-muted hover:text-fg transition-colors" data-modal="modal-mailbox">Cerrar</button>
@@ -464,12 +464,12 @@
 
   <div id="modal-edit-alias" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
     <div class="bg-bg-elev border border-line rounded-xl w-full max-w-md p-6">
-      <h3 class="text-lg font-bold mb-4">Editar alias <span id="edit-alias-name" class="font-mono text-mask-500"></span></h3>
+      <h3 class="text-lg font-bold mb-4">Editar alias <span id="edit-alias-name" class="font-mono text-accent-text"></span></h3>
       <form id="form-edit-alias">
         <input type="hidden" name="alias" />
         <div>
           <label class="block text-sm text-fg-muted mb-1">Destino(s)</label>
-          <div data-chips class="flex flex-wrap items-center gap-1.5 w-full bg-bg-inset border border-line rounded-lg px-2.5 py-2 focus-within:border-mask-500 cursor-text">
+          <div data-chips class="flex flex-wrap items-center gap-1.5 w-full bg-bg-inset border border-line rounded-lg px-2.5 py-2 focus-within:border-accent cursor-text">
             <input type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="tu@gmail.com"
               class="chips-input lowercase flex-1 min-w-[10rem] bg-transparent border-0 px-1.5 py-1 text-fg placeholder-fg-subtle focus:outline-none">
             <input type="hidden" name="destinations">
@@ -479,7 +479,7 @@
         <div id="edit-alias-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-edit-alias">Cancelar</button>
-          <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Guardar</button>
+          <button type="submit" class="bg-accent hover:bg-accent/90 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Guardar</button>
         </div>
       </form>
     </div>
@@ -531,7 +531,7 @@
         <div id="add-rule-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-add-rule">Cancelar</button>
-          <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear regla</button>
+          <button type="submit" class="bg-accent hover:bg-accent/90 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear regla</button>
         </div>
       </form>
     </div>
@@ -563,7 +563,7 @@
         <div id="invite-member-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-invite-member">Cancelar</button>
-          <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Enviar invitación</button>
+          <button type="submit" class="bg-accent hover:bg-accent/90 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Enviar invitación</button>
         </div>
       </form>
     </div>
@@ -588,7 +588,7 @@
         <div id="edit-slug-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-edit-slug">Cancelar</button>
-          <button type="submit" class="bg-mask-600 hover:bg-mask-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Guardar</button>
+          <button type="submit" class="bg-accent hover:bg-accent/90 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Guardar</button>
         </div>
       </form>
     </div>

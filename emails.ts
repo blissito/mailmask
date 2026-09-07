@@ -91,16 +91,16 @@ export interface Email {
 }
 
 const C = {
-  band: "#047857",
+  band: "#d7263d",           // rojo de máscara del sitio
   bandText: "#ffffff",
-  accent: "#a7f3d0",
-  text: "#18181b",
-  muted: "#52525b",
-  line: "#e4e4e7",
-  pageBg: "#f4f4f5",
-  cardBg: "#ffffff",
-  softBg: "#fafafa",
-  okBg: "#ecfdf5",
+  accent: "#f2b705",          // dorado de la máscara sobre la banda roja
+  text: "#1c1917",
+  muted: "#57534e",
+  line: "#e4dccd",
+  pageBg: "#faf6ee",          // crema del sitio
+  cardBg: "#fffdf9",
+  softBg: "#f2ecdf",
+  okBg: "#ecfdf5",            // el verde queda sólo para "esto va bien"
   okLine: "#a7f3d0",
   warnBg: "#fffbeb",
   warnLine: "#fde68a",

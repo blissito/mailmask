@@ -21,12 +21,12 @@ export const EMAIL_STYLES = `
   body {
     margin: 0;
     padding: 0;
-    background-color: #ffffff;
+    background-color: #faf6ee;
     -webkit-font-smoothing: antialiased;
   }
   .email-wrapper {
     width: 100%;
-    background-color: #ffffff;
+    background-color: #faf6ee;
   }
   .email-content {
     width: 100%;
@@ -38,38 +38,38 @@ export const EMAIL_STYLES = `
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     font-size: 16px;
     line-height: 1.6;
-    color: #18181b;
+    color: #1c1917;
     word-break: break-word;
   }
   p {
     margin: 0 0 16px 0;
     font-size: 16px;
     line-height: 1.6;
-    color: #18181b;
+    color: #1c1917;
   }
   h1 {
     margin: 0 0 16px 0;
     font-size: 26px;
     line-height: 1.25;
     font-weight: 700;
-    color: #18181b;
+    color: #1c1917;
   }
   h2 {
     margin: 24px 0 12px 0;
     font-size: 22px;
     line-height: 1.3;
     font-weight: 700;
-    color: #18181b;
+    color: #1c1917;
   }
   h3 {
     margin: 20px 0 10px 0;
     font-size: 18px;
     line-height: 1.3;
     font-weight: 700;
-    color: #18181b;
+    color: #1c1917;
   }
   a {
-    color: #2563eb;
+    color: #b31f33;
     text-decoration: underline;
   }
   strong { font-weight: 700; }
@@ -84,25 +84,25 @@ export const EMAIL_STYLES = `
     margin: 0 0 6px 0;
     font-size: 16px;
     line-height: 1.6;
-    color: #18181b;
+    color: #1c1917;
   }
   blockquote {
     margin: 0 0 16px 0;
     padding: 4px 0 4px 16px;
-    border-left: 3px solid #e4e4e7;
-    color: #52525b;
+    border-left: 3px solid #e4dccd;
+    color: #57534e;
   }
   code {
     font-family: Consolas, Monaco, 'Courier New', monospace;
     font-size: 14px;
-    background-color: #f4f4f5;
+    background-color: #f2ecdf;
     padding: 2px 5px;
     border-radius: 3px;
   }
   pre {
     margin: 0 0 16px 0;
     padding: 12px;
-    background-color: #f4f4f5;
+    background-color: #f2ecdf;
     border-radius: 6px;
     font-family: Consolas, Monaco, 'Courier New', monospace;
     font-size: 14px;
@@ -112,7 +112,7 @@ export const EMAIL_STYLES = `
   }
   hr {
     border: 0;
-    border-top: 1px solid #e4e4e7;
+    border-top: 1px solid #e4dccd;
     margin: 24px 0;
   }
   img {
@@ -131,11 +131,11 @@ export const EMAIL_STYLES = `
   table.alert { margin: 0 0 16px 0; }
   .alert-cell {
     padding: 12px 16px;
-    border-left: 4px solid #71717a;
-    background-color: #fafafa;
+    border-left: 4px solid #78716c;
+    background-color: #faf6ee;
     font-size: 15px;
     line-height: 1.55;
-    color: #18181b;
+    color: #1c1917;
   }
   .alert-cell p.alert-title {
     margin: 0 0 4px 0;
@@ -143,12 +143,12 @@ export const EMAIL_STYLES = `
     font-weight: 700;
     letter-spacing: .02em;
     text-transform: uppercase;
-    color: #52525b;
+    color: #57534e;
   }
   .alert-cell p { margin: 0 0 8px 0; font-size: 15px; }
   .alert-cell p:last-child { margin-bottom: 0; }
 
-  .alert-cell-note { border-left-color: #2563eb; background-color: #eff6ff; }
+  .alert-cell-note { border-left-color: #b31f33; background-color: #eff6ff; }
   .alert-cell p.alert-title-note { color: #1d4ed8; }
   .alert-cell-tip { border-left-color: #16a34a; background-color: #f0fdf4; }
   .alert-cell p.alert-title-tip { color: #15803d; }
@@ -166,12 +166,12 @@ export const EMAIL_STYLES = `
   }
   table.data th, table.data td {
     padding: 8px 10px;
-    border: 1px solid #e4e4e7;
+    border: 1px solid #e4dccd;
     text-align: left;
     font-size: 15px;
   }
   table.data th {
-    background-color: #fafafa;
+    background-color: #faf6ee;
     font-weight: 700;
   }
 `;

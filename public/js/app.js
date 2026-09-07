@@ -276,13 +276,13 @@ function renderBillingSummary() {
       ${aviso}
       <div class="flex items-center justify-between mb-2">
         <span class="text-[11px] uppercase tracking-widest text-fg-muted font-semibold">Tu cobro mensual</span>
-        <button data-action="show-orders" class="text-xs text-mask-500 hover:text-mask-600 transition-colors">Historial de pagos</button>
+        <button data-action="show-orders" class="text-xs text-accent-text hover:text-accent transition-colors">Historial de pagos</button>
       </div>
       <div class="space-y-1">
         ${lines.map(l => `
           <div class="flex items-center justify-between gap-3 text-sm">
-            <span class="${l.gift ? "text-mask-500" : "text-fg"}">${esc(l.label)}</span>
-            <span class="${l.gift ? "text-mask-500" : "text-fg"}">${money(l.cents)}</span>
+            <span class="${l.gift ? "text-accent-text" : "text-fg"}">${esc(l.label)}</span>
+            <span class="${l.gift ? "text-accent-text" : "text-fg"}">${money(l.cents)}</span>
           </div>`).join("")}
       </div>
       <div class="flex items-center justify-between border-t border-line mt-2 pt-2">
@@ -317,10 +317,10 @@ function renderLastOrderStrip() {
       </div>`;
   }
   return `
-    <div class="flex flex-wrap items-center justify-between gap-2 bg-mask-900/30 border border-mask-500/30 rounded-lg px-3 py-2 mb-3">
-      <span class="text-sm text-mask-500">Cobramos ${monto} MXN el ${fecha}</span>
+    <div class="flex flex-wrap items-center justify-between gap-2 bg-accent/10 border border-accent/30 rounded-lg px-3 py-2 mb-3">
+      <span class="text-sm text-accent-text">Cobramos ${monto} MXN el ${fecha}</span>
       <div class="flex items-center gap-3">
-        <button data-action="show-orders" class="text-xs text-mask-500 hover:text-mask-600">Ver recibo</button>
+        <button data-action="show-orders" class="text-xs text-accent-text hover:text-accent">Ver recibo</button>
         <button data-action="dismiss-order" data-order-id="${esc(lo.id)}" class="text-fg-muted hover:text-fg text-lg leading-none">&times;</button>
       </div>
     </div>`;
@@ -377,7 +377,7 @@ async function showOrdersModal() {
             ${o.note ? `<div class="text-xs text-fg-muted mt-0.5">${esc(o.note)}</div>` : ""}
           </div>
           <div class="text-right shrink-0">
-            <div class="text-sm font-semibold ${gratis ? "text-mask-500" : "text-fg"}">
+            <div class="text-sm font-semibold ${gratis ? "text-accent-text" : "text-fg"}">
               ${monto} <span class="text-xs font-normal text-fg-muted">${esc(o.currency)}</span>
             </div>
             <div class="flex items-center justify-end gap-1.5 mt-0.5">
@@ -389,7 +389,7 @@ async function showOrdersModal() {
         <div class="flex flex-wrap items-center gap-3 mt-2 pt-2 border-t border-line text-[11px] text-fg-muted">
           <span class="font-mono">${esc(o.number)}</span>
           ${o.reference ? `<span class="font-mono">MP ${esc(o.reference)}</span>` : ""}
-          <button data-action="copy-order" data-order-number="${esc(o.number)}" class="text-mask-500 hover:text-mask-600 ml-auto">Copiar folio</button>
+          <button data-action="copy-order" data-order-number="${esc(o.number)}" class="text-accent-text hover:text-accent ml-auto">Copiar folio</button>
         </div>
       </div>`;
   }).join("");
@@ -434,7 +434,7 @@ function renderStats() {
             ? `<div class="text-3xl font-light text-fg mt-1">${sendsToday.toLocaleString("es-MX")}<span class="text-lg text-fg-subtle">/${sendsLimit.toLocaleString("es-MX")}</span></div>
                <div class="text-[11px] text-fg-subtle mt-0.5">por dominio, al día</div>`
             : `<div class="text-3xl font-light text-fg-subtle mt-1">—</div>
-               <button id="usage-addon-cta" class="text-[11px] text-mask-500 hover:underline mt-0.5">Activar envíos →</button>`}
+               <button id="usage-addon-cta" class="text-[11px] text-accent-text hover:underline mt-0.5">Activar envíos →</button>`}
         </div>
         <div>
           <span class="text-[11px] uppercase tracking-widest text-fg-subtle font-semibold">Reenvíos</span>
@@ -494,7 +494,7 @@ async function showAddonsModal(domainId) {
       if (a.isCourtesy) {
         return `
           <div class="flex flex-wrap items-center gap-2 text-xs mt-2">
-            <span class="inline-flex items-center gap-1 bg-mask-500/15 border border-mask-500/30 text-mask-500 rounded-full px-2 py-0.5">Cortesía</span>
+            <span class="inline-flex items-center gap-1 bg-accent/10 border border-accent/30 text-accent-text rounded-full px-2 py-0.5">Cortesía</span>
             <span class="text-fg-muted">sin costo${a.currentPeriodEnd ? ` · hasta ${new Date(a.currentPeriodEnd).toLocaleDateString("es-MX")}` : ""}</span>
           </div>`;
       }
@@ -502,7 +502,7 @@ async function showAddonsModal(domainId) {
       const precio = `$${((a.priceCents ?? info.price) / 100).toLocaleString("es-MX")} MXN/mes`;
       return `
         <div class="flex flex-wrap items-center gap-2 text-xs mt-2">
-          <span class="${cancelled ? "text-amber-600" : "text-mask-500"}">${cancelled ? `Termina el ${new Date(a.currentPeriodEnd).toLocaleDateString("es-MX")}` : "Activo"}</span>
+          <span class="${cancelled ? "text-amber-600" : "text-accent-text"}">${cancelled ? `Termina el ${new Date(a.currentPeriodEnd).toLocaleDateString("es-MX")}` : "Activo"}</span>
           <span class="text-fg-muted">· ${precio}</span>
           ${cancelled ? "" : `<button data-action="cancel-addon" data-addon-id="${esc(a.id)}" class="text-fg-muted hover:text-red-500 transition-colors">Cancelar</button>`}
         </div>`;
@@ -515,15 +515,15 @@ async function showAddonsModal(domainId) {
 
     let accion;
     if (pending.length) accion = `<div class="text-[11px] text-fg-muted max-w-[8rem]">Pago en proceso</div>`;
-    else if (esDominio && r.activado) accion = `<div class="text-[11px] text-mask-500 max-w-[8rem]">${r.legado ? "Incluido en tu plan anterior" : "Activado"}</div>`;
+    else if (esDominio && r.activado) accion = `<div class="text-[11px] text-accent-text max-w-[8rem]">${r.legado ? "Incluido en tu plan anterior" : "Activado"}</div>`;
     else if (bloqueado) accion = `<div class="text-[11px] text-fg-muted max-w-[8rem]">Primero activa el dominio</div>`;
     else accion = `<button data-action="buy-addon" data-kind="${esc(kind)}" data-domain-id="${esc(domainId)}"
-                 class="bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                 class="bg-accent hover:bg-accent/90 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors">
                  ${esDominio ? "Activar" : owned.length ? "Agregar otro" : "Agregar"}
                </button>`;
 
     return `
-      <div class="border ${esDominio ? "border-mask-500/40" : "border-line"} rounded-lg p-4 flex items-start justify-between gap-4">
+      <div class="border ${esDominio ? "border-accent/30" : "border-line"} rounded-lg p-4 flex items-start justify-between gap-4">
         <div class="flex-1 min-w-0">
           <div class="font-semibold text-fg">${esc(info.label)}</div>
           <div class="text-sm text-fg-muted mt-1">${esc(ADDON_COPY[kind]?.desc ?? "")}</div>
@@ -590,11 +590,11 @@ function renderReferralBanner() {
   playCelebration();
 
   container.innerHTML = `
-    <div class="border border-mask-500/30 bg-mask-950/20 rounded-xl px-5 py-4">
+    <div class="border border-accent/30 bg-accent/10 rounded-xl px-5 py-4">
       <div class="flex items-center gap-3">
         <span class="text-2xl">🎉</span>
         <div>
-          <p class="text-sm font-semibold text-mask-500">No pagas este mes — $5 MXN*</p>
+          <p class="text-sm font-semibold text-accent-text">No pagas este mes — $5 MXN*</p>
           <p class="text-xs text-fg-subtle mt-0.5">*Mínimo requerido por procesador de pagos</p>
         </div>
       </div>
@@ -629,7 +629,7 @@ function buildSparklineSvg(byWeek) {
     const barH = Math.max(2, (wk.count / max) * h);
     return `<rect x="${i * (barW + gap)}" y="${h - barH}" width="${barW}" height="${barH}" rx="2" fill="currentColor" opacity="0.7"><title>${wk.week}: ${wk.count}</title></rect>`;
   }).join("");
-  return `<svg viewBox="0 0 ${w} ${h}" class="text-mask-500" style="width:${w}px;height:${h}px">${bars}</svg>`;
+  return `<svg viewBox="0 0 ${w} ${h}" class="text-accent-text" style="width:${w}px;height:${h}px">${bars}</svg>`;
 }
 
 function renderReferrals() {
@@ -667,7 +667,7 @@ function renderReferrals() {
         ` : `
           <div class="flex items-center gap-3 flex-1">
             <span class="text-sm text-fg-subtle">Aún no tienes enlace de referido.</span>
-            <button data-action="edit-slug" class="text-sm text-mask-500 hover:text-mask-600 transition-colors">Crear enlace</button>
+            <button data-action="edit-slug" class="text-sm text-accent-text hover:text-accent transition-colors">Crear enlace</button>
           </div>
         `}
       </div>
@@ -688,7 +688,7 @@ function renderReferrals() {
               <div class="flex items-center gap-3 text-sm">
                 <span class="w-2 h-2 rounded-full ${isConverted ? 'bg-mask-400' : 'bg-line'}"></span>
                 <span class="text-fg-muted font-mono text-xs">${esc(masked)}</span>
-                <span class="text-xs ${isConverted ? 'text-mask-500' : 'text-fg-subtle'}">${isConverted ? 'Activo' : 'Pendiente'}</span>
+                <span class="text-xs ${isConverted ? 'text-accent-text' : 'text-fg-subtle'}">${isConverted ? 'Activo' : 'Pendiente'}</span>
                 <span class="text-xs text-fg-subtle ml-auto">${relativeTime(r.createdAt)}</span>
               </div>`;
           }).join("")}
@@ -923,7 +923,7 @@ async function selectDomain(id) {
   document.getElementById("detail-domain-name").textContent = selectedDomain.domain;
   const statusEl = document.getElementById("detail-status");
   statusEl.textContent = selectedDomain.verified ? "Verificado" : "Pendiente DNS";
-  statusEl.className = `text-xs px-2 py-1 rounded-full ${selectedDomain.verified ? 'bg-mask-500/15 text-mask-500' : 'bg-amber-500/15 text-amber-600'}`;
+  statusEl.className = `text-xs px-2 py-1 rounded-full ${selectedDomain.verified ? 'bg-accent/10 text-accent-text' : 'bg-amber-500/15 text-amber-600'}`;
   renderActivacion();
 
   document.getElementById("alias-domain-suffix").textContent = `@${selectedDomain.domain}`;
@@ -948,11 +948,11 @@ function renderActivacion() {
   const el = document.getElementById("detail-activation");
   if (!el || !selectedDomain) return;
   const r = derechosDe(selectedDomain.id);
-  const btn = (label, primario = true) => `<button data-action="open-addons" data-domain-id="${esc(selectedDomain.id)}" class="${primario ? "bg-mask-600 hover:bg-mask-700 text-white" : "bg-bg-inset hover:bg-line text-fg"} text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">${label}</button>`;
+  const btn = (label, primario = true) => `<button data-action="open-addons" data-domain-id="${esc(selectedDomain.id)}" class="${primario ? "bg-accent hover:bg-accent/90 text-white" : "bg-bg-inset hover:bg-line text-fg"} text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">${label}</button>`;
   if (r.activado) {
     el.innerHTML = `
       <div class="flex flex-wrap items-center gap-3 bg-bg-elev border border-line rounded-xl px-4 py-3">
-        <span class="text-sm text-mask-500 font-semibold">Dominio activado</span>
+        <span class="text-sm text-accent-text font-semibold">Dominio activado</span>
         <span class="text-xs text-fg-muted">personas ilimitadas · buzones IMAP · ${r.sends} correos nuevos al día · ${Math.round((r.mailboxBytes ?? 0) / GB)} GB</span>
         <span class="ml-auto">${btn("+50 GB · +100 envíos", false)}</span>
       </div>`;
@@ -1035,7 +1035,7 @@ async function searchDomainAvailability() {
       resultEl.innerHTML = `
         <div class="bg-bg-inset border border-line rounded-lg p-4">
           <p class="text-sm text-fg mb-3">${esc(data.error || `Extensión no disponible para compra`)}</p>
-          <button type="button" id="btn-connect-existing" class="w-full bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
+          <button type="button" id="btn-connect-existing" class="w-full bg-accent hover:bg-accent/90 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
             Ya tengo este dominio, conectarlo →
           </button>
         </div>`;
@@ -1047,10 +1047,10 @@ async function searchDomainAvailability() {
     if (data.available) {
       const priceStr = (data.price / 100).toLocaleString("es-MX", { style: "currency", currency: "MXN", currencyDisplay: "narrowSymbol" });
       resultEl.innerHTML = `
-        <div class="bg-green-900/20 border border-mask-500/30 rounded-lg p-4">
+        <div class="bg-green-900/20 border border-accent/30 rounded-lg p-4">
           <div class="flex items-center justify-between mb-3">
             <div>
-              <span class="font-semibold text-mask-500">${esc(data.domain)}</span>
+              <span class="font-semibold text-accent-text">${esc(data.domain)}</span>
               <span class="text-xs text-green-500 ml-2">Disponible</span>
               <div class="text-xs text-fg-muted mt-0.5">${priceStr} MXN/año</div>
             </div>
@@ -1074,7 +1074,7 @@ async function searchDomainAvailability() {
         <div class="bg-bg-inset border border-line rounded-lg px-4 py-4">
           <p class="text-sm text-fg mb-1"><span class="font-semibold">${esc(data.domain)}</span> ya está registrado</p>
           <p class="text-xs text-fg-subtle mb-4">Si es tuyo, conéctalo para usarlo con MailMask.</p>
-          <button type="button" id="btn-connect-existing" class="w-full bg-mask-600 hover:bg-mask-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors mb-2">
+          <button type="button" id="btn-connect-existing" class="w-full bg-accent hover:bg-accent/90 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors mb-2">
             Ya es mío, conectarlo →
           </button>
           <button type="button" id="btn-search-another" class="w-full bg-bg-inset hover:bg-line text-fg text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors mb-2">
@@ -1220,7 +1220,7 @@ function renderAliases(aliases) {
           <span class="font-mono text-sm break-all ${a.enabled ? 'text-fg' : 'text-fg-subtle line-through'}">${a.alias === '*' ? '*' : esc(a.alias)}@${esc(selectedDomain.domain)}</span>
           ${a.destinations.length ? `<span class="text-fg-subtle">→</span>` : ''}
           ${a.destinations.map(d => `<span class="text-sm text-fg bg-bg-inset border border-line rounded-md px-2 py-0.5 break-all">${esc(d)}</span>`).join("")}
-          ${a.mailboxEnabled ? `<span class="text-xs text-mask-300 bg-mask-500/10 border border-mask-500/30 rounded-md px-2 py-0.5" title="El correo se guarda aquí y se lee con IMAP">Buzón${a.mailboxGraceUntil ? ' · sólo lectura' : ''}</span>` : ''}
+          ${a.mailboxEnabled ? `<span class="text-xs text-accent-text bg-accent/10 border border-accent/30 rounded-md px-2 py-0.5" title="El correo se guarda aquí y se lee con IMAP">Buzón${a.mailboxGraceUntil ? ' · sólo lectura' : ''}</span>` : ''}
         </div>
         ${a.forwardCount ? `<div class="text-xs text-fg-subtle mt-1">${a.forwardCount} reenviado${a.forwardCount === 1 ? '' : 's'}${a.lastFrom ? ` · último de ${esc(a.lastFrom)}` : ''}${a.lastAt ? ` · ${relativeTime(a.lastAt)}` : ''}</div>` : ''}
       </div>
@@ -1228,7 +1228,7 @@ function renderAliases(aliases) {
         <button data-action="copy-alias" data-value="${a.alias === '*' ? '' : esc(a.alias) + '@' + esc(selectedDomain.domain)}" class="text-xs text-fg-subtle hover:text-fg transition-colors${a.alias === '*' ? ' hidden' : ''}" title="Copiar la dirección para compartirla">Copiar</button>
         <button data-action="edit-alias" data-alias="${esc(a.alias)}" data-destinations="${esc(a.destinations.join(', '))}" class="text-xs text-fg-subtle hover:text-fg transition-colors">Editar</button>
         <button data-action="mailbox-alias" data-alias="${esc(a.alias)}" data-has="${a.mailboxEnabled ? '1' : ''}" class="text-xs text-fg-subtle hover:text-fg transition-colors${a.alias === '*' ? ' hidden' : ''}" title="Buzón IMAP para leer en Apple Mail u Outlook">${a.mailboxEnabled ? 'Buzón' : 'Crear buzón'}</button>
-        <button data-action="toggle-alias" data-alias="${esc(a.alias)}" data-enabled="${!a.enabled}" class="text-xs px-2 py-1 rounded ${a.enabled ? 'bg-mask-500/15 text-mask-500' : 'bg-line text-fg-muted'}">${a.enabled ? 'Activo' : 'Inactivo'}</button>
+        <button data-action="toggle-alias" data-alias="${esc(a.alias)}" data-enabled="${!a.enabled}" class="text-xs px-2 py-1 rounded ${a.enabled ? 'bg-accent/10 text-accent-text' : 'bg-line text-fg-muted'}">${a.enabled ? 'Activo' : 'Inactivo'}</button>
         <button data-action="remove-alias" data-alias="${esc(a.alias)}" class="text-xs text-fg-subtle hover:text-red-500 transition-colors">Eliminar</button>
       </div>
     </div>
@@ -1403,7 +1403,7 @@ function renderMembers(members, limit) {
         <div>
           <span class="text-sm text-fg">${esc(m.name)}</span>
           <span class="text-sm text-fg-subtle ml-2">${esc(m.email)}</span>
-          <span class="text-xs ml-2 px-2 py-0.5 rounded ${m.role === 'admin' ? 'bg-mask-600/15 text-mask-500' : 'bg-line text-fg-muted'}">${roleLabels[m.role] ?? m.role}</span>
+          <span class="text-xs ml-2 px-2 py-0.5 rounded ${m.role === 'admin' ? 'bg-accent/15 text-accent-text' : 'bg-line text-fg-muted'}">${roleLabels[m.role] ?? m.role}</span>
         </div>
         <button data-action="remove-member" data-agent-id="${esc(m.id)}" data-agent-name="${esc(m.name)}" class="text-xs text-fg-subtle hover:text-red-500 transition-colors">Eliminar</button>
       </div>
@@ -1529,12 +1529,12 @@ function renderLogs(logs) {
 
   empty.classList.add("hidden");
   const statusColors = {
-    forwarded: "text-mask-500",
+    forwarded: "text-accent-text",
     discarded: "text-fg-subtle",
     failed: "text-red-500",
     rule_matched: "text-amber-600",
     sent: "text-fg-muted",
-    delivered: "text-mask-500",
+    delivered: "text-accent-text",
     bounced: "text-red-500",
     complained: "text-red-500",
   };
@@ -1591,7 +1591,7 @@ async function loadDomainHealth() {
     selectedDomain._health = health;
 
     const badgeStyles = {
-      ok: "bg-mask-500/15 text-mask-500",
+      ok: "bg-accent/10 text-accent-text",
       warning: "bg-amber-500/15 text-amber-600",
       error: "bg-red-900/50 text-red-500",
     };
@@ -1602,7 +1602,7 @@ async function loadDomainHealth() {
     renderHealthPanel();
   } catch {
     statusEl.textContent = selectedDomain.verified ? "Verificado" : "Pendiente DNS";
-    statusEl.className = `text-xs px-2 py-1 rounded-full ${selectedDomain.verified ? 'bg-mask-500/15 text-mask-500' : 'bg-amber-500/15 text-amber-600'}`;
+    statusEl.className = `text-xs px-2 py-1 rounded-full ${selectedDomain.verified ? 'bg-accent/10 text-accent-text' : 'bg-amber-500/15 text-amber-600'}`;
   }
 }
 
@@ -1619,12 +1619,12 @@ function renderHealthPanel() {
     else return;
   }
 
-  const iconOk = `<svg class="w-4 h-4 text-mask-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+  const iconOk = `<svg class="w-4 h-4 text-accent-text shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
   const iconWarn = `<svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
   const iconErr = `<svg class="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
 
-  const summaryBg = { ok: "border-mask-500/30 bg-green-900/20", warning: "border-amber-500/30 bg-amber-500/15", error: "border-red-500/30 bg-red-500/10" };
-  const summaryText = { ok: "text-mask-500", warning: "text-amber-600", error: "text-red-500" };
+  const summaryBg = { ok: "border-accent/30 bg-green-900/20", warning: "border-amber-500/30 bg-amber-500/15", error: "border-red-500/30 bg-red-500/10" };
+  const summaryText = { ok: "text-accent-text", warning: "text-amber-600", error: "text-red-500" };
 
   const checkOrder = ["verified", "mx", "spf", "dkim", "aliases", "plan"];
   const checkLabels = { verified: "Verificación", mx: "MX (recepción)", spf: "SPF", dkim: "DKIM", aliases: "Aliases", plan: "Plan" };
@@ -1659,9 +1659,9 @@ function renderDnsRecords() {
 
   if (selectedDomain.registeredViaMailmask) {
     records.innerHTML = `
-      <div class="flex items-center gap-2 bg-green-900/20 border border-mask-500/30 rounded-lg px-4 py-3">
-        <svg class="w-5 h-5 text-mask-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-        <span class="text-sm text-mask-500 font-medium">DNS configurado automáticamente por MailMask</span>
+      <div class="flex items-center gap-2 bg-green-900/20 border border-accent/30 rounded-lg px-4 py-3">
+        <svg class="w-5 h-5 text-accent-text" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <span class="text-sm text-accent-text font-medium">DNS configurado automáticamente por MailMask</span>
       </div>`;
     return;
   }
@@ -1726,7 +1726,7 @@ function renderDnsRecords() {
   const levelPill = (r) => r.level === "opcional"
     ? `<span class="text-[10px] uppercase tracking-widest font-semibold px-1.5 py-px rounded-full text-fg-muted border border-line">opcional</span>`
     : r.level === "recomendado"
-      ? `<span class="text-[10px] uppercase tracking-widest font-semibold px-1.5 py-px rounded-full text-mask-500 border border-mask-500/30">recomendado</span>`
+      ? `<span class="text-[10px] uppercase tracking-widest font-semibold px-1.5 py-px rounded-full text-accent-text border border-accent/30">recomendado</span>`
       : "";
 
   // Una fila por registro: tipo · nombre · valor · copiar. En móvil nombre y valor se
@@ -1781,12 +1781,12 @@ async function verifyDns() {
 
   if (data.verified) {
     resultEl.textContent = "✓ Dominio verificado";
-    resultEl.className = "ml-3 text-sm text-mask-500";
+    resultEl.className = "ml-3 text-sm text-accent-text";
     playSound("success");
     selectedDomain.verified = true;
     const statusEl = document.getElementById("detail-status");
     statusEl.textContent = "Verificado";
-    statusEl.className = "text-xs px-2 py-1 rounded-full bg-mask-500/15 text-mask-500";
+    statusEl.className = "text-xs px-2 py-1 rounded-full bg-accent/10 text-accent-text";
     loadDomainHealth();
   } else {
     resultEl.textContent = "✗ DNS no configurado aún. Verifica los registros e intenta de nuevo.";
@@ -1801,7 +1801,7 @@ const _smtpCopied = new Set();
 function copySmtp(btn, text, key) {
   navigator.clipboard.writeText(text).then(() => {
     const orig = btn.innerHTML;
-    btn.innerHTML = `<svg class="w-4 h-4 text-mask-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+    btn.innerHTML = `<svg class="w-4 h-4 text-accent-text" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
     btn.classList.add("border-green-700");
     setTimeout(() => { btn.innerHTML = orig; btn.classList.remove("border-green-700"); }, 1500);
     if (key) {
@@ -1886,7 +1886,7 @@ function renderSmtpCredentials(creds) {
       </div>
       <div class="flex items-center gap-2 mt-2 text-xs text-fg-subtle">
         <span>${relativeTime(c.createdAt)}</span>
-        <span class="inline-flex items-center gap-1 bg-mask-500/15 text-mask-500 border border-green-800/40 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+        <span class="inline-flex items-center gap-1 bg-accent/10 text-accent-text border border-green-800/40 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
           <span class="w-1.5 h-1.5 bg-green-400 rounded-full"></span>Activa
         </span>
       </div>
@@ -2149,7 +2149,7 @@ async function loadWebhooks() {
   }));
 
   const badge = (d) => d.status === "delivered"
-    ? `<span class="text-mask-500">${d.lastStatusCode ?? "ok"}</span>`
+    ? `<span class="text-accent-text">${d.lastStatusCode ?? "ok"}</span>`
     : d.status === "failed"
       ? `<span class="text-red-500">falló</span>`
       : `<span class="text-amber-600">reintento ${d.attempts}</span>`;
@@ -2159,7 +2159,7 @@ async function loadWebhooks() {
       <div class="flex items-center justify-between gap-3 mb-2">
         <code class="text-sm font-mono text-fg truncate">${esc(h.url)}</code>
         <div class="flex items-center gap-3 shrink-0">
-          <span class="inline-flex items-center gap-1 ${h.enabled ? "bg-mask-500/15 text-mask-500 border-green-800/40" : "bg-bg-inset text-fg-subtle border-line"} border rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+          <span class="inline-flex items-center gap-1 ${h.enabled ? "bg-accent/10 text-accent-text border-green-800/40" : "bg-bg-inset text-fg-subtle border-line"} border rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
             <span class="w-1.5 h-1.5 ${h.enabled ? "bg-green-400" : "bg-fg-subtle"} rounded-full"></span>${h.enabled ? "Activo" : "Pausado"}
           </span>
           <button data-wh-test="${esc(h.id)}" class="text-xs text-fg-muted hover:text-fg transition-colors">Probar</button>
@@ -2268,10 +2268,10 @@ function renderTldGrid(base) {
   const name = base || "tudominio";
   container.innerHTML = AVAILABLE_TLDS.map(t => {
     const p = (t.price / 100).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-    return `<button type="button" class="tld-suggestion group text-left bg-bg-inset hover:bg-bg-inset border border-line hover:border-mask-500/40 rounded-xl px-5 py-4 transition-all" data-domain="${esc(name + t.tld)}">
-      <span class="block text-base font-bold text-mask-500 group-hover:text-mask-600">${t.tld}</span>
+    return `<button type="button" class="tld-suggestion group text-left bg-bg-inset hover:bg-bg-inset border border-line hover:border-accent/30 rounded-xl px-5 py-4 transition-all" data-domain="${esc(name + t.tld)}">
+      <span class="block text-base font-bold text-accent-text group-hover:text-accent">${t.tld}</span>
       <span class="block text-xs text-fg-subtle mt-1.5">$${p} MXN/año</span>
-      ${t.popular ? '<span class="inline-block text-[9px] bg-mask-600/25 text-mask-500 px-1.5 py-0.5 rounded mt-1.5 leading-none">Popular</span>' : ''}
+      ${t.popular ? '<span class="inline-block text-[9px] bg-accent/25 text-accent-text px-1.5 py-0.5 rounded mt-1.5 leading-none">Popular</span>' : ''}
     </button>`;
   }).join("");
   gridEl.classList.remove("hidden");
@@ -2663,8 +2663,8 @@ function setupEventListeners() {
       playSound("copy");
       const antes = copiar.textContent;
       copiar.textContent = "¡Copiado!";
-      copiar.classList.add("text-mask-500");
-      setTimeout(() => { copiar.textContent = antes; copiar.classList.remove("text-mask-500"); }, 1500);
+      copiar.classList.add("text-accent-text");
+      setTimeout(() => { copiar.textContent = antes; copiar.classList.remove("text-accent-text"); }, 1500);
       return;
     }
     const buzon = e.target.closest("[data-action='mailbox-alias']");
@@ -2747,7 +2747,7 @@ function setupEventListeners() {
     const copy = e.target.closest("[data-action='copy']");
     if (!copy) return;
     navigator.clipboard.writeText(copy.dataset.copyValue);
-    const checkIcon = `<svg class="w-3.5 h-3.5 text-mask-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
+    const checkIcon = `<svg class="w-3.5 h-3.5 text-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
     const original = copy.innerHTML;
     copy.innerHTML = checkIcon;
     setTimeout(() => { copy.innerHTML = original; }, 1500);
