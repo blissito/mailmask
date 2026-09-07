@@ -19,7 +19,12 @@ function esc(s) {
         }
       }
     }
-    return _fetch.call(this, url, opts);
+    const p = _fetch.call(this, url, opts);
+    // Sesión caducada: al login, no un error a media pantalla.
+    if (String(url).startsWith("/api/") && !String(url).startsWith("/api/auth/")) {
+      p.then((res) => { if (res.status === 401) window.location.href = "/login"; }).catch(() => {});
+    }
+    return p;
   };
 }
 

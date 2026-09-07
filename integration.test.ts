@@ -1604,7 +1604,7 @@ describe("Referidos: nombre público", () => {
     assert.equal(r.status, 400);
     await r.body?.cancel();
     const r2 = await jsonPut("/api/referrals/name", { name: "Brenda" });
-    assert.equal(r2.status, 403); // sin cookie el CSRF corta antes que la auth
+    assert.equal(r2.status, 401); // sin cookie de sesión: "vuelve a entrar", no un 403 de CSRF
     await r2.body?.cancel();
   });
 
