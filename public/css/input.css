@@ -161,6 +161,29 @@
    Componentes con @apply porque los pinta app.js en plantillas de texto y se repiten
    (filas de dominio, medidores). Tokens de Tailwind, nada de valores sueltos. */
 @layer components {
+  /* El acento de la app es el VERDE, no el rojo de máscara.
+   *
+   * `--accent` global es el rojo de la lucha libre y vive en el sitio público (landing,
+   * pricing, login). Dentro de `/app` significa otra cosa: es el "esto va bien" —dominio
+   * verificado, plan activo, guardado— y en rojo se lee como una alerta. Se redefine aquí,
+   * en el token, y no clase por clase: son 81 usos entre app.js y app.html.
+   *
+   * El rojo de verdad sigue disponible en la app como `red-500/600` para lo destructivo. */
+  body.app-shell {
+    --accent: 5 150 105;       /* mask-600 */
+    --accent-text: 4 120 87;   /* mask-700: 5.3:1 sobre el fondo claro */
+  }
+  :root[data-theme="dark"] body.app-shell {
+    --accent: 16 185 129;      /* mask-500 */
+    --accent-text: 52 211 153; /* mask-400 */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) body.app-shell {
+      --accent: 16 185 129;
+      --accent-text: 52 211 153;
+    }
+  }
+
   .app-shell { overflow-x: clip; font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
   /* iOS Safari ignora overflow-x en body si html no lo tiene; clip no crea contenedor de scroll */
   html:has(> body.app-shell) { overflow-x: clip; }

@@ -843,7 +843,7 @@ function playSound(type) {
 function showToast(message, isError = false) {
   if (isError) playSound("error");
   const toast = document.createElement("div");
-  toast.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg text-sm font-medium transition-opacity ${isError ? 'bg-red-900/90 text-red-200' : 'bg-green-900/90 text-green-200'}`;
+  toast.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg text-sm font-medium transition-opacity ${isError ? 'bg-red-900/90 text-red-100' : 'bg-mask-800 text-mask-50'}`;
   toast.textContent = message;
   document.body.appendChild(toast);
   setTimeout(() => { toast.style.opacity = "0"; setTimeout(() => toast.remove(), 300); }, 3000);
@@ -928,7 +928,7 @@ async function selectDomain(id) {
   document.getElementById("detail-domain-name").textContent = selectedDomain.domain;
   const statusEl = document.getElementById("detail-status");
   statusEl.textContent = selectedDomain.verified ? "Verificado" : "Pendiente DNS";
-  statusEl.className = `text-xs px-2 py-1 rounded-full ${selectedDomain.verified ? 'bg-accent/10 text-accent-text' : 'bg-amber-500/15 text-amber-600'}`;
+  statusEl.className = `text-xs px-2 py-1 rounded-full ${selectedDomain.verified ? 'bg-mask-500/15 text-accent-text' : 'bg-amber-500/15 text-amber-600'}`;
   renderActivacion();
 
   document.getElementById("alias-domain-suffix").textContent = `@${selectedDomain.domain}`;
@@ -1081,7 +1081,7 @@ async function searchDomainAvailability() {
     if (data.available) {
       const priceStr = (data.price / 100).toLocaleString("es-MX", { style: "currency", currency: "MXN", currencyDisplay: "narrowSymbol" });
       resultEl.innerHTML = `
-        <div class="bg-green-900/20 border border-accent/30 rounded-lg p-4">
+        <div class="bg-mask-500/10 border border-accent/30 rounded-lg p-4">
           <div class="flex items-center justify-between mb-3">
             <div>
               <span class="font-semibold text-accent-text">${esc(data.domain)}</span>
@@ -1720,9 +1720,9 @@ async function loadDomainHealth() {
     selectedDomain._health = health;
 
     const badgeStyles = {
-      ok: "bg-accent/10 text-accent-text",
+      ok: "bg-mask-500/15 text-accent-text",
       warning: "bg-amber-500/15 text-amber-600",
-      error: "bg-red-900/50 text-red-500",
+      error: "bg-red-500/10 text-red-600",
     };
     const badgeLabels = { ok: "Saludable", warning: "Atención", error: "Error" };
     statusEl.textContent = badgeLabels[health.status] || health.status;
@@ -1731,7 +1731,7 @@ async function loadDomainHealth() {
     renderHealthPanel();
   } catch {
     statusEl.textContent = selectedDomain.verified ? "Verificado" : "Pendiente DNS";
-    statusEl.className = `text-xs px-2 py-1 rounded-full ${selectedDomain.verified ? 'bg-accent/10 text-accent-text' : 'bg-amber-500/15 text-amber-600'}`;
+    statusEl.className = `text-xs px-2 py-1 rounded-full ${selectedDomain.verified ? 'bg-mask-500/15 text-accent-text' : 'bg-amber-500/15 text-amber-600'}`;
   }
 }
 
@@ -1752,7 +1752,7 @@ function renderHealthPanel() {
   const iconWarn = `<svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
   const iconErr = `<svg class="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
 
-  const summaryBg = { ok: "border-accent/30 bg-green-900/20", warning: "border-amber-500/30 bg-amber-500/15", error: "border-red-500/30 bg-red-500/10" };
+  const summaryBg = { ok: "border-accent/30 bg-mask-500/10", warning: "border-amber-500/30 bg-amber-500/15", error: "border-red-500/30 bg-red-500/10" };
   const summaryText = { ok: "text-accent-text", warning: "text-amber-600", error: "text-red-500" };
 
   const checkOrder = ["verified", "mx", "spf", "dkim", "aliases", "plan"];
