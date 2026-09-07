@@ -7,6 +7,10 @@
  * la otorgó ni por qué.
  *
  *   npx tsx scripts/grant-addon.ts --email x@y.com --kind domain --months 12
+ *   npx tsx scripts/grant-addon.ts --email x@y.com --kind domain --domain <domainId> --until 2027-12-31 --apply
+ *
+ * `--domain` es el id de la fila de `domains`: desde sep-2026 los add-ons son por
+ * dominio y sin él la cortesía queda como "legado del usuario" (aplica a todos).
  *   npx tsx scripts/grant-addon.ts --email x@y.com --kind domain --until 2027-12-31 \
  *       --note "Compensación por la falla de cobro del 29 de julio" --by hugo --apply
  *
@@ -110,6 +114,7 @@ if (!APPLY) {
 const { addon, order } = createCourtesyAddon({
   userEmail: email,
   kind,
+  domainId: flag("domain") || undefined,
   currentPeriodEnd: periodEnd.toISOString(),
   label: etiqueta,
   listPriceCents: valor ?? undefined,
