@@ -266,6 +266,13 @@ del dominio) y la ruta de salida `is_local_address(rcpt) ? 'local' : 'ses'` (dec
 nuevo ya con `allowRelaying`, y `crearBuzon` lo llama — antes fallaba en cualquier dominio
 distinto de `mailmask.studio`, que se creó a mano. El alta de máscara (`POST /alias`) acepta
 `mailbox: true` sin destinos en dominio activado y crea el buzón en la misma petición.
+Dos trampas más del alta de dominio: (1) hay que crearlo con `dkimManagement: Manual`, o
+Stalwart genera firmas DKIM y firma el correo, SES vuelve a firmar y contesta
+`554 Duplicate header 'DKIM-Signature'`; (2) la ruta `ses` de Stalwart usa el usuario IAM
+**`mailmask-stalwart-relay`** (llaves en `.env`, `STALWART_RELAY_*`), con `SendRawEmail`
+sobre cualquier identidad — la credencial anterior sólo autorizaba `From` de
+`mailmask.studio`. Es seguro porque `mustMatchSender: true` en Stalwart obliga a que el
+remitente sea el usuario autenticado.
 
 ### 🔴 Stalwart se baneó a sí mismo (7-sep-2026)
 

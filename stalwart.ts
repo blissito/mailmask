@@ -94,7 +94,10 @@ export async function asegurarDominio(domain: string): Promise<string | null> {
   if (existente) return existente;
   const clave = domain.toLowerCase();
   const r = await jmap([CORE, STALWART], [[
-    "x:Domain/set", { create: { d1: { name: clave, allowRelaying: true } } }, "c0",
+    // `dkimManagement: Manual`: sin esto Stalwart genera firmas DKIM propias y firma el
+    // correo, SES lo vuelve a firmar y rechaza con `554 Duplicate header 'DKIM-Signature'`.
+    // El DKIM del dominio ya lo pone SES.
+    "x:Domain/set", { create: { d1: { name: clave, allowRelaying: true, dkimManagement: { "@type": "Manual" } } } }, "c0",
   ]]);
   const id = respuesta(r)?.created?.d1?.id;
   if (!id) {

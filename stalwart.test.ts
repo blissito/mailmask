@@ -110,6 +110,8 @@ describe("Alta de buzón", () => {
     const alta = vistas.find((v) => v.metodo === "x:Domain/set")!;
     assert.equal(alta.args.create.d1.name, "nuevo.com");
     assert.equal(alta.args.create.d1.allowRelaying, true);
+    // Si Stalwart firmara, SES rechaza el correo por DKIM duplicado.
+    assert.deepEqual(alta.args.create.d1.dkimManagement, { "@type": "Manual" });
     const cuenta = vistas.find((v) => v.metodo === "x:Account/set")!;
     assert.equal(cuenta.args.create.t1.domainId, "dnuevo");
   });
