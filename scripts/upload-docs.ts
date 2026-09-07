@@ -129,6 +129,37 @@ La verificación puede tomar unos minutos mientras se propagan los registros DNS
 MailMask usa AWS SES para envío y recepción de email.`,
   },
   {
+    title: "Registrar, renovar y transferir dominios con MailMask",
+    content: `MailMask puede registrar tu dominio, o traer el que ya tienes, y llevarte el DNS. Todo desde el panel; no hace falta cuenta de AWS.
+
+REGISTRAR UNO NUEVO
+Se busca desde el panel y se paga una vez por año. El precio depende de la extensión: .com ~$329 MXN, .com.mx ~$589, .mx ~$1,359, .io ~$1,439. Al completarse, MailMask configura solo el DNS (MX, verificación, DKIM, SPF) y el dominio queda listo para recibir correo.
+
+RENOVACIÓN
+Se activa desde el panel y se cobra una vez al año, unos 60 días antes del vencimiento, para que el dominio nunca quede en riesgo. Se puede cancelar cuando se quiera.
+
+SI UN COBRO FALLA, EL DOMINIO NO SE PIERDE. MailMask lo mantiene activo e intenta cobrar de nuevo durante los días siguientes, avisando por correo. Nunca se deja expirar un dominio por falta de pago sin haber contactado al cliente. Esta es la duda más común y la respuesta es tranquilizadora: el dominio no está en riesgo inmediato.
+
+TRAER UN DOMINIO (TRANSFERENCIA ENTRANTE)
+Tarda de 5 a 7 días. Requisitos: que el dominio tenga más de 60 días, que el candado de transferencia esté desactivado, que la privacidad WHOIS esté apagada temporalmente (si no, no llega el correo de aprobación), y el código de autorización EPP que da el registrador actual. El cliente debe aprobar un correo que le manda su registrador; si no lo contesta, la transferencia se cancela sola.
+
+Antes de mover nada, MailMask copia los registros DNS actuales y se los muestra al cliente para que los revise y apruebe. Es importante decirle que revise esa lista: lo que no esté ahí dejará de funcionar cuando el dominio se mueva. Nada se mueve hasta que apruebe.
+
+Se aceptan todas las extensiones que AWS puede transferir (más de 400), no sólo las que se venden para registro nuevo. Por ejemplo .design, .app, .dev, .studio, .shop y .cloud sí se pueden transferir. La transferencia incluye un año más de registro.
+
+Si la transferencia falla por causas ajenas a MailMask (no se aprobó a tiempo, el candado seguía puesto, el código ya no era válido), se devuelve lo pagado.
+
+LLEVARSE EL DOMINIO (TRANSFERENCIA SALIENTE)
+Se pide desde el panel, sin costo y sin necesidad de estar al corriente de la suscripción. El código de autorización llega por correo, no se muestra en pantalla, porque ese código entrega el dominio a quien lo tenga. MailMask no retiene dominios.
+
+EDITOR DE DNS
+Si MailMask lleva el DNS, se pueden editar los registros desde el panel, el SDK o hablando con un agente por MCP. También funciona para un dominio registrado en otro lado: se crea la zona, se copian los registros actuales y el cliente cambia los nameservers en su registrador. Hay plantillas para apuntar el dominio a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render o Fly sin saber qué registros hacen falta.
+
+Los registros que MailMask necesita para el correo (MX, TXT de verificación, SPF y los CNAME de DKIM) están protegidos y no se pueden borrar: quitarlos deja al cliente sin correo.
+
+NO CONTROLAMOS: los precios, reglas y plazos los fijan el registro de cada extensión y el ICANN. Un dominio recién registrado o transferido no se puede volver a transferir durante 60 días.`,
+  },
+  {
     title: "Configuración SMTP Relay",
     content: `SMTP relay permite enviar emails desde código o aplicaciones SaaS usando credenciales SMTP estándar.
 

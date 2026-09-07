@@ -130,7 +130,7 @@
         </svg>
         <span class="font-bold text-lg">MailMask</span>
       </a>
-      <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-accent/10 text-accent-text border border-accent/20">SDK v0.1.0</span>
+      <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-accent/10 text-accent-text border border-accent/20">SDK v0.4.0</span>
     </div>
     <div class="flex items-center gap-4">
       <a href="/openapi" class="text-sm text-fg-subtle hover:text-fg transition-colors">HTTP API Reference</a>
@@ -150,6 +150,7 @@
         <a href="#dominios">Dominios</a>
         <a href="#aliases">Aliases</a>
         <a href="#buzones" class="pl-4">Buzones IMAP</a>
+        <a href="#dns">DNS</a>
         <a href="#reglas">Reglas</a>
         <a href="#envio">Env&iacute;o de emails</a>
         <a href="#logs">Logs</a>
@@ -248,6 +249,44 @@ ventas.errorBuzon; <span class="cm">// texto si el alias se cre&oacute; pero el 
 
 <span class="cm">// Borrar el buz&oacute;n Y SU CORREO (el alias conserva sus destinos)</span>
 <span class="kw">await</span> mm.aliases.<span class="fn">deleteMailbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);</code></pre>
+
+      <!-- DNS -->
+      <h2 id="dns" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">DNS</h2>
+      <p class="text-fg-muted mb-4">Si MailMask lleva el DNS de tu dominio, puedes editar sus registros desde el SDK. Para un dominio que registraste fuera, primero se crea la zona: copiamos lo que encontremos de tu proveedor actual y te damos los nameservers que hay que cambiar en tu registrador. <strong class="text-fg">Hasta que los cambies, nada de lo que edites tiene efecto.</strong></p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Estado de la zona y registros actuales</span>
+<span class="kw">const</span> { zone, records } = <span class="kw">await</span> mm.dns.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
+console.<span class="fn">log</span>(zone.status); <span class="cm">// "none" | "pending_delegation" | "active"</span>
+
+<span class="cm">// Crear la zona (importa tu DNS actual y devuelve los nameservers)</span>
+<span class="kw">const</span> z = <span class="kw">await</span> mm.dns.<span class="fn">createZone</span>(<span class="str">"domain-id"</span>);
+console.<span class="fn">log</span>(z.nameservers, z.imported);
+
+<span class="cm">// &iquest;Ya apunta a nosotros?</span>
+<span class="kw">const</span> d = <span class="kw">await</span> mm.dns.<span class="fn">delegation</span>(<span class="str">"domain-id"</span>);
+console.<span class="fn">log</span>(d.delegated, d.observed);</code></pre>
+
+      <p class="text-fg-muted mb-4"><code class="text-fg">upsert</code> <strong class="text-fg">reemplaza</strong> el conjunto de valores de ese nombre y tipo. Para a&ntilde;adir un valor, lee primero con <code class="text-fg">list</code> e incluye tambi&eacute;n los que ya estaban.</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Crear o reemplazar un registro</span>
+<span class="kw">await</span> mm.dns.<span class="fn">upsert</span>(<span class="str">"domain-id"</span>, {
+  name: <span class="str">"www"</span>,        <span class="cm">// "@" para la ra&iacute;z</span>
+  type: <span class="str">"CNAME"</span>,
+  values: [<span class="str">"cname.vercel-dns.com"</span>],
+  ttl: <span class="num">300</span>,
+});
+
+<span class="cm">// En MX la prioridad va dentro del valor</span>
+<span class="kw">await</span> mm.dns.<span class="fn">upsert</span>(<span class="str">"domain-id"</span>, { name: <span class="str">"sub"</span>, type: <span class="str">"MX"</span>, values: [<span class="str">"10 mail.ejemplo.com"</span>] });
+
+<span class="cm">// Borrar un registro completo</span>
+<span class="kw">await</span> mm.dns.<span class="fn">delete</span>(<span class="str">"domain-id"</span>, <span class="str">"www"</span>, <span class="str">"CNAME"</span>);
+
+<span class="cm">// Apuntar el dominio a un hosting sin saber qu&eacute; registros hacen falta</span>
+<span class="kw">await</span> mm.dns.<span class="fn">preset</span>(<span class="str">"domain-id"</span>, <span class="str">"vercel"</span>, <span class="str">"mi-proyecto.vercel.app"</span>);
+<span class="cm">// vercel | netlify | github-pages | cloudflare-pages | render | fly | redirect-a-www | dmarc</span></code></pre>
+
+      <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-6">
+        <p class="text-sm text-fg"><strong>Los registros de tu correo est&aacute;n protegidos.</strong> El MX, el TXT de verificaci&oacute;n y los CNAME de DKIM vienen marcados con <code>managed: true</code> y no se pueden borrar: si los quitas dejas de recibir correo. El TXT de la ra&iacute;z s&iacute; se puede editar mientras conserve el SPF de MailMask; si lo omites, la respuesta trae <code>suggestedValues</code> con los valores ya fusionados.</p>
+      </div>
 
       <!-- Reglas -->
       <h2 id="reglas" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Reglas</h2>

@@ -1,6 +1,6 @@
 {
   "name": "@easybits.cloud/mailmask",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "Official SDK for the MailMask email alias/forwarding API",
   "type": "module",
   "main": "./dist/index.cjs",

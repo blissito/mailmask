@@ -43,7 +43,7 @@
     <div class="max-w-3xl mx-auto px-4 py-16">
       <a href="/" class="text-mask-500 hover:text-mask-400 text-sm mb-8 inline-block">← Volver al inicio</a>
       <h1 class="text-3xl font-extrabold mb-8">Política de Privacidad</h1>
-      <p class="text-zinc-400 text-sm mb-8">Última actualización: 19 de febrero de 2026</p>
+      <p class="text-zinc-400 text-sm mb-8">Última actualización: 7 de septiembre de 2026</p>
 
       <div class="space-y-8 text-zinc-300 text-sm leading-relaxed">
         <section>
@@ -51,7 +51,8 @@
           <ul class="list-disc list-inside space-y-2">
             <li><strong>Datos de cuenta:</strong> email y contraseña (almacenada como hash).</li>
             <li><strong>Datos de configuración:</strong> dominios, alias, reglas de reenvío.</li>
-            <li><strong>Logs de email:</strong> metadatos de emails procesados (remitente, destinatario, fecha, estado). No almacenamos el contenido de los emails.</li>
+            <li><strong>Logs de email:</strong> metadatos de los correos procesados (remitente, destinatario, fecha, estado).</li>
+            <li><strong>Contenido de los correos:</strong> sí lo almacenamos. La Bandeja compartida guarda tus conversaciones para que puedas leerlas, buscarlas y responderlas, y los buzones IMAP guardan tu correo igual que cualquier proveedor. Si sólo usas reenvío y no abres la Bandeja, el mensaje se guarda de todos modos: es la misma tubería.</li>
             <li><strong>Datos de pago:</strong> procesados directamente por MercadoPago. No almacenamos datos de tarjeta.</li>
           </ul>
         </section>
@@ -69,15 +70,26 @@
 
         <section>
           <h2 class="text-lg font-semibold text-zinc-100 mb-3">3. Procesamiento de emails</h2>
-          <p>Los emails entrantes se almacenan temporalmente en AWS S3 para su procesamiento (máximo 24 horas) y luego se eliminan. El contenido del email solo se usa para reenviarlo al destino configurado. No leemos, analizamos ni vendemos el contenido de tus emails.</p>
+          <p>Los correos entrantes llegan a Amazon SES y su contenido se guarda en Amazon S3. De ahí salen el reenvío, las reglas y la Bandeja. El texto se indexa además en nuestra base de datos para que la búsqueda funcione. El correo de los buzones IMAP se guarda en Tigris.</p>
+          <p><strong>No leemos, analizamos ni vendemos el contenido de tus correos</strong>, y no lo usamos para entrenar modelos de inteligencia artificial. El acceso técnico existe porque operamos el servicio, y se usa sólo para atender un problema que nos reportes.</p>
+          <p>Cuánto tiempo lo conservamos:</p>
+          <ul class="list-disc list-inside space-y-2">
+            <li><strong>Dominio activado:</strong> conservamos el historial completo mientras el dominio siga activo. Es el punto del producto: que no pierdas la conversación.</li>
+            <li><strong>Dominio gratis:</strong> ves los últimos 7 días. Lo anterior se conserva 30 días —y vuelve a aparecer si activas el dominio— y después se borra de forma definitiva, incluidos los archivos en S3 y el índice de búsqueda.</li>
+            <li><strong>Papelera:</strong> lo que borras se elimina de forma definitiva a los 15 días.</li>
+            <li><strong>Buzones IMAP:</strong> el correo se conserva hasta que tú lo borres o elimines el buzón.</li>
+            <li><strong>Al cancelar un dominio activado:</strong> tienes 30 días de sólo lectura para descargar tu correo en formato <code>.mbox</code>.</li>
+          </ul>
+          <p>Puedes borrar una conversación, un buzón o el dominio completo en cualquier momento desde tu panel, y eso borra también lo que hay en S3 y en el índice.</p>
         </section>
 
         <section>
           <h2 class="text-lg font-semibold text-zinc-100 mb-3">4. Servicios de terceros</h2>
           <ul class="list-disc list-inside space-y-2">
-            <li><strong>Amazon Web Services (SES/S3):</strong> procesamiento y almacenamiento temporal de emails.</li>
+            <li><strong>Amazon Web Services (SES/S3):</strong> recepción, envío y almacenamiento del contenido de los correos.</li>
+            <li><strong>Tigris:</strong> almacenamiento del correo de los buzones IMAP.</li>
             <li><strong>MercadoPago:</strong> procesamiento de pagos.</li>
-            <li><strong>Deno Deploy:</strong> hosting de la aplicación.</li>
+            <li><strong>Fly.io:</strong> hosting de la aplicación.</li>
           </ul>
         </section>
 
