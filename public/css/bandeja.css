@@ -1454,21 +1454,24 @@ body.mm-composer-locked { overflow: hidden; }
 
 /* --- HTML entrante en iframe aislado --- */
 /* Alto fijo: sin scripts dentro no hay forma de medir el contenido. */
+.mesa-msg-html-wrap {
+  /* Colapsado mientras se mide: el iframe de dentro se maqueta completo pero
+     no ocupa sitio ni se ve, así nada brinca al darle su alto real. */
+  height: 0;
+  overflow: hidden;
+  border-radius: 6px;
+}
+.mesa-msg-html-wrap.is-medido {
+  border: 1px solid var(--mesa-border);
+  background: var(--mesa-paper);
+}
 .mesa-msg-html {
   display: block;
   width: 100%;
-  /* Nace sin alto e invisible; bandeja.js lo mide y entonces se muestra,
-     para que no aparezca con scroll y luego brinque al ajustarse. */
-  height: 0;
-  opacity: 0;
-  overflow: hidden;
-  transition: opacity 120ms ease;
-  border: 1px solid var(--mesa-border);
-  border-radius: 6px;
+  height: 2000px;
+  border: 0;
   background: var(--mesa-paper);
 }
-.mesa-msg-html.is-medido { opacity: 1; }
-.mesa-msg-html:not(.is-medido) { height: 0; border-width: 0; }
 
 /* --- Pestañas y métricas --- */
 

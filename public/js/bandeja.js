@@ -742,7 +742,10 @@ function cuerpoMensaje(item) {
   // srcdoc escapado: el HTML del correo viaja como atributo, no como marcado.
   // `allow-same-origin` sin `allow-scripts`: dentro sigue sin correr JS, pero el
   // padre puede leer el documento y ajustar el alto al contenido (ver ajustarIframe).
-  return `<iframe class="mesa-msg-html" sandbox="allow-same-origin" referrerpolicy="no-referrer" srcdoc="${esc(item.html)}"></iframe>`;
+  // El iframe va dentro de un envoltorio colapsado (alto 0, overflow hidden): así
+  // el correo se maqueta a su ancho y alto reales sin ocupar sitio ni verse,
+  // y cuando ya se pudo medir el envoltorio toma el alto definitivo.
+  return `<div class="mesa-msg-html-wrap"><iframe class="mesa-msg-html" sandbox="allow-same-origin" referrerpolicy="no-referrer" srcdoc="${esc(item.html)}"></iframe></div>`;
 }
 
 function renderMessages(messages, notes) {
@@ -783,47 +786,63 @@ function renderMessages(messages, notes) {
   container.scrollTop = container.scrollHeight;
 }
 
-// El alto del iframe se ajusta al correo, y se muestra hasta tenerlo. Medir antes
-// de tiempo es lo que brincaba: al insertarlo, contentDocument es un about:blank
-// de 16 px; después llega el srcdoc y luego las imágenes, y cada paso crecía a
-// la vista. Aquí se espera al documento real Y a que sus imágenes terminen (con
-// tope de 2 s), se mide una vez, y sólo entonces se enseña.
+// El alto del iframe se ajusta al correo, y sólo se ve cuando ya lo tiene.
+// Dos cosas hacían que brincara: medir al insertarlo (su documento es todavía
+// un about:blank de 16 px) y medir con el iframe a alto 0, donde el contenido
+// no se maqueta y `scrollHeight` sale en cero. Por eso el envoltorio colapsado:
+// el iframe mide 2000 px por dentro, se sondea hasta que el alto se repite
+// (con las imágenes ya abajo) y entonces se le da su alto real de una vez.
 function ajustarIframe(iframe) {
-  let mostrado = false;
-  const aplicar = () => {
+  const wrap = iframe.parentElement;
+  let anterior = -1;
+  let intentos = 0;
+  let listo = false;
+
+  const alto = () => {
     try {
       const doc = iframe.contentDocument;
-      if (!doc || !doc.documentElement) return;
-      const h = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight ?? 0);
-      if (h > 0) iframe.style.height = Math.min(h + 16, 4000) + "px";
-    } catch {}
+      if (!doc || !doc.body) return 0;
+      return Math.max(doc.documentElement?.scrollHeight ?? 0, doc.body.scrollHeight ?? 0);
+    } catch { return 0; }
   };
-  const mostrar = () => {
-    if (mostrado) return;
-    mostrado = true;
-    aplicar();
-    iframe.classList.add("is-medido");
-    // Si una imagen sin dimensiones llega tarde, se sigue el alto sin volver a ocultar.
+
+  const fijar = (h) => {
+    if (listo) return;
+    listo = true;
+    const px = Math.min(Math.max(h, 80) + 16, 4000);
+    iframe.style.height = px + "px";
+    wrap.style.height = px + "px";
+    wrap.classList.add("is-medido");
+    // Una imagen sin dimensiones puede llegar tarde: se sigue creciendo, ya visible.
     try {
       const doc = iframe.contentDocument;
       if (doc?.documentElement && "ResizeObserver" in window) {
-        new ResizeObserver(aplicar).observe(doc.documentElement);
+        new ResizeObserver(() => {
+          const h2 = alto();
+          if (h2 > 0) {
+            const px2 = Math.min(h2 + 16, 4000);
+            iframe.style.height = px2 + "px";
+            wrap.style.height = px2 + "px";
+          }
+        }).observe(doc.documentElement);
       }
     } catch {}
   };
-  const alCargar = () => {
-    let imgs = [];
-    try { imgs = [...(iframe.contentDocument?.images ?? [])].filter((i) => !i.complete); } catch {}
-    if (imgs.length === 0) return mostrar();
-    let faltan = imgs.length;
-    const una = () => { if (--faltan === 0) mostrar(); };
-    imgs.forEach((i) => { i.addEventListener("load", una, { once: true }); i.addEventListener("error", una, { once: true }); });
-    setTimeout(mostrar, 2000);
+
+  const sondear = () => {
+    if (listo) return;
+    const h = alto();
+    const imgsListas = (() => {
+      try { return [...(iframe.contentDocument?.images ?? [])].every((i) => i.complete); } catch { return true; }
+    })();
+    // Estable: el mismo alto dos veces seguidas y las imágenes ya bajadas.
+    if (h > 0 && h === anterior && imgsListas) return fijar(h);
+    anterior = h;
+    if (++intentos > 30) return fijar(h || 400); // ~3 s: se muestra con lo que haya
+    setTimeout(sondear, 100);
   };
-  // `load` dispara cuando el srcdoc ya está parseado; el about:blank previo no cuenta.
-  iframe.addEventListener("load", alCargar);
-  // Red de seguridad: nunca dejarlo invisible.
-  setTimeout(mostrar, 4000);
+
+  sondear();
 }
 
 // Separa "a@x.com, b@y.com" en lista. El servidor vuelve a validar cada dirección;
