@@ -586,13 +586,19 @@ export function listarBuzonesActivos(): { domainId: string; domain: string; alia
     .map((r) => ({ ...r, accountId: r.accountId! }));
 }
 
-/** Bytes de cuota ya repartidos entre los buzones de un dominio. */
+/**
+ * Bytes USADOS por todos los buzones de un dominio (caché diaria del servidor).
+ *
+ * La bolsa del dominio (10 GB + bloques) es COMPARTIDA: cada buzón nace con la bolsa
+ * entera como tope y lo que se vigila es el uso sumado, no la suma de cuotas. Antes el
+ * primer buzón se quedaba con todo lo "libre" y el segundo no podía nacer.
+ */
 export function bytesDeBuzonesDelDominio(domainId: string): number {
-  const rows = db.select({ q: alias.mailboxQuotaBytes })
+  const rows = db.select({ u: alias.mailboxUsedBytes })
     .from(alias)
     .where(and(eq(alias.domainId, domainId), eq(alias.mailboxEnabled, true)))
     .all();
-  return rows.reduce((t, r) => t + (r.q ?? 0), 0);
+  return rows.reduce((t, r) => t + (r.u ?? 0), 0);
 }
 
 /** Buzones de un usuario sin add-on vigente: entran en gracia o toca borrarlos. */

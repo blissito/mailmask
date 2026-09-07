@@ -2098,18 +2098,18 @@ const app = new Elysia({ adapter: node() })
     let buzon: Record<string, unknown> | null = null;
     let errorBuzon: string | null = null;
     if (conBuzon) {
-      const yaRepartido = bytesDeBuzonesDelDominio(domain.id);
-      const libre = aliasLimits.mailboxBytes - yaRepartido;
-      if (libre <= 0) {
-        errorBuzon = "Ya repartiste todo el almacenamiento de este dominio. Agrega un bloque de +50 GB.";
+      const usado = bytesDeBuzonesDelDominio(domain.id);
+      const bolsa = aliasLimits.mailboxBytes;
+      if (usado >= bolsa) {
+        errorBuzon = "Los buzones de este dominio ya llenaron su almacenamiento. Agrega un bloque de +50 GB.";
       } else {
-        const creado = await crearBuzon({ localPart: alias.toLowerCase(), domain: domain.domain, quotaBytes: libre });
+        const creado = await crearBuzon({ localPart: alias.toLowerCase(), domain: domain.domain, quotaBytes: bolsa });
         if (creado.ok) {
-          marcarBuzon(domain.id, alias.toLowerCase(), { accountId: creado.valor.accountId, quotaBytes: libre });
+          marcarBuzon(domain.id, alias.toLowerCase(), { accountId: creado.valor.accountId, quotaBytes: bolsa });
           buzon = {
             email: creado.valor.email,
             password: creado.valor.password, // Sólo se muestra aquí; no se guarda.
-            quotaBytes: libre,
+            quotaBytes: bolsa,
             imap: { host: IMAP_HOST, port: 993, security: "SSL/TLS" },
             smtp: { host: IMAP_HOST, port: 465, security: "SSL/TLS" },
           };
@@ -5446,13 +5446,13 @@ const app = new Elysia({ adapter: node() })
     // La cuota del add-on es del DOMINIO y se reparte entre sus buzones, que son
     // ilimitados. Es el diferenciador aplicado al almacenamiento: se cobra por
     // dominio, no por persona.
-    const yaRepartido = bytesDeBuzonesDelDominio(domain.id);
-    const libre = limits.mailboxBytes - yaRepartido;
-    if (libre <= 0) {
-      return new Response(JSON.stringify({ error: "Ya repartiste todo el almacenamiento de este dominio. Agrega un bloque de +50 GB o reduce la cuota de un buzón existente." }), { status: 400 });
+    // La bolsa del dominio es compartida: el buzón nace con la bolsa entera como tope, y
+    // sólo se frena si el uso real sumado ya la llenó.
+    const usado = bytesDeBuzonesDelDominio(domain.id);
+    if (usado >= limits.mailboxBytes) {
+      return new Response(JSON.stringify({ error: "Los buzones de este dominio ya llenaron su almacenamiento. Agrega un bloque de +50 GB." }), { status: 400 });
     }
-    // Sin cuota pedida, se le da lo que queda libre.
-    const quotaBytes = libre;
+    const quotaBytes = limits.mailboxBytes;
 
     const creado = await crearBuzon({ localPart: aliasName, domain: domain.domain, quotaBytes });
     if (!creado.ok) {
