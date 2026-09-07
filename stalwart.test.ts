@@ -96,11 +96,29 @@ describe("Alta de buzón", () => {
     assert.equal(r.ok && r.valor.email, "ventas@uno.com");
   });
 
-  it("un dominio que no existe en el servidor da error claro", async () => {
+  it("un dominio que no existe en el servidor se crea solo, ya en split delivery", async () => {
+    // `allowRelaying: true` es lo que deja que un buzón le escriba a una máscara del
+    // mismo dominio (que vive en SES) en vez de recibir "550 Mailbox does not exist".
+    const vistas = servidor((m) => {
+      if (m === "x:Domain/query") return { ids: [] };
+      if (m === "x:Domain/set") return { created: { d1: { id: "dnuevo" } } };
+      if (m === "x:Account/set") return { created: { t1: { id: "a1" } } };
+      return {};
+    });
+    const r = await crearBuzon({ localPart: "ventas", domain: "nuevo.com", quotaBytes: 1024 });
+    assert.equal(r.ok, true);
+    const alta = vistas.find((v) => v.metodo === "x:Domain/set")!;
+    assert.equal(alta.args.create.d1.name, "nuevo.com");
+    assert.equal(alta.args.create.d1.allowRelaying, true);
+    const cuenta = vistas.find((v) => v.metodo === "x:Account/set")!;
+    assert.equal(cuenta.args.create.t1.domainId, "dnuevo");
+  });
+
+  it("si el servidor no deja crear el dominio, el error lo dice", async () => {
     servidor((m) => (m === "x:Domain/query" ? { ids: [] } : {}));
     const r = await crearBuzon({ localPart: "ventas", domain: "ajeno.com", quotaBytes: 1024 });
     assert.equal(r.ok, false);
-    assert.match(r.ok ? "" : r.error, /no existe/);
+    assert.match(r.ok ? "" : r.error, /preparar el dominio/);
   });
 
   it("una contraseña rechazada por débil se reporta con el motivo del servidor", async () => {

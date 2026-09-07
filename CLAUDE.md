@@ -255,6 +255,18 @@ engancha el bucket a la app y **sobrescribe `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCE
 roto (`Startup repair failed: InvalidClientTokenId`). Créalo desde un directorio sin
 `fly.toml`, con `--name`.
 
+### Split delivery: el buzón puede escribirle a una máscara del mismo dominio (7-sep-2026)
+
+Desde Apple Mail, `buzon@` → `hola@mailmask.studio` moría con `550 Mailbox does not exist`:
+Stalwart tenía el dominio como **autoritativo** y `hola@` es una máscara que vive en SES.
+Es el patrón "split delivery" (Workspace) / "internal relay domain" (Exchange), no un bug.
+Dos ajustes en la caja: `x:Domain.allowRelaying: true` (el RCPT acepta a los desconocidos
+del dominio) y la ruta de salida `is_local_address(rcpt) ? 'local' : 'ses'` (decide por
+**dirección**, no por dominio). `asegurarDominio()` en `stalwart.ts` crea cada dominio
+nuevo ya con `allowRelaying`, y `crearBuzon` lo llama — antes fallaba en cualquier dominio
+distinto de `mailmask.studio`, que se creó a mano. El alta de máscara (`POST /alias`) acepta
+`mailbox: true` sin destinos en dominio activado y crea el buzón en la misma petición.
+
 ### 🔴 Stalwart se baneó a sí mismo (7-sep-2026)
 
 Todo el tráfico externo entra por el proxy de EasyBits con **una sola IP** (`172.20.0.1`).

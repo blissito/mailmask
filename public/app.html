@@ -425,6 +425,14 @@
           </div>
           <p class="text-xs text-zinc-500 mt-1">Enter o coma para agregar otro destino. Cada correo recibe una copia.</p>
         </div>
+        <!-- Sólo en dominio activado: la máscara puede guardar su correo en vez de (o además de) reenviarlo. -->
+        <label id="add-alias-mailbox-row" class="hidden flex items-start gap-3 mt-4 p-3 rounded-lg border border-mask-700/50 bg-mask-900/20 cursor-pointer">
+          <input type="checkbox" name="mailbox" class="mt-1 accent-mask-500">
+          <span class="text-sm">
+            <span class="text-zinc-100 font-semibold">Guardar el correo en un buzón IMAP</span>
+            <span class="block text-xs text-zinc-400 mt-0.5">Para leerlo en Apple Mail u Outlook. Con esto los destinos son opcionales: puedes reenviar además, o sólo guardar.</span>
+          </span>
+        </label>
         <div id="add-alias-error" class="text-red-400 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" class="btn-cancel-modal px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors" data-modal="modal-add-alias">Cancelar</button>

@@ -79,6 +79,32 @@ export async function domainId(domain: string): Promise<string | null> {
   return ids[0];
 }
 
+/**
+ * Crea el dominio en Stalwart si no existe, ya en modo **split delivery**.
+ *
+ * `allowRelaying: true` es lo que hace que el servidor entregue SUS buzones y reenvíe
+ * lo que no reconoce (las máscaras de MailMask, que viven en SES) en vez de contestar
+ * `550 Mailbox does not exist`. Es el patrón "internal relay domain" de Exchange o
+ * "split delivery" de Workspace; sin él, desde Apple Mail no se puede escribir a un
+ * compañero del mismo dominio. La ruta de salida (`is_local_address(rcpt)`) es global
+ * y ya está puesta en la caja.
+ */
+export async function asegurarDominio(domain: string): Promise<string | null> {
+  const existente = await domainId(domain);
+  if (existente) return existente;
+  const clave = domain.toLowerCase();
+  const r = await jmap([CORE, STALWART], [[
+    "x:Domain/set", { create: { d1: { name: clave, allowRelaying: true } } }, "c0",
+  ]]);
+  const id = respuesta(r)?.created?.d1?.id;
+  if (!id) {
+    log("error", "mesa", "No se pudo crear el dominio en Stalwart", { domain: clave, respuesta: JSON.stringify(respuesta(r)).slice(0, 300) });
+    return null;
+  }
+  dominios.set(clave, id);
+  return id;
+}
+
 // --- Traducción dirección -> cuenta ---
 
 // El `accountId` es lo que piden todas las llamadas de correo. `Principal/query`
@@ -169,8 +195,9 @@ export async function crearBuzon(o: {
   if (!stalwartConfigurado()) return fallo("El servidor IMAP no está configurado");
 
   try {
-    const dom = await domainId(o.domain);
-    if (!dom) return fallo(`El dominio ${o.domain} no existe en el servidor IMAP`);
+    // El dominio se crea solo la primera vez, ya con split delivery.
+    const dom = await asegurarDominio(o.domain);
+    if (!dom) return fallo(`No se pudo preparar el dominio ${o.domain} en el servidor IMAP`);
 
     const password = generarPassword();
     // `emailAddress` NO se manda: lo deriva el servidor de `name` + `domainId`, y

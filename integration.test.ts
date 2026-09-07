@@ -275,6 +275,35 @@ describe("Add-ons API", () => {
     assert.equal(data.addons.length, 2);
   });
 
+  it("una máscara puede nacer con buzón y sin destinos, sólo en dominio activado", async () => {
+    // Stalwart no está en pruebas: el alta del alias debe salir 201 y el buzón reportarse
+    // como error aparte (`errorBuzon`), sin perder la máscara creada.
+    const res = await jsonPost(`/api/domains/${domainId}/alias`, { alias: "solo-buzon", destinations: [], mailbox: true }, cookie!, csrfToken);
+    assert.equal(res.status, 201);
+    const data = await res.json();
+    assert.equal(data.alias, "solo-buzon");
+    assert.deepEqual(data.destinations, []);
+    assert.ok(data.buzon || data.errorBuzon, "o creó el buzón o explicó por qué no");
+
+    // Sin buzón y sin destinos: agujero negro, 400.
+    const r2 = await jsonPost(`/api/domains/${domainId}/alias`, { alias: "nada", destinations: [] }, cookie!, csrfToken);
+    assert.equal(r2.status, 400);
+    await r2.body?.cancel();
+  });
+
+  it("en un dominio gratis, pedir buzón al crear la máscara da 403", async () => {
+    const e3 = `alias-free-${suffix}@example.com`;
+    sqlite.prepare("DELETE FROM rate_limits").run();
+    createUser(e3, await hashPassword("password123"));
+    const lr = await jsonPost("/api/auth/login", { email: e3, password: "password123" });
+    const { cookie: c3, csrfToken: t3 } = extractCookies(lr);
+    await lr.body?.cancel();
+    const d3 = createDomain(e3, `alias-free-${suffix}.com`, ["dk"], "vf");
+    const res = await jsonPost(`/api/domains/${d3.id}/alias`, { alias: "ventas", destinations: [], mailbox: true }, c3!, t3);
+    assert.equal(res.status, 403);
+    await res.body?.cancel();
+  });
+
   it("activar dos veces el mismo dominio da 409", async () => {
     const res = await jsonPost("/api/addons/checkout", { kind: "domain", domainId }, cookie!, csrfToken);
     assert.equal(res.status, 409);

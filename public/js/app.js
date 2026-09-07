@@ -2379,6 +2379,8 @@ function setupEventListeners() {
   document.getElementById("btn-add-alias").addEventListener("click", () => {
     const form = document.getElementById("form-add-alias");
     initChips(form.querySelector("[data-chips]")).set([]);
+    form.mailbox.checked = false;
+    document.getElementById("add-alias-mailbox-row")?.classList.toggle("hidden", !derechosDe(selectedDomain?.id).mailboxes);
     showModal("modal-add-alias");
   });
 
@@ -2484,8 +2486,9 @@ function setupEventListeners() {
 
     initChips(form.querySelector("[data-chips]")).commit();
     const destinations = form.destinations.value.split(",").map(d => d.trim().toLowerCase()).filter(Boolean);
-    if (destinations.length === 0) {
-      errEl.textContent = "Agrega al menos un destino";
+    const conBuzon = form.mailbox?.checked === true;
+    if (destinations.length === 0 && !conBuzon) {
+      errEl.textContent = "Agrega al menos un destino, o marca que guarde el correo en un buzón";
       errEl.classList.remove("hidden");
       return;
     }
@@ -2500,15 +2503,24 @@ function setupEventListeners() {
     const res = await fetch(`/api/domains/${selectedDomain.id}/alias`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ alias: form.alias.value.trim().toLowerCase(), destinations }),
+      body: JSON.stringify({ alias: form.alias.value.trim().toLowerCase(), destinations, mailbox: conBuzon }),
     });
 
     if (res.ok) {
+      const data = await res.json();
       playSound("pop");
       hideModal("modal-add-alias");
       form.reset();
       await loadAliases();
       await refreshUsage();
+      // El buzón nació con la máscara: la contraseña se muestra UNA vez, aquí.
+      if (data.buzon) {
+        document.getElementById("mailbox-title").textContent = data.buzon.email;
+        document.getElementById("mailbox-body").innerHTML = credencialesNuevas(data.buzon, data.alias);
+        showModal("modal-mailbox");
+      } else if (data.errorBuzon) {
+        showToast(`La máscara se creó, pero el buzón no: ${data.errorBuzon}`, true);
+      }
     } else {
       const data = await res.json();
       errEl.textContent = data.error || "Error al crear alias";

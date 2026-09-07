@@ -2050,7 +2050,19 @@ const app = new Elysia({ adapter: node() })
       );
     }
 
-    const { alias, destinations } = body;
+    const { alias, destinations, mailbox: conBuzon } = body;
+
+    // Una máscara tiene que hacer ALGO con el correo: reenviarlo o guardarlo. Sin destinos
+    // sólo es válida si nace con buzón, y el buzón sólo existe en un dominio activado.
+    if (conBuzon && !aliasLimits.mailboxes) {
+      return new Response(JSON.stringify({ error: "Los buzones IMAP vienen con el dominio activado ($99/mes)." }), { status: 403 });
+    }
+    if (conBuzon && alias === "*") {
+      return new Response(JSON.stringify({ error: "El catch-all no puede tener buzón: usa una máscara con nombre" }), { status: 400 });
+    }
+    if (!destinations.length && !conBuzon) {
+      return new Response(JSON.stringify({ error: "Agrega al menos un destino, o marca que guarde el correo en un buzón" }), { status: 400 });
+    }
 
     // Validate alias format (alphanumeric, dots, hyphens, or * for catch-all)
     if (alias !== "*" && !/^[a-zA-Z0-9._-]+$/.test(alias)) {
@@ -2080,7 +2092,35 @@ const app = new Elysia({ adapter: node() })
     }
 
     const newAlias = await createAlias(domain.id, alias, destinations);
-    return new Response(JSON.stringify(newAlias), {
+
+    // Buzón en el mismo alta: si Stalwart falla, la máscara ya existe y el error se
+    // devuelve aparte para que la UI lo diga sin perder lo creado.
+    let buzon: Record<string, unknown> | null = null;
+    let errorBuzon: string | null = null;
+    if (conBuzon) {
+      const yaRepartido = bytesDeBuzonesDelDominio(domain.id);
+      const libre = aliasLimits.mailboxBytes - yaRepartido;
+      if (libre <= 0) {
+        errorBuzon = "Ya repartiste todo el almacenamiento de este dominio. Agrega un bloque de +50 GB.";
+      } else {
+        const creado = await crearBuzon({ localPart: alias.toLowerCase(), domain: domain.domain, quotaBytes: libre });
+        if (creado.ok) {
+          marcarBuzon(domain.id, alias.toLowerCase(), { accountId: creado.valor.accountId, quotaBytes: libre });
+          buzon = {
+            email: creado.valor.email,
+            password: creado.valor.password, // Sólo se muestra aquí; no se guarda.
+            quotaBytes: libre,
+            imap: { host: IMAP_HOST, port: 993, security: "SSL/TLS" },
+            smtp: { host: IMAP_HOST, port: 465, security: "SSL/TLS" },
+          };
+        } else {
+          errorBuzon = creado.error;
+          log("error", "admin", "No se pudo crear el buzón al crear la máscara", { domainId: domain.id, alias, error: creado.error });
+        }
+      }
+    }
+
+    return new Response(JSON.stringify({ ...newAlias, mailboxEnabled: !!buzon, buzon, errorBuzon }), {
       status: 201,
       headers: { "content-type": "application/json" },
     });
@@ -2088,6 +2128,7 @@ const app = new Elysia({ adapter: node() })
     body: t.Object({
       alias: t.String(),
       destinations: t.Array(t.String()),
+      mailbox: t.Optional(t.Boolean()),
     }),
     detail: { tags: ["Aliases", "SDK"], summary: "Create a new alias for a domain", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
