@@ -7400,6 +7400,15 @@ process.on("unhandledRejection", (err) => {
 // Receipt rule repair already imported at top
 if (esServidor) (async () => {
   try {
+    // Sin una lectura fresca, el precio de los dominios cae al respaldo del entorno. El cron
+    // corre en el minuto 7, así que un arranque a las 8:10 dejaría casi una hora cotizando
+    // sobre un número viejo.
+    const { lecturaRancia, actualizarTipoDeCambio } = await import("./fx.js");
+    if (lecturaRancia()) {
+      const l = await actualizarTipoDeCambio();
+      log(l ? "info" : "warn", "startup", l ? `Tipo de cambio al arrancar: ${l.rate}` : "No se pudo obtener el tipo de cambio al arrancar");
+    }
+
     const repaired = await repairReceiptRules();
     if (repaired > 0) log("info", "startup", `Repaired ${repaired} receipt rule(s) with missing TopicArn`);
 
