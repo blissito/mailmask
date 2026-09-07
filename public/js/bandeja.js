@@ -740,7 +740,9 @@ function cuerpoMensaje(item) {
   // (etiquetas fuera) y se ve peor que el original en el iframe.
   if (!item.html) return item.body ? esc(item.body) : "";
   // srcdoc escapado: el HTML del correo viaja como atributo, no como marcado.
-  return `<iframe class="mesa-msg-html" sandbox referrerpolicy="no-referrer" srcdoc="${esc(item.html)}"></iframe>`;
+  // `allow-same-origin` sin `allow-scripts`: dentro sigue sin correr JS, pero el
+  // padre puede leer el documento y ajustar el alto al contenido (ver ajustarIframe).
+  return `<iframe class="mesa-msg-html" sandbox="allow-same-origin" referrerpolicy="no-referrer" srcdoc="${esc(item.html)}"></iframe>`;
 }
 
 function renderMessages(messages, notes) {
@@ -777,7 +779,32 @@ function renderMessages(messages, notes) {
   }).join("");
 
   // Scroll to bottom
+  container.querySelectorAll("iframe.mesa-msg-html").forEach(ajustarIframe);
   container.scrollTop = container.scrollHeight;
+}
+
+// El alto del iframe se ajusta al correo: un alto fijo dejaba media pantalla vacía
+// con un scroll dentro de otro. Se mide al cargar y otra vez cuando terminan
+// de bajar las imágenes, que es lo que cambia la altura después del load.
+function ajustarIframe(iframe) {
+  const medir = () => {
+    try {
+      const doc = iframe.contentDocument;
+      if (!doc || !doc.documentElement) return;
+      const h = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight ?? 0);
+      if (h > 0) iframe.style.height = Math.min(h + 16, 4000) + "px";
+    } catch {}
+  };
+  iframe.addEventListener("load", () => {
+    medir();
+    try {
+      iframe.contentDocument?.querySelectorAll("img").forEach((img) => {
+        if (!img.complete) img.addEventListener("load", medir, { once: true });
+      });
+    } catch {}
+    setTimeout(medir, 500);
+  });
+  medir();
 }
 
 // Separa "a@x.com, b@y.com" en lista. El servidor vuelve a validar cada dirección;
