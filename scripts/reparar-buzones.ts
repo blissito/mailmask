@@ -23,7 +23,15 @@ for (const b of buzones) {
   const email = `${b.alias}@${b.domain}`.toLowerCase();
   olvidarCuenta(email);
   const id = await accountIdDe(email);
-  if (id) { console.log(`ok       ${email} (${id})`); continue; }
+  if (id && id === b.accountId) { console.log(`ok       ${email} (${id})`); continue; }
+  if (id) {
+    // Existe allá con OTRO id que el que guarda esta base (una restauración de
+    // respaldo devuelve los ids originales): se corrige el apuntador, no se crea nada.
+    faltan++;
+    if (apply) marcarBuzon(b.domainId, b.alias, { accountId: id, quotaBytes: b.quotaBytes ?? 1024 * 1024 * 1024 });
+    console.log(`${apply ? "REAPUNTA" : "DESFASE "} ${email}: base=${b.accountId} stalwart=${id}`);
+    continue;
+  }
   faltan++;
   if (!apply) { console.log(`FALTA    ${email} (base: ${b.accountId})`); continue; }
   const r = await crearBuzon({ localPart: b.alias, domain: b.domain, quotaBytes: b.quotaBytes ?? 1024 * 1024 * 1024 });
