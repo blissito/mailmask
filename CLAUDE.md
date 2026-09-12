@@ -176,6 +176,46 @@ primera transferencia con cliente):
    inventario vacío (que el cliente aprobaría creyendo que su zona no tenía nada), sino lo que
    alcanzó con `truncado: true`.
 
+**Lo que cerró la auditoría del 8-sep-2026** (toda la superficie: alta, pago, aprovisionamiento,
+transfer-in/out, renovación, DNS y crons). Once huecos, y los tres primeros costaban dinero o
+clientes:
+
+1. **Todo dominio quedaba a nombre de MailMask.** `whoisContact()` aceptaba los datos del
+   cliente desde el principio y **nadie se los pasaba nunca**. En un transfer-in eso es
+   quitarle la titularidad de algo que ya era suyo. Ahora `/transfer/start` exige un contacto
+   WHOIS válido (teléfono en el formato `+52.5512345678` que pide el registro, país ISO-2),
+   se guarda en `whois_contact` (migración 0022) y viaja a `TransferDomain`. El alta nueva
+   sigue a nombre de MailMask, pero los `REGISTRANT_*` ya no tienen respaldo inventado: si
+   falta uno, `whoisContact()` lanza. Un WHOIS falso es causa de suspensión por el registro.
+2. **`/transfer/start` cobraba sin comprobar los requisitos**: `checkDomainReadiness()` sólo
+   lo llamaba `/transfer/check`, o sea que el guardián vivía en el front y un POST directo
+   cobraba un dominio intransferible, con reembolso manual.
+3. **`DELETE /api/domains/:id` dejaba el dominio en AWS renovándose a nuestra costa** para
+   siempre (y el preapproval cobrándole al cliente algo que ya no tenía). Ahora da 409 si hay
+   registración viva: la salida es el transfer-out, que ya existe.
+4. **El aprovisionamiento adoptaba la fila de otro dueño.** Agregar un dominio no exige
+   probar que es tuyo, sólo que nadie lo tenga: el transfer-in del dueño real activaba el
+   dominio en la cuenta que se le había adelantado. Se comprueba en `/transfer/start` (antes
+   de cobrar) y al principio de `finalizeDomainRegistration` (antes de tocar AWS).
+5. **Editar DNS pedía `write`, y el rol `agent` lo tiene**: un invitado a responder correos
+   podía repuntar la web del cliente o emitirse un certificado con un `_acme-challenge`. Las
+   tres rutas de escritura pasan a `admin`; leer sigue en `read`.
+6. Dos estados esperaban en silencio para siempre: `transfer_paid` sin auth code vigente
+   (cobrado y sin transferencia — el `Map` no sobrevive a un deploy) y `registering` parado
+   por el inventario sin aprobar. Los dos alertan ahora, una sola vez, vía `warnedAt`.
+7. Un checkout abandonado bloqueaba el dominio con 409 **para siempre**, incluso para el
+   propio cliente. Pasadas 24 h se cancela y se deja reintentar.
+8. **Crear zona exige dominio activado**: cada hosted zone son $0.50 USD/mes que pagábamos
+   nosotros, y una cuenta gratis podía abrir tantas como dominios agregara.
+9. `checkTransferability` mapeaba `UNTRANSFERRABLE` con dos erres y AWS manda una: el cliente
+   veía el enum crudo. También faltaban `DOMAIN_IN_OWN_ACCOUNT` y `DOMAIN_IN_ANOTHER_ACCOUNT`.
+10. El guardián de DKIM salía de `dkimTokens`, que puede venir vacía o desfasada; ahora
+    también se reconoce un CNAME de DKIM por su forma (token de 32 caracteres o destino
+    `*.dkim.amazonses.com`). El DKIM de otro proveedor sigue siendo del cliente.
+11. Un dominio que ya **no aparece** en `listRegisteredDomains()` es un transfer-out
+    consumado: se marca `transferred_out` y se cancela su cobro. Es el único momento seguro
+    para hacerlo, y antes dependía de que una persona leyera una alerta.
+
 **Transfer-out** no es opcional: sin él, ofrecer migración entrante es asimétrico. El auth
 code va **por correo y no en la respuesta** —entregarlo es entregar el dominio— con un enlace
 de 30 minutos y un solo uso. `AutoRenew` se apaga sólo cuando la salida se confirma de
@@ -419,7 +459,7 @@ sin pasar por la app); hasta cerrarlo, "+100 envíos" no debe venderse como comp
 
 ## Buzones IMAP (7-sep-2026)
 
-**Stalwart corre en producción** en una caja permanente de EasyBits (`sb_4ba99ed3-…`, template `mail-svc`, `persistent` y `protected`), con 993 y 465 alcanzables desde fuera por el router SNI, certificado ACME DNS-01 contra Route 53 y salida por SES (SPF y DKIM en verde). Un alias puede tener **buzón**, **reenvío**, o los dos; y un buzón sin reenvío es lo que convierte a MailMask en reemplazo de Gmail y no en una capa encima.
+**Stalwart corre en producción** en una caja permanente de EasyBits (`sb_4c48dee1-…` desde el 12-sep-2026 —la anterior `sb_4ba99ed3` murió en un reboot del fierro—, template `mail-svc`, `persistent` y `protected`), con 993 y 465 alcanzables desde fuera por el router SNI, certificado ACME DNS-01 contra Route 53 y salida por SES (SPF y DKIM en verde). Un alias puede tener **buzón**, **reenvío**, o los dos; y un buzón sin reenvío es lo que convierte a MailMask en reemplazo de Gmail y no en una capa encima.
 
 **Un buzón es un alias con buzón**, no una tabla aparte (columnas `mailbox_*` en `alias`) — es también el modelo de ForwardEmail. Se cobra con el add-on `mailbox` ($99/mes **por dominio**, 10 GB compartidos entre buzones **ilimitados** de ese dominio). **Ningún plan lo incluye**, y no es tacañería: meter un recurso sin medidor en una cuota fija ya salió caro una vez —es la razón de que exista `monthlyForwards`— y el almacenamiento tiene la misma forma: crece solo, nunca baja y no se puede purgar sin avisar.
 
