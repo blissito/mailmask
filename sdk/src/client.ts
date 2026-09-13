@@ -103,6 +103,8 @@ class AliasesResource {
   createMailbox(domainId: string, alias: string) { return this.req<MailboxCreated>(`/api/domains/${domainId}/alias/${alias}/mailbox`, { method: "POST" }); }
   /** Borra el buzón Y SU CORREO. La máscara debe conservar al menos un destino. */
   deleteMailbox(domainId: string, alias: string) { return this.req<{ ok: boolean }>(`/api/domains/${domainId}/alias/${alias}/mailbox`, { method: "DELETE" }); }
+  /** Genera una contraseña nueva para el buzón. Sólo se devuelve aquí; no se guarda. */
+  resetMailboxPassword(domainId: string, alias: string) { return this.req<{ password: string }>(`/api/domains/${domainId}/alias/${alias}/mailbox/password`, { method: "POST" }); }
   update(domainId: string, alias: string, input: UpdateAliasInput) { return this.req<Alias>(`/api/domains/${domainId}/alias/${alias}`, { method: "PUT", body: JSON.stringify(input) }); }
   delete(domainId: string, alias: string) { return this.req<{ ok: boolean }>(`/api/domains/${domainId}/alias/${alias}`, { method: "DELETE" }); }
 }

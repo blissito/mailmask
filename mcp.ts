@@ -65,6 +65,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
   tool("delete_alias", "Borra una máscara (y su buzón, si tiene).", { domainId, alias: aliasName }, (a) => sdk.aliases.delete(a.domainId, a.alias));
   tool("create_mailbox", "Crea un buzón IMAP para una máscara existente (dominio activado). Devuelve email, contraseña (una sola vez) y datos IMAP/SMTP.", { domainId, alias: aliasName }, (a) => sdk.aliases.createMailbox(a.domainId, a.alias));
   tool("delete_mailbox", "Borra el buzón IMAP de una máscara Y TODO SU CORREO. La máscara debe conservar al menos un destino.", { domainId, alias: aliasName }, (a) => sdk.aliases.deleteMailbox(a.domainId, a.alias));
+  tool("reset_mailbox_password", "Genera una contraseña nueva para el buzón IMAP de una máscara y la devuelve UNA sola vez; no se guarda en ningún lado. Úsala cuando el cliente de correo la pide en bucle (p. ej. tras restaurar el servidor).", { domainId, alias: aliasName }, (a) => sdk.aliases.resetMailboxPassword(a.domainId, a.alias));
 
   // --- DNS ---
   //

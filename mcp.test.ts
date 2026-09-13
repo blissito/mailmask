@@ -93,7 +93,7 @@ describe("MCP: agentes contra la app", () => {
     assert.equal(init.json.result.serverInfo.name, "mailmask");
     const list = await rpc("tools/list");
     const nombres = list.json.result.tools.map((t: { name: string }) => t.name);
-    for (const n of ["create_domain", "create_alias", "create_mailbox", "create_rule", "create_webhook", "send_email", "search_tools"]) assert.ok(nombres.includes(n), n);
+    for (const n of ["create_domain", "create_alias", "create_mailbox", "reset_mailbox_password", "create_rule", "create_webhook", "send_email", "search_tools"]) assert.ok(nombres.includes(n), n);
     assert.ok(!nombres.some((n: string) => n.includes("api_key")), "las API keys no se fabrican por MCP");
   });
 
