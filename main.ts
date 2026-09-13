@@ -176,7 +176,7 @@ import {
   getMonthlyForwards,
 } from "./db.js";
 import { emitEvent, listWebhooks, getWebhook, createWebhook, updateWebhook, deleteWebhook, enqueuePing, listDeliveries, WEBHOOK_EVENTS, MAX_WEBHOOKS_PER_DOMAIN } from "./webhooks.js";
-import type { AddonKind } from "./db.js";
+import type { AddonKind, WhoisContacto } from "./db.js";
 import {
   hashPassword,
   verifyPassword,
@@ -770,6 +770,36 @@ async function cancelMpPreapproval(preapprovalId: string, accessToken: string): 
     signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) throw new Error(`MP cancel ${preapprovalId}: ${await res.text()}`);
+}
+
+/**
+ * Contacto WHOIS del cliente para un transfer-in. Devuelve el contacto ya limpio, o el
+ * mensaje de error. Route 53 rechaza el teléfono si no viene como `+52.5512345678`, y un
+ * WHOIS inexacto puede costar la suspensión del dominio, así que se valida aquí y no en el
+ * front.
+ */
+function validarWhois(entrada: unknown): WhoisContacto | string {
+  if (!entrada || typeof entrada !== "object") return "Faltan tus datos de contacto para el WHOIS del dominio.";
+  const e = entrada as Record<string, unknown>;
+  const campos = ["firstName", "lastName", "email", "phone", "address", "city", "state", "country", "zip"] as const;
+  const limpio: Record<string, string> = {};
+  for (const c of campos) {
+    const v = String(e[c] ?? "").trim();
+    if (!v) return `Falta un dato del contacto WHOIS: ${c}.`;
+    limpio[c] = v;
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(limpio.email)) return "El correo del contacto WHOIS no es válido.";
+  if (!/^\+\d{1,3}\.\d{6,14}$/.test(limpio.phone)) return 'El teléfono debe ir en el formato que pide el registro: "+52.5512345678".';
+  if (!/^[A-Za-z]{2}$/.test(limpio.country)) return 'El país debe ser su código de dos letras, por ejemplo "MX".';
+  limpio.country = limpio.country.toUpperCase();
+  const org = String(e.organization ?? "").trim();
+  return { ...(limpio as unknown as WhoisContacto), ...(org ? { organization: org } : {}) };
+}
+
+/** Un checkout que nadie pagó. Pasado un día deja de bloquear el dominio. */
+function checkoutAbandonado(reg: { status: string; createdAt: string }): boolean {
+  return (reg.status === "pending_payment" || reg.status === "transfer_pending_payment") &&
+    Date.now() - Date.parse(reg.createdAt) > 864e5;
 }
 
 /**
@@ -2237,6 +2267,17 @@ const app = new Elysia({ adapter: node() })
       });
     }
     const domain = access.domain;
+
+    // Borrar la fila no borra el dominio de AWS: el registro se queda con `AutoRenew: true`
+    // y nos lo cobran cada año para siempre, la hosted zone sigue viva, y el preapproval le
+    // sigue cobrando al cliente algo que ya no tiene. La salida legítima es el transfer-out.
+    const registro = getDomainRegistrationByDomainName(domain.domain);
+    if (registro && !["failed", "transfer_failed", "transfer_cancelled", "transferred_out", "pending_payment", "transfer_pending_payment"].includes(registro.status)) {
+      return jsonErr(
+        "Este dominio está registrado a través de MailMask, así que borrarlo aquí lo dejaría en el aire. Si te lo quieres llevar, pide el traslado a otro registrador desde la pestaña del dominio; si quieres darlo de baja, escríbenos.",
+        409,
+      );
+    }
 
     // Clean up all SES resources (best effort)
     try { await deleteReceiptRule(domain.domain); } catch { /* best effort */ }
@@ -6542,11 +6583,50 @@ const app = new Elysia({ adapter: node() })
     if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d)) return jsonErr("Formato de dominio inválido", 400);
     if (!authCode) return jsonErr("Falta el código de autorización (EPP) de tu registrador actual.", 400);
 
+    // El dominio ya es del cliente: ponerlo a nombre de MailMask le quitaría la titularidad,
+    // y un WHOIS inventado es causa de suspensión por parte del registro.
+    const whois = validarWhois((body as { whois?: unknown }).whois);
+    if (typeof whois === "string") return jsonErr(whois, 400);
+
     const tld = "." + d.split(".").slice(1).join(".");
     const { precioDeTransferencia } = await import("./tld-pricing.js");
     const precio = await precioDeTransferencia(tld);
     if (!precio) return jsonErr(`AWS no puede transferir dominios ${tld}. Escríbenos y lo revisamos contigo.`, 400);
-    if (getDomainRegistrationByDomainName(d)) return jsonErr("Ya hay una transferencia o un registro en curso para este dominio.", 409);
+
+    const enCurso = getDomainRegistrationByDomainName(d);
+    if (enCurso && !checkoutAbandonado(enCurso)) {
+      return jsonErr("Ya hay una transferencia o un registro en curso para este dominio.", 409);
+    }
+    if (enCurso && checkoutAbandonado(enCurso)) {
+      // Un checkout que nadie pagó no puede dejar el dominio bloqueado para siempre: el
+      // propio cliente se topaba con su 409 al reintentar.
+      updateDomainRegistration(enCurso.id, {
+        status: enCurso.kind === "transfer" ? "transfer_cancelled" : "failed",
+        lastError: "checkout abandonado",
+      });
+    }
+
+    // El dominio puede estar ya en la cuenta de alguien más: agregar un dominio no exige
+    // probar que es tuyo. Cobrarle una transferencia que acabaría activando el dominio en
+    // otra cuenta es lo peor que puede pasar aquí.
+    const { getDomainByName: buscarDominioPorNombre } = await import("./db.js");
+    const yaEnMailMask = await buscarDominioPorNombre(d);
+    if (yaEnMailMask && yaEnMailMask.ownerEmail !== auth.email) {
+      return jsonErr("Este dominio ya está dado de alta en otra cuenta de MailMask. Escríbenos y lo liberamos antes de transferirlo.", 409);
+    }
+
+    // Los requisitos se comprueban ANTES de cobrar. Vivían sólo en `/transfer/check`, o sea
+    // en el front: un POST directo aquí cobraba un dominio que AWS no puede mover, y el
+    // reembolso es manual.
+    const { checkDomainReadiness } = await import("./domain-transfer.js");
+    const listo = await checkDomainReadiness(d);
+    const impedimentos = listo.requisitos.filter((r) => r.ok === false);
+    if (impedimentos.length) {
+      return Response.json(
+        { error: impedimentos.map((r) => r.ayuda ?? r.texto).join(" "), requisitos: listo.requisitos },
+        { status: 400 },
+      );
+    }
 
     const mpAccessToken = process.env.MP_ACCESS_TOKEN;
     if (!mpAccessToken) return jsonErr("MercadoPago no configurado", 500);
@@ -6571,6 +6651,7 @@ const app = new Elysia({ adapter: node() })
       kind: "transfer",
       renewalPriceCents: precio.renewMxnCents,
       dnsSnapshot: inventario.found,
+      whoisContact: whois,
     });
 
     // El código completo vive en memoria y caduca en una hora; en la fila sólo quedan los
@@ -6601,6 +6682,7 @@ const app = new Elysia({ adapter: node() })
       authCode: t.String(),
       payerEmail: t.Optional(t.String()),
       dnsRecords: t.Optional(t.Array(t.Any())),
+      whois: t.Optional(t.Any()),
     }),
     detail: { tags: ["Domain Registration"], summary: "Start a domain transfer-in", security: [{ cookieAuth: [] }] },
   })
@@ -6999,6 +7081,12 @@ const app = new Elysia({ adapter: node() })
     if (!access) return jsonErr("Dominio no encontrado", 404);
     const d = access.domain;
 
+    // Y cuesta dinero de verdad: cada hosted zone son $0.50 USD al mes que pagamos nosotros.
+    // Sin esto una cuenta gratis podía abrir tantas como dominios agregara.
+    if (!derechosDeDominio(d, await getUser(d.ownerEmail)).activado) {
+      return jsonErr("El editor de DNS viene con el dominio activado ($99/mes).", 403);
+    }
+
     if (d.hostedZoneId) return jsonErr("Este dominio ya tiene su DNS en MailMask.", 409);
 
     const { ensureHostedZone, applyRecordChanges, configureDnsRecords, deleteHostedZone } = await import("./route53.js");
@@ -7085,13 +7173,16 @@ const app = new Elysia({ adapter: node() })
     detail: { tags: ["DNS", "SDK"], summary: "Probe the domain's current public DNS (read-only)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
+  // Escribir en el DNS es `admin`, no `write`: el rol `agent` de la Bandeja tiene write, y
+  // un invitado a responder correos no debe poder repuntar la web del cliente ni emitirse un
+  // certificado con un `_acme-challenge`.
   .put("/api/domains/:id/dns/records", async ({ request, params, body }) => {
     const user = await getAuthUser(request);
     if (!user) return jsonErr("No autenticado", 401);
     const limited = await rateLimitGuard(getIp(request), 10, 60_000);
     if (limited) return limited;
 
-    const access = await checkDomainAccess(user.email, params.id, "write");
+    const access = await checkDomainAccess(user.email, params.id, "admin");
     if (!access) return jsonErr("Dominio no encontrado", 404);
     const d = access.domain;
     if (!d.hostedZoneId) return jsonErr("Este dominio todavía no tiene zona DNS en MailMask.", 409);
@@ -7141,7 +7232,7 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(getIp(request), 10, 60_000);
     if (limited) return limited;
 
-    const access = await checkDomainAccess(user.email, params.id, "write");
+    const access = await checkDomainAccess(user.email, params.id, "admin");
     if (!access) return jsonErr("Dominio no encontrado", 404);
     const d = access.domain;
     if (!d.hostedZoneId) return jsonErr("Este dominio todavía no tiene zona DNS en MailMask.", 409);
@@ -7184,7 +7275,7 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(getIp(request), 10, 60_000);
     if (limited) return limited;
 
-    const access = await checkDomainAccess(user.email, params.id, "write");
+    const access = await checkDomainAccess(user.email, params.id, "admin");
     if (!access) return jsonErr("Dominio no encontrado", 404);
     const d = access.domain;
     if (!d.hostedZoneId) return jsonErr("Este dominio todavía no tiene zona DNS en MailMask.", 409);

@@ -17,6 +17,10 @@ import {
 
 /** Tras esto, seguir reintentando cada minuto sólo gasta llamadas a AWS. */
 const LIMITE_REINTENTOS_MS = 2 * 3600_000;
+/** Un transfer completado que espera la aprobación del inventario de DNS del cliente. */
+const ESPERA_APROBACION_DNS_MS = 3 * 864e5;
+/** Un transfer pagado que nunca llegó a mandarse a AWS (el auth code caduca en 1 h). */
+const ESPERA_AUTH_CODE_MS = 864e5;
 
 export async function finalizeDomainRegistration(reg: DomainRegistration): Promise<void> {
   const {
@@ -29,6 +33,31 @@ export async function finalizeDomainRegistration(reg: DomainRegistration): Promi
   if (reg.kind === "transfer" && reg.dnsImportStatus !== "approved") {
     updateDomainRegistration(reg.id, { lastError: "dns_snapshot_no_aprobado" });
     log("warn", "route53", "Transfer sin inventario DNS aprobado; no se toca nada", { domain: reg.domainName });
+    // Esperar es correcto, pero esperar en silencio para siempre no: el dominio ya está en
+    // nuestra cuenta y el cliente no ha aprobado nada.
+    const desde = Date.parse(reg.transferApprovedAt ?? reg.createdAt);
+    if (Number.isFinite(desde) && Date.now() - desde > ESPERA_APROBACION_DNS_MS && reg.warnedAt !== "dns") {
+      updateDomainRegistration(reg.id, { warnedAt: "dns" });
+      await sendAlert(
+        "transferencia-sin-aprobar-dns",
+        `${reg.domainName} (${reg.ownerEmail}) lleva más de 3 días transferido y sin aprobar su inventario de DNS. Hasta que lo apruebe no se toca su zona, así que el dominio está en el limbo: escríbele.`,
+      );
+    }
+    return;
+  }
+
+  // El dominio puede estar ya dado de alta en OTRA cuenta: agregar un dominio no exige
+  // probar que es tuyo, sólo que nadie lo tenga. Sin esta comprobación, el transfer-in del
+  // dueño real activaba el dominio en la cuenta que se le adelantó y quien pagó se quedaba
+  // sin nada. Va antes de tocar AWS: aquí todavía no se ha movido nada.
+  const existente = getDomainByName(reg.domainName);
+  if (existente && existente.ownerEmail !== reg.ownerEmail) {
+    updateDomainRegistration(reg.id, { lastError: "dominio_en_otra_cuenta" });
+    await sendAlert(
+      "dominio-en-otra-cuenta",
+      `${reg.domainName} lo pagó ${reg.ownerEmail}, pero la fila de \`domains\` es de ${existente.ownerEmail}. No se tocó nada: hay que resolver a mano quién se queda con el dominio.`,
+    );
+    log("error", "route53", "El dominio ya está en otra cuenta; aprovisionamiento detenido", { domain: reg.domainName });
     return;
   }
 
@@ -88,7 +117,6 @@ export async function finalizeDomainRegistration(reg: DomainRegistration): Promi
   }
 
   // 6. Fila en `domains`, reusándola si ya existe (reintento).
-  const existente = getDomainByName(reg.domainName);
   const domainRow = existente ??
     createDomain(reg.ownerEmail, reg.domainName, dnsRecords.dkimTokens, dnsRecords.verificationToken);
 
@@ -178,7 +206,8 @@ export async function iniciarTransferencia(reg: DomainRegistration): Promise<voi
   const ns = await nameserversActuales(reg.domainName).catch(() => [] as string[]);
 
   try {
-    const operationId = await transferDomain(reg.domainName, authCode, ns);
+    // El contacto es el del cliente: el dominio ya era suyo antes de llegar aquí.
+    const operationId = await transferDomain(reg.domainName, authCode, ns, reg.whoisContact ?? undefined);
     updateDomainRegistration(reg.id, {
       status: "transfer_submitted",
       route53OperationId: operationId,
@@ -202,8 +231,31 @@ export async function iniciarTransferencia(reg: DomainRegistration): Promise<voi
 const HITOS_RECORDATORIO = [2, 5, 8];
 const DIAS_HASTA_CANCELAR = 10;
 
+/**
+ * Pagadas y sin mandar a AWS. Pasa cuando el auth code caducó (vive una hora en memoria y no
+ * sobrevive a un deploy): `iniciarTransferencia` manda el correo de "mándalo otra vez" y ahí
+ * se quedaba, porque ningún cron miraba este estado. Cobrado y sin transferencia.
+ */
+async function avisarTransferenciasPagadasSinMandar(): Promise<void> {
+  const { sendAlert } = await import("./ses.js");
+  const { sendTemplate, domainTransferPending } = await import("./emails.js");
+
+  for (const reg of getDomainRegistrationsByStatus("transfer_paid")) {
+    if (Date.now() - Date.parse(reg.createdAt) < ESPERA_AUTH_CODE_MS) continue;
+    if (reg.warnedAt === "sin-auth-code") continue;
+    updateDomainRegistration(reg.id, { warnedAt: "sin-auth-code" });
+    await sendTemplate(reg.ownerEmail, domainTransferPending({ domain: reg.domainName, daysWaiting: 1 })).catch(() => {});
+    await sendAlert(
+      "transferencia-pagada-sin-mandar",
+      `${reg.ownerEmail} pagó la transferencia de ${reg.domainName} hace más de un día y nunca se mandó a AWS: falta que vuelva a mandar su código EPP. Si no contesta, hay que reembolsarle.`,
+    );
+  }
+}
+
 /** Sondea las transferencias en curso. */
 export async function sondearTransferencias(): Promise<void> {
+  await avisarTransferenciasPagadasSinMandar();
+
   const enCurso = [
     ...getDomainRegistrationsByStatus("transfer_submitted"),
     ...getDomainRegistrationsByStatus("transfer_awaiting_approval"),

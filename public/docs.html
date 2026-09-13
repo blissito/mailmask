@@ -248,11 +248,13 @@ ventas.errorBuzon; <span class="cm">// texto si el alias se cre&oacute; pero el 
 <span class="kw">const</span> buzon = <span class="kw">await</span> mm.aliases.<span class="fn">createMailbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
 
 <span class="cm">// Borrar el buz&oacute;n Y SU CORREO (el alias conserva sus destinos)</span>
+<span class="cm">// Contrase&ntilde;a nueva (se devuelve una sola vez)</span>
+<span class="kw">const</span> { password } = <span class="kw">await</span> mm.aliases.<span class="fn">resetMailboxPassword</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
 <span class="kw">await</span> mm.aliases.<span class="fn">deleteMailbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);</code></pre>
 
       <!-- DNS -->
       <h2 id="dns" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">DNS</h2>
-      <p class="text-fg-muted mb-4">Si MailMask lleva el DNS de tu dominio, puedes editar sus registros desde el SDK. Para un dominio que registraste fuera, primero se crea la zona: copiamos lo que encontremos de tu proveedor actual y te damos los nameservers que hay que cambiar en tu registrador. <strong class="text-fg">Hasta que los cambies, nada de lo que edites tiene efecto.</strong></p>
+      <p class="text-fg-muted mb-4">El editor de DNS viene con el <strong class="text-fg">dominio activado</strong>, y crear o editar registros es cosa del <strong class="text-fg">due&ntilde;o o un administrador</strong>: un agente de la Bandeja puede verlos, no cambiarlos. Si MailMask lleva el DNS de tu dominio, puedes editar sus registros desde el SDK. Para un dominio que registraste fuera, primero se crea la zona: copiamos lo que encontremos de tu proveedor actual y te damos los nameservers que hay que cambiar en tu registrador. <strong class="text-fg">Hasta que los cambies, nada de lo que edites tiene efecto.</strong></p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Estado de la zona y registros actuales</span>
 <span class="kw">const</span> { zone, records } = <span class="kw">await</span> mm.dns.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
 console.<span class="fn">log</span>(zone.status); <span class="cm">// "none" | "pending_delegation" | "active"</span>
@@ -488,7 +490,7 @@ claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \
       <p class="text-fg-muted mb-2">Herramientas (cada una es un m&eacute;todo del SDK, con las mismas reglas y l&iacute;mites):</p>
       <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-4">
         <li><strong>Dominios</strong>: <code>list_domains</code>, <code>get_domain</code>, <code>create_domain</code> (devuelve los registros DNS: MX, TXT, DKIM, SPF), <code>verify_domain</code>, <code>domain_health</code>, <code>delete_domain</code>.</li>
-        <li><strong>M&aacute;scaras y buzones</strong>: <code>list_aliases</code>, <code>create_alias</code> (con <code>mailbox: true</code> crea tambi&eacute;n el buz&oacute;n IMAP), <code>update_alias</code>, <code>delete_alias</code>, <code>create_mailbox</code>, <code>delete_mailbox</code>.</li>
+        <li><strong>M&aacute;scaras y buzones</strong>: <code>list_aliases</code>, <code>create_alias</code> (con <code>mailbox: true</code> crea tambi&eacute;n el buz&oacute;n IMAP), <code>update_alias</code>, <code>delete_alias</code>, <code>create_mailbox</code>, <code>delete_mailbox</code>, <code>reset_mailbox_password</code> (contrase&ntilde;a nueva, devuelta una sola vez).</li>
         <li><strong>Reglas</strong>: <code>list_rules</code>, <code>create_rule</code>, <code>update_rule</code>, <code>delete_rule</code>.</li>
         <li><strong>Webhooks</strong>: <code>list_webhooks</code>, <code>create_webhook</code>, <code>update_webhook</code>, <code>delete_webhook</code>, <code>test_webhook</code>, <code>webhook_deliveries</code>.</li>
         <li><strong>DNS</strong>: <code>list_dns_records</code>, <code>create_dns_zone</code>, <code>dns_delegation_status</code>, <code>set_dns_record</code>, <code>delete_dns_record</code>, <code>import_dns_records</code>, <code>point_domain_to</code> (apunta el dominio a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render o Fly sin saber qu&eacute; registros hacen falta).</li>

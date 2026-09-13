@@ -105,7 +105,10 @@ describe("Libro mayor: folios y listado", () => {
       assert.ok(all[i - 1].createdAt >= all[i].createdAt, "orden descendente");
     }
     assert.equal(listOrders(email, { limit: 2 }).length, 2);
+    // Cuatro órdenes creadas en el mismo milisegundo empataban en `createdAt` y SQLite
+    // desempataba a su antojo: la lista salía distinta en cada corrida.
     assert.equal(getLastOrder(email)?.id, all[0].id);
+    assert.deepEqual(listOrders(email).map((o) => o.id), all.map((o) => o.id));
   });
 });
 

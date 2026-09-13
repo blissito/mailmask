@@ -11,6 +11,8 @@ import assert from "node:assert/strict";
 const suffix = Date.now();
 // Lo que "dice AWS". Los tests lo mueven para comprobar que la base lo sigue.
 const aws = { expirationDate: "2027-06-01T00:00:00.000Z", autoRenew: true };
+/** Dominios que ya salieron de la cuenta de AWS (transfer-out consumado). */
+const fueraDeLaCuenta = new Set<string>();
 const alertas: { tipo: string; mensaje: string }[] = [];
 const correos: { to: string; subject: string }[] = [];
 
@@ -22,7 +24,17 @@ describe("renovación anual de dominios", () => {
   before(async () => {
     mock.module("./route53.ts", {
       namedExports: {
-        getDomainDetail: async () => ({ ...aws, nameservers: [], statusList: [], transferLock: false }),
+        getDomainDetail: async (d: string) => {
+          // Un dominio que ya salió de la cuenta deja de tener detalle: es la segunda
+          // opinión que se pide antes de cerrar su cobro.
+          if (fueraDeLaCuenta.has(d)) throw new Error("DomainNotFound");
+          return { ...aws, nameservers: [], statusList: [], transferLock: false };
+        },
+        // Lo que sigue en la cuenta. Lo que no aparezca aquí se toma por un transfer-out
+        // consumado, que es el único momento seguro para dejar de cobrar la renovación.
+        listRegisteredDomains: async () => dbmod.getDomainRegistrationsByStatus("registered")
+          .filter((r: { domainName: string }) => !fueraDeLaCuenta.has(r.domainName))
+          .map((r: { domainName: string }) => ({ domainName: r.domainName, expirationDate: aws.expirationDate, autoRenew: aws.autoRenew })),
       },
     });
     const realSes = await import("./ses.ts");
@@ -90,6 +102,18 @@ describe("renovación anual de dominios", () => {
     const digest = alertas.find((a) => a.tipo === "dominios-sin-renovacion");
     assert.ok(digest, "falta el digest que evita que paguemos dominios ajenos");
     assert.match(digest!.mensaje, /nos los va a cobrar/);
+  });
+
+  it("un dominio que ya no está en la cuenta cierra su cobro: el transfer-out se consumó", async () => {
+    const reg = registrar({ renewalStatus: "active", mpPreapprovalId: "pre-1" });
+    fueraDeLaCuenta.add(reg.domainName);
+    await sync.syncDomainExpirations();
+    fueraDeLaCuenta.delete(reg.domainName);
+
+    const despues = dbmod.getDomainRegistration(reg.id);
+    assert.equal(despues.status, "transferred_out");
+    assert.equal(despues.renewalStatus, "cancelled");
+    assert.ok(alertas.some((a) => a.tipo === "transfer-out-completado"));
   });
 
   it("los avisos van a 75, 30 y 7 días, y cada hito una sola vez", async () => {

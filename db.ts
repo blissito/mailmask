@@ -956,18 +956,26 @@ export function recordOrder(input: NewOrder): Order | null {
   throw new Error("No se pudo generar un folio único para la orden");
 }
 
+/**
+ * Dos órdenes del mismo milisegundo empataban en `createdAt`, y SQLite resolvía el empate
+ * como le vino en gana: la lista salía en un orden distinto cada vez y `getLastOrder` podía
+ * no coincidir con la primera fila de `listOrders`. `rowid` desempata por orden de
+ * inserción, que es justo lo que "la más reciente" quiere decir.
+ */
+const ORDEN_LIBRO = [desc(orders.createdAt), rawSql`orders.rowid desc`];
+
 export function listOrders(email: string, opts?: { limit?: number; before?: string }): Order[] {
   const limit = Math.min(opts?.limit ?? 50, 200);
   const where = opts?.before
     ? and(eq(orders.userEmail, email), lt(orders.createdAt, opts.before))
     : eq(orders.userEmail, email);
   return db.select().from(orders).where(where)
-    .orderBy(desc(orders.createdAt)).limit(limit).all().map(rowToOrder);
+    .orderBy(...ORDEN_LIBRO).limit(limit).all().map(rowToOrder);
 }
 
 export function getLastOrder(email: string): Order | null {
   const r = db.select().from(orders).where(eq(orders.userEmail, email))
-    .orderBy(desc(orders.createdAt)).limit(1).get();
+    .orderBy(...ORDEN_LIBRO).limit(1).get();
   return r ? rowToOrder(r) : null;
 }
 
@@ -984,7 +992,7 @@ export function getOrderByEventKey(eventKey: string): Order | null {
 export function listOrdersForSubject(subject: OrderSubject, subjectId: string): Order[] {
   return db.select().from(orders)
     .where(and(eq(orders.subject, subject), eq(orders.subjectId, subjectId)))
-    .orderBy(desc(orders.createdAt)).all().map(rowToOrder);
+    .orderBy(...ORDEN_LIBRO).all().map(rowToOrder);
 }
 
 // Otorga un add-on de cortesía: la fila del add-on y su asiento en el libro mayor, o
@@ -2311,13 +2319,19 @@ export type DomainRegistrationStatus =
   // Transfer-in: la solicitud tarda 5-7 días y depende de que el cliente apruebe el correo
   // que manda AWS, así que necesita estados propios antes de entrar al pipeline normal.
   | "transfer_pending_payment" | "transfer_paid" | "transfer_submitted"
-  | "transfer_awaiting_approval" | "transfer_failed" | "transfer_cancelled";
+  | "transfer_awaiting_approval" | "transfer_failed" | "transfer_cancelled"
+  // El dominio ya salió de nuestra cuenta: es el único momento seguro para dejar de
+  // cobrarle la renovación al cliente y de pagarla nosotros.
+  | "transferred_out";
 
 export type DomainRegistrationKind = "register" | "transfer";
 export type DomainRenewalStatus = "none" | "active" | "past_due" | "cancelled";
 export type DnsImportStatus = "none" | "discovered" | "approved";
 
 export interface DnsSnapshotRecord { name: string; type: string; ttl: number; values: string[] }
+
+export type { WhoisContacto } from "./schema.js";
+import type { WhoisContacto } from "./schema.js";
 
 export interface DomainRegistration {
   id: string;
@@ -2352,6 +2366,7 @@ export interface DomainRegistration {
   dnsSnapshot: DnsSnapshotRecord[] | null;
   dnsSnapshotAt: string | null;
   dnsImportStatus: DnsImportStatus;
+  whoisContact: WhoisContacto | null;
 }
 
 /** Lo que puede ver el cliente. `awsCostCents` es nuestro costo interno y salía en la API. */
@@ -2370,6 +2385,7 @@ export function createDomainRegistration(data: {
   renewalPriceCents?: number;
   transferAuthCodeHint?: string;
   dnsSnapshot?: DnsSnapshotRecord[];
+  whoisContact?: WhoisContacto;
 }): DomainRegistration {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -2389,6 +2405,7 @@ export function createDomainRegistration(data: {
     dnsSnapshot: data.dnsSnapshot ?? null,
     dnsSnapshotAt: data.dnsSnapshot ? now : null,
     dnsImportStatus: data.dnsSnapshot ? "discovered" : "none",
+    whoisContact: data.whoisContact ?? null,
   }).run();
   return getDomainRegistration(id)!;
 }
@@ -2418,7 +2435,8 @@ type CamposRegistro =
   | "kind" | "mpPreapprovalId" | "renewalStatus" | "renewalPriceCents" | "nextChargeAt"
   | "lastSyncedAt" | "awsAutoRenew" | "warnedAt" | "dunningStartedAt"
   | "transferAuthCodeHint" | "transferRequestedAt" | "transferApprovedAt"
-  | "previousRegistrar" | "dnsSnapshot" | "dnsSnapshotAt" | "dnsImportStatus";
+  | "previousRegistrar" | "dnsSnapshot" | "dnsSnapshotAt" | "dnsImportStatus"
+  | "whoisContact";
 
 /** `autoRenew` estaba en la tabla desde el principio y esta función no dejaba escribirlo. */
 export function updateDomainRegistration(

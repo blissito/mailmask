@@ -106,6 +106,9 @@ describe("API de DNS", () => {
     csrf = /csrf_token=([^;]+)/.exec(cookie)?.[1] ?? "";
 
     domainId = dbmod.createDomain(email, dominio, ["a1", "b2", "c3"], "tokverif").id;
+    // El editor de DNS viene con el dominio activado: cada hosted zone nos cuesta dinero.
+    const addon = dbmod.createAddon(email, "domain", domainId);
+    dbmod.updateAddon(addon.id, { status: "active", currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString() });
 
     const otroEmail = `dns-otro-${suffix}@example.com`;
     dbmod.createUser(otroEmail, await hashPassword("password123"));
@@ -138,6 +141,38 @@ describe("API de DNS", () => {
     const j = await r.json();
     assert.equal(j.zone.status, "none");
     assert.match(j.hint, /dns\/zone/);
+  });
+
+  it("un agente de la Bandeja no puede tocar el DNS", async () => {
+    // `agent` tiene permiso de escritura para responder correos; con eso podía repuntar la
+    // web del cliente o emitirse un certificado con un `_acme-challenge`.
+    conZona();
+    const { hashPassword } = await import("./auth.ts");
+    const agente = `agente-${suffix}@example.com`;
+    dbmod.createUser(agente, await hashPassword("password123"));
+    dbmod.createAgent({ domainId, email: agente, name: "Agente", role: "agent" });
+
+    const login = await app.fetch(new Request("http://localhost/api/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: agente, password: "password123" }),
+    }));
+    // deno-lint-ignore no-explicit-any
+    const galletas = (login.headers as any).getSetCookie?.() ?? [login.headers.get("set-cookie") ?? ""];
+    const suCookie = galletas.map((c: string) => c.split(";")[0]).join("; ");
+    const suCsrf = /csrf_token=([^;]+)/.exec(suCookie)?.[1] ?? "";
+    const r = await app.fetch(new Request(`http://localhost/api/domains/${domainId}/dns/records`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", cookie: suCookie, "x-csrf-token": suCsrf },
+      body: JSON.stringify({ name: "www", type: "CNAME", values: ["suyo.example.com"] }),
+    }));
+    assert.equal(r.status, 404);
+  });
+
+  it("un dominio sin activar no puede crear zona: la pagamos nosotros", async () => {
+    sinZona();
+    const libre = dbmod.createDomain(email, `libre-${suffix}.com`, ["z"], "t2").id;
+    const r = await pedir(`/api/domains/${libre}/dns/zone`, { method: "POST" });
+    assert.equal(r.status, 403);
   });
 
   it("crea la zona importando primero lo del proveedor anterior", async () => {

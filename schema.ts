@@ -287,6 +287,20 @@ export const smtpCredentials = sqliteTable("smtp_credentials", {
   revokedAt: text("revoked_at"),
 });
 
+/** Los campos que Route 53 exige para el contacto de un dominio. */
+export interface WhoisContacto {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  zip: string;
+  organization?: string;
+}
+
 export const domainRegistrations = sqliteTable("domain_registrations", {
   id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
   domainId: text("domain_id").references(() => domains.id),
@@ -326,6 +340,9 @@ export const domainRegistrations = sqliteTable("domain_registrations", {
   dnsSnapshot: text("dns_snapshot", { mode: "json" }).$type<{ name: string; type: string; ttl: number; values: string[] }[]>(),
   dnsSnapshotAt: text("dns_snapshot_at"),
   dnsImportStatus: text("dns_import_status").$type<"none" | "discovered" | "approved">().notNull().default("none"),
+  // Datos del cliente para el WHOIS (0022). En un transfer-in el dominio ya era suyo:
+  // ponerlo a nombre de MailMask le quitaría la titularidad.
+  whoisContact: text("whois_contact", { mode: "json" }).$type<WhoisContacto>(),
 }, (table) => [
   index("idx_domain_reg_owner").on(table.ownerEmail),
   index("idx_domain_reg_status").on(table.status),

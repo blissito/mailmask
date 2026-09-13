@@ -357,6 +357,7 @@ describe("SDK ↔ servidor: contrato", () => {
     // createMailbox pega a la ruta real (aquí 502: Stalwart no configurado), no a un 404.
     await assert.rejects(() => dev.aliases.createMailbox(devDomainId, `buzon-${suffix}`), (e: MailMaskError) => e.status === 502);
     await assert.rejects(() => dev.aliases.deleteMailbox(devDomainId, `buzon-${suffix}`), (e: MailMaskError) => e.status === 404);
+    await assert.rejects(() => dev.aliases.resetMailboxPassword(devDomainId, `buzon-${suffix}`), (e: MailMaskError) => e.status === 404);
   });
 
   it("apiKeys.create devuelve la llave una vez y revoke la invalida", async () => {
@@ -552,6 +553,13 @@ describe("SDK ↔ servidor: contrato", () => {
   });
 
   it("dns: createZone deja la zona lista y en espera de delegación", async () => {
+    // El editor de DNS viene con el dominio activado: cada hosted zone nos cuesta dinero.
+    const activacion = dbmod.createAddon(email, "domain", domainId);
+    dbmod.updateAddon(activacion.id, {
+      status: "active",
+      currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString(),
+    });
+
     const z = await mm.dns.createZone(domainId);
     assert.equal(z.hostedZoneId, "ZSDK");
     assert.deepEqual(z.nameservers, ["ns-1.awsdns-01.com"]);

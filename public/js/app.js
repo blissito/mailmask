@@ -1189,7 +1189,23 @@ async function iniciarTransferencia(dominio) {
     </div>
     ${bloqueado ? `<p class="text-sm text-amber-600 mb-3">Arregla lo marcado con ✗ en tu registrador actual y vuelve a intentarlo.</p>` : `
       <label class="block text-xs text-fg-muted mb-1">Código de autorización (EPP)</label>
-      <input id="transf-code" placeholder="Lo pides en tu registrador actual" class="w-full bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg font-mono mb-3">
+      <input id="transf-code" placeholder="Lo pides en tu registrador actual" class="w-full bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg font-mono mb-4">
+      <p class="text-xs text-fg-muted mb-2">Tus datos para el WHOIS. El dominio queda <strong>a tu nombre</strong>, no al nuestro, y el registro exige que sean reales.</p>
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        ${[
+          ["firstName", "Nombre", "text"],
+          ["lastName", "Apellido", "text"],
+          ["email", "Correo", "email"],
+          ["phone", "Teléfono (+52.5512345678)", "text"],
+          ["address", "Calle y número", "text"],
+          ["city", "Ciudad", "text"],
+          ["state", "Estado", "text"],
+          ["zip", "Código postal", "text"],
+          ["country", "País (MX)", "text"],
+          ["organization", "Empresa (opcional)", "text"],
+        ].map(([campo, etiqueta, tipo]) => `
+          <input data-whois="${campo}" type="${tipo}" placeholder="${etiqueta}" class="bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg">`).join("")}
+      </div>
       <p id="transf-error" class="text-sm text-red-500 mb-2 hidden"></p>
       <button type="button" id="transf-pagar" class="w-full bg-accent hover:bg-accent/90 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
         Transferir por $${(data.price / 100).toFixed(0)} MXN · incluye 1 año
@@ -1206,10 +1222,13 @@ async function iniciarTransferencia(dominio) {
       err.classList.remove("hidden");
       return;
     }
+    const whois = {};
+    dlg.querySelectorAll("[data-whois]").forEach((i) => { whois[i.dataset.whois] = i.value.trim(); });
+
     const r = await fetch("/api/domains/transfer/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ domain: dominio, authCode: code, dnsRecords: data.dns.found }),
+      body: JSON.stringify({ domain: dominio, authCode: code, dnsRecords: data.dns.found, whois }),
     });
     const j = await r.json();
     if (!r.ok) {

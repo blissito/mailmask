@@ -182,6 +182,18 @@ describe("guardián de los registros de MailMask", () => {
     assert.equal(aplicarGuardian("upsert", rr("google._domainkey.ejemplo.com", "TXT", ['"v=DKIM1"']), dominio), null);
   });
 
+  it("protege un DKIM de SES aunque no esté en la lista de tokens", () => {
+    // `dkimTokens` puede venir vacía o desfasada (un dominio a medio verificar, una fila
+    // restaurada de un respaldo) y entonces la firma del cliente quedaba borrable.
+    const sinTokens = { ...dominio, dkimTokens: [] };
+    const token = "a".repeat(32);
+    assert.ok(aplicarGuardian("delete", rr(`${token}._domainkey.ejemplo.com`, "CNAME", [`${token}.dkim.amazonses.com`]), sinTokens));
+    // También el intento de sustituirla por otro destino.
+    assert.ok(aplicarGuardian("upsert", rr(`${token}._domainkey.ejemplo.com`, "CNAME", ["mio.example.com"]), sinTokens));
+    // Y el DKIM de otro proveedor sigue siendo del cliente.
+    assert.equal(aplicarGuardian("upsert", rr("k1._domainkey.ejemplo.com", "CNAME", ["dkim.mailchimp.com"]), sinTokens), null);
+  });
+
   it("protege los NS de la raíz, que son de Route 53", () => {
     assert.ok(aplicarGuardian("upsert", rr("ejemplo.com", "NS", ["ns1.otro.com"]), dominio));
   });

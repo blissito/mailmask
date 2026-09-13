@@ -14,18 +14,19 @@ const correos: { to: string; subject: string }[] = [];
 const alertas: string[] = [];
 let zona: { name: string; type: string; ttl: number; values: string[] }[] = [];
 let estadoOperacion = "IN_PROGRESS";
+let transferible: { transferable: boolean; motivo: string | null } = { transferable: true, motivo: null };
 
 describe("transferencia de dominios", () => {
   // deno-lint-ignore no-explicit-any
-  let dbmod: any, prov: any, transfer: any;
+  let dbmod: any, prov: any, transfer: any, sqlite: any;
   const email = `transf-${suffix}@example.com`;
 
   before(async () => {
     mock.module("./route53.ts", {
       namedExports: {
-        checkTransferability: async () => ({ transferable: true, motivo: null }),
-        transferDomain: async (domain: string, authCode: string, ns: string[]) => {
-          llamadas.push({ op: "transferDomain", args: { domain, authCode, ns } });
+        checkTransferability: async () => transferible,
+        transferDomain: async (domain: string, authCode: string, ns: string[], contacto: unknown) => {
+          llamadas.push({ op: "transferDomain", args: { domain, authCode, ns, contacto } });
           return `op-${suffix}`;
         },
         getOperationStatus: async () => estadoOperacion,
@@ -80,6 +81,7 @@ describe("transferencia de dominios", () => {
     });
 
     dbmod = await import("./db.ts");
+    ({ sqlite } = await import("./pg.ts"));
     prov = await import("./domain-provision.ts");
     transfer = await import("./domain-transfer.ts");
 
@@ -87,7 +89,17 @@ describe("transferencia de dominios", () => {
     dbmod.createUser(email, await hashPassword("password123"));
   });
 
-  beforeEach(() => { llamadas.length = 0; correos.length = 0; alertas.length = 0; zona = []; estadoOperacion = "IN_PROGRESS"; });
+  beforeEach(() => {
+    llamadas.length = 0; correos.length = 0; alertas.length = 0; zona = [];
+    estadoOperacion = "IN_PROGRESS";
+    transferible = { transferable: true, motivo: null };
+    sqlite.prepare("DELETE FROM rate_limits").run();
+  });
+
+  const WHOIS = {
+    firstName: "Ana", lastName: "López", email: "ana@example.com", phone: "+52.5512345678",
+    address: "Calle 1", city: "CDMX", state: "CDMX", country: "mx", zip: "06600",
+  };
 
   const crear = (extra: Record<string, unknown> = {}) => {
     const reg = dbmod.createDomainRegistration({
@@ -211,6 +223,130 @@ describe("transferencia de dominios", () => {
     // Los que no se pueden verificar desde fuera se marcan como "confírmalo tú", no como ok.
     assert.equal(r.requisitos.find((x: { clave: string }) => x.clave === "whois").ok, null);
   });
+  // --- Lo que se comprueba ANTES de cobrar ---
+  //
+  // Vivía sólo en `/transfer/check`, o sea en el front: un POST directo aquí cobraba una
+  // transferencia imposible, y el reembolso es manual.
+
+  const iniciar = async (cuerpo: Record<string, unknown>) => {
+    const { app } = await import("./main.ts");
+    const { hashPassword } = await import("./auth.ts");
+    const correo = `start-${Math.random().toString(36).slice(2, 8)}-${suffix}@example.com`;
+    dbmod.createUser(correo, await hashPassword("password123"));
+    const login = await app.fetch(new Request("http://localhost/api/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: correo, password: "password123" }),
+    }));
+    // deno-lint-ignore no-explicit-any
+    const galletas = (login.headers as any).getSetCookie?.() ?? [login.headers.get("set-cookie") ?? ""];
+    const cookie = galletas.map((c: string) => c.split(";")[0]).join("; ");
+    const csrf = /csrf_token=([^;]+)/.exec(cookie)?.[1] ?? "";
+    const res = await app.fetch(new Request("http://localhost/api/domains/transfer/start", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie, "x-csrf-token": csrf },
+      body: JSON.stringify(cuerpo),
+    }));
+    return { res, correo };
+  };
+
+  it("sin datos de WHOIS no se cobra: el dominio ya es del cliente", async () => {
+    const { res } = await iniciar({ domain: `sinwhois-${suffix}.com`, authCode: "EPP" });
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).error, /WHOIS/i);
+    assert.equal(dbmod.getDomainRegistrationByDomainName(`sinwhois-${suffix}.com`), null);
+  });
+
+  it("un teléfono que Route 53 no acepta se rechaza aquí, no en AWS", async () => {
+    const { res } = await iniciar({
+      domain: `tel-${suffix}.com`, authCode: "EPP", whois: { ...WHOIS, phone: "5512345678" },
+    });
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).error, /tel/i);
+  });
+
+  it("un dominio que AWS no puede mover no llega al cobro", async () => {
+    transferible = { transferable: false, motivo: "El registro lo tiene bloqueado." };
+    const dominio = `nomueve-${suffix}.com`;
+    const { res } = await iniciar({ domain: dominio, authCode: "EPP", whois: WHOIS });
+    assert.equal(res.status, 400);
+    // Y no queda fila cobrable: si la hubiera, el dominio quedaría bloqueado para siempre.
+    assert.equal(dbmod.getDomainRegistrationByDomainName(dominio), null);
+  });
+
+  it("un dominio que ya está en otra cuenta de MailMask no se cobra", async () => {
+    const dominio = `ajeno-${suffix}.com`;
+    dbmod.createDomain(email, dominio, ["dk"], "vf");
+    const { res } = await iniciar({ domain: dominio, authCode: "EPP", whois: WHOIS });
+    assert.equal(res.status, 409);
+  });
+
+  it("no se puede borrar un dominio que sigue registrado a través de MailMask", async () => {
+    // Borrar la fila no borra nada en AWS: el registro se queda renovándose a nuestra costa
+    // y el preapproval le sigue cobrando al cliente algo que ya no tiene.
+    const { app } = await import("./main.ts");
+    const { hashPassword } = await import("./auth.ts");
+    const dueño = `borra-${suffix}@example.com`;
+    dbmod.createUser(dueño, await hashPassword("password123"));
+    const login = await app.fetch(new Request("http://localhost/api/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: dueño, password: "password123" }),
+    }));
+    // deno-lint-ignore no-explicit-any
+    const galletas = (login.headers as any).getSetCookie?.() ?? [login.headers.get("set-cookie") ?? ""];
+    const cookie = galletas.map((c: string) => c.split(";")[0]).join("; ");
+    const csrf = /csrf_token=([^;]+)/.exec(cookie)?.[1] ?? "";
+
+    const nombre = `borrable-${suffix}.com`;
+    const d = dbmod.createDomain(dueño, nombre, ["dk"], "vf");
+    const reg = dbmod.createDomainRegistration({
+      domainName: nombre, ownerEmail: dueño, tld: ".com", priceCents: 59900, awsCostCents: 1300,
+    });
+    dbmod.updateDomainRegistration(reg.id, { status: "registered" });
+
+    const r = await app.fetch(new Request(`http://localhost/api/domains/${d.id}`, {
+      method: "DELETE", headers: { cookie, "x-csrf-token": csrf },
+    }));
+    assert.equal(r.status, 409);
+    assert.match((await r.json()).error, /traslado a otro registrador/);
+    assert.ok(dbmod.getDomainByName(nombre), "borró el dominio de todos modos");
+  });
+
+  it("el contacto WHOIS del cliente viaja a AWS: el dominio queda a su nombre", async () => {
+    const reg = crear({ whoisContact: WHOIS });
+    transfer.guardarAuthCode(reg.id, "EPP-OK");
+    await prov.iniciarTransferencia(dbmod.getDomainRegistration(reg.id));
+    // deno-lint-ignore no-explicit-any
+    const llamada = llamadas.find((l) => l.op === "transferDomain")!.args as any;
+    assert.equal(llamada.contacto.firstName, "Ana");
+  });
+
+  it("una transferencia pagada que nunca se mandó a AWS acaba alertando", async () => {
+    const reg = crear({ status: "transfer_paid" });
+    dbmod.updateDomainRegistration(reg.id, { status: "transfer_paid" });
+    // Se le añaden dos días de antigüedad: el auth code vive una hora y no sobrevive a un
+    // deploy, así que esto es "cobrado y sin transferencia".
+    sqlite.prepare("UPDATE domain_registrations SET created_at = ? WHERE id = ?")
+      .run(new Date(Date.now() - 2 * 864e5).toISOString(), reg.id);
+
+    await prov.sondearTransferencias();
+    assert.ok(alertas.some((a) => /nunca se mandó a AWS/.test(a)), "no alertó del cobro sin transferencia");
+    assert.equal(dbmod.getDomainRegistration(reg.id).warnedAt, "sin-auth-code");
+  });
+
+  it("no se activa el dominio en la cuenta de quien se adelantó a agregarlo", async () => {
+    const otro = `otro-${suffix}@example.com`;
+    const { hashPassword } = await import("./auth.ts");
+    dbmod.createUser(otro, await hashPassword("password123"));
+    const reg = crear({ dnsImportStatus: "approved", status: "registering" });
+    dbmod.createDomain(otro, reg.domainName, ["dk"], "vf");
+
+    await prov.finalizeDomainRegistration(dbmod.getDomainRegistration(reg.id));
+
+    assert.equal(dbmod.getDomainRegistration(reg.id).lastError, "dominio_en_otra_cuenta");
+    assert.ok(!llamadas.some((l) => l.op === "updateNameservers"), "tocó los nameservers de un dominio ajeno");
+    assert.ok(alertas.some((a) => /otra cuenta|hay que resolver a mano/.test(a)));
+  });
+
   it("el pago del dominio entra por el webhook PRINCIPAL de MercadoPago", async () => {
     // El panel de MP acepta una sola URL por aplicación. Hubo un momento en que estos pagos
     // tenían ruta propia, y sólo funcionaba mientras MP respetara el notification_url que

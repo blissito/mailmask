@@ -253,13 +253,42 @@ export function registrosGestionados(d: DominioGestionado): Gestionado[] {
   return lista;
 }
 
+/**
+ * Un CNAME de DKIM de SES, aunque no esté en `dkimTokens`. La lista de tokens puede venir
+ * vacía o desfasada (un dominio a medio verificar, una fila restaurada de un respaldo), y
+ * entonces la firma del cliente quedaba editable: cualquiera podía borrarla.
+ */
+function esDkimDeSes(r: RRSet, apex: string): boolean {
+  // Sólo se mira lo que vive bajo `_domainkey`: un CNAME cualquiera que apunte a Amazon no
+  // es nuestra firma y bloquearlo sería frenar al cliente por parecido.
+  if (r.type !== "CNAME" || !r.name.endsWith(`._domainkey.${apex}`)) return false;
+  // Por el nombre (el token de SES son 32 caracteres) o por el destino. Lo primero atrapa
+  // también el intento de *sustituir* la firma por otro valor; lo segundo, un token que no
+  // conocíamos. Un `k1._domainkey` de Mailchimp o un `google._domainkey` siguen siendo del
+  // cliente: sólo se protege lo que es de SES.
+  const nombreDeSes = new RegExp(`^[a-z0-9]{32}\\._domainkey\\.${apex.replace(/\./g, "\\.")}$`).test(r.name);
+  const destinoDeSes = r.values.some((v) => v.toLowerCase().replace(/\.$/, "").endsWith(".dkim.amazonses.com"));
+  return nombreDeSes || destinoDeSes;
+}
+
+const DKIM_GESTIONADO: Omit<Gestionado, "name" | "type"> = {
+  modo: "total",
+  razon: "Firma DKIM de tu dominio",
+};
+
+/** El gestionado que le toca a un RRSet, si es que le toca alguno. */
+function gestionadoDe(r: RRSet, gestionados: Gestionado[], apex: string): Gestionado | undefined {
+  return gestionados.find((x) => x.name === r.name && x.type === r.type)
+    ?? (esDkimDeSes(r, apex) ? { ...DKIM_GESTIONADO, name: r.name, type: r.type } : undefined);
+}
+
 /** Anota una lista de RRSets para la UI y para el agente. */
 export function anotarRegistros(registros: RRSet[], d: DominioGestionado): RRSetAnotado[] {
   const gestionados = registrosGestionados(d);
   const apex = d.domain.toLowerCase();
 
   return registros.map((r) => {
-    const g = gestionados.find((x) => x.name === r.name && x.type === r.type);
+    const g = gestionadoDe(r, gestionados, apex);
     if (!g) {
       // Los NS y el SOA de la raíz son de Route 53; se ven, no se tocan.
       if (r.name === apex && (r.type === "NS" || (r.type as string) === "SOA")) {
@@ -291,8 +320,8 @@ export function aplicarGuardian(
   rrset: RRSet,
   d: DominioGestionado,
 ): ErrorDns | null {
-  const g = registrosGestionados(d).find((x) => x.name === rrset.name && x.type === rrset.type);
   const apex = d.domain.toLowerCase();
+  const g = gestionadoDe(rrset, registrosGestionados(d), apex);
 
   if (!g) {
     if (rrset.name === apex && (rrset.type === "NS" || (rrset.type as string) === "SOA")) {

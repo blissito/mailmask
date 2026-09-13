@@ -33,11 +33,29 @@ export async function syncDomainExpirations(): Promise<void> {
   const regs = getDomainRegistrationsByStatus("registered");
   if (!regs.length) return;
 
-  const { getDomainDetail } = await import("./route53.js");
+  const { getDomainDetail, listRegisteredDomains } = await import("./route53.js");
   const { sendAlert } = await import("./ses.js");
   const sinRenovacion: string[] = [];
 
+  // Una sola llamada para saber qué sigue en la cuenta. Un dominio que ya no está es un
+  // transfer-out consumado: es el único momento seguro para dejar de cobrarle la renovación
+  // al cliente, porque hasta que sale de verdad apagar el cobro sería perder el dominio.
+  // Una lista vacía se ignora: sería indistinguible de unas credenciales apuntando a otra
+  // cuenta, y cerraría el cobro de TODOS los dominios de un golpe.
+  const enLaCuenta = await listRegisteredDomains()
+    .then((d) => new Set(d.map((x) => x.domainName.toLowerCase())))
+    .catch(() => null);
+
   for (const reg of regs) {
+    if (enLaCuenta?.size && !enLaCuenta.has(reg.domainName.toLowerCase())) {
+      // Segunda opinión antes de dejar de cobrar: si AWS todavía nos da su detalle, el
+      // dominio sigue siendo nuestro y la ausencia en la lista era un espejismo.
+      const sigue = await getDomainDetail(reg.domainName).then(() => true).catch(() => false);
+      if (!sigue) {
+        await cerrarTransferOut(reg);
+        continue;
+      }
+    }
     try {
       const detalle = await getDomainDetail(reg.domainName);
       const expiresAt = detalle.expirationDate ?? reg.expiresAt;
@@ -75,6 +93,31 @@ export async function syncDomainExpirations(): Promise<void> {
       `Estos dominios vencen en menos de 90 días y NO tienen renovación cobrada:\n\n${sinRenovacion.join("\n")}\n\nAWS los va a renovar y nos los va a cobrar.`,
     );
   }
+}
+
+/** El dominio ya salió: se marca, se deja de cobrar y se avisa. */
+async function cerrarTransferOut(reg: DomainRegistration): Promise<void> {
+  const { sendAlert } = await import("./ses.js");
+  const token = process.env.MP_ACCESS_TOKEN;
+  if (reg.mpPreapprovalId && reg.renewalStatus === "active" && token) {
+    try {
+      const res = await fetch(`https://api.mercadopago.com/preapproval/${reg.mpPreapprovalId}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled" }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) throw new Error(await res.text());
+    } catch (err) {
+      log("error", "cron", "No se pudo cancelar la renovación de un dominio que ya salió", { domain: reg.domainName, error: String(err) });
+    }
+  }
+  updateDomainRegistration(reg.id, { status: "transferred_out", renewalStatus: "cancelled" });
+  log("warn", "cron", "Dominio fuera de la cuenta: transfer-out consumado", { domain: reg.domainName });
+  await sendAlert(
+    "transfer-out-completado",
+    `${reg.domainName} ya no está en nuestra cuenta de AWS: la salida de ${reg.ownerEmail} se completó. Cancelamos su renovación en MercadoPago; ya no pagamos nada por este dominio.`,
+  );
 }
 
 /** Avisos a T-75, T-30 y T-7. `warnedAt` guarda el hito ya avisado para no repetir. */

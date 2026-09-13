@@ -1,5 +1,6 @@
 import { log } from "./logger.js";
 import { AWS_REGION } from "./ses.js";
+import type { WhoisContacto } from "./db.js";
 
 // Lazy-loaded AWS SDK clients (same pattern as ses.ts)
 let _route53Domains: any;
@@ -24,18 +25,9 @@ async function getRoute53() {
 
 // --- WHOIS contact from env vars ---
 
-export interface WhoisContact {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  state: string;
-  country: string;
-  zip: string;
-  organization?: string;
-}
+// Definido en `db.ts` porque ahí vive la fila que lo guarda; aquí sólo se traduce a lo que
+// pide la API de Route 53.
+export type { WhoisContacto };
 
 /**
  * Contacto WHOIS. Sin argumento devuelve el de MailMask (los `REGISTRANT_*` del entorno),
@@ -43,7 +35,7 @@ export interface WhoisContact {
  * en un transfer-in el dominio ya era suyo y ponerlo a nuestro nombre le quitaría algo que
  * ya tenía. No hace falta cuenta de AWS del cliente, sólo estos datos.
  */
-function whoisContact(c?: WhoisContact) {
+function whoisContact(c?: WhoisContacto) {
   if (c) {
     return {
       FirstName: c.firstName,
@@ -59,18 +51,29 @@ function whoisContact(c?: WhoisContact) {
       ...(c.organization ? { OrganizationName: c.organization } : {}),
     };
   }
+  // Un WHOIS inexacto es causa de suspensión del dominio por el registro, así que los
+  // placeholders de antes (`+52.5555555555`, `Av. Reforma 222`) eran una bomba de tiempo:
+  // se veían bien y nadie los volvía a mirar. Ahora falta un dato = falla ruidosamente.
+  const env = {
+    FirstName: process.env.REGISTRANT_FIRST_NAME,
+    LastName: process.env.REGISTRANT_LAST_NAME,
+    Email: process.env.REGISTRANT_EMAIL,
+    PhoneNumber: process.env.REGISTRANT_PHONE,
+    AddressLine1: process.env.REGISTRANT_ADDRESS,
+    City: process.env.REGISTRANT_CITY,
+    State: process.env.REGISTRANT_STATE,
+    CountryCode: process.env.REGISTRANT_COUNTRY,
+    ZipCode: process.env.REGISTRANT_ZIP,
+  };
+  const faltan = Object.entries(env).filter(([, v]) => !v).map(([k]) => k);
+  if (faltan.length) {
+    throw new Error(`Faltan los datos del contacto WHOIS de MailMask en el entorno: ${faltan.join(", ")}`);
+  }
   return {
-    FirstName: process.env.REGISTRANT_FIRST_NAME ?? "MailMask",
-    LastName: process.env.REGISTRANT_LAST_NAME ?? "Inc",
-    Email: process.env.REGISTRANT_EMAIL ?? "admin@mailmask.studio",
-    PhoneNumber: process.env.REGISTRANT_PHONE ?? "+52.5555555555",
-    AddressLine1: process.env.REGISTRANT_ADDRESS ?? "Av. Reforma 222",
-    City: process.env.REGISTRANT_CITY ?? "CDMX",
-    State: process.env.REGISTRANT_STATE ?? "CDMX",
-    CountryCode: (process.env.REGISTRANT_COUNTRY ?? "MX") as any,
-    ZipCode: process.env.REGISTRANT_ZIP ?? "06600",
+    ...env,
+    CountryCode: env.CountryCode as any,
     ContactType: "COMPANY" as const,
-    OrganizationName: "MailMask",
+    OrganizationName: process.env.REGISTRANT_ORG ?? "MailMask",
   };
 }
 
@@ -92,7 +95,7 @@ export async function checkAvailability(domain: string): Promise<{ available: bo
 
 // --- Register domain ---
 
-export async function registerDomain(domain: string, contacto?: WhoisContact): Promise<string> {
+export async function registerDomain(domain: string, contacto?: WhoisContacto): Promise<string> {
   const client = await getRoute53Domains();
   const { RegisterDomainCommand } = await import("@aws-sdk/client-route-53-domains");
   const contact = whoisContact(contacto);
@@ -497,7 +500,10 @@ export async function checkTransferability(domain: string): Promise<{ transferab
   const t = res.Transferability?.Transferable ?? "DONT_KNOW";
 
   const motivos: Record<string, string> = {
-    UNTRANSFERRABLE: "El registrador actual no permite transferirlo todavía. Suele ser porque se registró o se transfirió hace menos de 60 días.",
+    // AWS lo escribe con una sola R; con dos, el cliente veía el enum crudo.
+    UNTRANSFERABLE: "El registrador actual no permite transferirlo todavía. Suele ser porque se registró o se transfirió hace menos de 60 días.",
+    DOMAIN_IN_OWN_ACCOUNT: "Este dominio ya está en nuestra cuenta de AWS. Escríbenos: no hay nada que transferir.",
+    DOMAIN_IN_ANOTHER_ACCOUNT: "El dominio está en otra cuenta de AWS. Tiene que salir de ahí antes de transferirlo.",
     DOESNT_HAVE_AUTHORIZATION_CODE: "Falta el código de autorización (EPP). Pídeselo a tu registrador actual.",
     DONT_KNOW: "No pudimos confirmarlo con el registrador. Puedes intentarlo de todos modos.",
     PREMIUM_DOMAIN: "Es un dominio premium y su transferencia se cotiza aparte. Escríbenos.",
@@ -519,7 +525,7 @@ export async function transferDomain(
   domain: string,
   authCode: string,
   nameservers: string[] = [],
-  contacto?: WhoisContact,
+  contacto?: WhoisContacto,
 ): Promise<string> {
   const client = await getRoute53Domains();
   const { TransferDomainCommand } = await import("@aws-sdk/client-route-53-domains");
@@ -581,7 +587,7 @@ export async function retrieveDomainAuthCode(domain: string): Promise<string> {
   return res.AuthCode ?? "";
 }
 
-export async function updateDomainContact(domain: string, contacto: WhoisContact): Promise<void> {
+export async function updateDomainContact(domain: string, contacto: WhoisContacto): Promise<void> {
   const client = await getRoute53Domains();
   const { UpdateDomainContactCommand } = await import("@aws-sdk/client-route-53-domains");
   const contact = whoisContact(contacto);
