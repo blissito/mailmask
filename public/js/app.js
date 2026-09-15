@@ -411,9 +411,11 @@ function renderStats() {
   const totalAliases = u.aliasesPerDomain.reduce((s, a) => s + a.current, 0);
   const totalForwards = domains.reduce((s, d) => s + (d.monthlyForwards ?? 0), 0);
   const sendsToday = (u.sendsPerDomain ?? []).reduce((s, d) => s + d.current, 0);
-  const sendsLimit = currentUser?.limits?.sends ?? 0;
-  const sendsUnlocked = currentUser?.limits?.sendsUnlocked ?? false;
-  const fwdPerHour = currentUser?.limits?.forwardPerHour ?? 0;
+  // Ya no hay `limits` global: cada dominio trae sus derechos en `porDominio`.
+  const derechos = (currentUser?.porDominio ?? []).map((d) => d.derechos ?? {});
+  const sendsLimit = derechos.reduce((s, d) => s + (d.sendsUnlocked ? d.sends ?? 0 : 0), 0);
+  const sendsUnlocked = derechos.some((d) => d.sendsUnlocked);
+  const fwdPerHour = Math.max(0, ...derechos.map((d) => d.forwardPerHour ?? 0));
   // Tope mensual por cuenta: es el que protege el margen (SES cobra por correo).
   const fwdMes = currentUser?.forwards?.current ?? 0;
   const fwdCap = currentUser?.forwards?.limit ?? 0;

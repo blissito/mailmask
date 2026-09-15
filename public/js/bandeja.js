@@ -173,8 +173,13 @@ async function checkAuth() {
   if (currentUser.isAdmin) { const al = document.getElementById("admin-link"); if (al) al.style.display = ""; }
 
   canDoActions = true;
-  // Responder está incluido en todos los planes; iniciar un correo nuevo no.
-  canCompose = currentUser.limits?.sendsUnlocked === true;
+}
+
+// Responder está incluido siempre; iniciar un correo nuevo depende del dominio
+// seleccionado. `/api/auth/me` ya no trae `limits` global: todo es `porDominio`.
+function actualizarPermisoRedactar() {
+  const d = (currentUser?.porDominio || []).find(x => x.id === selectedDomainId);
+  canCompose = d?.derechos?.sendsUnlocked === true;
 }
 
 // --- Domains ---
@@ -207,6 +212,7 @@ async function loadDomains() {
 // existentes: si no, la respuesta del contacto no se reenvía a ningún buzón.
 async function loadAliasesForCompose() {
   domainAliases = [];
+  actualizarPermisoRedactar();
   if (!selectedDomainId) return;
   try {
     const res = await fetch(`/api/domains/${selectedDomainId}/alias`);
