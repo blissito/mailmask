@@ -429,7 +429,7 @@ function renderStats() {
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
         <div>
           <span class="text-[11px] uppercase tracking-widest text-fg-subtle font-semibold">Dominios</span>
-          <div class="text-3xl font-light text-fg mt-1">${u.domains.current}<span class="text-lg text-fg-subtle">/${u.domains.limit}</span></div>
+          <div class="text-3xl font-light text-fg mt-1">${u.domains.current}${u.domains.limit == null ? "" : `<span class="text-lg text-fg-subtle">/${u.domains.limit}</span>`}</div>
         </div>
         <div>
           <span class="text-[11px] uppercase tracking-widest text-fg-subtle font-semibold">Alias</span>
