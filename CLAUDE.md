@@ -404,6 +404,16 @@ La clave del sitio es pública y vive en el HTML; la secreta es `TURNSTILE_SECRE
 
 ## TODO
 
+- [ ] **Renombrar identificadores en español a inglés** (anotado 15-sep-2026). Regla del repo: código en
+  inglés, comentarios y strings en español. Se coló mucho legado: `derechosDeDominio`, `porDominio`,
+  `suscripcionLegadoVigente`, `dominioMasAntiguo`, `esGratis`/`bloqueado`/`activado` en `DerechosDominio`,
+  `revisarPatron`, `acotarTexto`, `programar`, `precioDeTransferencia`, `asegurarDominio`, `crearBuzon`,
+  `purgarConversacionesGratis`, `procesarPagoDominio`, `bytesDeBuzonesDelDominio`, `corteRetencion`,
+  `ajustarIframe`, `convsNuevasEnVivo`, `seleccionadas`… Inventariar con
+  `grep -rnoE "(function|const|let) [a-z]+[áéíóúñ]?[A-Za-z]*(ar|er|ir|ado|ida|ion|os|as)\b"` y revisar a mano.
+  Ojo: `porDominio`/`derechos` viajan en el JSON de `/api/auth/me` y los lee el front — renombrar los dos
+  lados en el mismo commit, y el MCP/SDK si exponen alguno. Sin cambiar comportamiento; `npm test` en verde.
+
 ## Modelo de precios: gratis + $99 por dominio (construido el 7-sep-2026)
 
 Se tira el modelo de planes. **Todas las cuentas son gratis** y se compran tres cosas,
