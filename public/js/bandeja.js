@@ -177,7 +177,7 @@ async function checkAuth() {
 
 // Responder está incluido siempre; iniciar un correo nuevo depende del dominio
 // seleccionado. `/api/auth/me` ya no trae `limits` global: todo es `porDominio`.
-function actualizarPermisoRedactar() {
+function updateComposePermission() {
   const d = (currentUser?.porDominio || []).find(x => x.id === selectedDomainId);
   canCompose = d?.derechos?.sendsUnlocked === true;
 }
@@ -212,7 +212,7 @@ async function loadDomains() {
 // existentes: si no, la respuesta del contacto no se reenvía a ningún buzón.
 async function loadAliasesForCompose() {
   domainAliases = [];
-  actualizarPermisoRedactar();
+  updateComposePermission();
   if (!selectedDomainId) return;
   try {
     const res = await fetch(`/api/domains/${selectedDomainId}/alias`);
