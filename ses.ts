@@ -438,6 +438,24 @@ export class S3FetchError extends Error {
   }
 }
 
+/** Días que el bucket conserva `inbound/` antes de que la lifecycle policy lo borre
+ * (`expire-inbound-90d`, decisión del 15-sep-2026: los planes no prometen respaldo permanente). */
+export const INBOUND_RETENTION_DAYS = 90;
+
+export type DegradedBody = "index" | "gone" | "expired" | "expired_gone" | "error";
+
+/**
+ * Qué le decimos al usuario cuando el cuerpo no se pudo leer de S3. Un NOT_FOUND
+ * pasada la retención es lo esperado ("expired"); antes de tiempo es que algo se
+ * perdió ("index"/"gone"), y eso sí merece un log de error.
+ */
+export function degradedBodyState(code: S3ErrorCode, createdAt: string, hasIndexedText: boolean): DegradedBody {
+  if (code !== "NOT_FOUND") return "error";
+  const expired = Date.now() - new Date(createdAt).getTime() > INBOUND_RETENTION_DAYS * 86_400_000;
+  if (expired) return hasIndexedText ? "expired" : "expired_gone";
+  return hasIndexedText ? "index" : "gone";
+}
+
 /** Exportada para poder probarla: es la que decide qué ve el usuario. */
 export function clasificarErrorS3(err: any): S3ErrorCode {
   const status = err?.$metadata?.httpStatusCode;

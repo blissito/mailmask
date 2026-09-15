@@ -355,7 +355,15 @@ Es lo que justifica el plan Equipo frente a Front/Help Scout ($25 USD por asient
 
 El cuerpo del correo entrante **no se guarda en `messages.body` a propósito**: vive en S3 y su texto plano en el índice FTS. `fetchEmailFromS3` clasifica el fallo (`NOT_FOUND` / `DENIED` / `OTHER`, `S3FetchError` en `ses.ts`) y el detalle degrada en tres estados distintos — rescatado del índice, ya no disponible, o error de verdad.
 
-🔴 **Pendiente**: el 6-sep-2026 todos los objetos `inbound/fancyfiles.app/*` daban `NoSuchKey` con las filas vivas. Nada del código lo explica; la hipótesis es una **lifecycle policy del bucket puesta a mano**, sin verificar (no hay credenciales locales de AWS). El arranque ya avisa si `S3_BUCKET` no coincide con el bucket de la regla de recepción de SES.
+**Retención de 90 días (decidido el 15-sep-2026).** El bucket tiene la lifecycle rule
+`expire-inbound-90d` sobre `inbound/`: el correo original (HTML y adjuntos) vive 90 días; el
+hilo, el asunto y el texto plano del índice FTS se quedan. Los planes no prometen respaldo
+permanente, y la copia de landing/pricing ya lo dice ("adjuntos 90 días"). Pasado el plazo el
+detalle devuelve `bodyDegraded: "expired"` / `"expired_gone"` (log `info`, no `error`);
+`"index"`/`"gone"` siguen significando que algo se perdió **antes** de tiempo.
+Historia: del 23-ago al 6-sep la regla era `expire-24h` (puesta con aws-cli por `easybits`,
+visto en CloudTrail) y borraba cada correo al día siguiente: eso fue lo de fancyfiles.app y
+los `NOT_FOUND` de brendago.design de esa ventana. Sin versionado, ese correo no se recupera.
 
 ### Firma y logo
 
@@ -618,7 +626,7 @@ Bandeja **y** en el buzón. Es el producto entero funcionando sobre un dominio d
 
 ### ⏭️ Lo primero de la próxima sesión
 
-- [ ] 🔴 **Revisar la lifecycle policy de `s3://mailmask-inbound`** en la consola de AWS. Es la hipótesis principal de por qué desaparecieron los objetos del correo entrante de fancyfiles.app (6-sep-2026) dejando las filas vivas. Si existe una regla que expira objetos, decidir si se quita o si se asume que el índice FTS es el archivo de largo plazo — pero decidirlo, no descubrirlo con correo de una clienta. Tarea manual: no hay credenciales locales de AWS desde la rotación de secretos.
+- [x] ~~Revisar la lifecycle policy de `s3://mailmask-inbound`~~: era `expire-24h` del 23-ago al 6-sep; hoy 90 días y es decisión de producto (ver "Cuerpo del entrante y S3").
 - [ ] **Rotar `TURNSTILE_SECRET`** en el panel de Cloudflare: la clave viajó por el chat el 6-sep-2026.
 - [ ] **Probar la Bandeja en pareja, media hora.** Todos los bugs del 6-sep salieron de usarla diez minutos, no de las 485 pruebas: los atajos disparándose dentro del compositor, la lista latiendo sola por una animación en bucle, el plan "activo" con fecha vencida. Sin verificar todavía: la **colisión con dos personas de verdad**, el **logo de la firma en Gmail y Outlook** (se eligió URL sobre `cid:` justo para que no salga icono de adjunto) y el **contraste del tema claro** en la app — sospechosos: fila seleccionada, `<mark>` del resaltado de búsqueda y la barra ámbar de presencia.
 - [ ] **Evaluar el costo de sacar la app de Fly**. Análisis, no decisión: qué costaría migrar y a dónde. Lo que ata hoy a Fly es el **volumen único con SQLite** — es la misma restricción que impide el deploy multi-máquina y sin downtime, así que conviene evaluarlo junto con el punto de abajo y no por separado.

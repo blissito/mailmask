@@ -208,7 +208,7 @@ import {
   deleteDomainIdentity,
 } from "./ses.js";
 import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, extractAttachmentByIndex, rebuildConversationsFromS3 } from "./forwarding.js";
-import { fetchEmailFromS3, S3FetchError, repairReceiptRules, ensureDomainInbound, ensureSnsSubscription, AWS_REGION, getBackupBytesFromS3 } from "./ses.js";
+import { fetchEmailFromS3, S3FetchError, degradedBodyState, repairReceiptRules, ensureDomainInbound, ensureSnsSubscription, AWS_REGION, getBackupBytesFromS3 } from "./ses.js";
 import { runDbBackup, DB_BACKUP_SUFFIX } from "./backup.js";
 import { resolveEmailBody, extractInlineImages, appendSignature, quotePrevious, MAX_EMAIL_HTML_BYTES } from "./email-html.js";
 import { putDomainAssetToS3, getDomainAssetFromS3, deleteDomainAssetFromS3, putEmailImageToS3, getEmailImageFromS3, deleteEmailImageFromS3, sweepOrphanEmailImages, putEmailFileToS3, getEmailFileFromS3, deleteEmailFileFromS3, ALLOWED_IMAGE_TYPES } from "./ses.js";
@@ -4487,7 +4487,13 @@ const app = new Elysia({ adapter: node() })
           // Antes los tres decían "(Error al cargar el mensaje)", que para un
           // correo que simplemente ya no existe es información equivocada.
           const code = err instanceof S3FetchError ? err.code : "OTHER";
-          log("error", "mesa", "No se pudo leer el cuerpo del correo en S3", {
+          // Plan B: el texto plano que quedó en el índice de búsqueda. Sin
+          // formato ni adjuntos, pero es el contenido del correo.
+          const rescatado = code === "NOT_FOUND" ? getIndexedBody(msg.id) : null;
+          const bodyDegraded = degradedBodyState(code, msg.createdAt, !!rescatado);
+          // Pasada la retención de 90 días el NOT_FOUND es lo esperado, no un error.
+          const caducado = bodyDegraded.startsWith("expired");
+          log(caducado ? "info" : "error", "mesa", caducado ? "Correo fuera de retención en S3" : "No se pudo leer el cuerpo del correo en S3", {
             conversationId: conv.id,
             messageId: msg.id,
             s3Bucket: msg.s3Bucket,
@@ -4495,15 +4501,7 @@ const app = new Elysia({ adapter: node() })
             code,
             error: String(err),
           });
-          if (code === "NOT_FOUND") {
-            // Plan B: el texto plano que quedó en el índice de búsqueda. Sin
-            // formato ni adjuntos, pero es el contenido del correo.
-            const rescatado = getIndexedBody(msg.id);
-            return rescatado
-              ? { ...msg, body: rescatado, html: "", attachments: [], bodyDegraded: "index" }
-              : { ...msg, body: "", html: "", attachments: [], bodyDegraded: "gone" };
-          }
-          return { ...msg, body: "", html: "", attachments: [], bodyDegraded: "error" };
+          return { ...msg, body: rescatado ?? "", html: "", attachments: [], bodyDegraded };
         }
       }
       return msg;

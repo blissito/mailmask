@@ -6,7 +6,7 @@ import { app } from "./main.ts";
 import { createUser, createDomain, createConversation, addMessage, indexMessage, getIndexedBody } from "./db.ts";
 import { signJwt, generateCsrfToken } from "./auth.ts";
 import { ftsDisponible } from "./pg.ts";
-import { clasificarErrorS3 } from "./ses.ts";
+import { clasificarErrorS3, degradedBodyState } from "./ses.ts";
 
 const sufijo = () => Math.random().toString(36).slice(2, 10);
 let ipN = 0;
@@ -174,5 +174,17 @@ describe("Clasificación de errores de S3", () => {
     assert.equal(clasificarErrorS3({ name: "AccessDenied", $metadata: { httpStatusCode: 403 } }), "DENIED");
     assert.equal(clasificarErrorS3({ name: "TimeoutError" }), "OTHER");
     assert.equal(clasificarErrorS3(new Error("red caída")), "OTHER");
+  });
+
+  it("un NOT_FOUND pasada la retención de 90 días es 'expired', antes es una pérdida", () => {
+    // El bucket borra inbound/ a los 90 días a propósito (lifecycle). Perder un
+    // correo de ayer es otra cosa y debe seguir saliendo como error.
+    const hace = (dias: number) => new Date(Date.now() - dias * 86_400_000).toISOString();
+    assert.equal(degradedBodyState("NOT_FOUND", hace(91), true), "expired");
+    assert.equal(degradedBodyState("NOT_FOUND", hace(91), false), "expired_gone");
+    assert.equal(degradedBodyState("NOT_FOUND", hace(1), true), "index");
+    assert.equal(degradedBodyState("NOT_FOUND", hace(1), false), "gone");
+    assert.equal(degradedBodyState("DENIED", hace(200), true), "error");
+    assert.equal(degradedBodyState("OTHER", hace(1), false), "error");
   });
 });

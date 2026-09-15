@@ -752,6 +752,9 @@ const AVISOS_CUERPO = {
   index: "Mostramos una versión sin formato ni adjuntos: el original ya no está disponible.",
   gone: "El contenido de este correo ya no está disponible.",
   error: "No pudimos cargar este correo. Vuelve a intentarlo.",
+  // Retención de 90 días del correo original (ver CLAUDE.md, "Cuerpo del entrante y S3").
+  expired: "Este correo tiene más de 90 días: conservamos el texto, pero el original con formato y adjuntos ya caducó.",
+  expired_gone: "Este correo tiene más de 90 días y su contenido ya caducó. Queda el asunto y el hilo.",
 };
 
 function cuerpoMensaje(item) {
