@@ -570,15 +570,32 @@ function alternarMarcada(idx, conShift) {
   }
 
   ultimaMarcada = idx;
-  renderList();
+  actualizarMarcadas();
   renderBarraSeleccion();
 }
 
 function limpiarSeleccion() {
   seleccionadas.clear();
   ultimaMarcada = -1;
-  renderList();
+  actualizarMarcadas();
   renderBarraSeleccion();
+}
+
+/**
+ * Refleja `seleccionadas` en las filas ya pintadas, sin reconstruir la lista:
+ * renderList borra e inserta las treinta filas y eso devolvía el scroll arriba
+ * con cada casilla que marcabas.
+ */
+function actualizarMarcadas() {
+  document.querySelectorAll("#conv-list .mesa-conv").forEach((el) => {
+    const marcada = seleccionadas.has(el.dataset.id);
+    el.classList.toggle("mesa-conv--marcada", marcada);
+    const check = el.querySelector(".mesa-conv-check input");
+    // El click en la casilla lleva preventDefault (marcar no es abrir), y con eso
+    // Chrome restaura el estado de la casilla al terminar el evento, pisando lo
+    // que se ponga aquí. Se sincroniza un tick después.
+    if (check) setTimeout(() => { check.checked = marcada; }, 0);
+  });
 }
 
 function renderBarraSeleccion() {
@@ -1304,7 +1321,7 @@ function setupListeners() {
     // "Visibles" es literal: sólo la página cargada. Marcar lo que no se ha
     // traído sería prometer un borrado que el tope de 200 no puede cumplir.
     for (const c of conversations) seleccionadas.add(c.id);
-    renderList();
+    actualizarMarcadas();
     renderBarraSeleccion();
   });
   document.getElementById("bulk-none")?.addEventListener("click", limpiarSeleccion);

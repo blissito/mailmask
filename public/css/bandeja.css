@@ -4,9 +4,9 @@
  * zinc propia y hardcodeada, así que /bandeja era oscura para siempre y no se
  * parecía al resto del producto.
  *
- * El acento NO cambia: sigue siendo el verde `mask-*`. Es el color de "esto va
- * bien" dentro de la app; el rojo de máscara es de la marca en el sitio público
- * (ver CLAUDE.md). Pintar de rojo los estados de éxito sería otra cosa.
+ * El acento es el rojo de máscara (`--accent`, 15-sep-2026): con el verde en
+ * botones, chips y foco la Bandeja parecía el diseño viejo. El verde queda
+ * sólo en `--mesa-green` para lo que significa "esto va bien" (entregado, ok).
  */
 :root {
   --mesa-bg: rgb(var(--bg));
@@ -17,8 +17,9 @@
   --mesa-text: rgb(var(--fg));
   --mesa-text-2: rgb(var(--fg-muted));
   --mesa-text-3: rgb(var(--fg-subtle));
-  --mesa-accent: rgb(var(--mask-600));
-  --mesa-accent-dim: rgb(var(--mask-600) / 0.15);
+  --mesa-accent: rgb(var(--accent));        /* rojo de máscara del sitio; el verde queda para estados OK */
+  --mesa-accent-dim: rgb(var(--accent) / 0.15);
+  --mesa-accent-text: rgb(var(--accent-text));
 
   /* Colores de estado. Van aparte de los tokens porque significan algo —error,
      nota, entregado— y no deben cambiar con el tema más que en luminosidad.
@@ -111,7 +112,7 @@ body {
   padding: 2px 6px;
   border-radius: 4px;
   background: var(--mesa-accent-dim);
-  color: rgb(var(--mask-400));
+  color: var(--mesa-accent-text);
   text-transform: uppercase;
 }
 
@@ -471,8 +472,8 @@ body {
   word-break: break-word;
 }
 .mesa-msg.outbound .mesa-msg-body {
-  background: rgb(var(--mask-600) / 0.06);
-  border-color: rgb(var(--mask-600) / 0.15);
+  background: rgb(var(--accent) / 0.06);
+  border-color: rgb(var(--accent) / 0.15);
 }
 
 /* Attachments */
@@ -611,7 +612,7 @@ body {
   font-weight: 600;
   transition: background 0.15s;
 }
-.mesa-send-btn:hover { background: rgb(var(--mask-700)); }
+.mesa-send-btn:hover { background: var(--mesa-accent-text); }
 .mesa-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .mesa-send-btn.note-mode {
   background: var(--mesa-note);
@@ -827,11 +828,11 @@ body {
   border: 1px solid rgba(8,145,178,0.2);
   border-radius: 6px;
   font-size: 12px;
-  color: rgb(var(--mask-400));
+  color: var(--mesa-accent-text);
   text-align: center;
   margin: 8px 20px 0;
 }
-.mesa-upgrade a { color: rgb(var(--mask-400)); font-weight: 600; text-decoration: underline; }
+.mesa-upgrade a { color: var(--mesa-accent-text); font-weight: 600; text-decoration: underline; }
 
 /* --- Loading spinner --- */
 @keyframes mesa-spin {
@@ -1183,7 +1184,7 @@ body.mm-composer-locked { overflow: hidden; }
   padding: 8px 10px;
   border: none;
   background: transparent;
-  color: rgb(var(--mask-400));
+  color: var(--mesa-accent-text);
   font: inherit;
   font-size: 14px;
   font-weight: 600;
@@ -1306,7 +1307,7 @@ body.mm-composer-locked { overflow: hidden; }
 }
 
 .mesa-conv-snippet mark {
-  background: rgb(var(--mask-600) / 0.28);
+  background: rgb(var(--accent) / 0.28);
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
