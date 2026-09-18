@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Documentación — SDK, API REST, SMTP y MCP | MailMask</title>
-  <meta name="description" content="Documentación de MailMask: SDK de JavaScript/TypeScript, API REST para máscaras y dominios, credenciales SMTP y servidor MCP. Con ejemplos de código.">
+  <title>Documentación — Skills para agentes, SDK, API REST, SMTP y MCP | MailMask</title>
+  <meta name="description" content="Documentación de MailMask: skills para tu agente (npx skills add), SDK de JavaScript/TypeScript, API REST para máscaras y dominios, credenciales SMTP y servidor MCP. Con ejemplos de código.">
   <link rel="canonical" href="https://www.mailmask.studio/docs">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
   <meta property="og:type" content="website">
@@ -13,14 +13,14 @@
   <meta property="og:locale" content="es_MX">
   <meta property="og:url" content="https://www.mailmask.studio/docs">
   <meta property="og:title" content="Documentación — SDK, API REST, SMTP y MCP | MailMask">
-  <meta property="og:description" content="Documentación de MailMask: SDK de JavaScript/TypeScript, API REST para máscaras y dominios, credenciales SMTP y servidor MCP. Con ejemplos de código.">
+  <meta property="og:description" content="Documentación de MailMask: skills para tu agente (npx skills add), SDK de JavaScript/TypeScript, API REST para máscaras y dominios, credenciales SMTP y servidor MCP. Con ejemplos de código.">
   <meta property="og:image" content="https://www.mailmask.studio/img/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="MailMask — email profesional en tu dominio">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Documentación — SDK, API REST, SMTP y MCP | MailMask">
-  <meta name="twitter:description" content="Documentación de MailMask: SDK de JavaScript/TypeScript, API REST para máscaras y dominios, credenciales SMTP y servidor MCP. Con ejemplos de código.">
+  <meta name="twitter:description" content="Documentación de MailMask: skills para tu agente (npx skills add), SDK de JavaScript/TypeScript, API REST para máscaras y dominios, credenciales SMTP y servidor MCP. Con ejemplos de código.">
   <meta name="twitter:image" content="https://www.mailmask.studio/img/og-image.png">
   <script type="application/ld+json">
   {
@@ -145,6 +145,7 @@
     <aside class="sidebar hidden md:block border-r border-line py-6">
       <p class="px-4 text-xs font-bold uppercase tracking-widest text-fg-subtle mb-3">Contenido</p>
       <nav id="sidebar-nav">
+        <a href="#skills">&#9733; Skills para tu agente</a>
         <a href="#instalacion">Instalaci&oacute;n</a>
         <a href="#autenticacion">Autenticaci&oacute;n</a>
         <a href="#dominios">Dominios</a>
@@ -160,7 +161,6 @@
         <a href="#api-keys">API Keys</a>
         <a href="#errores">Manejo de errores</a>
         <a href="#mcp">MCP Server</a>
-        <a href="#skills">Skills</a>
         <a href="#referencia">Referencia API</a>
       </nav>
     </aside>
@@ -169,12 +169,29 @@
     <main class="prose-section px-6 md:px-12 py-10">
 
       <h1 class="text-3xl font-bold mb-2">SDK de MailMask</h1>
-      <p class="text-fg-muted mb-8">Cliente oficial TypeScript/JavaScript para la API de MailMask. Crea aliases, gestiona dominios, env&iacute;a emails y m&aacute;s desde tu c&oacute;digo.</p>
+      <p class="text-fg-muted mb-8">Skills para tu agente, cliente oficial TypeScript/JavaScript, API REST, SMTP y servidor MCP. Crea aliases, gestiona dominios, env&iacute;a emails y m&aacute;s &mdash; desde tu c&oacute;digo o pidi&eacute;ndoselo a tu agente.</p>
 
       <p class="text-sm text-fg-subtle mb-10">
         <code class="text-accent-text">npm</code>:
         <a href="https://www.npmjs.com/package/@easybits.cloud/mailmask" class="text-accent-text hover:underline" target="_blank">@easybits.cloud/mailmask</a>
       </p>
+
+      <!-- Skills: la puerta recomendada -->
+      <section id="skills" class="mt-2 mb-12 rounded-xl border-2 border-mask-500 bg-mask-500/10 p-6">
+        <p class="text-xs font-bold uppercase tracking-widest text-mask-500 mb-2">Recomendado</p>
+        <h2 class="text-2xl font-bold mb-3">Usa MailMask con tu agente</h2>
+        <p class="text-fg-muted mb-4">No hace falta leer esta p&aacute;gina: inst&aacute;lale a tu agente (Claude Code, Cursor, Codex, Copilot&hellip;) las <strong class="text-fg">skills oficiales</strong> y p&iacute;dele lo que necesitas en espa&ntilde;ol &mdash; &ldquo;crea hola@ que reenv&iacute;e a mi Gmail&rdquo;, &ldquo;apunta el dominio a Vercel&rdquo;, &ldquo;av&iacute;sale a mi app cuando llegue correo&rdquo;. Las skills saben qu&eacute; puede hacer cada plan, qu&eacute; secretos salen una sola vez y qu&eacute; no se debe borrar.</p>
+        <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-4"><code>npx skills add https://www.mailmask.studio</code></pre>
+        <p class="text-fg-muted text-sm mb-3">Despu&eacute;s conecta el <a href="#mcp" class="text-accent-text hover:underline">servidor MCP</a> con tu API key y el agente opera la cuenta por ti. Cinco skills, instala todas o solo la que necesitas:</p>
+        <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-3">
+          <li><code>mailmask-account</code>: opera la cuenta entera en tu nombre (dominios, m&aacute;scaras, buzones, reglas, webhooks, env&iacute;o) con sus reglas de seguridad.</li>
+          <li><code>mailmask-mcp</code>: conecta el cliente MCP y sabe leer sus resultados (403 con precio, 409 con <code>suggestedValues</code>, secretos que salen una sola vez).</li>
+          <li><code>mailmask-sdk</code>: usa <code>@easybits.cloud/mailmask</code> desde c&oacute;digo, incluida la verificaci&oacute;n de firma de webhooks.</li>
+          <li><code>mailmask-dns</code>: apunta el dominio a Vercel, Netlify, GitHub Pages&hellip; sin romper el correo.</li>
+          <li><code>mailmask-docs</code>: lee esta documentaci&oacute;n, <code>llms.txt</code> y el OpenAPI sin scrapear.</li>
+        </ul>
+        <p class="text-fg-subtle text-xs">Formato <a href="https://agentskills.io" class="text-accent-text hover:underline" rel="noopener" target="_blank">Agent Skills</a>. Espejo en GitHub: <code>npx skills add blissito/mailmask-skills</code>. &Iacute;ndice en <code>/.well-known/agent-skills/index.json</code>; cada skill en <code>/skills/&lt;nombre&gt;/SKILL.md</code>.</p>
+      </section>
 
       <!-- Instalacion -->
       <h2 id="instalacion" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Instalaci&oacute;n</h2>
@@ -502,21 +519,6 @@ claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \
       <p class="text-fg-muted text-sm mb-4">Sobre el DNS: <code>set_dns_record</code> <strong>reemplaza</strong> el conjunto de valores de ese nombre y tipo, as&iacute; que para a&ntilde;adir un valor hay que leer primero con <code>list_dns_records</code> e incluir tambi&eacute;n los que ya estaban. Los registros que MailMask necesita para tu correo (el MX, el TXT de verificaci&oacute;n, el SPF y los CNAME de DKIM) vienen marcados con <code>managed</code> y no se pueden borrar: el agente recibe un 409 explicando por qu&eacute;.</p>
 
       <p class="text-fg-muted text-sm mb-4">Un error del servidor (por ejemplo, un dominio gratis pidiendo un buz&oacute;n) llega al agente como resultado con <code>isError</code> y el mensaje tal cual, no como fallo del protocolo. Las API keys no se crean ni revocan por MCP: un agente con una llave no puede fabricar m&aacute;s. El l&iacute;mite es el mismo de la API: 60 peticiones por minuto por llave.</p>
-
-      <!-- Skills -->
-      <h2 id="skills" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Skills para agentes</h2>
-      <p class="text-fg-muted mb-4">Instrucciones en formato <a href="https://agentskills.io" class="text-accent-text underline" rel="noopener" target="_blank">Agent Skills</a> para que tu agente (Claude Code, Cursor, Codex, Copilot&hellip;) sepa operar MailMask sin que se lo expliques. Se instalan con <code>npx skills</code> desde el sitio o desde GitHub:</p>
-      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto mb-4"><code>npx skills add https://www.mailmask.studio
-<span class="cm"># o el espejo en GitHub</span>
-npx skills add blissito/mailmask-skills</code></pre>
-      <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-4">
-        <li><code>mailmask-account</code>: opera la cuenta entera en nombre del due&ntilde;o (dominios, m&aacute;scaras, buzones, reglas, webhooks, env&iacute;o) con sus reglas de seguridad.</li>
-        <li><code>mailmask-mcp</code>: conecta el cliente MCP y sabe leer sus resultados (403 con precio, 409 con <code>suggestedValues</code>, secretos que salen una sola vez).</li>
-        <li><code>mailmask-sdk</code>: usa <code>@easybits.cloud/mailmask</code> desde c&oacute;digo, incluida la verificaci&oacute;n de firma de webhooks.</li>
-        <li><code>mailmask-dns</code>: apunta el dominio a Vercel, Netlify, GitHub Pages&hellip; sin romper el correo.</li>
-        <li><code>mailmask-docs</code>: lee esta documentaci&oacute;n, <code>llms.txt</code> y el OpenAPI sin scrapear.</li>
-      </ul>
-      <p class="text-fg-muted text-sm mb-4">El &iacute;ndice vive en <code>/.well-known/agent-skills/index.json</code> y cada skill en <code>/skills/&lt;nombre&gt;/SKILL.md</code>.</p>
 
       <!-- Referencia -->
       <h2 id="referencia" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Referencia API</h2>
