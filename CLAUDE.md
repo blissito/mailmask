@@ -52,6 +52,21 @@ información útil para el agente). No se exponen las API keys (un agente con un
 fabrica más), ni Bandeja ni billing. Pruebas en `mcp.test.ts`. Docs en `docs.html#mcp` y
 `EXTRA_DOCS` de `upload-docs.ts`. GET/DELETE dan 405: sin sesiones no hay stream ni cierre.
 
+## Skills para agentes (`public/skills/`, 18-sep-2026)
+
+Mismo montaje que ghosty-studio. Cinco skills en formato Agent Skills (`mailmask-account`,
+`mailmask-mcp`, `mailmask-sdk`, `mailmask-dns`, `mailmask-docs`), instalables con
+`npx skills add https://www.mailmask.studio` (well-known) o `npx skills add blissito/mailmask-skills`
+(espejo en GitHub, que es lo que cuenta skills.sh). `scripts/skills-pack.mts` valida cada
+`SKILL.md` (nombre = carpeta, `metadata.version`, ≤500 líneas, y **la description no puede
+llevar `: `** — Claude descarta la skill en silencio, medido en ghosty) y escribe
+`index.json` (v0.2.0 con `digest`) + `index.legacy.json` + `.tar.gz` de las multi-archivo. Lo
+generado **no se commitea**: lo produce el `RUN` del Dockerfile (por eso `.dockerignore` re-incluye
+`scripts/skills-pack.mts` y `public/skills/**/*.md`) y `skills.test.ts` corre la validación en
+`npm test`. Rutas en `main.ts`: `/skills/*`, `/.well-known/agent-skills/index.json`,
+`/.well-known/skills/index.json`. **Al tocar una skill**: `npm run skills:publish` (subtree push
+al espejo, manual) y, si cambió la sección `#skills` de `docs.html`, re-subir la KB de Formmy.
+
 ## Dominios: registro, renovación, transferencias y DNS (7-sep-2026)
 
 El registro de un dominio nuevo llevaba meses construido y **nunca se había ejercitado**.

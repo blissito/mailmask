@@ -11,6 +11,9 @@
     "db:migrate": "drizzle-kit migrate",
     "build:css": "npx tailwindcss -c tailwind.config.ts -i public/css/input.css -o public/css/styles.css --minify",
     "build:chat": "esbuild public/js/docs-chat.tsx --bundle --outfile=public/js/docs-chat.js --format=esm --jsx=automatic --target=es2020 --minify",
+    "check:skills": "npx tsx scripts/skills-pack.mts",
+    "skills:pack": "npx tsx scripts/skills-pack.mts --write",
+    "skills:publish": "npm run check:skills && git subtree push --prefix public/skills git@github.com:blissito/mailmask-skills.git main",
     "build:composer": "NODE_ENV=production esbuild public/js/composer.ts --bundle --outfile=public/js/composer.js --format=iife --target=es2020 --minify"
   },
   "dependencies": {

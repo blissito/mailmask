@@ -303,6 +303,8 @@ async function serveStatic(filePath: string): Promise<Response> {
       json: "application/json; charset=utf-8",
       xml: "application/xml; charset=utf-8",
       txt: "text/plain; charset=utf-8",
+      md: "text/markdown; charset=utf-8",
+      gz: "application/gzip",
       pdf: "application/pdf",
       epub: "application/epub+zip",
       webmanifest: "application/manifest+json",
@@ -1112,7 +1114,7 @@ const app = new Elysia({ adapter: node() })
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
-        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/health", "/healthz", "/docs", "/mcp",
+        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/health", "/healthz", "/docs", "/mcp",
       ],
       staticFile: true,
     },
@@ -1319,6 +1321,13 @@ const app = new Elysia({ adapter: node() })
   // Convention for generative engines: a plain-text summary of what the product is,
   // so assistants cite it accurately instead of inferring from marketing copy.
   .get("/llms.txt", () => serveStatic("/llms.txt"))
+  // Skills para agentes (formato Agent Skills, `npx skills add https://www.mailmask.studio`).
+  // `/.well-known/agent-skills/` sirve el índice v0.2.0 que genera `scripts/skills-pack.mts`
+  // (con `url` + `digest`); `/.well-known/skills/` el legacy v0.1.0 (`files[]`), que aún leen
+  // clientes viejos. Los archivos viven en `public/skills/<name>/…` y se sirven también ahí.
+  .get("/skills/*", ({ params }) => serveStatic(`/skills/${params["*"]}`))
+  .get("/.well-known/agent-skills/index.json", () => serveStatic("/skills/index.json"))
+  .get("/.well-known/skills/index.json", () => serveStatic("/skills/index.legacy.json"))
 
   // --- Auth ---
 

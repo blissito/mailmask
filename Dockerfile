@@ -17,6 +17,10 @@ RUN --mount=type=cache,target=/root/.npm \
 # Application source last — it changes on every deploy, so nothing cacheable follows.
 COPY . .
 
+# Índice de skills para agentes (/.well-known/agent-skills) y sus .tar.gz: se generan aquí
+# y no se commitean, igual que en ghosty-studio.
+RUN node_modules/.bin/tsx scripts/skills-pack.mts --write
+
 # Mount point for the SQLite volume, created in the image so the first boot after a
 # fresh volume attach does not have to mkdir it.
 RUN mkdir -p data

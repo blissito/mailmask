@@ -11,8 +11,10 @@ data/
 sdk/node_modules
 sdk/dist
 scripts/
+!scripts/skills-pack.mts
 docs/
 *.md
 !README.md
+!public/skills/**/*.md
 .DS_Store
 **/.DS_Store

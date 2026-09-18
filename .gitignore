@@ -12,3 +12,8 @@ sdk/node_modules/
 # macOS
 .DS_Store
 **/.DS_Store
+
+# Generado por scripts/skills-pack.mts (Dockerfile y npm run skills:pack)
+public/skills/index.json
+public/skills/index.legacy.json
+public/skills/*.tar.gz

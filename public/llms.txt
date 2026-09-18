@@ -80,7 +80,7 @@ respectivamente. Quien solo reenvía nunca toca el límite de envíos.
 2. Con esa llave, el agente usa cualquiera de estas tres puertas, todas equivalentes:
    - **MCP**: `https://www.mailmask.studio/mcp` (Streamable HTTP, sin sesiones), encabezado
      `Authorization: Bearer mk_…`. Claude Code: `claude mcp add --transport http mailmask
-     https://www.mailmask.studio/mcp --header "Authorization: Bearer mk_…"`. 33
+     https://www.mailmask.studio/mcp --header "Authorization: Bearer mk_…"`. 41
      herramientas: `create_domain` (devuelve los registros DNS), `create_alias` (con
      `mailbox: true` crea el buzón IMAP), reglas, webhooks, `send_email`, supresiones,
      SMTP, y `search_tools` para buscar por palabra.
@@ -89,6 +89,10 @@ respectivamente. Quien solo reenvía nunca toca el límite de envíos.
    - **REST**: `https://www.mailmask.studio/api/...`, especificación OpenAPI en
      https://www.mailmask.studio/openapi/json y referencia navegable en
      https://www.mailmask.studio/openapi.
+   - **Skills** (formato Agent Skills): `npx skills add https://www.mailmask.studio` o
+     `npx skills add blissito/mailmask-skills`. Cinco: `mailmask-account`, `mailmask-mcp`,
+     `mailmask-sdk`, `mailmask-dns`, `mailmask-docs`. Índice en
+     https://www.mailmask.studio/.well-known/agent-skills/index.json.
 3. Flujo típico: `create_domain` → publicar los DNS que devuelve (MX, TXT, 3 CNAME, SPF)
    → `verify_domain` → `create_alias`. Los errores de negocio vuelven con su código y un
    mensaje en español (p. ej. 403 "Los buzones IMAP vienen con el dominio activado
