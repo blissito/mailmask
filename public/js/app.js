@@ -174,13 +174,9 @@ async function checkAuth() {
     badge.classList.remove("hidden");
   }
 
-  // Show API Keys tab for all active plans
-  const sub = currentUser.subscription;
-  const periodEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
-  const isActive = sub && (sub.status === "active" || sub.status === "cancelled") && (!periodEnd || periodEnd >= new Date());
-  if (isActive) {
-    document.getElementById("tab-btn-apikeys")?.classList.remove("hidden");
-  }
+  // La API (y el MCP y las skills) va con todas las cuentas, gratis incluidas: la pestaña
+  // se ocultaba a quien no tuviera una suscripción legado y nadie nuevo podía crear su llave.
+  document.getElementById("tab-btn-apikeys")?.classList.remove("hidden");
 
   renderVerifyBanner();
   renderAccountUI();
@@ -860,6 +856,12 @@ async function loadDomains() {
   renderDomains();
   renderHello();
   renderPlanCard(); // los reenvíos del mes salen de los dominios
+
+  // `/app#apikeys` (desde /docs): abre el primer dominio en la pestaña de API Keys.
+  if (window.location.hash === "#apikeys" && domains[0]) {
+    await selectDomain(domains[0].id);
+    switchTab("apikeys");
+  }
 
   // Load referrals list
   try {

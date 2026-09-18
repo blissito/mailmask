@@ -181,8 +181,20 @@
         <p class="text-xs font-bold uppercase tracking-widest text-mask-500 mb-2">Recomendado</p>
         <h2 class="text-2xl font-bold mb-3">Usa MailMask con tu agente</h2>
         <p class="text-fg-muted mb-4">No hace falta leer esta p&aacute;gina: inst&aacute;lale a tu agente (Claude Code, Cursor, Codex, Copilot&hellip;) las <strong class="text-fg">skills oficiales</strong> y p&iacute;dele lo que necesitas en espa&ntilde;ol &mdash; &ldquo;crea hola@ que reenv&iacute;e a mi Gmail&rdquo;, &ldquo;apunta el dominio a Vercel&rdquo;, &ldquo;av&iacute;sale a mi app cuando llegue correo&rdquo;. Las skills saben qu&eacute; puede hacer cada plan, qu&eacute; secretos salen una sola vez y qu&eacute; no se debe borrar.</p>
+        <p class="text-sm font-bold mb-1">1. Instala las skills</p>
         <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-4"><code>npx skills add https://www.mailmask.studio</code></pre>
-        <p class="text-fg-muted text-sm mb-3">Despu&eacute;s conecta el <a href="#mcp" class="text-accent-text hover:underline">servidor MCP</a> con tu API key y el agente opera la cuenta por ti. Cinco skills, instala todas o solo la que necesitas:</p>
+        <div id="docs-key" class="rounded-lg border border-line bg-bg p-4 mb-4">
+          <p class="text-sm font-bold mb-1">2. Dale una API key a tu agente</p>
+          <div data-anon class="hidden text-sm text-fg-muted">
+            <a href="/login" class="text-accent-text hover:underline">Inicia sesi&oacute;n</a> y gen&eacute;rala aqu&iacute; mismo, o cr&eacute;ala en el <a href="/app#apikeys" class="text-accent-text hover:underline">Dashboard &rarr; API Keys</a>. Es gratis y da acceso a toda la cuenta.
+          </div>
+          <div data-auth class="hidden text-sm text-fg-muted">
+            <p class="mb-3">Sesi&oacute;n de <strong class="text-fg" data-email></strong>. Tambi&eacute;n puedes administrarlas en <a href="/app#apikeys" class="text-accent-text hover:underline">Dashboard &rarr; API Keys</a>.</p>
+            <button data-generate class="btn-primary text-sm px-4 py-2">Generar API key para mi agente</button>
+            <div data-result class="hidden mt-3"></div>
+          </div>
+        </div>
+        <p class="text-fg-muted text-sm mb-3">3. Conecta el <a href="#mcp" class="text-accent-text hover:underline">servidor MCP</a> con esa llave y el agente opera la cuenta por ti. Cinco skills, instala todas o solo la que necesitas:</p>
         <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-3">
           <li><code>mailmask-account</code>: opera la cuenta entera en tu nombre (dominios, m&aacute;scaras, buzones, reglas, webhooks, env&iacute;o) con sus reglas de seguridad.</li>
           <li><code>mailmask-mcp</code>: conecta el cliente MCP y sabe leer sus resultados (403 con precio, 409 con <code>suggestedValues</code>, secretos que salen una sola vez).</li>
@@ -544,6 +556,7 @@ claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \
   </div>
 
   <script type="module" src="/js/docs-chat.js"></script>
+  <script src="/js/docs-keys.js" defer></script>
   <script>
     // Copy buttons
     document.querySelectorAll('pre').forEach(pre => {
