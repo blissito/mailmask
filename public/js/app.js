@@ -1570,10 +1570,10 @@ function renderMembers(members, invites = []) {
     ${invites.map(i => `
       <div class="bg-bg-inset border border-dashed border-line rounded-lg px-5 py-4 flex items-center justify-between gap-3">
         <div class="min-w-0">
+          <span class="text-xs px-2 py-0.5 rounded bg-amber-500/15 text-amber-600 mr-2">Pendiente · aún no acepta</span>
           <span class="text-sm text-fg">${esc(i.name)}</span>
           <span class="text-sm text-fg-subtle ml-2">${esc(i.email)}</span>
-          ${roleChip(i.role)}
-          <span class="text-xs text-fg-subtle ml-2">expira el ${fmtDate(i.expiresAt)}</span>
+          <span class="text-xs text-fg-subtle ml-2">será ${(ROLE_LABELS[i.role] ?? i.role).toLowerCase()} · el enlace vence el ${fmtDate(i.expiresAt)}</span>
         </div>
         <div class="flex items-center gap-3 shrink-0 text-xs">
           <button data-action="copy-invite" data-url="${esc(i.inviteUrl)}" class="text-fg-muted hover:text-fg transition-colors">Copiar enlace</button>
