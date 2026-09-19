@@ -1926,8 +1926,40 @@ export function getAgentInvite(token: string): { domainId: string; email: string
   return rows[0].value as any;
 }
 
-export function deleteAgentInvite(token: string): void {
-  db.delete(tokens).where(and(eq(tokens.token, token), eq(tokens.kind, "agent-invite"))).run();
+export interface AgentInvite {
+  token: string;
+  email: string;
+  name: string;
+  role: "admin" | "agent";
+  expiresAt: string;
+}
+
+// Invitaciones vigentes de un dominio. El domainId vive dentro del JSON del
+// token, así que se filtra con json_extract (mismo truco que la limpieza de
+// tokens de verificación).
+export function listAgentInvites(domainId: string): AgentInvite[] {
+  const now = new Date().toISOString();
+  const rows = sqlite.prepare(
+    `SELECT token, value, expires_at FROM tokens
+     WHERE kind = 'agent-invite' AND json_extract(value, '$.domainId') = ? AND expires_at > ?
+     ORDER BY expires_at ASC`,
+  ).all(domainId, now) as { token: string; value: string; expires_at: string }[];
+  return rows.map((r) => {
+    const v = JSON.parse(r.value);
+    return { token: r.token, email: v.email, name: v.name, role: v.role, expiresAt: r.expires_at };
+  });
+}
+
+// Con domainId sólo borra si la invitación es de ese dominio; devuelve si borró algo.
+export function deleteAgentInvite(token: string, domainId?: string): boolean {
+  if (domainId) {
+    const res = sqlite.prepare(
+      `DELETE FROM tokens WHERE token = ? AND kind = 'agent-invite' AND json_extract(value, '$.domainId') = ?`,
+    ).run(token, domainId);
+    return res.changes > 0;
+  }
+  const res = db.delete(tokens).where(and(eq(tokens.token, token), eq(tokens.kind, "agent-invite"))).run();
+  return res.changes > 0;
 }
 
 // --- Admin: list all users ---

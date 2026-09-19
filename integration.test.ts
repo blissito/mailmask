@@ -1650,3 +1650,93 @@ describe("Referidos: nombre público", () => {
     await res.body?.cancel();
   });
 });
+
+describe("Miembros: invitaciones pendientes", () => {
+  const email = `invites-${suffix}@example.com`;
+  const invitee = `brendi-${suffix}@example.com`;
+  let cookie: string | undefined;
+  let csrfToken: string | undefined;
+  let domainId = "";
+  let otherDomainId = "";
+
+  before(async () => {
+    sqlite.prepare("DELETE FROM rate_limits").run();
+    createUser(email, await hashPassword("password123"));
+    const loginRes = await jsonPost("/api/auth/login", { email, password: "password123" });
+    ({ cookie, csrfToken } = extractCookies(loginRes));
+    await loginRes.body?.cancel();
+
+    // Dos dominios activados: el segundo sólo sirve para probar que un token
+    // no se puede cancelar desde otro dominio.
+    for (const [name, setter] of [["a", (id: string) => { domainId = id; }], ["b", (id: string) => { otherDomainId = id; }]] as const) {
+      const dom = createDomain(email, `invites-${name}-${suffix}.com`, ["dkim1"], "verify1");
+      sqlite.prepare("UPDATE domains SET verified = 1 WHERE id = ?").run(dom.id);
+      const a = createAddon(email, "domain", dom.id);
+      updateAddon(a.id, { status: "active", currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString() });
+      setter(dom.id);
+    }
+  });
+
+  it("la lista arranca vacía con la forma { members, invites }", async () => {
+    const res = await jsonGet(`/api/domains/${domainId}/agents`, cookie);
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { members: [], invites: [] });
+  });
+
+  it("invitar deja la invitación visible con su enlace, e invitar de nuevo no duplica", async () => {
+    const r1 = await jsonPost(`/api/domains/${domainId}/agents/invite`,
+      { email: invitee, name: "Brendi", role: "admin" }, cookie!, csrfToken);
+    assert.equal(r1.status, 201);
+    const { inviteUrl } = await r1.json();
+    assert.match(inviteUrl, /\/api\/agents\/accept\?token=[0-9a-f-]{36}$/);
+
+    const r2 = await jsonPost(`/api/domains/${domainId}/agents/invite`,
+      { email: invitee.toUpperCase(), name: "Brendi", role: "admin" }, cookie!, csrfToken);
+    assert.equal(r2.status, 201);
+    assert.equal((await r2.json()).inviteUrl, inviteUrl, "reinvitar reenvía el mismo enlace");
+
+    const res = await jsonGet(`/api/domains/${domainId}/agents`, cookie);
+    const data = await res.json();
+    assert.equal(data.members.length, 0);
+    assert.equal(data.invites.length, 1);
+    assert.equal(data.invites[0].email, invitee);
+    assert.equal(data.invites[0].role, "admin");
+    assert.equal(data.invites[0].inviteUrl, inviteUrl);
+    assert.ok(new Date(data.invites[0].expiresAt) > new Date());
+  });
+
+  it("no se puede cancelar desde otro dominio; desde el suyo sí", async () => {
+    const list = await (await jsonGet(`/api/domains/${domainId}/agents`, cookie)).json();
+    const token = list.invites[0].token;
+
+    const ajeno = await req(`/api/domains/${otherDomainId}/agents/invites/${token}`,
+      { method: "DELETE", headers: { cookie: `${cookie}; csrf_token=${csrfToken}`, "x-csrf-token": csrfToken! } });
+    assert.equal(ajeno.status, 404);
+    await ajeno.body?.cancel();
+
+    const propio = await req(`/api/domains/${domainId}/agents/invites/${token}`,
+      { method: "DELETE", headers: { cookie: `${cookie}; csrf_token=${csrfToken}`, "x-csrf-token": csrfToken! } });
+    assert.equal(propio.status, 200);
+    await propio.body?.cancel();
+
+    const after = await (await jsonGet(`/api/domains/${domainId}/agents`, cookie)).json();
+    assert.equal(after.invites.length, 0);
+  });
+
+  it("al aceptar, la invitación pasa a miembro", async () => {
+    const r = await jsonPost(`/api/domains/${domainId}/agents/invite`,
+      { email: invitee, name: "Brendi", role: "admin" }, cookie!, csrfToken);
+    const { inviteUrl } = await r.json();
+    const token = new URL(inviteUrl).searchParams.get("token")!;
+
+    const accept = await req(`/api/agents/accept?token=${token}`, { redirect: "manual" });
+    assert.equal(accept.status, 302);
+    await accept.body?.cancel();
+
+    const data = await (await jsonGet(`/api/domains/${domainId}/agents`, cookie)).json();
+    assert.equal(data.invites.length, 0);
+    assert.equal(data.members.length, 1);
+    assert.equal(data.members[0].email, invitee);
+    assert.equal(data.members[0].role, "admin");
+  });
+});

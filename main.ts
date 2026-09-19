@@ -106,6 +106,7 @@ import {
   createAgentInvite,
   getAgentInvite,
   deleteAgentInvite,
+  listAgentInvites,
   addSuppression,
   isSuppressed,
   normalizeSuppressionKeys,
@@ -5607,7 +5608,9 @@ const app = new Elysia({ adapter: node() })
     const existing = await getAgentByEmail(domain.id, email);
     if (existing) return new Response(JSON.stringify({ error: "Este email ya es agente de este dominio" }), { status: 409 });
 
-    const token = await createAgentInvite(domain.id, email, name, role as "agent" | "admin");
+    // Reinvitar al mismo correo reenvía el mismo enlace en vez de acumular tokens.
+    const pending = listAgentInvites(domain.id).find((i) => i.email.toLowerCase() === email.toLowerCase());
+    const token = pending?.token ?? await createAgentInvite(domain.id, email, name, role as "agent" | "admin");
     const inviteUrl = `${getMainDomainUrl()}/api/agents/accept?token=${token}`;
 
     try {
@@ -5671,12 +5674,36 @@ const app = new Elysia({ adapter: node() })
     }
     const domain = access.domain;
 
-    const agents = await listAgents(domain.id);
-    return new Response(JSON.stringify(agents), {
+    const members = await listAgents(domain.id);
+    // El enlace sólo lo ve quien tiene manage_members: es quien pudo crearlo.
+    const invites = listAgentInvites(domain.id).map((i) => ({
+      ...i,
+      inviteUrl: `${getMainDomainUrl()}/api/agents/accept?token=${i.token}`,
+    }));
+    return new Response(JSON.stringify({ members, invites }), {
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["Agents"], summary: "List agents for a domain", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Agents"], summary: "List agents and pending invites for a domain", security: [{ cookieAuth: [] }] },
+  })
+
+  .delete("/api/domains/:id/agents/invites/:token", async ({ request, params }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
+
+    const access = await checkDomainAccess(auth.email, params.id, "manage_members");
+    if (!access) {
+      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+    }
+
+    const deleted = deleteAgentInvite(params.token, access.domain.id);
+    if (!deleted) return new Response(JSON.stringify({ error: "Invitación no encontrada" }), { status: 404 });
+
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "content-type": "application/json" },
+    });
+  }, {
+    detail: { tags: ["Agents"], summary: "Cancel a pending invitation", security: [{ cookieAuth: [] }] },
   })
 
   .delete("/api/domains/:id/agents/:agentId", async ({ request, params }) => {

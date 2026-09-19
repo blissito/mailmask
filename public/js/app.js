@@ -1532,34 +1532,67 @@ async function loadMembers() {
 
   const res = await fetch(`/api/domains/${selectedDomain.id}/agents`);
   if (!res.ok) return;
-  const members = await res.json();
-  renderMembers(members, limit);
+  const { members, invites } = await res.json();
+  renderMembers(members, invites);
 }
 
-function renderMembers(members, limit) {
+const ROLE_LABELS = { admin: "Admin", agent: "Miembro" };
+
+function roleChip(role) {
+  return `<span class="text-xs ml-2 px-2 py-0.5 rounded ${role === 'admin' ? 'bg-accent/15 text-accent-text' : 'bg-line text-fg-muted'}">${ROLE_LABELS[role] ?? role}</span>`;
+}
+
+function renderMembers(members, invites = []) {
   const list = document.getElementById("members-list");
   const empty = document.getElementById("members-empty");
 
-  if (members.length === 0) {
+  if (members.length === 0 && invites.length === 0) {
     list.innerHTML = "";
     empty.classList.remove("hidden");
     return;
   }
 
   empty.classList.add("hidden");
-  const roleLabels = { admin: "Admin", agent: "Miembro" };
+  const fmtDate = (iso) => new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short" });
   list.innerHTML = `
-    <p class="text-xs text-fg-subtle mb-2">${members.length}/${limit} miembros</p>
+    ${members.length ? `<p class="text-xs text-fg-subtle mb-2">${members.length} ${members.length === 1 ? "miembro" : "miembros"}</p>` : ""}
     ${members.map(m => `
       <div class="bg-bg-inset border border-line rounded-lg px-5 py-4 flex items-center justify-between">
         <div>
           <span class="text-sm text-fg">${esc(m.name)}</span>
           <span class="text-sm text-fg-subtle ml-2">${esc(m.email)}</span>
-          <span class="text-xs ml-2 px-2 py-0.5 rounded ${m.role === 'admin' ? 'bg-accent/15 text-accent-text' : 'bg-line text-fg-muted'}">${roleLabels[m.role] ?? m.role}</span>
+          ${roleChip(m.role)}
         </div>
         <button data-action="remove-member" data-agent-id="${esc(m.id)}" data-agent-name="${esc(m.name)}" class="text-xs text-fg-subtle hover:text-red-500 transition-colors">Eliminar</button>
       </div>
+    `).join("")}
+    ${invites.length ? `<p class="text-xs text-fg-subtle mt-4 mb-2">Invitaciones pendientes</p>` : ""}
+    ${invites.map(i => `
+      <div class="bg-bg-inset border border-dashed border-line rounded-lg px-5 py-4 flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <span class="text-sm text-fg">${esc(i.name)}</span>
+          <span class="text-sm text-fg-subtle ml-2">${esc(i.email)}</span>
+          ${roleChip(i.role)}
+          <span class="text-xs text-fg-subtle ml-2">expira el ${fmtDate(i.expiresAt)}</span>
+        </div>
+        <div class="flex items-center gap-3 shrink-0 text-xs">
+          <button data-action="copy-invite" data-url="${esc(i.inviteUrl)}" class="text-fg-muted hover:text-fg transition-colors">Copiar enlace</button>
+          <button data-action="resend-invite" data-name="${esc(i.name)}" data-email="${esc(i.email)}" data-role="${esc(i.role)}" class="text-fg-muted hover:text-fg transition-colors">Reenviar</button>
+          <button data-action="cancel-invite" data-token="${esc(i.token)}" class="text-fg-subtle hover:text-red-500 transition-colors">Cancelar</button>
+        </div>
+      </div>
     `).join("")}`;
+}
+
+async function cancelInvite(token) {
+  const res = await fetch(`/api/domains/${selectedDomain.id}/agents/invites/${token}`, { method: "DELETE" });
+  if (res.ok) {
+    showToast("Invitación cancelada");
+    await loadMembers();
+  } else {
+    const data = await res.json().catch(() => ({}));
+    showToast(data.error || "Error al cancelar", true);
+  }
 }
 
 async function inviteMember(name, email, role) {
@@ -1575,10 +1608,11 @@ async function inviteMember(name, email, role) {
   if (res.ok) {
     hideModal("modal-invite-member");
     document.getElementById("form-invite-member").reset();
-    showToast("Invitación enviada");
+    showToast("Invitación enviada · el enlace también se puede copiar abajo");
     await loadMembers();
   } else {
     const data = await res.json();
+    showToast(data.error || "Error al invitar miembro", true);
     errEl.textContent = data.error || "Error al invitar miembro";
     errEl.classList.remove("hidden");
   }
@@ -3208,9 +3242,21 @@ function setupEventListeners() {
   });
 
   // Event delegation: members list
-  document.getElementById("members-list")?.addEventListener("click", (e) => {
-    const remove = e.target.closest("[data-action='remove-member']");
-    if (remove) removeMember(remove.dataset.agentId, remove.dataset.agentName);
+  document.getElementById("members-list")?.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const { action } = btn.dataset;
+    if (action === "remove-member") removeMember(btn.dataset.agentId, btn.dataset.agentName);
+    else if (action === "cancel-invite") cancelInvite(btn.dataset.token);
+    else if (action === "copy-invite") {
+      await navigator.clipboard.writeText(btn.dataset.url);
+      const orig = btn.textContent;
+      btn.textContent = "Copiado ✓";
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    } else if (action === "resend-invite") {
+      btn.disabled = true;
+      await inviteMember(btn.dataset.name, btn.dataset.email, btn.dataset.role);
+    }
   });
 
   // Event delegation: DNS copy buttons with feedback
