@@ -52,6 +52,19 @@ información útil para el agente). No se exponen las API keys (un agente con un
 fabrica más), ni Bandeja ni billing. Pruebas en `mcp.test.ts`. Docs en `docs.html#mcp` y
 `EXTRA_DOCS` de `upload-docs.ts`. GET/DELETE dan 405: sin sesiones no hay stream ni cierre.
 
+## MCP Registry oficial (`studio.mailmask/mailmask`, 19-sep-2026)
+
+Listado en `registry.modelcontextprotocol.io` con el manifiesto `server.json` de la raíz (sólo
+`remotes` → `https://www.mailmask.studio/mcp`; el SDK npm no es stdio). El namespace se verifica
+por HTTP: el registry lee `https://mailmask.studio/.well-known/mcp-registry-auth` **en el apex y
+sin seguir redirects**, por eso esa ruta es la única exenta del 301 naked→www en `main.ts`
+(`mcp.test.ts` lo fija). La llave privada Ed25519 vive en `~/.mailmask-mcp-registry-key.pem`
+(fuera del repo; sin ella no se republica bajo este namespace; el `openssl` del sistema es
+LibreSSL, usar `/opt/homebrew/opt/openssl@3/bin/openssl`). `version` de `server.json` sube en
+**cada** republicación (las publicaciones son inmutables y el string debe ser único); la
+`description` tiene tope de 100 caracteres. Publicar: `mcp-publisher validate` →
+`mcp-publisher login http --domain mailmask.studio --private-key <seed hex>` → `mcp-publisher publish`.
+
 ## Skills para agentes (`public/skills/`, 18-sep-2026)
 
 Mismo montaje que ghosty-studio. Cinco skills en formato Agent Skills (`mailmask-account`,

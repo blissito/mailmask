@@ -87,6 +87,19 @@ describe("MCP: agentes contra la app", () => {
     assert.equal(res.status, 405);
   });
 
+  it("la prueba de dominio del MCP Registry se sirve en el apex sin redirect", async () => {
+    // El registry lee https://mailmask.studio/.well-known/mcp-registry-auth con redirects
+    // deshabilitados; un 301 al www rompería la verificación del namespace.
+    const res = await app.fetch(new Request("http://mailmask.studio/.well-known/mcp-registry-auth"));
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type") ?? "", /text\/plain/);
+    assert.match(await res.text(), /^v=MCPv1; k=ed25519; p=[A-Za-z0-9+/]+=*\n$/);
+    // Y el resto del apex sigue yendo al www.
+    const otro = await app.fetch(new Request("http://mailmask.studio/docs"));
+    assert.equal(otro.status, 301);
+    assert.match(otro.headers.get("location") ?? "", /^https?:\/\/www\.mailmask\.studio\/docs$/);
+  });
+
   it("initialize y tools/list traen el catálogo", async () => {
     const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "0" } });
     assert.equal(init.status, 200);

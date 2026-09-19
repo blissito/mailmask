@@ -1,0 +1,25 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "studio.mailmask/mailmask",
+  "title": "MailMask",
+  "description": "Email for agents: domains, aliases, IMAP mailboxes, DNS, sending and webhooks via one API key.",
+  "repository": {
+    "url": "https://github.com/blissito/mailmask",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "websiteUrl": "https://www.mailmask.studio",
+  "icons": [
+    {
+      "src": "https://www.mailmask.studio/favicon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": ["any"]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://www.mailmask.studio/mcp"
+    }
+  ]
+}

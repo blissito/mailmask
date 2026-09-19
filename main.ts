@@ -219,6 +219,9 @@ import { log } from "./logger.js";
 import { createSmtpIamCredential, revokeSmtpIamCredential } from "./ses.js";
 import { crearBuzon, cambiarPassword, borrarBuzon, exportarBuzon } from "./stalwart.js";
 import { atenderMcp } from "./mcp.js";
+
+const MCP_REGISTRY_AUTH_PATH = "/.well-known/mcp-registry-auth";
+const MCP_REGISTRY_PUBLIC_KEY = "+L7eynWTl5U/ZUd1DbrylPBzJHKTE0TzU9qdO8n8Vos=";
 import {
   sendTemplate,
   verifyEmail as verifyEmailTemplate,
@@ -1115,7 +1118,7 @@ const app = new Elysia({ adapter: node() })
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
-        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/health", "/healthz", "/docs", "/mcp",
+        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/.well-known/mcp-registry-auth", "/health", "/healthz", "/docs", "/mcp",
       ],
       staticFile: true,
     },
@@ -1124,7 +1127,10 @@ const app = new Elysia({ adapter: node() })
   // --- Naked domain redirect ---
   .onRequest(({ request }) => {
     const url = new URL(request.url);
-    if (url.hostname === "mailmask.studio") {
+    // El MCP Registry oficial verifica el namespace `studio.mailmask/*` leyendo
+    // https://mailmask.studio/.well-known/mcp-registry-auth en el APEX y con redirects
+    // deshabilitados (registry `auth/http.go`, CheckRedirect): esa ruta no puede ir al www.
+    if (url.hostname === "mailmask.studio" && url.pathname !== MCP_REGISTRY_AUTH_PATH) {
       url.hostname = "www.mailmask.studio";
       return Response.redirect(url.toString(), 301);
     }
@@ -1329,6 +1335,12 @@ const app = new Elysia({ adapter: node() })
   .get("/skills/*", ({ params }) => serveStatic(`/skills/${params["*"]}`))
   .get("/.well-known/agent-skills/index.json", () => serveStatic("/skills/index.json"))
   .get("/.well-known/skills/index.json", () => serveStatic("/skills/index.legacy.json"))
+  // Prueba de dominio para registry.modelcontextprotocol.io (listado `studio.mailmask/mailmask`,
+  // manifiesto en `server.json`). Sólo la mitad pública; la privada vive en
+  // ~/.mailmask-mcp-registry-key.pem, fuera del repo.
+  .get(MCP_REGISTRY_AUTH_PATH, () => new Response(`v=MCPv1; k=ed25519; p=${MCP_REGISTRY_PUBLIC_KEY}\n`, {
+    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=300" },
+  }))
 
   // --- Auth ---
 
