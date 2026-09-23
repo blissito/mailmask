@@ -129,7 +129,11 @@ function flattenMimeParts(raw: string): MimePart[] {
   const headerBodySplit = raw.indexOf("\r\n\r\n");
   if (headerBodySplit === -1) return [];
   const body = raw.slice(headerBodySplit + 4);
-  const contentType = extractHeader(raw, "Content-Type");
+  // Desdoblado: el boundary suele venir en el renglón de continuación
+  // (`multipart/related;\r\n\tboundary=...`, así lo manda javamail). Sin
+  // desdoblar, el correo entero se tomaba por una sola parte y se perdía el HTML.
+  const topHeaders = raw.slice(0, headerBodySplit).replace(/\r\n[ \t]+/g, " ");
+  const contentType = topHeaders.match(/^Content-Type:[ \t]*(.+)$/im)?.[1].trim() ?? "";
 
   if (contentType.includes("multipart")) {
     const boundaryMatch = contentType.match(/boundary="?([^";\s]+)"?/);
@@ -139,8 +143,8 @@ function flattenMimeParts(raw: string): MimePart[] {
   }
 
   // Not multipart — single part
-  const encMatch = raw.slice(0, headerBodySplit).match(/^Content-Transfer-Encoding:[ \t]*(\S+)/im);
-  return [{ headers: raw.slice(0, headerBodySplit), contentType, body, encoding: encMatch?.[1]?.trim().toLowerCase() }];
+  const encMatch = topHeaders.match(/^Content-Transfer-Encoding:[ \t]*(\S+)/im);
+  return [{ headers: topHeaders, contentType, body, encoding: encMatch?.[1]?.trim().toLowerCase() }];
 }
 
 function decodePartBody(part: MimePart): string {
@@ -209,6 +213,49 @@ export interface AttachmentMeta {
   filename: string;
   contentType: string;
   size: number;
+  /** Content-ID sin ángulos, si la parte lo trae: es lo que el HTML referencia con `cid:`. */
+  contentId?: string;
+}
+
+// Muchos transaccionales (Paquetexpress, por ejemplo) mandan las imágenes del
+// cuerpo como `application/octet-stream`; el tipo real sale de la extensión.
+const IMAGE_EXT_TYPES: Record<string, string> = {
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml",
+};
+
+function partContentType(part: MimePart): string {
+  const base = part.contentType.toLowerCase().split(";")[0].trim();
+  if (base && base !== "application/octet-stream") return base;
+  const ext = part.filename?.split(".").pop()?.toLowerCase();
+  return (ext && IMAGE_EXT_TYPES[ext]) || base || "application/octet-stream";
+}
+
+function partContentId(part: MimePart): string | undefined {
+  const m = part.headers.match(/^Content-ID:[ \t]*([^\r\n]+)/im);
+  const id = m?.[1].trim().replace(/^<|>$/g, "").trim();
+  return id || undefined;
+}
+
+/**
+ * Cambia cada `cid:` del HTML por la URL del adjunto que lo lleva. Sin esto, las
+ * imágenes incrustadas (logos, botones, banners de un transaccional) salen rotas
+ * en la Bandeja. Devuelve también qué adjuntos quedaron dentro del cuerpo, para no
+ * enseñarlos además como adjuntos sueltos.
+ */
+export function resolveCidImages(html: string, attachments: AttachmentMeta[], urlFor: (index: number) => string): { html: string; inlined: Set<number> } {
+  const byCid = new Map<string, AttachmentMeta>();
+  for (const a of attachments) if (a.contentId) byCid.set(a.contentId.toLowerCase(), a);
+  const inlined = new Set<number>();
+  if (!byCid.size) return { html, inlined };
+  const out = html.replace(/cid:([^"'\s)>]+)/gi, (whole, ref: string) => {
+    let key = ref;
+    try { key = decodeURIComponent(ref); } catch { /* se queda tal cual */ }
+    const att = byCid.get(key.toLowerCase());
+    if (!att) return whole;
+    inlined.add(att.index);
+    return urlFor(att.index);
+  });
+  return { html: out, inlined };
 }
 
 export function extractAttachments(raw: string): AttachmentMeta[] {
@@ -223,12 +270,12 @@ export function extractAttachments(raw: string): AttachmentMeta[] {
     // Skip empty parts
     if (!part.body.trim()) continue;
 
-    const baseType = ct.split(";")[0].trim();
     attachments.push({
       index: idx++,
       filename: part.filename ?? `attachment-${idx}`,
-      contentType: baseType,
+      contentType: partContentType(part),
       size: part.body.length,
+      contentId: partContentId(part),
     });
   }
   return attachments;
@@ -244,7 +291,7 @@ export function extractAttachmentByIndex(raw: string, index: number): { data: Ui
     if (!part.body.trim()) continue;
 
     if (idx === index) {
-      const baseType = ct.split(";")[0].trim();
+      const baseType = partContentType(part);
       const filename = part.filename ?? `attachment-${idx + 1}`;
       // Decode base64 content to binary
       let data: Uint8Array;

@@ -208,7 +208,7 @@ import {
   deleteConfigurationSet,
   deleteDomainIdentity,
 } from "./ses.js";
-import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, extractAttachmentByIndex, rebuildConversationsFromS3 } from "./forwarding.js";
+import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, extractAttachmentByIndex, resolveCidImages, rebuildConversationsFromS3 } from "./forwarding.js";
 import { fetchEmailFromS3, S3FetchError, degradedBodyState, repairReceiptRules, ensureDomainInbound, ensureSnsSubscription, AWS_REGION, getBackupBytesFromS3 } from "./ses.js";
 import { runDbBackup, DB_BACKUP_SUFFIX } from "./backup.js";
 import { resolveEmailBody, extractInlineImages, appendSignature, quotePrevious, MAX_EMAIL_HTML_BYTES } from "./email-html.js";
@@ -4502,8 +4502,13 @@ const app = new Elysia({ adapter: node() })
       if (msg.s3Bucket && msg.s3Key && !msg.body) {
         try {
           const raw = await fetchEmailFromS3(msg.s3Bucket, msg.s3Key);
-          const attachments = extractAttachments(raw);
-          return { ...msg, body: extractPlainBody(raw), html: extractHtmlBody(raw), attachments };
+          const all = extractAttachments(raw);
+          // Las imágenes `cid:` apuntan a la ruta de adjuntos, llaveada por id de
+          // mensaje (el índice se descuadra con la paginación de 30).
+          const { html, inlined } = resolveCidImages(extractHtmlBody(raw), all, (i) =>
+            `/api/bandeja/conversations/${conv.id}/attachments/${msg.id}/${i}?domainId=${encodeURIComponent(domainId)}`);
+          const attachments = all.filter((a) => !inlined.has(a.index));
+          return { ...msg, body: extractPlainBody(raw), html, attachments };
         } catch (err) {
           // Tres desenlaces distintos, y el usuario merece saber cuál le tocó.
           // Antes los tres decían "(Error al cargar el mensaje)", que para un
@@ -4564,13 +4569,16 @@ const app = new Elysia({ adapter: node() })
     if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
 
     const messages = await listMessages(conv.id);
-    const msgIdx = parseInt(params.msgIdx, 10);
+    // Acepta el id del mensaje (lo que usa el cliente y las imágenes `cid:`) o,
+    // por compatibilidad, su índice en el hilo completo.
     const attIdx = parseInt(params.attIdx, 10);
-    if (isNaN(msgIdx) || isNaN(attIdx) || msgIdx < 0 || msgIdx >= messages.length) {
+    const byId = messages.find((m) => m.id === params.msgIdx);
+    const msgIdx = byId ? -1 : parseInt(params.msgIdx, 10);
+    if (isNaN(attIdx) || (!byId && (isNaN(msgIdx) || msgIdx < 0 || msgIdx >= messages.length))) {
       return new Response(JSON.stringify({ error: "Índice inválido" }), { status: 400 });
     }
 
-    const msg = messages[msgIdx];
+    const msg = byId ?? messages[msgIdx];
     if (!msg.s3Bucket || !msg.s3Key) {
       return new Response(JSON.stringify({ error: "Mensaje sin contenido S3" }), { status: 404 });
     }

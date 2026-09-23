@@ -792,7 +792,7 @@ function renderMessages(messages, notes) {
     }
 
     const dir = item.direction;
-    const attachmentsHtml = renderAttachments(item.attachments, item._msgIdx);
+    const attachmentsHtml = renderAttachments(item.attachments, item.id);
     return `<div class="mesa-msg ${dir}">
       <div class="mesa-msg-header">
         <span class="mesa-msg-from">${esc(item.from)}</span>
@@ -1640,10 +1640,10 @@ function scrollToSelected() {
 }
 
 // --- Attachments ---
-function renderAttachments(attachments, msgIdx) {
+function renderAttachments(attachments, msgId) {
   if (!attachments || attachments.length === 0) return "";
   const chips = attachments.map(att => {
-    const url = `/api/bandeja/conversations/${activeConv.id}/attachments/${msgIdx}/${att.index}?domainId=${selectedDomainId}`;
+    const url = `/api/bandeja/conversations/${activeConv.id}/attachments/${msgId}/${att.index}?domainId=${selectedDomainId}`;
     const isImage = att.contentType.startsWith("image/");
     const icon = isImage
       ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`

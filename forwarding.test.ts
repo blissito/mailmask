@@ -1,7 +1,7 @@
 import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
 
-import { evaluateRules, processInbound, extractPlainBody, extractHtmlBody, extractAttachments } from "./forwarding.ts";
+import { evaluateRules, processInbound, extractPlainBody, extractHtmlBody, extractAttachments, resolveCidImages } from "./forwarding.ts";
 import {
   enqueueForward, dequeueForward, listForwardQueue, moveToDeadLetter,
   getQueueDepth, getDeadLetterCount,
@@ -869,6 +869,38 @@ describe("MIME parsing", () => {
     assert.equal(attachments[0].contentType, "image/png");
     assert.equal(attachments[1].filename, "doc.pdf");
     assert.equal(attachments[1].contentType, "application/pdf");
+  });
+
+  // Paquetexpress (javamail): boundary en el renglón de continuación e imágenes
+  // `cid:` como octet-stream con Content-ID sin ángulos. Antes salía sin HTML.
+  it("folded top-level Content-Type and cid images resolve", () => {
+    const raw = [
+      "From: infoexpress@paquetexpress.com.mx",
+      "Content-Type: multipart/related; ",
+      '\tboundary="----=_Part_1"',
+      "",
+      "------=_Part_1",
+      "Content-Type: text/html; charset=UTF-8",
+      "",
+      '<img src="cid:img0"><p>Hola</p>',
+      "------=_Part_1",
+      "Content-Type: application/octet-stream; name=logo.png",
+      "Content-Transfer-Encoding: base64",
+      "Content-Disposition: attachment; filename=logo.png",
+      "Content-ID: img0",
+      "",
+      "iVBORw0KGgo=",
+      "------=_Part_1--",
+    ].join("\r\n");
+    const html = extractHtmlBody(raw);
+    assert.equal(html, '<img src="cid:img0"><p>Hola</p>');
+    const atts = extractAttachments(raw);
+    assert.equal(atts.length, 1);
+    assert.equal(atts[0].contentType, "image/png");
+    assert.equal(atts[0].contentId, "img0");
+    const out = resolveCidImages(html, atts, (i) => `/att/${i}`);
+    assert.equal(out.html, '<img src="/att/0"><p>Hola</p>');
+    assert.deepEqual([...out.inlined], [0]);
   });
 
   it("extractPlainBody handles simple non-multipart email", () => {
