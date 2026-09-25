@@ -280,6 +280,12 @@ export async function sondearTransferencias(): Promise<void> {
           expiresAt: detalle?.expirationDate ?? reg.expiresAt,
         });
         log("info", "route53", "Transfer completed, entra al aprovisionamiento", { domain: reg.domainName });
+        // Nos enteramos en el momento: hasta aquí sólo avisábamos a los 3 días sin aprobar, y
+        // es justo cuando conviene revisar el inventario con el cliente (IPs de CDN que rotan).
+        await sendAlert(
+          `transferencia-completada:${reg.domainName}`,
+          `La transferencia de ${reg.domainName} (${reg.ownerEmail}) se completó en AWS. ${reg.dnsImportStatus === "approved" ? "Su DNS ya estaba aprobado: se aprovisiona solo en el siguiente minuto." : "Falta que apruebe su inventario de DNS; nada se mueve hasta entonces. Revísalo con el cliente."}`,
+        ).catch(() => {});
 
         // El aprovisionamiento se detiene solo si el inventario no está aprobado; el aviso
         // es para que el cliente vaya a aprobarlo.

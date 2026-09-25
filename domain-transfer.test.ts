@@ -197,6 +197,8 @@ describe("transferencia de dominios", () => {
     assert.equal(dbmod.getDomainRegistration(reg.id).status, "registering");
     const aviso = correos.find((c) => /Revisa el DNS/.test(c.subject));
     assert.ok(aviso, "no se pidió revisar el inventario");
+    // Y nos enteramos nosotros en el momento, no a los 3 días.
+    assert.ok(alertas.some((m) => m.includes(reg.domainName) && /se completó/.test(m)), "no avisó al equipo");
   });
 
   it("recuerda la aprobación y cancela a los 10 días", async () => {
