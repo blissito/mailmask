@@ -7,6 +7,7 @@
 import { Resolver } from "node:dns/promises";
 import { log } from "./logger.js";
 import type { RRSet, RRSetTipo } from "./dns-records.js";
+import { dropCnameConflicts } from "./dns-records.js";
 
 /** Resolvers públicos, para no depender del caché del sistema. */
 const PUBLICOS = ["8.8.8.8", "1.1.1.1"];
@@ -159,7 +160,7 @@ export async function snapshotDns(domain: string, nombresExtra: string[] = []): 
     : [];
 
   // Los NS y el SOA del apex son del proveedor viejo: no se copian.
-  const limpio = found.filter((x) => !(x.name === apex && (x.type === "NS" || (x.type as string) === "SOA")));
+  const limpio = dropCnameConflicts(found.filter((x) => !(x.name === apex && (x.type === "NS" || (x.type as string) === "SOA"))));
 
   log("info", "route53", "DNS snapshot", { domain: apex, encontrados: limpio.length, ns: ns.length, extra: nombresExtra.length });
 
@@ -192,3 +193,4 @@ export async function delegacionActiva(domain: string, esperados: string[]): Pro
     expected,
   };
 }
+

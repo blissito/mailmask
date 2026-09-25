@@ -452,3 +452,14 @@ export function expandirPreset(preset: Preset, domain: string, target?: string, 
 
 /** El MX de MailMask, para poder compararlo sin importar `route53.ts`. */
 export const MX_MAILMASK = `10 inbound-smtp.${AWS_REGION}.amazonaws.com`;
+
+/**
+ * Un nombre con CNAME no puede tener otro tipo, y Route 53 rechaza el lote entero si lo
+ * intentas. Pero el resolver sigue el CNAME: preguntar A o TXT de `mail.x` cuando es un
+ * CNAME a `x` devuelve los de `x`, y el inventario salía con los dos (kandey.com.mx,
+ * 24-sep-2026). Esos otros tipos son eco del destino; se queda el CNAME.
+ */
+export function dropCnameConflicts<T extends { name: string; type: string }>(records: T[]): T[] {
+  const conCname = new Set(records.filter((r) => r.type === "CNAME").map((r) => r.name));
+  return records.filter((r) => r.type === "CNAME" || !conCname.has(r.name));
+}

@@ -136,6 +136,13 @@ describe("configureDnsRecords y hosted zones", () => {
     assert.ok(mx.includes("101 aspmx.l.google.com"), `no se conservó con prioridad menor: ${mx}`);
   });
 
+  it("con keepForeignMx (transfer-in) el MX del cliente no se toca", async () => {
+    zona = [{ name: "ejemplo.com", type: "MX", ttl: 300, values: ["5 mx1.hostinger.com", "10 mx2.hostinger.com"] }];
+    const r = await r53.configureDnsRecords("Z1", "ejemplo.com", "tok", [], { keepForeignMx: true });
+    assert.equal(r.mxOurs, false);
+    assert.equal(cambios.filter((c) => c.ResourceRecordSet.Type === "MX").length, 0, "no debe mandar cambios al MX");
+  });
+
   it("escribe el TXT de verificación y un CNAME por token DKIM", async () => {
     await r53.configureDnsRecords("Z1", "ejemplo.com", "tok", ["a1", "b2", "c3"]);
     assert.deepEqual(valores("_amazonses.ejemplo.com", "TXT"), ['"tok"']);

@@ -827,9 +827,9 @@ function validarWhois(entrada: unknown): WhoisContacto | string {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(limpio.email)) return "El correo del contacto WHOIS no es válido.";
   if (!/^[A-Za-z]{2}$/.test(limpio.country)) return 'El país debe ser su código de dos letras, por ejemplo "MX".';
   limpio.country = limpio.country.toUpperCase();
-  const tel = normalizePhone(limpio.phone, limpio.country);
-  if (!tel) return 'No entendimos el teléfono. Escríbelo con lada de país, por ejemplo "+52 55 1234 5678".';
-  limpio.phone = tel;
+  const phone = normalizePhone(limpio.phone, limpio.country);
+  if (!phone) return 'No entendimos el teléfono. Escríbelo con lada de país, por ejemplo "+52 55 1234 5678".';
+  limpio.phone = phone;
   const org = String(e.organization ?? "").trim();
   return { ...(limpio as unknown as WhoisContacto), ...(org ? { organization: org } : {}) };
 }
@@ -7632,8 +7632,8 @@ if (esServidor) (async () => {
     }
 
     const { backfillSesThreadRefs } = await import("./db.js");
-    const hilos = backfillSesThreadRefs();
-    if (hilos > 0) log("info", "startup", `Hilo: ${hilos} conversación(es) con el Message-ID reescrito por SES`);
+    const rethreaded = backfillSesThreadRefs();
+    if (rethreaded > 0) log("info", "startup", `Hilo: ${rethreaded} conversación(es) con el Message-ID reescrito por SES`);
 
     const repaired = await repairReceiptRules();
     if (repaired > 0) log("info", "startup", `Repaired ${repaired} receipt rule(s) with missing TopicArn`);

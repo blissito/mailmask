@@ -3181,9 +3181,9 @@ export function backfillSesThreadRefs(): number {
   for (const r of rows) {
     let refs: string[] = [];
     try { refs = JSON.parse(r.thread_refs || "[]"); } catch { refs = []; }
-    const faltan = r.ses_ids.split(" ").map((id) => `<${id}@email.amazonses.com>`).filter((x) => !refs.includes(x));
-    if (!faltan.length) continue;
-    upd.run(JSON.stringify([...refs, ...faltan]), r.id);
+    const missing = r.ses_ids.split(" ").map((id) => `<${id}@email.amazonses.com>`).filter((x) => !refs.includes(x));
+    if (!missing.length) continue;
+    upd.run(JSON.stringify([...refs, ...missing]), r.id);
     n++;
   }
   return n;

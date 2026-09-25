@@ -39,7 +39,7 @@ describe("transferencia de dominios", () => {
           return { changeId: "C1" };
         },
         listRecordSets: async () => zona,
-        configureDnsRecords: async () => { llamadas.push({ op: "configureDnsRecords", args: null }); },
+        configureDnsRecords: async () => { llamadas.push({ op: "configureDnsRecords", args: null }); return { mxOurs: true }; },
         updateNameservers: async (domain: string, ns: string[]) => { llamadas.push({ op: "updateNameservers", args: { domain, ns } }); },
         disableDomainTransferLock: async (d: string) => { llamadas.push({ op: "disableLock", args: d }); },
         retrieveDomainAuthCode: async () => "EPP-SECRETO",

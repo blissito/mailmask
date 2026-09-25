@@ -22,3 +22,14 @@ test("threadRefsFor guarda el Message-ID que SES pone en su lugar", () => {
   ]);
   assert.deepEqual(threadRefsFor({ messageId: "<a@denik.me>", sesMessageId: "" }), ["<a@denik.me>"]);
 });
+
+test("dropCnameConflicts: el CNAME gana y se van los ecos de su destino", async () => {
+  const { dropCnameConflicts } = await import("./dns-records.js");
+  const r = dropCnameConflicts([
+    { name: "mail.k.mx", type: "A", ttl: 60, values: ["1.2.3.4"] },
+    { name: "mail.k.mx", type: "CNAME", ttl: 300, values: ["k.mx"] },
+    { name: "mail.k.mx", type: "TXT", ttl: 300, values: ['"v=spf1 ~all"'] },
+    { name: "k.mx", type: "A", ttl: 60, values: ["1.2.3.4"] },
+  ] as never);
+  assert.deepEqual(r.map((x: { name: string; type: string }) => `${x.name} ${x.type}`), ["mail.k.mx CNAME", "k.mx A"]);
+});

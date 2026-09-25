@@ -77,16 +77,17 @@ export async function finalizeDomainRegistration(reg: DomainRegistration): Promi
   if (reg.kind === "transfer" && reg.dnsSnapshot?.length) {
     const { applyRecordChanges } = await import("./route53.js");
     const apex = reg.domainName.toLowerCase();
-    const copiables = reg.dnsSnapshot.filter((r) => !(r.name === apex && (r.type === "NS" || r.type === "SOA")));
+    const { dropCnameConflicts } = await import("./dns-records.js");
+    const copyable = dropCnameConflicts(reg.dnsSnapshot).filter((r) => !(r.name === apex && (r.type === "NS" || r.type === "SOA")));
     // Route 53 acepta 1000 cambios por lote, pero de 100 en 100 un fallo cuesta menos.
-    for (let i = 0; i < copiables.length; i += 100) {
+    for (let i = 0; i < copyable.length; i += 100) {
       await applyRecordChanges(
         hostedZoneId,
-        copiables.slice(i, i + 100).map((rrset) => ({ action: "UPSERT" as const, rrset })),
+        copyable.slice(i, i + 100).map((rrset) => ({ action: "UPSERT" as const, rrset })),
         `Inventario aprobado de ${reg.domainName}`,
       );
     }
-    log("info", "route53", "Inventario DNS restaurado", { domain: reg.domainName, registros: copiables.length });
+    log("info", "route53", "Inventario DNS restaurado", { domain: reg.domainName, registros: copyable.length });
   }
 
   // 2. Apuntar el dominio a nuestra zona. Idempotente: si ya apunta, no se toca.
@@ -101,12 +102,12 @@ export async function finalizeDomainRegistration(reg: DomainRegistration): Promi
   const dnsRecords = await verifyDomain(reg.domainName);
 
   // 4. Registros de correo, fusionando con lo que la zona ya tuviera.
-  await configureDnsRecords(
+  const { mxOurs } = await configureDnsRecords(
     hostedZoneId,
     reg.domainName,
     dnsRecords.verificationToken,
     dnsRecords.dkimTokens,
-    { preserveMx: reg.kind === "transfer" },
+    { keepForeignMx: reg.kind === "transfer" },
   );
 
   // 5. Regla de recepción. No fatal: puede faltar SNS_TOPIC_ARN.
@@ -122,7 +123,7 @@ export async function finalizeDomainRegistration(reg: DomainRegistration): Promi
 
   updateDomain(domainRow.id, {
     verified: true,
-    mxConfigured: true,
+    mxConfigured: mxOurs,
     registeredViaMailmask: true,
     hostedZoneId,
     dnsZoneStatus: "active",

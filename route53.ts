@@ -424,8 +424,8 @@ export async function configureDnsRecords(
   domain: string,
   verificationToken: string,
   dkimTokens: string[],
-  opts: { preserveMx?: boolean } = {},
-): Promise<void> {
+  opts: { preserveMx?: boolean; keepForeignMx?: boolean } = {},
+): Promise<{ mxOurs: boolean }> {
   const existentes = await listRecordSets(hostedZoneId);
   const apex = domain.toLowerCase();
   const buscar = (name: string, type: string) => existentes.find((r) => r.name === name && r.type === type);
@@ -434,7 +434,12 @@ export async function configureDnsRecords(
   const mxPrevio = buscar(apex, "MX");
   const mxAjenos = (mxPrevio?.values ?? []).filter((v) => !v.includes("inbound-smtp."));
 
-  if (mxAjenos.length && !opts.preserveMx) {
+  // Transfer-in: mover el registro del dominio no es mudar el correo. Si el MX apunta a
+  // otro proveedor (kandey.com.mx → Hostinger) se deja intacto; ponernos delante dejaba
+  // sus buzones sin correo nuevo. El cambio de MX lo decide el cliente después.
+  const keepMx = !!opts.keepForeignMx && mxAjenos.length > 0;
+
+  if (mxAjenos.length && !opts.preserveMx && !keepMx) {
     // Pisar el MX de alguien es tumbarle el correo. Que lo decida quien llama.
     throw new MxAjenoError(mxAjenos);
   }
@@ -450,7 +455,7 @@ export async function configureDnsRecords(
   const txtApexPrevio = buscar(apex, "TXT")?.values ?? [];
 
   const cambios: CambioDns[] = [
-    { action: "UPSERT", rrset: { name: apex, type: "MX", ttl: 300, values: mxValores } },
+    ...(keepMx ? [] : [{ action: "UPSERT" as const, rrset: { name: apex, type: "MX" as const, ttl: 300, values: mxValores } }]),
     { action: "UPSERT", rrset: { name: `_amazonses.${apex}`, type: "TXT", ttl: 300, values: [`"${verificationToken}"`] } },
     { action: "UPSERT", rrset: { name: apex, type: "TXT", ttl: 300, values: fusionarSpf(txtApexPrevio) } },
   ];
@@ -464,8 +469,9 @@ export async function configureDnsRecords(
 
   await applyRecordChanges(hostedZoneId, cambios, `MailMask email setup for ${domain}`);
   log("info", "route53", "DNS records configured", {
-    domain, hostedZoneId, records: cambios.length, mxPreservados: mxAjenos.length,
+    domain, hostedZoneId, records: cambios.length, mxPreservados: mxAjenos.length, mxIntacto: keepMx,
   });
+  return { mxOurs: !keepMx };
 }
 
 // --- Update nameservers (point registered domain to hosted zone NS) ---
