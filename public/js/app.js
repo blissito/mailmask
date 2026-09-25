@@ -1203,7 +1203,7 @@ async function iniciarTransferencia(dominio) {
           ["phone", "Teléfono (+52 55 1234 5678)", "tel"],
           ["address", "Calle y número", "text"],
           ["city", "Ciudad", "text"],
-          ["state", "Estado", "text"],
+          ["state", "Estado (ej. Ciudad de México)", "text"],
           ["zip", "Código postal", "text"],
           ["country", "País (MX)", "text"],
           ["organization", "Empresa (opcional)", "text"],

@@ -44,3 +44,16 @@ test("el rate limit no se burla mandando X-Forwarded-For", async () => {
   for (let i = 0; i < 12; i++) statuses.push((await request(`198.51.100.${i}`)).status);
   assert.ok(statuses.includes(429), `cambiar el XFF no debe dar cubeta nueva: ${statuses}`);
 });
+
+// AWS rechaza un .mx con el estado escrito como lo escribe la gente (kandey.com.mx pidió "CDMX").
+test("normalizeMxState traduce a la clave que exige el registro", async () => {
+  const { normalizeMxState } = await import("./main.js");
+  assert.equal(normalizeMxState("CDMX"), "DF");
+  assert.equal(normalizeMxState("Ciudad de México"), "DF");
+  assert.equal(normalizeMxState("Jalisco"), "JA");
+  assert.equal(normalizeMxState("Edo. Méx."), "ME");
+  assert.equal(normalizeMxState("Nuevo León"), "NL");
+  assert.equal(normalizeMxState("qro"), "QE");
+  assert.equal(normalizeMxState("NL"), "NL");
+  assert.equal(normalizeMxState("Narnia"), null);
+});

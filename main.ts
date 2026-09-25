@@ -782,6 +782,30 @@ async function cancelMpPreapproval(preapprovalId: string, accessToken: string): 
   if (!res.ok) throw new Error(`MP cancel ${preapprovalId}: ${await res.text()}`);
 }
 
+// Para .mx el registro exige el estado como su clave (lista de AWS). La gente escribe
+// "CDMX", "Jalisco" o "Edo. Méx.": AWS rechaza la solicitud entera (kandey.com.mx,
+// 24-sep-2026), así que se traduce aquí.
+const MX_STATES: Record<string, string[]> = {
+  AG: ["aguascalientes", "ags"], BC: ["baja california", "bc"], BS: ["baja california sur", "bcs"],
+  CH: ["chihuahua", "chih"], CL: ["colima", "col"], CM: ["campeche", "camp"],
+  CO: ["coahuila", "coahuila de zaragoza", "coah"], CS: ["chiapas", "chis"],
+  DF: ["cdmx", "ciudad de mexico", "mexico df", "distrito federal", "df", "cd de mexico", "cd mx"],
+  DG: ["durango", "dgo"], GR: ["guerrero", "gro"], GT: ["guanajuato", "gto"], HG: ["hidalgo", "hgo"],
+  JA: ["jalisco", "jal"], ME: ["estado de mexico", "edomex", "edo mex", "edo de mexico", "mexico", "mex", "em"],
+  MI: ["michoacan", "michoacan de ocampo", "mich"], MO: ["morelos", "mor"], NA: ["nayarit", "nay"],
+  NL: ["nuevo leon", "nl"], OA: ["oaxaca", "oax"], PB: ["puebla", "pue"], QE: ["queretaro", "qro"],
+  QR: ["quintana roo", "qroo", "q roo"], SI: ["sinaloa", "sin"], SL: ["san luis potosi", "slp"],
+  SO: ["sonora", "son"], TB: ["tabasco", "tab"], TL: ["tlaxcala", "tlax"], TM: ["tamaulipas", "tamps"],
+  VE: ["veracruz", "veracruz de ignacio de la llave", "ver"], YU: ["yucatan", "yuc"], ZA: ["zacatecas", "zac"],
+};
+
+export function normalizeMxState(raw: string): string | null {
+  const key = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[.,]/g, " ").replace(/\s+/g, " ").trim();
+  if (MX_STATES[key.toUpperCase()]) return key.toUpperCase();
+  for (const [code, names] of Object.entries(MX_STATES)) if (names.includes(key)) return code;
+  return null;
+}
+
 // Lada internacional por país, para partir "+525512345678" en "+52.5512345678".
 const CALLING_CODES: Record<string, string> = {
   MX: "52", US: "1", CA: "1", ES: "34", CO: "57", AR: "54", CL: "56", PE: "51", EC: "593",
@@ -831,6 +855,11 @@ function validarWhois(entrada: unknown): WhoisContacto | string {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(limpio.email)) return "El correo del contacto WHOIS no es válido.";
   if (!/^[A-Za-z]{2}$/.test(limpio.country)) return 'El país debe ser su código de dos letras, por ejemplo "MX".';
   limpio.country = limpio.country.toUpperCase();
+  if (limpio.country === "MX") {
+    const state = normalizeMxState(limpio.state);
+    if (!state) return `No reconocimos el estado "${limpio.state}". Escribe el nombre completo, por ejemplo "Ciudad de México" o "Jalisco".`;
+    limpio.state = state;
+  }
   const phone = normalizePhone(limpio.phone, limpio.country);
   if (!phone) return 'No entendimos el teléfono. Escríbelo con lada de país, por ejemplo "+52 55 1234 5678".';
   limpio.phone = phone;
