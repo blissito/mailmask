@@ -6681,10 +6681,16 @@ const app = new Elysia({ adapter: node() })
     if (!precio) return jsonErr(`AWS no puede transferir dominios ${tld}. Escríbenos y lo revisamos contigo.`, 400);
 
     const enCurso = getDomainRegistrationByDomainName(d);
-    if (enCurso && !checkoutAbandonado(enCurso)) {
+    // Un segundo intento del mismo dueño sin pagar reusa la fila: kandey.com.mx pagó a
+    // medias (la pantalla de MP se quedó en negro, sin cargo) y al volver se topaba con el
+    // 409 de abajo durante 24 h. Mismo id = misma `external_reference`, así que el pago
+    // de cualquiera de las dos preferencias cae en la misma transferencia.
+    const retry = enCurso && enCurso.ownerEmail === auth.email && enCurso.kind === "transfer" &&
+      enCurso.status === "transfer_pending_payment" ? enCurso : null;
+    if (enCurso && !retry && !checkoutAbandonado(enCurso)) {
       return jsonErr("Ya hay una transferencia o un registro en curso para este dominio.", 409);
     }
-    if (enCurso && checkoutAbandonado(enCurso)) {
+    if (enCurso && !retry && checkoutAbandonado(enCurso)) {
       // Un checkout que nadie pagó no puede dejar el dominio bloqueado para siempre: el
       // propio cliente se topaba con su 409 al reintentar.
       updateDomainRegistration(enCurso.id, {
@@ -6729,17 +6735,24 @@ const app = new Elysia({ adapter: node() })
         return c ? [...(c.dkimTokens ?? []).map((t: string) => `${t}._domainkey`), "_amazonses"] : [];
       })()).catch(() => ({ found: [] as never[] }));
 
-    const reg = createDomainRegistration({
-      domainName: d,
-      ownerEmail: auth.email,
-      tld,
-      priceCents: precio.transferMxnCents,
-      awsCostCents: precio.transferUsdCents,
-      kind: "transfer",
-      renewalPriceCents: precio.renewMxnCents,
-      dnsSnapshot: inventario.found,
-      whoisContact: whois,
-    });
+    const reg = retry
+      ? (updateDomainRegistration(retry.id, {
+          renewalPriceCents: precio.renewMxnCents,
+          dnsSnapshot: inventario.found,
+          dnsSnapshotAt: new Date().toISOString(),
+          whoisContact: whois,
+        }), retry)
+      : createDomainRegistration({
+          domainName: d,
+          ownerEmail: auth.email,
+          tld,
+          priceCents: precio.transferMxnCents,
+          awsCostCents: precio.transferUsdCents,
+          kind: "transfer",
+          renewalPriceCents: precio.renewMxnCents,
+          dnsSnapshot: inventario.found,
+          whoisContact: whois,
+        });
 
     // El código completo vive en memoria y caduca en una hora; en la fila sólo quedan los
     // últimos 4 caracteres, para que el cliente sepa cuál mandó.

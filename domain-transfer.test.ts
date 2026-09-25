@@ -228,11 +228,11 @@ describe("transferencia de dominios", () => {
   // Vivía sólo en `/transfer/check`, o sea en el front: un POST directo aquí cobraba una
   // transferencia imposible, y el reembolso es manual.
 
-  const iniciar = async (cuerpo: Record<string, unknown>) => {
+  const iniciar = async (cuerpo: Record<string, unknown>, existing?: string) => {
     const { app } = await import("./main.ts");
     const { hashPassword } = await import("./auth.ts");
-    const correo = `start-${Math.random().toString(36).slice(2, 8)}-${suffix}@example.com`;
-    dbmod.createUser(correo, await hashPassword("password123"));
+    const correo = existing ?? `start-${Math.random().toString(36).slice(2, 8)}-${suffix}@example.com`;
+    if (!existing) dbmod.createUser(correo, await hashPassword("password123"));
     const login = await app.fetch(new Request("http://localhost/api/auth/login", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: correo, password: "password123" }),
@@ -254,6 +254,27 @@ describe("transferencia de dominios", () => {
     assert.equal(res.status, 400);
     assert.match((await res.json()).error, /WHOIS/i);
     assert.equal(dbmod.getDomainRegistrationByDomainName(`sinwhois-${suffix}.com`), null);
+  });
+
+  it("reintentar sin haber pagado reusa la transferencia en vez de dar 409", async () => {
+    const dominio = `reintento-${suffix}.com`;
+    const { correo } = await iniciar({ domain: dominio, authCode: "EPP-1111", whois: WHOIS });
+    const primera = dbmod.getDomainRegistrationByDomainName(dominio)!;
+    assert.equal(primera.status, "transfer_pending_payment");
+
+    const { res } = await iniciar({ domain: dominio, authCode: "EPP-2222", whois: WHOIS }, correo);
+    assert.notEqual(res.status, 409);
+    const segunda = dbmod.getDomainRegistrationByDomainName(dominio)!;
+    assert.equal(segunda.id, primera.id, "debe ser la misma fila: el pago de cualquier link cae ahí");
+    assert.equal(segunda.transferAuthCodeHint, "2222");
+    assert.equal(transfer.tomarAuthCode(primera.id), "EPP-2222");
+  });
+
+  it("otra cuenta sigue topándose con el 409", async () => {
+    const dominio = `ajeno-${suffix}.com`;
+    await iniciar({ domain: dominio, authCode: "EPP", whois: WHOIS });
+    const { res } = await iniciar({ domain: dominio, authCode: "EPP", whois: WHOIS });
+    assert.equal(res.status, 409);
   });
 
   it("un teléfono que Route 53 no acepta se rechaza aquí, no en AWS", async () => {
