@@ -315,7 +315,7 @@ export function extractAttachmentByIndex(raw: string, index: number): { data: Ui
 
 // Tag de la conversación cuyo correo finge venir del propio dominio del cliente y falla
 // DMARC. La Bandeja lo pinta como aviso; el reenvío no lo toca.
-export const SPOOF_TAG = "suplantacion";
+export const SPOOF_TAG = "spoof";
 
 /**
  * ¿El `From` finge ser del propio dominio? Sólo cuenta si SES dice que DMARC falló:

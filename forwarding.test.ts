@@ -382,7 +382,7 @@ describe("processInbound", () => {
       assert.equal(r.result.details, "forwarded=0 discarded=1");
       assert.equal(r.queued, undefined, "no debe reenviarse");
       assert.ok(r.conv, "debe quedar en la Bandeja");
-      assert.deepEqual(r.conv!.tags, ["suplantacion"]);
+      assert.deepEqual(r.conv!.tags, ["spoof"]);
       assert.equal(r.entry?.status, "discarded");
       assert.match(r.entry?.error ?? "", /Suplantación/);
     });
@@ -390,7 +390,7 @@ describe("processInbound", () => {
     it("From de un subdominio → mismo trato", async () => {
       const r = await inbound(`x@mail.${fwdDomain}`, "FAIL");
       assert.equal(r.queued, undefined);
-      assert.deepEqual(r.conv?.tags, ["suplantacion"]);
+      assert.deepEqual(r.conv?.tags, ["spoof"]);
     });
 
     it("dominio ajeno con DMARC FAIL → se reenvía normal", async () => {
