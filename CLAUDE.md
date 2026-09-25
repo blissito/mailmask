@@ -253,6 +253,22 @@ verdad, nunca antes: si la transferencia se cae, el dominio se pierde.
 cliente (no hace falta cuenta de AWS suya, son sólo datos) y en transfer-in deberían ser los
 suyos: el dominio ya era de él.
 
+### Primera transferencia real: kandey.com.mx (24-sep-2026)
+
+Operación AWS `3f62f782-b045-44c5-888d-aafd09cc44e6`, mandada a mano (pago manual, el
+checkout de MP se colgó sin llegar a crear el pago: `COW00-YNTHGUYKKQGH`). Ella sola no lo
+hubiera logrado: teléfono, 409 al reintentar, EPP en memoria, estado "CDMX" que AWS
+rechaza, CNAME+A en el inventario y el MX que le iba a tumbar Hostinger — todo arreglado
+ese día. Vence el **3-oct-2026** en Hostinger; al completar, revisar la IP del apex (CDN
+de Hostinger, rota) antes de aprobar el inventario. El titular WHOIS quedó a nombre de
+Rosalba Flores; en Hostinger era Josue Kraves.
+
+**Pendiente: ficha del dominio en la app**, con la de Hostinger como referencia: fecha de
+caducidad con alerta, renovación automática, nameservers, titular WHOIS ("Ver todo"),
+bloqueo de transferencia y código de autorización; más el paso en el que va una
+transferencia traducido ("Hostinger la libera sola, hasta 10 días"). Y el checkout de MP
+de pagos únicos: nunca ha cobrado en producción.
+
 ### Antes de venderlo
 
 1. ~~IAM~~ **ya está**: el usuario `pulso_easybits` (476114113638) trae
