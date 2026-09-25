@@ -150,6 +150,7 @@ function makeSnsNotification(opts: {
   rawContent?: string;
   spamVerdict?: string;
   virusVerdict?: string;
+  dmarcVerdict?: string;
 }) {
   const raw = opts.rawContent ?? [
     `From: ${opts.from}`,
@@ -174,6 +175,7 @@ function makeSnsNotification(opts: {
         virusVerdict: { status: opts.virusVerdict ?? "PASS" },
         spfVerdict: { status: "PASS" },
         dkimVerdict: { status: "PASS" },
+        dmarcVerdict: { status: opts.dmarcVerdict ?? "PASS" },
       },
       mail: {
         source: opts.from,
@@ -357,6 +359,51 @@ describe("processInbound", () => {
 
     assert.equal(result.action, "rejected");
     assert.match(result.details, /spam|virus/i);
+  });
+
+  // Phishing real a denik.me (sep-2026): `From: cpanel@denik.me` desde un servidor ajeno.
+  // SES decía dmarc=fail y aun así se reenviaba a Gmail, que ya no puede evaluarlo.
+  describe("suplantación del propio dominio (DMARC FAIL)", () => {
+    async function inbound(from: string, dmarcVerdict: string) {
+      const msgId = `spoof-${crypto.randomUUID()}`;
+      const subject = `Warning ${msgId}`;
+      const result = await processInbound(makeSnsNotification({
+        from, to: `info@${fwdDomain}`, subject, messageId: msgId, dmarcVerdict,
+      }));
+      const queued = listForwardQueue().find((q) => q.subject === subject);
+      if (queued) dequeueForward(queued.id);
+      const conv = listConversations(fwdDomainId).find((c) => c.subject === subject);
+      const entry = listLogs(fwdDomainId, 50).find((l) => l.subject === subject);
+      return { result, queued, conv, entry };
+    }
+
+    it("From del mismo dominio → Bandeja marcada, sin reenvío", async () => {
+      const r = await inbound(`cpanel@${fwdDomain}`, "FAIL");
+      assert.equal(r.result.details, "forwarded=0 discarded=1");
+      assert.equal(r.queued, undefined, "no debe reenviarse");
+      assert.ok(r.conv, "debe quedar en la Bandeja");
+      assert.deepEqual(r.conv!.tags, ["suplantacion"]);
+      assert.equal(r.entry?.status, "discarded");
+      assert.match(r.entry?.error ?? "", /Suplantación/);
+    });
+
+    it("From de un subdominio → mismo trato", async () => {
+      const r = await inbound(`x@mail.${fwdDomain}`, "FAIL");
+      assert.equal(r.queued, undefined);
+      assert.deepEqual(r.conv?.tags, ["suplantacion"]);
+    });
+
+    it("dominio ajeno con DMARC FAIL → se reenvía normal", async () => {
+      const r = await inbound("alguien@otro-dominio.com", "FAIL");
+      assert.match(r.result.details, /forwarded=1/);
+      assert.deepEqual(r.conv?.tags, []);
+    });
+
+    it("mismo dominio con DMARC PASS → se reenvía normal", async () => {
+      const r = await inbound(`hola@${fwdDomain}`, "PASS");
+      assert.match(r.result.details, /forwarded=1/);
+      assert.deepEqual(r.conv?.tags, []);
+    });
   });
 
   it("rules: discard action prevents forwarding", async () => {

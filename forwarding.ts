@@ -28,6 +28,8 @@ interface SesMailNotification {
     virusVerdict: { status: string };
     spfVerdict: { status: string };
     dkimVerdict: { status: string };
+    dmarcVerdict?: { status: string };
+    dmarcPolicy?: { status: string };
   };
   mail: {
     source: string;
@@ -311,7 +313,26 @@ export function extractAttachmentByIndex(raw: string, index: number): { data: Ui
 
 // --- Mesa integration ---
 
-async function saveToMesa(rawContent: string, from: string, recipient: string, subject: string, domainId: string, s3Bucket?: string, s3Key?: string): Promise<{ conversationId: string; isNew: boolean }> {
+// Tag de la conversación cuyo correo finge venir del propio dominio del cliente y falla
+// DMARC. La Bandeja lo pinta como aviso; el reenvío no lo toca.
+export const SPOOF_TAG = "suplantacion";
+
+/**
+ * ¿El `From` finge ser del propio dominio? Sólo cuenta si SES dice que DMARC falló:
+ * todo lo legítimo que sale del dominio (SES con su DKIM, Stalwart→SES, Bandeja, API)
+ * pasa DMARC. Hace falta aquí y no en la política del cliente porque, al reenviar, el
+ * receptor final (Gmail) ya no evalúa el DMARC del dominio original: `p=reject` no
+ * frena lo que nosotros mismos le entregamos. Caso real: phishing "cpanel@denik.me",
+ * sep-2026.
+ */
+export function isOwnDomainSpoof(from: string, domainName: string, dmarcStatus?: string): boolean {
+  if (dmarcStatus !== "FAIL") return false;
+  const fromDomain = from.split("@").pop()?.toLowerCase() ?? "";
+  const d = domainName.toLowerCase();
+  return fromDomain === d || fromDomain.endsWith("." + d);
+}
+
+async function saveToMesa(rawContent: string, from: string, recipient: string, subject: string, domainId: string, s3Bucket?: string, s3Key?: string, spoof = false): Promise<{ conversationId: string; isNew: boolean }> {
   const references = rawContent ? extractReferences(rawContent) : [];
   const messageIdHeader = rawContent ? extractHeader(rawContent, "Message-ID") : "";
 
@@ -352,6 +373,7 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
       messageCount: conv.messageCount + 1,
       status: "open", // Re-open on new inbound message
       threadReferences: newRefs,
+      ...(spoof && !conv.tags.includes(SPOOF_TAG) ? { tags: [...conv.tags, SPOOF_TAG] } : {}),
     });
     // Visibilidad del threading: sin esto no hay forma de saber, viendo los logs, si un
     // correo entrante enganchó en su hilo o abrió uno nuevo por error.
@@ -377,7 +399,7 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
       priority: "normal",
       lastMessageAt: new Date().toISOString(),
       messageCount: 1,
-      tags: [],
+      tags: spoof ? [SPOOF_TAG] : [],
       threadReferences: initialRefs,
     });
     const msg = await addMessage({
@@ -585,6 +607,34 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
         forwardedTo: "",
         sizeBytes: rawContent.length,
         error: "Rate limit exceeded",
+      }, logDays);
+      discarded++;
+      continue;
+    }
+
+    // Suplantación del propio dominio: se guarda en la Bandeja marcada y ahí termina.
+    // Sin reenvío, sin buzón IMAP, sin reglas ni webhooks — el reenvío es justo lo que
+    // le entregaba el phishing al cliente.
+    if (isOwnDomainSpoof(from, domainName, receipt.dmarcVerdict?.status)) {
+      log("warn", "forwarding", "Own-domain spoof held", { domainId: domain.id, from, subject, dmarcPolicy: receipt.dmarcPolicy?.status });
+      if (rawContent) {
+        try {
+          const mesa = await saveToMesa(rawContent, from, recipient, subject, domain.id, s3Bucket, s3Key, true);
+          notifyBandeja(domain.id, mesa.isNew ? "new_conversation" : "new_message", {
+            conversationId: mesa.conversationId, from, subject,
+          });
+        } catch (err) {
+          log("error", "forwarding", "Failed to save spoof to Mesa", { error: String(err), domainId: domain.id });
+        }
+      }
+      await addLog({
+        domainId: domain.id,
+        timestamp: new Date().toISOString(),
+        from, to: recipient, subject,
+        status: "discarded",
+        forwardedTo: "",
+        sizeBytes: rawContent.length,
+        error: `Suplantación: DMARC falló para ${from}, que finge ser del propio dominio`,
       }, logDays);
       discarded++;
       continue;

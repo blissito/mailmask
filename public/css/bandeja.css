@@ -832,6 +832,15 @@ body {
   text-align: center;
   margin: 8px 20px 0;
 }
+.mesa-spoof {
+  padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--mesa-danger);
+  margin: 8px 20px 0;
+}
 .mesa-upgrade a { color: var(--mesa-accent-text); font-weight: 600; text-decoration: underline; }
 
 /* --- Loading spinner --- */

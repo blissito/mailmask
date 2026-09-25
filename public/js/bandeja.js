@@ -484,6 +484,7 @@ function convRowHtml(c, i) {
     if (c.to) meta += `<span class="mesa-tag mesa-tag-alias">${esc(c.to.split("@")[0])}</span>`;
     if (c.deletedAt) meta += `<span class="mesa-tag mesa-tag-deleted">eliminado</span>`;
     if (c.priority === "urgent") meta += `<span class="mesa-tag mesa-tag-urgent">urgente</span>`;
+    if (c.tags?.includes("suplantacion")) meta += `<span class="mesa-tag mesa-tag-deleted" title="Finge venir de tu dominio y falló DMARC">suplantación</span>`;
     if (c.status === "snoozed" && c.snoozedUntil) {
       const hasta = new Date(c.snoozedUntil);
       meta += `<span class="mesa-tag mesa-tag-snoozed">💤 ${esc(hasta.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }))}</span>`;
@@ -663,6 +664,8 @@ async function openConversation(conv) {
   document.getElementById("detail-from").textContent = conv.from;
   document.getElementById("detail-to").textContent = conv.to;
   document.getElementById("detail-count").textContent = conv.messageCount;
+  // El reenvío ya lo retuvo (forwarding.ts, isOwnDomainSpoof); aquí sólo se avisa.
+  document.getElementById("spoof-banner").classList.toggle("mesa-hidden", !conv.tags?.includes("suplantacion"));
 
   const isDeleted = !!conv.deletedAt;
 
