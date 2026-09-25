@@ -187,14 +187,14 @@ export async function marcarFalloDeAprovisionamiento(reg: DomainRegistration, er
  * cuando el cliente vuelve a mandar el auth code porque el de la primera vez ya caducó.
  */
 export async function iniciarTransferencia(reg: DomainRegistration): Promise<void> {
-  const { tomarAuthCode, olvidarAuthCode } = await import("./domain-transfer.js");
+  const { takeAuthCode, forgetAuthCode } = await import("./domain-transfer.js");
   const { transferDomain } = await import("./route53.js");
   const { nameserversActuales } = await import("./dns-import.js");
   const { sendTemplate, domainTransferStarted, domainTransferPending } = await import("./emails.js");
 
-  const authCode = tomarAuthCode(reg.id);
+  const authCode = takeAuthCode(reg.id);
   if (!authCode) {
-    // El código vive una hora en memoria; si el pago tardó más, hay que pedirlo otra vez.
+    // El código caduca a los 7 días o no se pudo descifrar: hay que pedirlo otra vez.
     log("warn", "route53", "Transferencia sin auth code vigente", { domain: reg.domainName });
     await sendTemplate(reg.ownerEmail, domainTransferPending({ domain: reg.domainName, daysWaiting: 0 }))
       .catch(() => {});
@@ -215,11 +215,11 @@ export async function iniciarTransferencia(reg: DomainRegistration): Promise<voi
       transferRequestedAt: new Date().toISOString(),
       lastError: null,
     });
-    olvidarAuthCode(reg.id);
+    forgetAuthCode(reg.id);
     await sendTemplate(reg.ownerEmail, domainTransferStarted({ domain: reg.domainName })).catch(() => {});
     log("info", "route53", "Transfer submitted", { domain: reg.domainName, operationId, nsPropios: ns.length });
   } catch (err) {
-    olvidarAuthCode(reg.id);
+    forgetAuthCode(reg.id);
     updateDomainRegistration(reg.id, { status: "transfer_failed", lastError: String(err) });
     const { sendAlert } = await import("./ses.js");
     await sendAlert("transferencia-fallida", `AWS rechazó la transferencia de ${reg.domainName} (${reg.ownerEmail}):\n\n${String(err)}\n\nYa se le cobró: hay que reembolsarle.`);
@@ -233,8 +233,8 @@ const HITOS_RECORDATORIO = [2, 5, 8];
 const DIAS_HASTA_CANCELAR = 10;
 
 /**
- * Pagadas y sin mandar a AWS. Pasa cuando el auth code caducó (vive una hora en memoria y no
- * sobrevive a un deploy): `iniciarTransferencia` manda el correo de "mándalo otra vez" y ahí
+ * Pagadas y sin mandar a AWS. Pasa cuando el auth code caducó (7 días) o no se pudo
+ * descifrar: `iniciarTransferencia` manda el correo de "mándalo otra vez" y ahí
  * se quedaba, porque ningún cron miraba este estado. Cobrado y sin transferencia.
  */
 async function avisarTransferenciasPagadasSinMandar(): Promise<void> {

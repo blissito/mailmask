@@ -114,23 +114,35 @@ describe("transferencia de dominios", () => {
 
   it("el auth code no se guarda: sólo viven en la fila sus últimos 4 caracteres", () => {
     const reg = crear();
-    const pista = transfer.guardarAuthCode(reg.id, "SUPER-SECRETO-1234");
+    const pista = transfer.saveAuthCode(reg.id, "SUPER-SECRETO-1234");
     assert.equal(pista, "1234");
 
     dbmod.updateDomainRegistration(reg.id, { transferAuthCodeHint: pista });
     const fila = JSON.stringify(dbmod.getDomainRegistration(reg.id));
     assert.doesNotMatch(fila, /SUPER-SECRETO/, "el código completo acabó en la base");
-    assert.equal(transfer.tomarAuthCode(reg.id), "SUPER-SECRETO-1234");
+    assert.equal(transfer.takeAuthCode(reg.id), "SUPER-SECRETO-1234");
 
-    transfer.olvidarAuthCode(reg.id);
-    assert.equal(transfer.tomarAuthCode(reg.id), null);
+    transfer.forgetAuthCode(reg.id);
+    assert.equal(transfer.takeAuthCode(reg.id), null);
+  });
+
+  it("el código EPP se guarda cifrado y sobrevive al proceso; caducado no se usa", async () => {
+    const { sqlite } = await import("./pg.ts");
+    const reg = crear();
+    transfer.saveAuthCode(reg.id, "EPP-CIFRADO-9876");
+    const row = sqlite.prepare("SELECT ciphertext FROM transfer_auth_codes WHERE registration_id = ?").get(reg.id) as { ciphertext: string };
+    assert.doesNotMatch(row.ciphertext, /EPP-CIFRADO/, "el código quedó en claro en la base");
+    assert.equal(transfer.takeAuthCode(reg.id), "EPP-CIFRADO-9876");
+
+    sqlite.prepare("UPDATE transfer_auth_codes SET expires_at = 1 WHERE registration_id = ?").run(reg.id);
+    assert.equal(transfer.takeAuthCode(reg.id), null);
   });
 
   it("la solicitud lleva los nameservers ACTUALES del cliente", async () => {
     // Si no se mandan, AWS pone los suyos al completarse y el dominio se queda sin DNS de
     // golpe. Mandándolos, el transfer no cambia nada y la migración la hacemos nosotros.
     const reg = crear();
-    transfer.guardarAuthCode(reg.id, "EPP123");
+    transfer.saveAuthCode(reg.id, "EPP123");
     await prov.iniciarTransferencia(dbmod.getDomainRegistration(reg.id));
 
     const llamada = llamadas.find((l) => l.op === "transferDomain");
@@ -139,7 +151,7 @@ describe("transferencia de dominios", () => {
     assert.equal(dbmod.getDomainRegistration(reg.id).status, "transfer_submitted");
     assert.ok(correos.some((c) => /transferencia/i.test(c.subject)));
     // Usado el código, se olvida.
-    assert.equal(transfer.tomarAuthCode(reg.id), null);
+    assert.equal(transfer.takeAuthCode(reg.id), null);
   });
 
   it("sin auth code vigente no se manda nada a AWS", async () => {
@@ -267,7 +279,7 @@ describe("transferencia de dominios", () => {
     const segunda = dbmod.getDomainRegistrationByDomainName(dominio)!;
     assert.equal(segunda.id, primera.id, "debe ser la misma fila: el pago de cualquier link cae ahí");
     assert.equal(segunda.transferAuthCodeHint, "2222");
-    assert.equal(transfer.tomarAuthCode(primera.id), "EPP-2222");
+    assert.equal(transfer.takeAuthCode(primera.id), "EPP-2222");
   });
 
   it("otra cuenta sigue topándose con el 409", async () => {
@@ -334,7 +346,7 @@ describe("transferencia de dominios", () => {
 
   it("el contacto WHOIS del cliente viaja a AWS: el dominio queda a su nombre", async () => {
     const reg = crear({ whoisContact: WHOIS });
-    transfer.guardarAuthCode(reg.id, "EPP-OK");
+    transfer.saveAuthCode(reg.id, "EPP-OK");
     await prov.iniciarTransferencia(dbmod.getDomainRegistration(reg.id));
     // deno-lint-ignore no-explicit-any
     const llamada = llamadas.find((l) => l.op === "transferDomain")!.args as any;
@@ -375,7 +387,7 @@ describe("transferencia de dominios", () => {
     // cliente y no registrarle nada.
     const { app } = await import("./main.ts");
     const reg = crear({ status: "transfer_pending_payment" });
-    transfer.guardarAuthCode(reg.id, "EPP-OK");
+    transfer.saveAuthCode(reg.id, "EPP-OK");
 
     const pagoId = `${suffix}-pago`;
     globalThis.fetch = (async (url: string) =>

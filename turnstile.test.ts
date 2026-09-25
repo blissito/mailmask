@@ -101,7 +101,7 @@ describe("El registro sí canjea el token", () => {
     const correo = `bot-${Math.random().toString(36).slice(2, 10)}@ejemplo.com`;
     const res = await app.fetch(new Request("http://localhost/api/auth/register", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": `10.9.9.${Math.floor(Math.random() * 250)}` },
+      headers: { "content-type": "application/json", "fly-client-ip": `10.9.9.${Math.floor(Math.random() * 250)}` },
       body: JSON.stringify({ email: correo, password: "contrasena-larga", turnstileToken: "token-de-bot" }),
     }));
 
@@ -125,7 +125,7 @@ describe("El registro sí canjea el token", () => {
 
     const res = await app.fetch(new Request("http://localhost/api/auth/forgot-password", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": `10.9.8.${Math.floor(Math.random() * 250)}` },
+      headers: { "content-type": "application/json", "fly-client-ip": `10.9.8.${Math.floor(Math.random() * 250)}` },
       body: JSON.stringify({ email: "quien-sea@ejemplo.com", turnstileToken: "token-de-bot" }),
     }));
 

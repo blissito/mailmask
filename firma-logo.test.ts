@@ -32,7 +32,7 @@ function subir(domainId: string, s: { cookie: string; csrf: string }, bytes: Uin
   return app.fetch(new Request(`http://localhost/api/domains/${domainId}/logo`, {
     method: "POST",
     headers: {
-      "x-forwarded-for": nextIp(),
+      "fly-client-ip": nextIp(),
       cookie: `${s.cookie}; csrf_token=${s.csrf}`,
       "x-csrf-token": s.csrf,
     },

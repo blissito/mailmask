@@ -33,3 +33,14 @@ test("dropCnameConflicts: el CNAME gana y se van los ecos de su destino", async 
   ] as never);
   assert.deepEqual(r.map((x: { name: string; type: string }) => `${x.name} ${x.type}`), ["mail.k.mx CNAME", "k.mx A"]);
 });
+
+// Con X-Forwarded-For el cliente elegía su cubeta del rate limit (24-sep-2026).
+test("el rate limit no se burla mandando X-Forwarded-For", async () => {
+  const { app } = await import("./main.js");
+  const request = (xff: string) => app.fetch(new Request("http://localhost/api/coupons/NOEXISTE", {
+    headers: { "x-forwarded-for": xff, "fly-client-ip": "203.0.113.77" },
+  }));
+  const statuses: number[] = [];
+  for (let i = 0; i < 12; i++) statuses.push((await request(`198.51.100.${i}`)).status);
+  assert.ok(statuses.includes(429), `cambiar el XFF no debe dar cubeta nueva: ${statuses}`);
+});

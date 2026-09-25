@@ -462,12 +462,16 @@ function parseCopyList(value: unknown, max = 20): string[] {
     .slice(0, max);
 }
 
+// La IP del cliente sale de UNA cabecera que el borde pone y el cliente no puede
+// falsificar. Se leía el primer elemento de `X-Forwarded-For`, que el cliente manda a su
+// gusto (el proxy sólo AÑADE): con `X-Forwarded-For: 9.9.9.9` producción contaba la
+// petición a nombre de 9.9.9.9 y el rate limit entero se saltaba (24-sep-2026).
+// Fly pisa `Fly-Client-IP`; el Caddy de sandbox-host pisa `X-Real-Client-IP`. Sólo se
+// confía en la del borde en el que corremos: la otra la podría mandar cualquiera.
+const TRUSTED_IP_HEADER = (process.env.TRUSTED_IP_HEADER ?? "fly-client-ip").toLowerCase();
+
 function getIp(request: Request): string {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    request.headers.get("cf-connecting-ip") ??
-    "unknown"
-  );
+  return request.headers.get(TRUSTED_IP_HEADER)?.trim() || "unknown";
 }
 
 async function rateLimitGuard(
@@ -6724,7 +6728,7 @@ const app = new Elysia({ adapter: node() })
     const mpAccessToken = process.env.MP_ACCESS_TOKEN;
     if (!mpAccessToken) return jsonErr("MercadoPago no configurado", 500);
 
-    const { guardarAuthCode } = await import("./domain-transfer.js");
+    const { saveAuthCode } = await import("./domain-transfer.js");
     const { snapshotDns } = await import("./dns-import.js");
 
     const inventario = Array.isArray(b.dnsRecords) && b.dnsRecords.length
@@ -6754,9 +6758,9 @@ const app = new Elysia({ adapter: node() })
           whoisContact: whois,
         });
 
-    // El código completo vive en memoria y caduca en una hora; en la fila sólo quedan los
+    // El código completo va cifrado en `transfer_auth_codes` (7 días); en la fila sólo quedan los
     // últimos 4 caracteres, para que el cliente sepa cuál mandó.
-    const pista = guardarAuthCode(reg.id, authCode);
+    const pista = saveAuthCode(reg.id, authCode);
     updateDomainRegistration(reg.id, { transferAuthCodeHint: pista });
 
     try {
@@ -6799,8 +6803,8 @@ const app = new Elysia({ adapter: node() })
     const authCode = String((body as { authCode?: string }).authCode ?? "").trim();
     if (!authCode) return jsonErr("Falta el código de autorización.", 400);
 
-    const { guardarAuthCode } = await import("./domain-transfer.js");
-    updateDomainRegistration(reg.id, { transferAuthCodeHint: guardarAuthCode(reg.id, authCode) });
+    const { saveAuthCode } = await import("./domain-transfer.js");
+    updateDomainRegistration(reg.id, { transferAuthCodeHint: saveAuthCode(reg.id, authCode) });
 
     // Si el pago ya entró y el código se había vencido, arranca ahora.
     if (reg.status === "transfer_paid") {
@@ -6810,7 +6814,7 @@ const app = new Elysia({ adapter: node() })
     return Response.json({ ok: true });
   }, {
     body: t.Object({ authCode: t.String() }),
-    detail: { tags: ["Domain Registration"], summary: "Re-send the EPP auth code (it lives in memory and expires)", security: [{ cookieAuth: [] }] },
+    detail: { tags: ["Domain Registration"], summary: "Re-send the EPP auth code (stored encrypted, expires in 7 days)", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/domains/transfer/:regId/dns", async ({ request, params }) => {

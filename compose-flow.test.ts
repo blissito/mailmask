@@ -52,7 +52,7 @@ describe("Bandeja: redactar — camino feliz", () => {
 
     const loginRes = await app.fetch(new Request("http://localhost/api/auth/login", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "10.9.9.9" },
+      headers: { "content-type": "application/json", "fly-client-ip": "10.9.9.9" },
       body: JSON.stringify({ email, password: "password123" }),
     }));
     for (const sc of loginRes.headers.getSetCookie?.() ?? []) {
@@ -74,7 +74,7 @@ describe("Bandeja: redactar — camino feliz", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-forwarded-for": `10.9.9.${Math.floor(Math.random() * 200) + 10}`,
+        "fly-client-ip": `10.9.9.${Math.floor(Math.random() * 200) + 10}`,
         cookie: `${cookie}; csrf_token=${csrf}`,
         "x-csrf-token": csrf,
       },
@@ -125,7 +125,7 @@ describe("Bandeja: redactar — camino feliz", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-forwarded-for": "10.9.9.77",
+        "fly-client-ip": "10.9.9.77",
         cookie: `${cookie}; csrf_token=${csrf}`,
         "x-csrf-token": csrf,
       },
@@ -144,7 +144,7 @@ describe("Bandeja: redactar — camino feliz", () => {
   it("un evento delivery de SES marca el reply como entregado; un rebote, como rebotado", async () => {
     const res = await compose({ subject: "Con acuse" });
     const { conversationId } = await res.json();
-    const headers = { "content-type": "application/json", "x-forwarded-for": "10.9.9.78", cookie: `${cookie}; csrf_token=${csrf}`, "x-csrf-token": csrf };
+    const headers = { "content-type": "application/json", "fly-client-ip": "10.9.9.78", cookie: `${cookie}; csrf_token=${csrf}`, "x-csrf-token": csrf };
     const replyRes = await app.fetch(new Request(`http://localhost/api/bandeja/conversations/${conversationId}/reply`, {
       method: "POST", headers, body: JSON.stringify({ domainId, body: "¿llegó?" }),
     }));
@@ -222,7 +222,7 @@ describe("Bandeja: redactar — camino feliz", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-forwarded-for": "10.9.9.78",
+        "fly-client-ip": "10.9.9.78",
         cookie: `${cookie}; csrf_token=${csrf}`,
         "x-csrf-token": csrf,
       },

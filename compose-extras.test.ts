@@ -50,7 +50,7 @@ describe("Bandeja: firma, cita, copias y adjuntos", () => {
 
     const loginRes = await app.fetch(new Request("http://localhost/api/auth/login", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "10.7.7.7" },
+      headers: { "content-type": "application/json", "fly-client-ip": "10.7.7.7" },
       body: JSON.stringify({ email, password: "password123" }),
     }));
     for (const sc of loginRes.headers.getSetCookie?.() ?? []) {
@@ -85,7 +85,7 @@ describe("Bandeja: firma, cita, copias y adjuntos", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-forwarded-for": `10.7.7.${Math.floor(Math.random() * 200) + 10}`,
+        "fly-client-ip": `10.7.7.${Math.floor(Math.random() * 200) + 10}`,
         cookie: `${cookie}; csrf_token=${csrf}`,
         "x-csrf-token": csrf,
       },

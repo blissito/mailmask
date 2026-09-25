@@ -4,29 +4,60 @@
 // La parte delicada no es hablar con AWS: es que el dominio **ya está en producción para
 // alguien**. Si cambiamos sus nameservers con la zona vacía, su web y su correo mueren en el
 // acto. Por eso nada se mueve sin un inventario de DNS aprobado por el cliente.
+import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
 import { log } from "./logger.js";
+import { sqlite } from "./pg.js";
 
 /**
- * El auth code EPP vive en memoria y con caducidad: entregarlo es entregar el dominio, así
- * que no toca disco ni logs. En la fila sólo quedan sus últimos 4 caracteres.
+ * El auth code EPP: entregarlo es entregar el dominio. Se guarda cifrado con AES-256-GCM y
+ * la llave vive en el entorno, no en la base: un respaldo o un volcado de SQLite no lo
+ * expone. En la fila del registro sólo quedan sus últimos 4 caracteres.
+ *
+ * Antes vivía en un Map en memoria con una hora de vida, y un deploy o un pago lento
+ * (24-sep-2026, kandey.com.mx) dejaba la transferencia pagada y sin poderse mandar. Ahora
+ * dura lo que puede durar un pago y se borra en cuanto AWS acepta la solicitud.
  */
-const AUTH_TTL_MS = 60 * 60_000;
-const authCodes = new Map<string, { code: string; expira: number }>();
+const AUTH_TTL_MS = 7 * 864e5;
 
-export function guardarAuthCode(regId: string, code: string): string {
-  authCodes.set(regId, { code, expira: Date.now() + AUTH_TTL_MS });
+function encryptionKey(): Buffer {
+  const explicit = process.env.EPP_ENCRYPTION_KEY;
+  if (explicit) return createHash("sha256").update(explicit).digest();
+  const jwt = process.env.JWT_SECRET;
+  if (!jwt) throw new Error("Falta EPP_ENCRYPTION_KEY (o JWT_SECRET) para cifrar el código EPP");
+  return Buffer.from(hkdfSync("sha256", jwt, "mailmask", "epp-auth-code", 32));
+}
+
+export function saveAuthCode(regId: string, code: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv);
+  const body = Buffer.concat([cipher.update(code, "utf8"), cipher.final()]);
+  const ciphertext = [iv, cipher.getAuthTag(), body].map((b) => b.toString("base64")).join(".");
+  sqlite.prepare(`
+    INSERT INTO transfer_auth_codes (registration_id, ciphertext, expires_at) VALUES (?, ?, ?)
+    ON CONFLICT (registration_id) DO UPDATE SET ciphertext = excluded.ciphertext, expires_at = excluded.expires_at
+  `).run(regId, ciphertext, Date.now() + AUTH_TTL_MS);
   return code.slice(-4);
 }
 
-export function tomarAuthCode(regId: string): string | null {
-  const g = authCodes.get(regId);
-  if (!g) return null;
-  if (g.expira < Date.now()) { authCodes.delete(regId); return null; }
-  return g.code;
+export function takeAuthCode(regId: string): string | null {
+  const row = sqlite.prepare(`SELECT ciphertext, expires_at FROM transfer_auth_codes WHERE registration_id = ?`)
+    .get(regId) as { ciphertext: string; expires_at: number } | undefined;
+  if (!row) return null;
+  if (row.expires_at < Date.now()) { forgetAuthCode(regId); return null; }
+  try {
+    const [iv, tag, body] = row.ciphertext.split(".").map((p) => Buffer.from(p, "base64"));
+    const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(body), decipher.final()]).toString("utf8");
+  } catch {
+    // Llave rotada o dato corrupto: es lo mismo que no tenerlo, y se pide otra vez.
+    log("warn", "route53", "No se pudo descifrar el código EPP guardado", { regId });
+    return null;
+  }
 }
 
-export function olvidarAuthCode(regId: string): void {
-  authCodes.delete(regId);
+export function forgetAuthCode(regId: string): void {
+  sqlite.prepare(`DELETE FROM transfer_auth_codes WHERE registration_id = ?`).run(regId);
 }
 
 export interface Requisito {

@@ -537,7 +537,7 @@ export async function transferDomain(
   const { TransferDomainCommand } = await import("@aws-sdk/client-route-53-domains");
   const contact = whoisContact(contacto);
 
-  const res = await client.send(new TransferDomainCommand({
+  const send = (privacy: boolean) => client.send(new TransferDomainCommand({
     DomainName: domain,
     DurationInYears: 1,
     AuthCode: authCode,
@@ -548,10 +548,22 @@ export async function transferDomain(
     AdminContact: contact,
     RegistrantContact: contact,
     TechContact: contact,
-    PrivacyProtectAdminContact: true,
-    PrivacyProtectRegistrantContact: true,
-    PrivacyProtectTechContact: true,
+    PrivacyProtectAdminContact: privacy,
+    PrivacyProtectRegistrantContact: privacy,
+    PrivacyProtectTechContact: privacy,
   }));
+
+  // Hay TLD que no admiten privacidad (.mx, entre otros) y AWS rechaza la solicitud
+  // entera en vez de ignorarla. Se reintenta sin ella; el registro de esos TLD ya
+  // oculta los datos por su cuenta.
+  let res;
+  try {
+    res = await send(true);
+  } catch (err) {
+    if (!/privacy/i.test(String((err as Error)?.message ?? err))) throw err;
+    log("warn", "route53", "El TLD no admite privacidad WHOIS; se transfiere sin ella", { domain });
+    res = await send(false);
+  }
 
   log("info", "route53", "Domain transfer submitted", { domain, operationId: res.OperationId });
   return res.OperationId ?? "";

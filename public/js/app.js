@@ -1307,6 +1307,12 @@ async function loadDomainRegistrations() {
         paid: { label: "Pagado — esperando registro", color: "text-amber-600", dot: "bg-yellow-400", animate: true },
         registering: { label: "Registrando dominio...", color: "text-blue-400", dot: "bg-blue-400", animate: true },
         failed: { label: "Error: " + (r.lastError || "fallo desconocido"), color: "text-red-500", dot: "bg-red-400", animate: false },
+        transfer_pending_payment: { label: "Transferencia: esperando pago", color: "text-fg-muted", dot: "bg-fg-muted", animate: false },
+        transfer_paid: { label: "Pagada — falta tu código EPP", color: "text-amber-600", dot: "bg-yellow-400", animate: false },
+        transfer_submitted: { label: "Transferencia enviada — revisa tu correo", color: "text-blue-400", dot: "bg-blue-400", animate: true },
+        transfer_awaiting_approval: { label: "Esperando que apruebes en tu registrador", color: "text-blue-400", dot: "bg-blue-400", animate: true },
+        transfer_failed: { label: "La transferencia falló", color: "text-red-500", dot: "bg-red-400", animate: false },
+        transfer_cancelled: { label: "Transferencia cancelada", color: "text-fg-muted", dot: "bg-fg-muted", animate: false },
       };
       const s = statusMap[r.status] || { label: r.status, color: "text-fg-muted", dot: "bg-fg-muted", animate: false };
       return `
@@ -1318,8 +1324,38 @@ async function loadDomainRegistrations() {
           </div>
           <span class="text-xs ${s.color}">${s.label}</span>
         </div>
+        ${r.status === "transfer_paid" ? `
+        <div class="mt-3 flex flex-col sm:flex-row gap-2" data-epp-form="${esc(r.id)}">
+          <input type="text" autocomplete="off" spellcheck="false" placeholder="Pega aquí tu código EPP" class="flex-1 bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg font-mono">
+          <button class="btn-primary text-sm px-4 py-2 rounded-lg">Mandar transferencia</button>
+        </div>
+        <p class="text-xs text-red-500 mt-2 hidden" data-epp-error></p>` : ""}
       </div>`;
     }).join("");
+
+    container.querySelectorAll("[data-epp-form]").forEach((form) => {
+      const input = form.querySelector("input");
+      const button = form.querySelector("button");
+      const error = form.parentElement.querySelector("[data-epp-error]");
+      button.addEventListener("click", async () => {
+        const authCode = input.value.trim();
+        if (!authCode) return;
+        button.disabled = true;
+        const r = await fetch(`/api/domains/transfer/${form.dataset.eppForm}/auth-code`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ authCode }),
+        });
+        const j = await r.json().catch(() => ({}));
+        button.disabled = false;
+        if (!r.ok) {
+          error.textContent = j.error || "No se pudo mandar la transferencia.";
+          error.classList.remove("hidden");
+          return;
+        }
+        loadDomainRegistrations();
+      });
+    });
 
     // Poll while there are registering domains
     if (active.some(r => r.status === "registering" || r.status === "paid")) {

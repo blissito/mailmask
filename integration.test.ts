@@ -23,14 +23,14 @@ async function req(path: string, opts?: RequestInit): Promise<Response> {
 }
 
 function jsonPost(path: string, body: unknown, cookie?: string, csrf?: string): Promise<Response> {
-  const headers: Record<string, string> = { "content-type": "application/json", "x-forwarded-for": nextIp() };
+  const headers: Record<string, string> = { "content-type": "application/json", "fly-client-ip": nextIp() };
   if (cookie) headers["cookie"] = csrf ? `${cookie}; csrf_token=${csrf}` : cookie;
   if (csrf) headers["x-csrf-token"] = csrf;
   return req(path, { method: "POST", headers, body: JSON.stringify(body) });
 }
 
 function jsonPut(path: string, body: unknown, cookie?: string, csrf?: string): Promise<Response> {
-  const headers: Record<string, string> = { "content-type": "application/json", "x-forwarded-for": nextIp() };
+  const headers: Record<string, string> = { "content-type": "application/json", "fly-client-ip": nextIp() };
   if (cookie) headers["cookie"] = csrf ? `${cookie}; csrf_token=${csrf}` : cookie;
   if (csrf) headers["x-csrf-token"] = csrf;
   return req(path, { method: "PUT", headers, body: JSON.stringify(body) });

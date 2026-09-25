@@ -26,7 +26,7 @@ function post(path: string, body: unknown, s: { cookie: string; csrf: string }) 
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-forwarded-for": nextIp(),
+      "fly-client-ip": nextIp(),
       cookie: `${s.cookie}; csrf_token=${s.csrf}`,
       "x-csrf-token": s.csrf,
     },
@@ -39,7 +39,7 @@ function patch(path: string, body: unknown, s: { cookie: string; csrf: string })
     method: "PATCH",
     headers: {
       "content-type": "application/json",
-      "x-forwarded-for": nextIp(),
+      "fly-client-ip": nextIp(),
       cookie: `${s.cookie}; csrf_token=${s.csrf}`,
       "x-csrf-token": s.csrf,
     },
@@ -51,7 +51,7 @@ function del(path: string, s: { cookie: string; csrf: string }) {
   return app.fetch(new Request(`http://localhost${path}`, {
     method: "DELETE",
     headers: {
-      "x-forwarded-for": nextIp(),
+      "fly-client-ip": nextIp(),
       cookie: `${s.cookie}; csrf_token=${s.csrf}`,
       "x-csrf-token": s.csrf,
     },
