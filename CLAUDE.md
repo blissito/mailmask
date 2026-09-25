@@ -284,6 +284,12 @@ orden (todo arreglado ese día salvo lo marcado):
 **Riesgos abiertos, vigilar:**
 - **Vence el 3-oct-2026 en Hostinger** con la autorrenovación apagada. Se le pidió
   encenderla como seguro. Si la transferencia no termina antes, revisarlo.
+  **Choque de fechas:** Hostinger tiene hasta 10 días para soltarla (≈4-oct) y el dominio
+  vence un día antes. Confirmar con la clienta que la autorrenovación quedó encendida, o
+  que renueve ya. Revisado el 25-sep: AWS sigue en el paso 7/14 sin cambios desde las
+  22:47 del 24-sep; el whois del .mx sigue en Registrar.eu (Hostinger), `ACTIVE`, y el
+  NS y el MX siguen en Hostinger. Para revisar:
+  `aws route53domains get-operation-detail --region us-east-1 --operation-id 3f62f782-b045-44c5-888d-aafd09cc44e6`.
 - Que **no pida otro código** en Hostinger: invalida el que mandamos.
 - La IP del apex es la CDN de Hostinger y rota en cada consulta: **antes de aprobar el
   inventario**, poner la IP que da el hPanel.
