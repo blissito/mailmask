@@ -1122,7 +1122,11 @@ export async function ensureSnsSubscription(appUrl: string, kind: SnsSubscriptio
 // --- Admin alerts with throttle ---
 
 export async function sendAlert(alertType: string, message: string): Promise<boolean> {
-  const alertEmail = process.env.ALERT_EMAIL ?? "brenda@fixter.org,contacto@fixter.org";
+  // Las de Stalwart (`imap-*`) van fuera de nuestro propio correo: admin@mailmask.studio es un
+  // buzón de Stalwart, y el aviso de "Stalwart caído" acabaría en el buzón caído.
+  const alertEmail = alertType.startsWith("imap-")
+    ? (process.env.IMAP_ALERT_EMAIL ?? "contacto@fixter.org")
+    : (process.env.ALERT_EMAIL ?? "admin@mailmask.studio");
   if (!alertEmail) return false;
 
   // Throttle: max 1 alert of same type per hour

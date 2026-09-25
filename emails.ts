@@ -37,7 +37,7 @@ export const ALERT_FROM = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.stud
 // <noreply@...>>`, un header inválido: SES rechazaba con "Missing '>'" y **todo**
 // correo de plantilla —incluida la verificación de cuenta— moría con 500.
 export const FROM_HEADER = /<[^<>]+>/.test(ALERT_FROM) ? ALERT_FROM : `MailMask <${ALERT_FROM}>`;
-export const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL ?? "brenda@fixter.org";
+export const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL ?? "admin@mailmask.studio";
 
 // La mascarita, servida desde el sitio. Va como imagen remota porque no hay otra vía:
 // `sendFromDomain` no arma multipart/mixed, así que no se puede adjuntar por CID, y el
