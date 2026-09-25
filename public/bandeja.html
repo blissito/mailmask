@@ -49,18 +49,28 @@
       <option value="deleted">Eliminados</option>
     </select>
     <select id="alias-filter" class="mesa-select">
-      <option value="">Todos los alias</option>
+      <option value="">Alias: todos</option>
     </select>
     <span id="conv-count" class="mesa-toolbar-count"></span>
     <div class="mesa-toolbar-spacer"></div>
     <button id="btn-signature" class="mesa-action-btn" title="Firma del dominio">Firma</button>
     <button id="btn-canned" class="mesa-action-btn" title="Respuestas guardadas">Respuestas</button>
-    <button id="btn-compose" class="mesa-action-btn" title="Redactar (C)">
+    <button id="btn-compose" class="mesa-action-btn" title="Redactar (C)" aria-label="Redactar">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-      Redactar <span class="kbd">C</span>
+      <span class="mesa-btn-lbl">Redactar</span> <span class="kbd">C</span>
     </button>
+    <!-- Sólo en móvil: Firma y Respuestas viven aquí para que la cabecera quepa en dos filas. -->
+    <div class="mesa-snooze-wrap mesa-more-wrap">
+      <button type="button" class="mesa-action-btn" id="btn-toolbar-more" aria-label="Más opciones" aria-haspopup="menu" title="Más opciones">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+      </button>
+      <div class="mesa-snooze-menu mesa-more-menu mesa-hidden" id="toolbar-more-menu" role="menu">
+        <button type="button" role="menuitem" data-proxy="btn-signature">Firma</button>
+        <button type="button" role="menuitem" data-proxy="btn-canned">Respuestas guardadas</button>
+      </div>
+    </div>
     <div class="mesa-search-wrap">
-      <input type="text" id="search-input" class="mesa-search" placeholder="Buscar en asunto y contenido..."
+      <input type="text" id="search-input" class="mesa-search" placeholder="Buscar en tus correos"
         autocomplete="off" spellcheck="false">
       <button type="button" class="mesa-search-clear mesa-hidden" id="search-clear"
         aria-label="Limpiar búsqueda" title="Limpiar (Esc)">&times;</button>
@@ -71,10 +81,10 @@
   <!-- Barra de selección múltiple: sólo aparece cuando hay algo marcado. -->
   <div id="bulk-bar" class="mesa-bulk mesa-hidden">
     <span id="bulk-count"></span>
-    <button type="button" class="mesa-bulk-link" id="bulk-all">Seleccionar todas las visibles</button>
-    <button type="button" class="mesa-bulk-link" id="bulk-none">Quitar selección</button>
+    <button type="button" class="mesa-bulk-link" id="bulk-all"><span class="mesa-lbl-long">Seleccionar todas las visibles</span><span class="mesa-lbl-short">Todas</span></button>
+    <button type="button" class="mesa-bulk-link" id="bulk-none"><span class="mesa-lbl-long">Quitar selección</span><span class="mesa-lbl-short">Ninguna</span></button>
     <div class="mesa-toolbar-spacer"></div>
-    <button type="button" class="mesa-action-btn mesa-action-danger" id="bulk-delete">Eliminar seleccionadas</button>
+    <button type="button" class="mesa-action-btn mesa-action-danger" id="bulk-delete"><span class="mesa-lbl-long">Eliminar seleccionadas</span><span class="mesa-lbl-short">Eliminar</span></button>
   </div>
 
   <!-- Cambiar de pestaña sólo alterna clases: el SSE no se desmonta. -->
@@ -127,12 +137,12 @@
             <span id="detail-count"></span> mensajes
           </div>
           <div class="mesa-detail-actions">
-            <button class="mesa-action-btn" id="btn-reply" title="Responder"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg> Responder <span class="kbd">R</span></button>
-            <button class="mesa-action-btn" id="btn-assign" title="Asignar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Asignar <span class="kbd">A</span></button>
-            <button class="mesa-action-btn" id="btn-close-conv" title="Cerrar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Cerrar <span class="kbd">E</span></button>
-            <button class="mesa-action-btn mesa-action-urgent" id="btn-urgent" title="Urgente"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <span class="kbd">!</span></button>
+            <button aria-label="Responder" class="mesa-action-btn" id="btn-reply" title="Responder"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg> <span class="mesa-btn-lbl">Responder</span> <span class="kbd">R</span></button>
+            <button aria-label="Asignar" class="mesa-action-btn" id="btn-assign" title="Asignar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> <span class="mesa-btn-lbl">Asignar</span> <span class="kbd">A</span></button>
+            <button aria-label="Cerrar" class="mesa-action-btn" id="btn-close-conv" title="Cerrar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> <span class="mesa-btn-lbl">Cerrar</span> <span class="kbd">E</span></button>
+            <button aria-label="Urgente" class="mesa-action-btn mesa-action-urgent" id="btn-urgent" title="Urgente"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <span class="kbd">!</span></button>
             <div class="mesa-snooze-wrap">
-              <button class="mesa-action-btn" id="btn-snooze" type="button" title="Posponer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg> Posponer <span class="kbd">S</span></button>
+              <button aria-label="Posponer" class="mesa-action-btn" id="btn-snooze" type="button" title="Posponer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg> <span class="mesa-btn-lbl">Posponer</span> <span class="kbd">S</span></button>
               <div class="mesa-snooze-menu mesa-hidden" id="snooze-menu">
                 <button type="button" data-snooze="1h">En 1 hora</button>
                 <button type="button" data-snooze="tarde">Esta tarde, 18:00</button>
@@ -144,8 +154,8 @@
                 </label>
               </div>
             </div>
-            <button class="mesa-action-btn mesa-action-danger" id="btn-delete-conv" title="Eliminar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Eliminar</button>
-            <button class="mesa-action-btn mesa-action-restore mesa-hidden" id="btn-restore-conv" title="Restaurar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Restaurar</button>
+            <button aria-label="Eliminar" class="mesa-action-btn mesa-action-danger" id="btn-delete-conv" title="Eliminar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> <span class="mesa-btn-lbl">Eliminar</span></button>
+            <button aria-label="Restaurar" class="mesa-action-btn mesa-action-restore mesa-hidden" id="btn-restore-conv" title="Restaurar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> <span class="mesa-btn-lbl">Restaurar</span></button>
           </div>
           <div class="mesa-presence mesa-hidden" id="presence-bar"></div>
         </div>

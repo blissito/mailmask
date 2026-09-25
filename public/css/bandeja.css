@@ -1212,20 +1212,32 @@ body.mm-composer-locked { overflow: hidden; }
 @media (max-width: 767px) {
   body { height: 100dvh; }
 
-  /* Nav: sólo lo esencial */
-  .mesa-nav { padding: 0 12px; height: 44px; }
-  .mesa-nav-right { gap: 12px; }
+  /* Nav: sólo lo esencial, con áreas de toque de 40 px */
+  .mesa-nav { padding: 0 6px 0 12px; height: 46px; }
+  .mesa-nav-right { gap: 2px; }
   .mesa-user-email { display: none; }
+  .mesa-nav-right .mesa-nav-link { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; min-width: 40px; padding: 0 10px; }
 
-  /* Toolbar en dos filas: filtros arriba, acciones y búsqueda abajo */
+  /* Toolbar en dos filas: filtros arriba; búsqueda, Redactar y ⋯ abajo. Firma y
+     Respuestas se mudan al menú ⋯. 16 px en los selects: con menos, iOS hace zoom. */
   .mesa-toolbar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
-  .mesa-toolbar .mesa-select { flex: 1 1 24%; min-width: 0; font-size: 14px; padding: 9px 26px 9px 10px; }
-  .mesa-toolbar #domain-select { flex: 1.6 1 34%; }
+  .mesa-toolbar .mesa-select { flex: 1 1 24%; min-width: 0; font-size: 16px; padding: 8px 24px 8px 10px; }
+  .mesa-toolbar #domain-select { flex: 1.5 1 32%; }
+  .mesa-toolbar #status-filter { flex: 0.8 1 20%; }
+  .mesa-toolbar #alias-filter { flex: 1.2 1 28%; }
+  #conv-count, #btn-signature, #btn-canned { display: none; }
+  .mesa-search-wrap { order: 1; flex: 1 1 60%; min-width: 0; }
+  #btn-compose { order: 2; }
+  .mesa-more-wrap { order: 3; }
+  #btn-compose .mesa-btn-lbl { display: none; }
+  .mesa-toolbar #btn-compose, .mesa-toolbar #btn-toolbar-more { min-width: 40px; min-height: 40px; justify-content: center; padding: 0; }
+  .mesa-snooze-menu.mesa-more-menu { left: auto; right: 0; }
+  .mesa-more-menu button, .mesa-snooze-menu button { min-height: 44px; font-size: 15px; }
   /* Dentro de una conversación la toolbar sobra: la pantalla es para leer y responder */
   body.mesa-mobile-detail .mesa-toolbar { display: none; }
   .mesa-toolbar-spacer { display: none; }
   .mesa-toolbar .mesa-action-btn { flex: 0 0 auto; min-height: 38px; padding: 8px 12px; font-size: 13px; }
-  .mesa-search { flex: 1 1 100%; width: auto; font-size: 16px; padding: 9px 10px 9px 32px; }
+  .mesa-search { width: 100%; font-size: 16px; padding: 9px 10px 9px 32px; }
   .mesa-action-btn .kbd { display: none; }
 
   /* Lista o detalle, nunca los dos. min-width: 0 en los hijos flex: sin eso una
@@ -1249,8 +1261,15 @@ body.mm-composer-locked { overflow: hidden; }
   .mesa-detail-header { padding: 10px 14px; }
   .mesa-detail-subject { font-size: 16px; line-height: 1.3; }
   .mesa-detail-meta { flex-wrap: wrap; gap: 6px 12px; }
-  .mesa-detail-actions { flex-wrap: wrap; gap: 8px; }
-  .mesa-detail-actions .mesa-action-btn { min-height: 40px; padding: 8px 12px; font-size: 13px; }
+  /* Acciones en una fila: Responder con texto, el resto sólo icono (aria-label en el HTML). */
+  .mesa-detail-actions { flex-wrap: nowrap; gap: 6px; }
+  .mesa-detail-actions .mesa-action-btn { min-height: 40px; min-width: 40px; padding: 0 10px; font-size: 14px; justify-content: center; }
+  .mesa-detail-actions .mesa-action-btn:not(#btn-reply) .mesa-btn-lbl { display: none; }
+  .mesa-detail-actions .mesa-action-btn:not(#btn-reply) { padding: 0; }
+  .mesa-detail-actions #btn-reply { flex: 1 1 auto; }
+  .mesa-detail-actions svg { width: 16px; height: 16px; }
+  /* Posponer quedó cerca del borde derecho: su menú se abre hacia la izquierda. */
+  .mesa-detail-actions .mesa-snooze-menu { left: auto; right: 0; }
   .mesa-messages { padding: 12px; }
   .mesa-msg { max-width: 100%; }
   .mesa-msg-body { font-size: 15px; overflow-wrap: anywhere; }
@@ -1264,7 +1283,22 @@ body.mm-composer-locked { overflow: hidden; }
   .mesa-composer-footer { flex-wrap: wrap; gap: 8px; }
   .mesa-mode-btn { min-height: 38px; padding: 8px 12px; font-size: 13px; }
   .mesa-send-btn { min-height: 40px; padding: 8px 18px; font-size: 14px; }
-  .mesa-composer-hint { display: none; }
+  .mesa-composer-hint, .mm-composer-hint-md { display: none; }
+  #detail-empty .mesa-empty-desc { display: none; }
+
+  /* Barra de selección: etiquetas cortas */
+  .mesa-lbl-long { display: none; }
+  .mesa-bulk { gap: 12px; padding: 8px 12px; }
+  .mesa-bulk .mesa-action-btn { min-height: 40px; padding: 0 12px; }
+  .mesa-bulk-link { min-height: 40px; }
+
+  /* Métricas a dos columnas */
+  #metrics-range { font-size: 16px; }
+  .mesa-metrics-cards { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mesa-metric-card { padding: 10px; }
+  .mesa-metric-value { font-size: 18px; }
+  .mesa-metrics-table { display: block; overflow-x: auto; }
+  .mesa-logo-btn { min-height: 40px; }
 
   /* Atajos de teclado: no existen en el teléfono */
   .mesa-shortcuts { display: none !important; }
@@ -1284,6 +1318,22 @@ body.mm-composer-locked { overflow: hidden; }
   .mesa-modal-actions button { min-height: 44px; flex: 1; }
 
   .mesa-toast { bottom: 24px; max-width: calc(100vw - 32px); }
+}
+
+/* El menú ⋯ y las etiquetas cortas sólo existen en móvil. */
+@media (min-width: 768px) {
+  .mesa-more-wrap { display: none !important; }
+  .mesa-lbl-short { display: none; }
+}
+
+/* Táctil (sin hover): la casilla no se descubre pasando el mouse, así que su columna
+   no ocupa sitio hasta que se marca algo con una presión larga (bandeja.js,
+   engancharPresionLarga). Entonces aparecen todas. */
+@media (hover: none) {
+  /* .mesa-conv delante: la regla base de .mesa-conv-check va más abajo en el archivo. */
+  .mesa-conv .mesa-conv-check { display: none; }
+  .mesa-list--seleccionando .mesa-conv .mesa-conv-check { display: flex; opacity: 1; }
+  .mesa-conv { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 }
 
 /* Tabletas: lado a lado pero con la lista más angosta */
@@ -1476,6 +1526,10 @@ body.mm-composer-locked { overflow: hidden; }
   background: var(--mesa-paper);
 }
 .mesa-msg-html.is-medido { opacity: 1; }
+/* Envoltorio del iframe: si el correo es más ancho que el hueco, ajustarIframe lo
+   escala con transform y le pone aquí el alto ya escalado. */
+.mesa-msg-html-wrap { overflow: hidden; max-width: 100%; }
+.mesa-msg-html-wrap .mesa-msg-html { transform-origin: 0 0; }
 
 /* --- Pestañas y métricas --- */
 
@@ -1653,7 +1707,17 @@ body.mm-composer-locked { overflow: hidden; }
 .mesa-logo-empty { color: var(--mesa-text-3); font-size: 11px; }
 
 .mesa-logo-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.mesa-logo-btn { cursor: pointer; }
+.mesa-logo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border: 1px solid var(--mesa-border);
+  background: var(--mesa-surface);
+  color: var(--mesa-text-2);
+  cursor: pointer;
+}
+.mesa-logo-btn:hover { border-color: var(--mesa-border-active); color: var(--mesa-text); }
 .mesa-logo-hint {
   flex-basis: 100%;
   margin: 0;

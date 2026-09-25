@@ -241,7 +241,7 @@ function updateComposeButton() {
 // --- Redactar ---
 function openComposeModal() {
   if (!canCompose) {
-    toast("Tu plan no incluye enviar correos nuevos. Agrega el add-on desde el panel.");
+    toast("Para redactar correos nuevos, activa este dominio desde el panel.");
     return;
   }
   if (domainAliases.length === 0) {
@@ -374,7 +374,7 @@ async function loadConversations(opts = {}) {
 function populateAliasFilter(aliases) {
   const sel = document.getElementById("alias-filter");
   const prev = sel.value;
-  sel.innerHTML = '<option value="">Todos los alias</option>' +
+  sel.innerHTML = '<option value="">Alias: todos</option>' +
     aliases.map(a => `<option value="${esc(a)}">${esc(a.split("@")[0])}</option>`).join("");
   if (prev && aliases.includes(prev)) sel.value = prev;
 }
@@ -537,8 +537,12 @@ function engancharClicksLista() {
     const idx = parseInt(fila.dataset.idx);
     if (Number.isNaN(idx) || !conversations[idx]) return;
 
-    // Marcar no es abrir: la casilla se queda con el click.
-    if (ev.target.closest(".mesa-conv-check")) {
+    // Un mantener-presionado ya marcó la fila: el click que le sigue no abre nada.
+    if (clickTrasPresion) { clickTrasPresion = false; ev.preventDefault(); return; }
+
+    // Marcar no es abrir: la casilla se queda con el click. En táctil, mientras hay
+    // algo marcado, tocar una fila también marca (como Gmail en el teléfono).
+    if (ev.target.closest(".mesa-conv-check") || (seleccionadas.size > 0 && esTactil())) {
       ev.preventDefault();
       alternarMarcada(idx, ev.shiftKey);
       return;
@@ -546,6 +550,42 @@ function engancharClicksLista() {
     selectedIdx = idx;
     openConversation(conversations[idx]);
   });
+  engancharPresionLarga(container);
+}
+
+const esTactil = () => window.matchMedia("(hover: none)").matches;
+let clickTrasPresion = false;
+
+/**
+ * Mantener presionada una fila la marca: en táctil no hay hover que descubra la
+ * casilla. Sólo con `pointerType === "touch"`, así el mouse sigue igual. Mover el
+ * dedo más de 10 px es scroll, no presión.
+ */
+function engancharPresionLarga(container) {
+  let timer = null, x0 = 0, y0 = 0;
+  const cancelar = () => { clearTimeout(timer); timer = null; };
+  container.addEventListener("pointerdown", (ev) => {
+    if (ev.pointerType !== "touch") return;
+    const fila = ev.target.closest(".mesa-conv");
+    if (!fila) return;
+    const idx = parseInt(fila.dataset.idx);
+    if (Number.isNaN(idx)) return;
+    x0 = ev.clientX; y0 = ev.clientY;
+    cancelar();
+    timer = setTimeout(() => {
+      timer = null;
+      clickTrasPresion = true;
+      alternarMarcada(idx, false);
+      navigator.vibrate?.(15);
+    }, 500);
+  });
+  container.addEventListener("pointermove", (ev) => {
+    if (timer && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 10) cancelar();
+  });
+  container.addEventListener("pointerup", cancelar);
+  container.addEventListener("pointercancel", cancelar);
+  // Sin esto iOS abre el menú de "copiar/compartir" encima de la presión larga.
+  container.addEventListener("contextmenu", (ev) => { if (esTactil() && ev.target.closest(".mesa-conv")) ev.preventDefault(); });
 }
 
 /**
@@ -604,6 +644,8 @@ function renderBarraSeleccion() {
   if (!barra) return;
   const n = seleccionadas.size;
   barra.classList.toggle("mesa-hidden", n === 0);
+  // En táctil las casillas sólo se ven mientras hay algo marcado (ver bandeja.css).
+  document.getElementById("conv-list")?.classList.toggle("mesa-list--seleccionando", n > 0);
   document.getElementById("bulk-count").textContent =
     `${n} ${n === 1 ? "seleccionada" : "seleccionadas"}`;
 }
@@ -771,7 +813,7 @@ function cuerpoMensaje(item) {
   // srcdoc escapado: el HTML del correo viaja como atributo, no como marcado.
   // `allow-same-origin` (sin `allow-scripts`) deja que el padre lo mida: dentro
   // sigue sin correr JavaScript. El alto lo pone ajustarIframe.
-  return `<iframe class="mesa-msg-html" sandbox="allow-same-origin" referrerpolicy="no-referrer" srcdoc="${esc(item.html)}"></iframe>`;
+  return `<div class="mesa-msg-html-wrap"><iframe class="mesa-msg-html" sandbox="allow-same-origin" referrerpolicy="no-referrer" srcdoc="${esc(item.html)}"></iframe></div>`;
 }
 
 function renderMessages(messages, notes) {
@@ -846,9 +888,39 @@ function ajustarIframe(iframe) {
     } catch { return 0; }
   };
 
+  const wrap = iframe.parentElement?.classList.contains("mesa-msg-html-wrap") ? iframe.parentElement : null;
+
   const aplicar = (h) => {
     // +2 px de holgura: sin ellos el redondeo deja la barra de scroll asomada.
-    iframe.style.height = Math.min(Math.max(h + 2, 120), IFRAME_MAX) + "px";
+    const alto = Math.min(Math.max(h + 2, 120), IFRAME_MAX);
+    iframe.style.height = alto + "px";
+    encajarAncho(alto);
+  };
+
+  /**
+   * Un correo de plantilla trae tablas de 600 px fijos; en un teléfono se cortaba y
+   * había que arrastrarlo de lado dentro de la caja. Si el contenido es más ancho que
+   * el hueco, el iframe toma su ancho natural y se escala para caber — lo que hacen
+   * Gmail y Apple Mail. Si cabe, no se toca nada (escritorio casi nunca entra aquí).
+   */
+  const encajarAncho = (alto) => {
+    if (!wrap) return;
+    const disponible = wrap.clientWidth;
+    let natural = 0;
+    try { natural = iframe.contentDocument?.documentElement?.scrollWidth ?? 0; } catch {}
+    // Se mide con el iframe a su ancho actual: si ya estaba escalado, su ancho ES el natural.
+    if (!disponible || natural + 2 <= disponible + 1) {
+      iframe.style.width = "";
+      iframe.style.transform = "";
+      wrap.style.height = "";
+      return;
+    }
+    // +2: el borde de 1 px por lado del iframe (box-sizing: border-box).
+    const ancho = natural + 2;
+    const k = disponible / ancho;
+    iframe.style.width = ancho + "px";
+    iframe.style.transform = `scale(${k})`;
+    wrap.style.height = Math.ceil(alto * k) + "px";
   };
 
   const fijar = (h) => {
@@ -1368,6 +1440,18 @@ function setupListeners() {
   document.getElementById("signature-save").addEventListener("click", saveSignature);
 
   document.getElementById("btn-canned").addEventListener("click", openCannedModal);
+
+  // Menú ⋯ (sólo móvil): cada entrada dispara el botón real, sin lógica duplicada.
+  const btnMasToolbar = document.getElementById("btn-toolbar-more");
+  const menuMas = document.getElementById("toolbar-more-menu");
+  if (btnMasToolbar && menuMas) {
+    btnMasToolbar.addEventListener("click", (ev) => { ev.stopPropagation(); menuMas.classList.toggle("mesa-hidden"); });
+    menuMas.querySelectorAll("[data-proxy]").forEach((b) => b.addEventListener("click", () => {
+      menuMas.classList.add("mesa-hidden");
+      document.getElementById(b.dataset.proxy)?.click();
+    }));
+    document.addEventListener("click", (ev) => { if (!ev.target.closest(".mesa-more-wrap")) menuMas.classList.add("mesa-hidden"); });
+  }
   document.getElementById("canned-close").addEventListener("click", () => closeModal("modal-canned"));
   document.getElementById("canned-save").addEventListener("click", saveCanned);
 
