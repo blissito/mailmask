@@ -258,7 +258,7 @@ describe("transferencia de dominios", () => {
 
   it("un teléfono que Route 53 no acepta se rechaza aquí, no en AWS", async () => {
     const { res } = await iniciar({
-      domain: `tel-${suffix}.com`, authCode: "EPP", whois: { ...WHOIS, phone: "5512345678" },
+      domain: `tel-${suffix}.com`, authCode: "EPP", whois: { ...WHOIS, phone: "+44 20 7946 0958" },
     });
     assert.equal(res.status, 400);
     assert.match((await res.json()).error, /tel/i);

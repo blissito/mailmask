@@ -1200,7 +1200,7 @@ async function iniciarTransferencia(dominio) {
           ["firstName", "Nombre", "text"],
           ["lastName", "Apellido", "text"],
           ["email", "Correo", "email"],
-          ["phone", "Teléfono (+52.5512345678)", "text"],
+          ["phone", "Teléfono (+52 55 1234 5678)", "tel"],
           ["address", "Calle y número", "text"],
           ["city", "Ciudad", "text"],
           ["state", "Estado", "text"],

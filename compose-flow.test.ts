@@ -97,8 +97,10 @@ describe("Bandeja: redactar — camino feliz", () => {
     assert.equal(conv.to, `hola@composeok-${suffix}.com`);
     assert.equal(conv.messageCount, 1);
     assert.equal(conv.status, "open");
-    // Lo que engancha la respuesta del contacto en este mismo hilo.
-    assert.deepEqual(conv.threadReferences, [data.messageId]);
+    // Lo que engancha la respuesta del contacto en este mismo hilo: el nuestro y el que
+    // SES pone en su lugar al reescribirlo.
+    assert.equal(conv.threadReferences[0], data.messageId);
+    assert.match(conv.threadReferences[1], /@email\.amazonses\.com>$/);
 
     const msgs = dbmod.listMessages(conv.id);
     assert.equal(msgs.length, 1);

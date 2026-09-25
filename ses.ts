@@ -629,6 +629,18 @@ export const MAX_RAW_MESSAGE_BYTES = 9 * 1024 * 1024;
  */
 export interface SentEmail { messageId: string; sesMessageId: string }
 
+/**
+ * Referencias de hilo de un saliente. SES reescribe el Message-ID que generamos por
+ * `<sesMessageId@email.amazonses.com>` (visto el 24-sep-2026: la respuesta de Gmail a un
+ * correo de denik.me traía ése en In-Reply-To y abrió conversación nueva). Se guardan los
+ * dos para que la respuesta enganche la haya reescrito SES o no.
+ */
+export function threadRefsFor(sent: SentEmail): string[] {
+  return sent.sesMessageId
+    ? [sent.messageId, `<${sent.sesMessageId}@email.amazonses.com>`]
+    : [sent.messageId];
+}
+
 export async function sendFromDomain(from: string, to: string, subject: string, body: string, opts?: { html?: string; replyTo?: string; configSet?: string; inReplyTo?: string; references?: string; inlineImages?: InlineImage[]; attachments?: Attachment[]; cc?: string[]; bcc?: string[] }): Promise<SentEmail> {
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");

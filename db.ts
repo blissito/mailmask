@@ -3163,3 +3163,28 @@ export function listConversationAliases(domainId: string): string[] {
   `).all(domainId) as { alias: string }[];
   return rows.map((r) => r.alias);
 }
+
+/**
+ * Los salientes enviados antes del 24-sep-2026 guardaron sólo nuestro Message-ID en el
+ * hilo, y SES lo reescribe: la respuesta del contacto no enganchaba. Añade a cada
+ * conversación el `<sesMessageId@email.amazonses.com>` de sus salientes. Idempotente.
+ */
+export function backfillSesThreadRefs(): number {
+  const rows = sqlite.prepare(`
+    SELECT c.id, c.thread_refs, group_concat(m.ses_message_id, ' ') AS ses_ids
+    FROM conversations c JOIN messages m ON m.conversation_id = c.id
+    WHERE m.ses_message_id IS NOT NULL AND m.ses_message_id != ''
+    GROUP BY c.id
+  `).all() as { id: string; thread_refs: string; ses_ids: string }[];
+  const upd = sqlite.prepare(`UPDATE conversations SET thread_refs = ? WHERE id = ?`);
+  let n = 0;
+  for (const r of rows) {
+    let refs: string[] = [];
+    try { refs = JSON.parse(r.thread_refs || "[]"); } catch { refs = []; }
+    const faltan = r.ses_ids.split(" ").map((id) => `<${id}@email.amazonses.com>`).filter((x) => !refs.includes(x));
+    if (!faltan.length) continue;
+    upd.run(JSON.stringify([...refs, ...faltan]), r.id);
+    n++;
+  }
+  return n;
+}

@@ -209,7 +209,7 @@ import {
   deleteDomainIdentity,
 } from "./ses.js";
 import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, extractAttachmentByIndex, resolveCidImages, rebuildConversationsFromS3 } from "./forwarding.js";
-import { fetchEmailFromS3, S3FetchError, degradedBodyState, repairReceiptRules, ensureDomainInbound, ensureSnsSubscription, AWS_REGION, getBackupBytesFromS3 } from "./ses.js";
+import { fetchEmailFromS3, threadRefsFor, S3FetchError, degradedBodyState, repairReceiptRules, ensureDomainInbound, ensureSnsSubscription, AWS_REGION, getBackupBytesFromS3 } from "./ses.js";
 import { runDbBackup, DB_BACKUP_SUFFIX } from "./backup.js";
 import { resolveEmailBody, extractInlineImages, appendSignature, quotePrevious, MAX_EMAIL_HTML_BYTES } from "./email-html.js";
 import { putDomainAssetToS3, getDomainAssetFromS3, deleteDomainAssetFromS3, putEmailImageToS3, getEmailImageFromS3, deleteEmailImageFromS3, sweepOrphanEmailImages, putEmailFileToS3, getEmailFileFromS3, deleteEmailFileFromS3, ALLOWED_IMAGE_TYPES } from "./ses.js";
@@ -778,6 +778,36 @@ async function cancelMpPreapproval(preapprovalId: string, accessToken: string): 
   if (!res.ok) throw new Error(`MP cancel ${preapprovalId}: ${await res.text()}`);
 }
 
+// Lada internacional por país, para partir "+525512345678" en "+52.5512345678".
+const CALLING_CODES: Record<string, string> = {
+  MX: "52", US: "1", CA: "1", ES: "34", CO: "57", AR: "54", CL: "56", PE: "51", EC: "593",
+  GT: "502", CR: "506", PA: "507", UY: "598", VE: "58", BO: "591", PY: "595", DO: "1",
+  SV: "503", HN: "504", NI: "505", BR: "55", GB: "44", FR: "33", DE: "49", IT: "39",
+};
+
+/**
+ * Route 53 exige el teléfono como `+52.5512345678`. La gente lo escribe como sea
+ * ("+525512345678", "55 1234 5678", "+52 (55) 1234-5678"), así que se normaliza en vez de
+ * rechazarlo. Sin lada, se asume la del país del contacto.
+ */
+export function normalizePhone(raw: string, country: string): string | null {
+  const s = raw.trim();
+  const dotted = s.replace(/[\s()-]/g, "");
+  if (/^\+\d{1,3}\.\d{6,14}$/.test(dotted)) return dotted;
+  const digits = s.replace(/\D/g, "");
+  const code = CALLING_CODES[country.toUpperCase()];
+  const conPlus = s.startsWith("+") || s.startsWith("00");
+  const num = s.startsWith("00") ? digits.slice(2) : digits;
+  if (conPlus) {
+    if (code && num.startsWith(code) && num.length - code.length >= 6) return `+${code}.${num.slice(code.length)}`;
+    return null;
+  }
+  if (!code || num.length < 6 || num.length > 14) return null;
+  // Alguien que escribe "5255..." sin el "+" ya puso la lada.
+  if (num.startsWith(code) && num.length - code.length === 10) return `+${code}.${num.slice(code.length)}`;
+  return `+${code}.${num}`;
+}
+
 /**
  * Contacto WHOIS del cliente para un transfer-in. Devuelve el contacto ya limpio, o el
  * mensaje de error. Route 53 rechaza el teléfono si no viene como `+52.5512345678`, y un
@@ -795,9 +825,11 @@ function validarWhois(entrada: unknown): WhoisContacto | string {
     limpio[c] = v;
   }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(limpio.email)) return "El correo del contacto WHOIS no es válido.";
-  if (!/^\+\d{1,3}\.\d{6,14}$/.test(limpio.phone)) return 'El teléfono debe ir en el formato que pide el registro: "+52.5512345678".';
   if (!/^[A-Za-z]{2}$/.test(limpio.country)) return 'El país debe ser su código de dos letras, por ejemplo "MX".';
   limpio.country = limpio.country.toUpperCase();
+  const tel = normalizePhone(limpio.phone, limpio.country);
+  if (!tel) return 'No entendimos el teléfono. Escríbelo con lada de país, por ejemplo "+52 55 1234 5678".';
+  limpio.phone = tel;
   const org = String(e.organization ?? "").trim();
   return { ...(limpio as unknown as WhoisContacto), ...(org ? { organization: org } : {}) };
 }
@@ -4725,7 +4757,7 @@ const app = new Elysia({ adapter: node() })
         lastMessageAt: new Date().toISOString(),
         messageCount: 1,
         tags: [],
-        threadReferences: [messageId],
+        threadReferences: threadRefsFor({ messageId, sesMessageId: composeSesId }),
       });
 
       const outMsg = await addMessage({
@@ -5236,7 +5268,7 @@ const app = new Elysia({ adapter: node() })
 
       const ahoraReply = new Date().toISOString();
       await updateConversation(domainId, conv.id, {
-        threadReferences: [...conv.threadReferences, messageId],
+        threadReferences: [...new Set([...conv.threadReferences, ...threadRefsFor({ messageId, sesMessageId })])],
         lastMessageAt: ahoraReply,
         messageCount: conv.messageCount + 1,
       });
@@ -6628,9 +6660,6 @@ const app = new Elysia({ adapter: node() })
   .post("/api/domains/transfer/start", async ({ request, body }) => {
     const auth = await getAuthUser(request);
     if (!auth) return jsonErr("No autenticado", 401);
-    const limited = await rateLimitGuard(getIp(request), 3, 60_000);
-    if (limited) return limited;
-
     const b = body as { domain: string; authCode: string; payerEmail?: string; dnsRecords?: unknown };
     const d = String(b.domain ?? "").toLowerCase().trim();
     const authCode = String(b.authCode ?? "").trim();
@@ -6641,6 +6670,10 @@ const app = new Elysia({ adapter: node() })
     // y un WHOIS inventado es causa de suspensión por parte del registro.
     const whois = validarWhois((body as { whois?: unknown }).whois);
     if (typeof whois === "string") return jsonErr(whois, 400);
+
+    // Por usuario y después de validar: un error de captura no debe gastar intentos.
+    const limited = await rateLimitGuard(`transfer-start:${auth.email}`, 5, 60_000);
+    if (limited) return limited;
 
     const tld = "." + d.split(".").slice(1).join(".");
     const { precioDeTransferencia } = await import("./tld-pricing.js");
@@ -7597,6 +7630,10 @@ if (esServidor) (async () => {
       const l = await actualizarTipoDeCambio();
       log(l ? "info" : "warn", "startup", l ? `Tipo de cambio al arrancar: ${l.rate}` : "No se pudo obtener el tipo de cambio al arrancar");
     }
+
+    const { backfillSesThreadRefs } = await import("./db.js");
+    const hilos = backfillSesThreadRefs();
+    if (hilos > 0) log("info", "startup", `Hilo: ${hilos} conversación(es) con el Message-ID reescrito por SES`);
 
     const repaired = await repairReceiptRules();
     if (repaired > 0) log("info", "startup", `Repaired ${repaired} receipt rule(s) with missing TopicArn`);
