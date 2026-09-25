@@ -204,8 +204,9 @@
   .app-mail { @apply max-w-[34vw] truncate text-[13px] text-fg-muted; }
   .app-out { @apply flex-none px-1.5 py-1 text-[13px] text-fg-subtle hover:text-fg; }
   @media (max-width: 640px) {
-    .app-nav a:not(.on) { @apply hidden; }
-    .app-mail { @apply hidden; }
+    /* Inicio y Bandeja siempre visibles: sin ellas no hay forma de llegar a la Bandeja */
+    .app-nav a[href="/docs"], .app-nav a.admin { @apply hidden; }
+    .app-brand span, .app-pill, .app-mail { @apply hidden; }
     .app-me { @apply flex-none; }
     .app-hello h1 { @apply text-[22px]; }
   }
