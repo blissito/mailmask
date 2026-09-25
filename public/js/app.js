@@ -1310,10 +1310,13 @@ async function loadDomainRegistrations() {
         transfer_pending_payment: { label: "Transferencia: esperando pago", color: "text-fg-muted", dot: "bg-fg-muted", animate: false },
         transfer_paid: { label: "Pagada — falta tu código EPP", color: "text-amber-600", dot: "bg-yellow-400", animate: false },
         transfer_submitted: { label: "Transferencia enviada — revisa tu correo", color: "text-blue-400", dot: "bg-blue-400", animate: true },
-        transfer_awaiting_approval: { label: "Esperando que apruebes en tu registrador", color: "text-blue-400", dot: "bg-blue-400", animate: true },
+        transfer_awaiting_approval: { label: "Esperando que tu registrador actual la suelte (hasta 10 días)", color: "text-blue-400", dot: "bg-blue-400", animate: true },
         transfer_failed: { label: "La transferencia falló", color: "text-red-500", dot: "bg-red-400", animate: false },
         transfer_cancelled: { label: "Transferencia cancelada", color: "text-fg-muted", dot: "bg-fg-muted", animate: false },
       };
+      if (r.kind === "transfer" && r.status === "registering" && r.dnsImportStatus !== "approved") {
+        statusMap.registering = { label: "Transferido — aprueba tu DNS para terminar", color: "text-amber-600", dot: "bg-yellow-400", animate: false };
+      }
       const s = statusMap[r.status] || { label: r.status, color: "text-fg-muted", dot: "bg-fg-muted", animate: false };
       return `
       <div class="bg-bg-elev border border-line rounded-xl px-5 py-3">
@@ -1330,8 +1333,18 @@ async function loadDomainRegistrations() {
           <button class="btn-primary text-sm px-4 py-2 rounded-lg">Mandar transferencia</button>
         </div>
         <p class="text-xs text-red-500 mt-2 hidden" data-epp-error></p>` : ""}
+        ${needsDnsReview(r) ? `
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+          <button class="btn-secondary text-sm px-4 py-2 rounded-lg" data-dns-review="${esc(r.id)}" data-domain="${esc(r.domainName)}">Revisar y aprobar DNS (${(r.dnsSnapshot || []).length})</button>
+          <span class="text-xs text-fg-muted">Nada se mueve hasta que lo apruebes.</span>
+        </div>` : r.kind === "transfer" && r.dnsImportStatus === "approved" && r.status !== "registered" ? `
+        <p class="mt-2 text-xs text-mask-500">DNS aprobado ✓</p>` : ""}
       </div>`;
     }).join("");
+
+    container.querySelectorAll("[data-dns-review]").forEach((b) => {
+      b.addEventListener("click", () => openDnsReview(b.dataset.dnsReview, b.dataset.domain));
+    });
 
     container.querySelectorAll("[data-epp-form]").forEach((form) => {
       const input = form.querySelector("input");
@@ -1364,6 +1377,122 @@ async function loadDomainRegistrations() {
       setTimeout(loadDomains, 6000);
     }
   } catch { /* ignore */ }
+}
+
+// --- Revisión del inventario DNS de una transferencia ---
+//
+// Al terminar la transferencia, el dominio pasa a nuestra zona con EXACTAMENTE estos
+// registros. Lo que falte aquí deja de funcionar, así que se revisa, se corrige y se aprueba.
+
+const DNS_REVIEW_STATUSES = ["transfer_paid", "transfer_submitted", "transfer_awaiting_approval", "registering"];
+
+function needsDnsReview(r) {
+  return r.kind === "transfer" && r.dnsImportStatus !== "approved" && DNS_REVIEW_STATUSES.includes(r.status);
+}
+
+async function openDnsReview(regId, domain) {
+  const res = await fetch(`/api/domains/transfer/${regId}/dns`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return alertInline(data.error || "No pudimos leer tu inventario.");
+  let records = (data.records || []).map((r) => ({ ...r, values: [...r.values] }));
+
+  const dlg = document.createElement("div");
+  dlg.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto";
+  document.body.appendChild(dlg);
+  const close = () => dlg.remove();
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) close(); });
+
+  const render = () => {
+    dlg.innerHTML = `
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-2xl p-5 my-8">
+      <h3 class="font-semibold text-fg mb-1">DNS de ${esc(domain)}</h3>
+      <p class="text-sm text-fg-muted mb-3">Cuando termine la transferencia, tu dominio va a usar <b>exactamente</b> estos registros. Compáralos con el panel de tu proveedor actual: lo que falte aquí dejará de funcionar.</p>
+      <p class="text-xs text-fg-muted mb-4">Tu correo (MX) se queda donde está: no lo cambiamos.</p>
+      <div class="space-y-2" id="dns-rows">
+        ${records.map((r, i) => `
+        <div class="bg-bg-inset border border-line rounded-lg p-3" data-row="${i}">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xs font-mono px-2 py-0.5 rounded bg-bg-elev border border-line">${esc(r.type)}</span>
+            <span class="text-sm font-mono text-fg break-all flex-1">${esc(r.name)}</span>
+            <button type="button" class="text-xs text-red-500 hover:underline" data-remove="${i}">Quitar</button>
+          </div>
+          <textarea rows="${Math.max(1, r.values.length)}" spellcheck="false" class="w-full bg-bg-elev border border-line rounded px-2 py-1 text-xs font-mono text-fg" data-values="${i}">${esc(r.values.join("\n"))}</textarea>
+          ${r.type === "A" || r.type === "AAAA" ? `<p class="text-xs text-fg-subtle mt-1">Si tu web está en Hostinger u otro hosting con CDN, usa la IP que te da su panel: estas pueden cambiar.</p>` : ""}
+        </div>`).join("")}
+      </div>
+      <details class="mt-3">
+        <summary class="text-sm text-fg-muted cursor-pointer">Agregar un registro que falte</summary>
+        <div class="mt-2 grid grid-cols-1 sm:grid-cols-4 gap-2">
+          <input id="dns-new-name" placeholder="nombre (ej. shop.${esc(domain)})" class="sm:col-span-2 bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg font-mono">
+          <select id="dns-new-type" class="bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg">
+            ${["A", "AAAA", "CNAME", "TXT", "MX", "CAA", "SRV"].map((t) => `<option>${t}</option>`).join("")}
+          </select>
+          <button type="button" id="dns-new-add" class="btn-secondary text-sm px-3 py-2 rounded-lg">Agregar</button>
+          <textarea id="dns-new-values" rows="2" placeholder="valor (uno por línea)" class="sm:col-span-4 bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg font-mono"></textarea>
+        </div>
+      </details>
+      <p id="dns-error" class="text-sm text-red-500 mt-3 hidden"></p>
+      <div class="flex flex-wrap justify-end gap-2 mt-5">
+        <button type="button" data-action="close" class="text-sm text-fg-muted hover:text-fg px-3 py-2">Cerrar</button>
+        <button type="button" data-action="save" class="btn-secondary text-sm px-4 py-2 rounded-lg">Guardar cambios</button>
+        <button type="button" data-action="approve" class="btn-primary text-sm px-4 py-2 rounded-lg">Aprobar ${records.length} registro(s)</button>
+      </div>
+    </div>`;
+
+    dlg.querySelector('[data-action="close"]').addEventListener("click", close);
+    dlg.querySelectorAll("[data-remove]").forEach((b) => b.addEventListener("click", () => {
+      readValues();
+      records.splice(Number(b.dataset.remove), 1);
+      render();
+    }));
+    dlg.querySelector("#dns-new-add").addEventListener("click", () => {
+      readValues();
+      const name = dlg.querySelector("#dns-new-name").value.trim().toLowerCase().replace(/\.$/, "");
+      const values = dlg.querySelector("#dns-new-values").value.split("\n").map((v) => v.trim()).filter(Boolean);
+      if (!name || !values.length) return;
+      records.push({ name, type: dlg.querySelector("#dns-new-type").value, ttl: 300, values });
+      render();
+    });
+    dlg.querySelector('[data-action="save"]').addEventListener("click", () => save(false));
+    dlg.querySelector('[data-action="approve"]').addEventListener("click", () => save(true));
+  };
+
+  const readValues = () => {
+    dlg.querySelectorAll("[data-values]").forEach((t) => {
+      records[Number(t.dataset.values)].values = t.value.split("\n").map((v) => v.trim()).filter(Boolean);
+    });
+  };
+
+  const showError = (msg) => {
+    const el = dlg.querySelector("#dns-error");
+    el.textContent = msg;
+    el.classList.remove("hidden");
+  };
+
+  const save = async (approve) => {
+    readValues();
+    const put = await fetch(`/api/domains/transfer/${regId}/dns`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ records }),
+    });
+    const saved = await put.json().catch(() => ({}));
+    if (!put.ok) return showError(saved.error || "No se pudo guardar.");
+    records = saved.records;
+    if (!approve) { render(); return; }
+    const ok = await fetch(`/api/domains/transfer/${regId}/dns/approve`, { method: "POST" });
+    const j = await ok.json().catch(() => ({}));
+    if (!ok.ok) return showError(j.error || "No se pudo aprobar.");
+    close();
+    loadDomainRegistrations();
+  };
+
+  render();
+}
+
+function alertInline(msg) {
+  const container = document.getElementById("domain-registrations-list");
+  if (container) container.insertAdjacentHTML("afterbegin", `<p class="text-sm text-red-500 mb-2">${esc(msg)}</p>`);
 }
 
 // --- Aliases ---
