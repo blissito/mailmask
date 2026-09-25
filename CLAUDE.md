@@ -253,21 +253,54 @@ verdad, nunca antes: si la transferencia se cae, el dominio se pierde.
 cliente (no hace falta cuenta de AWS suya, son sólo datos) y en transfer-in deberían ser los
 suyos: el dominio ya era de él.
 
-### Primera transferencia real: kandey.com.mx (24-sep-2026)
+### ⏳ EN ESPERA — primera transferencia real: kandey.com.mx (24-sep-2026)
 
-Operación AWS `3f62f782-b045-44c5-888d-aafd09cc44e6`, mandada a mano (pago manual, el
-checkout de MP se colgó sin llegar a crear el pago: `COW00-YNTHGUYKKQGH`). Ella sola no lo
-hubiera logrado: teléfono, 409 al reintentar, EPP en memoria, estado "CDMX" que AWS
-rechaza, CNAME+A en el inventario y el MX que le iba a tumbar Hostinger — todo arreglado
-ese día. Vence el **3-oct-2026** en Hostinger; al completar, revisar la IP del apex (CDN
-de Hostinger, rota) antes de aprobar el inventario. El titular WHOIS quedó a nombre de
-Rosalba Flores; en Hostinger era Josue Kraves.
+**Estado:** mandada a AWS el 24-sep a las 22:47 (operación
+`3f62f782-b045-44c5-888d-aafd09cc44e6`), paso 7 de 14: *"esperando a que el registrador
+actual la apruebe automáticamente"*. En .mx Hostinger no tiene botón de aprobar: la suelta
+solo, hasta 10 días. Cliente: `fresnnyypublicidad@gmail.com` (WHOIS `rfc.rossy@gmail.com`).
+Pago **manual** (`mpPaymentId: manual:bliss-2026-09-24`), fuera de MercadoPago.
 
-**Pendiente: ficha del dominio en la app**, con la de Hostinger como referencia: fecha de
-caducidad con alerta, renovación automática, nameservers, titular WHOIS ("Ver todo"),
-bloqueo de transferencia y código de autorización; más el paso en el que va una
-transferencia traducido ("Hostinger la libera sola, hasta 10 días"). Y el checkout de MP
-de pagos únicos: nunca ha cobrado en producción.
+**Fue un dolor de muelas para la clienta.** Ella sola no lo hubiera logrado; hicieron
+falta bliss en WhatsApp y una sesión entera arreglando en producción. Lo que se topó, en
+orden (todo arreglado ese día salvo lo marcado):
+
+1. Teléfono `+525643868687` rechazado por no llevar el punto de Route 53 → se normaliza.
+2. Cada error de captura gastaba el rate limit (3/min por IP) → por usuario y después de validar.
+3. Reintentar daba 409 "transferencia en curso" durante 24 h → reusa la fila pendiente.
+4. ❌ **El checkout de MercadoPago se colgó dos veces** sin llegar a crear el pago (ni
+   rechazado): `COW00-YNTHGUYKKQGH`. Es el primer pago único de la historia de MailMask;
+   **sigue sin investigar**.
+5. El EPP vivía en memoria una hora y un deploy lo borraba → cifrado en `transfer_auth_codes`, 7 días.
+6. AWS rechazó el estado "CDMX" (quiere `DF`) → `normalizeMxState`. Si MP hubiera cobrado,
+   este era el peor: cobro hecho, transferencia rechazada, reembolso manual.
+7. El inventario traía `mail.` como CNAME y A a la vez, que Route 53 rechaza → `dropCnameConflicts`.
+8. Al terminar le íbamos a poner nuestro MX delante del de Hostinger y sus buzones se
+   quedaban sin correo nuevo → en transfer-in el MX ajeno se deja intacto (`keepForeignMx`).
+9. No había pantalla para aprobar el inventario → "Revisar y aprobar DNS" en la app.
+10. ❌ Nada le dice al cliente qué hacer en su registrador (bloqueo, renovación, no pedir
+    otro código). Hoy se lo explicamos por WhatsApp con capturas del hPanel.
+
+**Riesgos abiertos, vigilar:**
+- **Vence el 3-oct-2026 en Hostinger** con la autorrenovación apagada. Se le pidió
+  encenderla como seguro. Si la transferencia no termina antes, revisarlo.
+- Que **no pida otro código** en Hostinger: invalida el que mandamos.
+- La IP del apex es la CDN de Hostinger y rota en cada consulta: **antes de aprobar el
+  inventario**, poner la IP que da el hPanel.
+- Si Hostinger borra su zona DNS al soltar el dominio, el correo cae hasta que aprobemos:
+  aprobar en cuanto llegue la alerta.
+- El WHOIS quedó a nombre de Rosalba Flores; en Hostinger era Josue Kraves. Confirmar.
+
+**Al completarse:** llega alerta `transferencia-completada:kandey.com.mx` a
+`admin@mailmask.studio` y a la clienta el correo "Revisa el DNS". Revisar el inventario
+con ella, aprobar, y comprobar después que `dig MX kandey.com.mx` sigue en Hostinger y que
+la web carga.
+
+**Pendiente de producto:** ficha del dominio en la app con la de Hostinger como
+referencia (caducidad con alerta, renovación automática, nameservers, titular WHOIS,
+bloqueo de transferencia, código de autorización) y el paso de la transferencia traducido
+("Hostinger la libera sola, hasta 10 días"); y una compra real de punta a punta del
+checkout de MP de pagos únicos.
 
 ### Antes de venderlo
 
