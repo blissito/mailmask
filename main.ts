@@ -269,6 +269,39 @@ function getMainDomainUrl(): string {
   return `https://${bare}`;
 }
 
+// Cuerpo de la Preference de pago único de un dominio (registro o transferencia). El
+// checkout de kandey.com.mx se colgó dos veces sin crear el pago (`COW00-…`): la Preference
+// iba sin comprador, sin categoría ni descriptor, que es lo que el antifraude de MP pide para
+// aprobar. `binary_mode` evita que un pago quede en `pending` indefinido.
+function domainPreferenceBody(opts: {
+  id: string;
+  title: string;
+  description: string;
+  unitPriceCents: number;
+  externalReference: string;
+  payer: { email: string; name?: string; surname?: string };
+}) {
+  const backUrl = `${getMainDomainUrl()}/app`;
+  return {
+    items: [{
+      id: opts.id,
+      title: opts.title,
+      description: opts.description,
+      category_id: "services",
+      quantity: 1,
+      unit_price: opts.unitPriceCents / 100,
+      currency_id: "MXN",
+    }],
+    payer: opts.payer,
+    statement_descriptor: "MAILMASK",
+    binary_mode: true,
+    external_reference: opts.externalReference,
+    back_urls: { success: backUrl, failure: backUrl, pending: backUrl },
+    auto_return: "approved",
+    notification_url: `${getMainDomainUrl()}/api/webhooks/mercadopago`,
+  };
+}
+
 // En desarrollo Google redirige a localhost; en producción, al dominio principal. Las
 // dos URIs tienen que estar dadas de alta en la consola de Google Cloud.
 function googleRedirectUri(request: Request): string {
@@ -6586,25 +6619,14 @@ const app = new Elysia({ adapter: node() })
     try {
       const { Preference } = await import("mercadopago");
       const preference = new Preference({ accessToken: mpAccessToken });
-      const backUrl = getMainDomainUrl() + "/app";
-
-      const result = await preference.create({ body: {
-        items: [{
-          id: registration.id,
-          title: `Registro de dominio: ${d} (1 año)`,
-          quantity: 1,
-          unit_price: pricing.userMxnCents / 100,
-          currency_id: "MXN",
-        }],
-        external_reference: `domain-reg:${registration.id}`,
-        back_urls: {
-          success: backUrl,
-          failure: backUrl,
-          pending: backUrl,
-        },
-        auto_return: "approved",
-        notification_url: getMainDomainUrl() + "/api/webhooks/mercadopago",
-      }});
+      const result = await preference.create({ body: domainPreferenceBody({
+        id: registration.id,
+        title: `Registro de dominio: ${d} (1 año)`,
+        description: `Registro del dominio ${d} por un año en MailMask`,
+        unitPriceCents: pricing.userMxnCents,
+        externalReference: `domain-reg:${registration.id}`,
+        payer: { email: auth.email },
+      })});
 
       // Store MP preference ID for tracking
       updateDomainRegistration(registration.id, { mpPaymentId: result.id ?? "" });
@@ -6795,13 +6817,14 @@ const app = new Elysia({ adapter: node() })
     try {
       const { Preference } = await import("mercadopago");
       const preference = new Preference({ accessToken: mpAccessToken });
-      const result = await preference.create({ body: {
-        items: [{ id: reg.id, title: `Transferencia de dominio: ${d} (incluye 1 año)`, quantity: 1, unit_price: precio.transferMxnCents / 100, currency_id: "MXN" }],
-        external_reference: `domain-transfer:${reg.id}`,
-        back_urls: { success: `${getMainDomainUrl()}/app`, failure: `${getMainDomainUrl()}/app`, pending: `${getMainDomainUrl()}/app` },
-        auto_return: "approved",
-        notification_url: `${getMainDomainUrl()}/api/webhooks/mercadopago`,
-      }});
+      const result = await preference.create({ body: domainPreferenceBody({
+        id: reg.id,
+        title: `Transferencia de dominio: ${d} (incluye 1 año)`,
+        description: `Transferencia del dominio ${d} a MailMask, con un año de renovación`,
+        unitPriceCents: precio.transferMxnCents,
+        externalReference: `domain-transfer:${reg.id}`,
+        payer: { email: auth.email, name: whois.firstName, surname: whois.lastName },
+      })});
 
       updateDomainRegistration(reg.id, { mpPaymentId: result.id ?? "" });
       return Response.json({ initPoint: result.init_point, registrationId: reg.id });

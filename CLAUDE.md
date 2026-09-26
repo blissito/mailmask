@@ -259,7 +259,9 @@ suyos: el dominio ya era de él.
 `3f62f782-b045-44c5-888d-aafd09cc44e6`), paso 7 de 14: *"esperando a que el registrador
 actual la apruebe automáticamente"*. En .mx Hostinger no tiene botón de aprobar: la suelta
 solo, hasta 10 días. Cliente: `fresnnyypublicidad@gmail.com` (WHOIS `rfc.rossy@gmail.com`).
-Pago **manual** (`mpPaymentId: manual:bliss-2026-09-24`), fuera de MercadoPago.
+Pago **manual** (`mpPaymentId: manual:bliss-2026-09-24`), fuera de MercadoPago, pero **la clienta
+no ha pagado**: paga cuando se complete la transferencia. AWS ya nos cobró $29 USD el 24-sep; si
+falla, pedir el reembolso a AWS con la operación.
 
 **Fue un dolor de muelas para la clienta.** Ella sola no lo hubiera logrado; hicieron
 falta bliss en WhatsApp y una sesión entera arreglando en producción. Lo que se topó, en
@@ -286,7 +288,8 @@ orden (todo arreglado ese día salvo lo marcado):
   encenderla como seguro. Si la transferencia no termina antes, revisarlo.
   **Choque de fechas:** Hostinger tiene hasta 10 días para soltarla (≈4-oct) y el dominio
   vence un día antes. Confirmar con la clienta que la autorrenovación quedó encendida, o
-  que renueve ya. Revisado el 25-sep: AWS sigue en el paso 7/14 sin cambios desde las
+  que renueve ya. **La clienta no piensa renovar** (dicho el 25-sep): pedirle que escriba al chat de
+  Hostinger para que aprueben la transferencia ya. Revisado el 25-sep: AWS sigue en el paso 7/14 sin cambios desde las
   22:47 del 24-sep; el whois del .mx sigue en Registrar.eu (Hostinger), `ACTIVE`, y el
   NS y el MX siguen en Hostinger. Para revisar:
   `aws route53domains get-operation-detail --region us-east-1 --operation-id 3f62f782-b045-44c5-888d-aafd09cc44e6`.
