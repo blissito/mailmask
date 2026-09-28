@@ -289,10 +289,12 @@ orden (todo arreglado ese día salvo lo marcado):
   **Choque de fechas:** Hostinger tiene hasta 10 días para soltarla (≈4-oct) y el dominio
   vence un día antes. Confirmar con la clienta que la autorrenovación quedó encendida, o
   que renueve ya. **La clienta no piensa renovar** (dicho el 25-sep): pedirle que escriba al chat de
-  Hostinger para que aprueben la transferencia ya. Revisado el 25-sep: AWS sigue en el paso 7/14 sin cambios desde las
+  Hostinger para que aprueben la transferencia ya. Revisado el 28-sep: AWS sigue en el paso 7/14 sin cambios desde las
   22:47 del 24-sep; el whois del .mx sigue en Registrar.eu (Hostinger), `ACTIVE`, y el
-  NS y el MX siguen en Hostinger. Para revisar:
-  `aws route53domains get-operation-detail --region us-east-1 --operation-id 3f62f782-b045-44c5-888d-aafd09cc44e6`.
+  NS y el MX siguen en Hostinger. Para revisar (el perfil por defecto de `aws` tiene llaves
+  vencidas y da `UnrecognizedClientException`; hay que cargar las de `.env` del repo):
+  `set -a; source .env; set +a; aws route53domains get-operation-detail --region us-east-1 --operation-id 3f62f782-b045-44c5-888d-aafd09cc44e6`
+  y `whois kandey.com.mx`, `dig +short NS kandey.com.mx`, `dig +short MX kandey.com.mx`.
 - Que **no pida otro código** en Hostinger: invalida el que mandamos.
 - La IP del apex es la CDN de Hostinger y rota en cada consulta: **antes de aprobar el
   inventario**, poner la IP que da el hPanel.
