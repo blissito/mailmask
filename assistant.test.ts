@@ -1,3 +1,4 @@
+process.env.ASSISTANT_PUBLIC = "1"; // las pruebas no corren como admin
 // Asistente de /app: turn token `mt_`, relay del SSE de Ghosty, historial, adjuntos y la
 // confirmación de lo destructivo. Ghosty es un fetch simulado (`setGhostyFetch`); el mock
 // de ses.ts va antes de cargar main.ts, igual que en mcp.test.ts.
