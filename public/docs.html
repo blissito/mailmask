@@ -89,6 +89,10 @@
     .docs-layout > * { min-width: 0; }
     #docs-chat { display: none; }
     pre { max-width: 100%; }
+    /* Trigger del asistente en la barra superior */
+    #docs-chat-trigger { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; border: 1px solid rgb(var(--line)); background: none; color: rgb(var(--fg-muted)); font-size: 14px; font-weight: 500; cursor: pointer; transition: border-color 120ms, color 120ms; }
+    #docs-chat-trigger svg { color: rgb(var(--accent)); }
+    #docs-chat-trigger:hover, #docs-chat-trigger[aria-pressed="true"] { border-color: rgb(var(--accent)); color: rgb(var(--fg)); }
     @media (min-width: 768px) {
       .docs-layout { grid-template-columns: 240px 1fr; }
     }
@@ -135,6 +139,13 @@
     <div class="flex items-center gap-4">
       <a href="/openapi" class="text-sm text-fg-subtle hover:text-fg transition-colors">HTTP API Reference</a>
       <a href="/app" class="text-sm text-fg-subtle hover:text-fg transition-colors">Dashboard</a>
+      <button id="docs-chat-trigger" type="button" aria-pressed="false">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 6c.5 3 2 4.5 5 6-3 .5-4.5 2-5 5-.5-3-2-4.5-5-5 3-1.5 4.5-3 5-6z" fill="currentColor" />
+        </svg>
+        Asistente IA
+      </button>
     </div>
   </nav>
 
