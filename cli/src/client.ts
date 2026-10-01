@@ -7,8 +7,8 @@ export function buildClient(auth: Pick<ResolvedAuth, "apiKey" | "baseUrl">): Mai
 }
 
 /** Resuelve la auth guardada/env y construye el cliente, o termina el proceso con el código de auth. */
-export function requireClient(): { client: MailMask; auth: ResolvedAuth } {
-  const auth = resolveAuth();
+export async function requireClient(): Promise<{ client: MailMask; auth: ResolvedAuth }> {
+  const auth = await resolveAuth();
   if (!auth) fail(NO_AUTH_MESSAGE, 2);
   return { client: buildClient(auth), auth };
 }

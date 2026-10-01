@@ -14,11 +14,16 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
 - **Framework:** [citty](https://github.com/unjs/citty) (`defineCommand` /
   `runMain`). Un archivo por comando en `cli/src/commands/`, registrado como
   `subCommands` en `cli/src/index.ts`.
-- **Auth:** `MAILMASK_API_KEY` (variable de entorno, siempre gana) o
-  `~/.config/mailmask/credentials.json` (modo `600`), escrito por `mailmask login`.
-  Es el fallback de archivo; la integración con el keychain del sistema operativo
-  (macOS Keychain / Secret Service / Credential Manager) queda pendiente para una
-  siguiente iteración — no la des por hecha.
+- **Auth:** `MAILMASK_API_KEY` (variable de entorno, siempre gana) >
+  keychain del SO (Keychain en macOS vía `security`, Secret Service en Linux vía
+  `secret-tool`) > `~/.config/mailmask/credentials.json` (modo `600`) como
+  fallback cuando no hay keychain. `mailmask login` sin `--api-key` hace el
+  device-code flow (`cli/src/device-auth.ts`): pide al servidor un código, abre el
+  navegador en `/cli/authorize` y hace poll hasta que alguien lo confirma con su
+  sesión — nunca pide pegar la llave a mano. Las rutas del servidor están en
+  `cli-auth.ts` (en memoria, TTL de 5 min: no necesita tabla ni migración).
+  `MAILMASK_NO_KEYCHAIN` fuerza el fallback de archivo — es cómo `test/config.test.ts`
+  prueba ese camino sin depender de si la máquina que corre la prueba tiene keychain real.
 - **No existe un endpoint `/me`.** `whoami` arma la identidad combinando
   `apiKeys.list()` (para nombrar la llave activa por su `keyPrefix`) con
   `domains.list()` (conteo de dominios visibles). Si MailMask agrega un endpoint de

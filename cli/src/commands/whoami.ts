@@ -11,7 +11,7 @@ export default defineCommand({
     json: { type: "boolean", description: "Salida en JSON para scripts/agentes" },
   },
   async run({ args }) {
-    const { client, auth } = requireClient();
+    const { client, auth } = await requireClient();
 
     // No hay endpoint de identidad: apiKeys.list() + domains.list() es la forma de
     // confirmar que la llave sirve y de qué cuenta es (por el prefijo de la llave activa).
@@ -24,6 +24,8 @@ export default defineCommand({
     }
 
     const activeKey = keys.find((k) => auth.apiKey.startsWith(k.keyPrefix));
+    const sourceLabel =
+      auth.source === "env" ? "MAILMASK_API_KEY" : auth.source === "keychain" ? "el keychain del sistema" : "archivo local";
     const result = {
       authSource: auth.source,
       baseUrl: auth.baseUrl ?? "https://www.mailmask.studio",
@@ -38,7 +40,7 @@ export default defineCommand({
     }
 
     process.stdout.write(`Llave activa: ${result.apiKey}${activeKey ? ` ("${activeKey.name}")` : ""}\n`);
-    process.stdout.write(`Guardada en: ${auth.source === "env" ? "MAILMASK_API_KEY" : "archivo local"}\n`);
+    process.stdout.write(`Guardada en: ${sourceLabel}\n`);
     process.stdout.write(`API: ${result.baseUrl}\n`);
     process.stdout.write(`Dominios visibles: ${result.domainCount}\n`);
   },

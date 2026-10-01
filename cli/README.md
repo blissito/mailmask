@@ -21,15 +21,16 @@ mailmask whoami [--json]
 mailmask logout
 ```
 
-Sin `--api-key`, `login` la pide de forma interactiva (necesita una terminal
-interactiva). También se puede fijar `MAILMASK_API_KEY` por variable de
-entorno — tiene prioridad sobre lo guardado con `login` y es la vía recomendada
-para CI o para un agente de código.
+Sin `--api-key`, `login` abre el navegador para autorizar el dispositivo
+(device-code, como `gh auth login`) — no hace falta copiar y pegar nada. Con
+`--api-key` se salta ese paso y guarda la llave directo; también se puede fijar
+`MAILMASK_API_KEY` por variable de entorno, que tiene prioridad sobre lo
+guardado y es la vía recomendada para CI o para un agente de código.
 
-La API key se guarda en `~/.config/mailmask/credentials.json` con permisos
-`600`. La integración con el keychain del sistema operativo (macOS Keychain /
-Secret Service / Credential Manager) queda para una siguiente iteración; hoy
-sólo existe el fallback de archivo.
+La sesión se guarda en el keychain del sistema operativo (Keychain en macOS,
+Secret Service/`secret-tool` en Linux). Si no hay keychain disponible —Windows,
+o un Linux sin Secret Service— cae a `~/.config/mailmask/credentials.json` con
+permisos `600`. `mailmask logout` borra la sesión de donde haya quedado.
 
 ## Códigos de salida
 
