@@ -17,9 +17,11 @@ cada dominio vive en su propio archivo en la raíz (`auth.ts`, `db.ts`, `ses.ts`
 SQLite vía Drizzle (`db.ts`), en un volumen único de Fly.io — por eso el deploy
 tiene downtime estructural. AWS (SES/S3/Route53) para correo y dominios,
 MercadoPago para cobros. `sdk/` es el cliente npm que también alimenta el
-servidor MCP en `mcp.ts`. `public/` sirve el dashboard y `public/skills/` las
-Agent Skills (se generan en el build, no se commitean). `scripts/` trae
-utilidades puntuales, no forman parte del server.
+servidor MCP en `mcp.ts`. `cli/` es la CLI de terminal construida sobre ese
+mismo SDK — paquete npm aparte, con su propio `package.json` (ver
+`docs/agents/mailmask-cli.md`). `public/` sirve el dashboard y
+`public/skills/` las Agent Skills (se generan en el build, no se commitean).
+`scripts/` trae utilidades puntuales, no forman parte del server.
 
 ## Convenciones
 - Cambios chicos y con pruebas; un PR por pedido.
@@ -40,6 +42,7 @@ Fichas cortas en `docs/agents/`: decisiones, trampas y glosario que el código n
 Léelas antes de tocar su tema; si tu cambio fija una convención o descubres una trampa, escribe o
 pon al día la ficha en el mismo PR y agrega aquí su renglón.
 <!-- - [Tema](docs/agents/tema.md) — de qué trata, en una línea -->
+- [CLI de MailMask](docs/agents/mailmask-cli.md) — convenciones de `cli/`: framework de comandos, auth, exit codes y la regla dura de no tocar DNS `managed`.
 
 ## Pull requests
 - Rama nueva desde `main`; el PR explica qué cambia y cómo se probó.
