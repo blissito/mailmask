@@ -1,5 +1,7 @@
-// Apunta la ruta de salida `ses` de Stalwart al relay SMTP de la app (outbound-relay.ts),
-// para que lo que manda Apple Mail pase por la app: cuota, supresión, log y Bandeja.
+// Apunta la ruta de salida `ses` de Stalwart al relay LMTP local de la caja
+// (box/outbound-relay/, 127.0.0.1:2525), que entrega a la app por HTTPS
+// (`POST /api/internal/outbound`): así lo que manda Apple Mail pasa por la app —
+// cuota, supresión, log y Bandeja—. Instala primero el relay con su install.sh.
 //
 // Por defecto NO cambia nada: imprime la ruta actual, el parche y la definición de
 // `MtaRoute` del esquema de la caja, para comparar los nombres de campo antes de aplicar.
@@ -10,9 +12,10 @@
 //
 // Entorno:
 //   STALWART_ADMIN_URL, STALWART_ADMIN_USER, STALWART_ADMIN_PASSWORD  (los de Fly)
-//   OUTBOUND_RELAY_SECRET   el mismo valor que el secreto de Fly (obligatorio en --apply)
-//   OUTBOUND_RELAY_HOST     default mailmask.fly.dev (certificado *.fly.dev del borde)
-//   OUTBOUND_RELAY_PORT     default 2465 (TLS implícito, lo termina Fly)
+//   OUTBOUND_RELAY_SECRET   el mismo de Fly y de /etc/mailmask-relay.env (obligatorio en --apply)
+//   OUTBOUND_RELAY_HOST     default 127.0.0.1 (el relay sólo escucha en loopback)
+//   OUTBOUND_RELAY_PORT     default 2525
+//   OUTBOUND_RELAY_PROTOCOL default lmtp (respuesta por destinatario)
 //   OUTBOUND_RELAY_USER     default stalwart
 //   STALWART_ROUTE_NAME     default ses
 //
@@ -30,8 +33,9 @@ const USER = process.env.STALWART_ADMIN_USER ?? "admin";
 const PASS = process.env.STALWART_ADMIN_PASSWORD ?? "";
 const ROUTE_NAME = process.env.STALWART_ROUTE_NAME ?? "ses";
 const TARGET = {
-  address: process.env.OUTBOUND_RELAY_HOST ?? "mailmask.fly.dev",
-  port: parseInt(process.env.OUTBOUND_RELAY_PORT ?? "2465", 10),
+  address: process.env.OUTBOUND_RELAY_HOST ?? "127.0.0.1",
+  port: parseInt(process.env.OUTBOUND_RELAY_PORT ?? "2525", 10),
+  protocol: process.env.OUTBOUND_RELAY_PROTOCOL ?? "lmtp",
   user: process.env.OUTBOUND_RELAY_USER ?? "stalwart",
   secret: process.env.OUTBOUND_RELAY_SECRET ?? "",
 };
@@ -129,8 +133,9 @@ async function main() {
     "@type": "Relay",
     address: TARGET.address,
     port: TARGET.port,
-    protocol: "smtp",
-    implicitTls: true,
+    protocol: TARGET.protocol,
+    // Loopback: sin TLS. El tramo a la app sí va por HTTPS.
+    implicitTls: false,
     allowInvalidCerts: false,
     authUsername: TARGET.user,
     authSecret: secretLike(route.authSecret, TARGET.secret || "<OUTBOUND_RELAY_SECRET>"),
@@ -160,8 +165,9 @@ async function main() {
 
   const after = await findRoute();
   if (!pointsToApp(after)) throw new Error("La ruta no quedó apuntando a la app");
-  console.log(`Listo: "${ROUTE_NAME}" → ${TARGET.address}:${TARGET.port} (TLS implícito).`);
+  console.log(`Listo: "${ROUTE_NAME}" → ${TARGET.protocol}://${TARGET.address}:${TARGET.port}.`);
   console.log("Si el siguiente envío de Apple Mail no aparece en la Bandeja, reinicia Stalwart (`systemctl restart stalwart`).");
+  console.log("Si `journalctl -u mailmask-outbound-relay` muestra 530/535 (Stalwart no autentica por LMTP), pon RELAY_REQUIRE_AUTH=false en /etc/mailmask-relay.env: sigue siendo sólo loopback.");
 }
 
 main().catch((err) => {

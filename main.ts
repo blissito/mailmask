@@ -219,7 +219,7 @@ import { log } from "./logger.js";
 import { createSmtpIamCredential, revokeSmtpIamCredential } from "./ses.js";
 import { crearBuzon, cambiarPassword, borrarBuzon, exportarBuzon } from "./stalwart.js";
 import { atenderMcp } from "./mcp.js";
-import { logOutbound, startOutboundRelay } from "./outbound-relay.js";
+import { logOutbound, handleInternalOutbound } from "./outbound-relay.js";
 import { copyToSentFolder } from "./imap-store.js";
 
 const MCP_REGISTRY_AUTH_PATH = "/.well-known/mcp-registry-auth";
@@ -1198,7 +1198,7 @@ const app = new Elysia({ adapter: node() })
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
-        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/.well-known/mcp-registry-auth", "/health", "/healthz", "/docs", "/mcp",
+        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/.well-known/mcp-registry-auth", "/health", "/healthz", "/docs", "/mcp", "/api/internal/outbound",
       ],
       staticFile: true,
     },
@@ -1257,6 +1257,8 @@ const app = new Elysia({ adapter: node() })
     // /mcp sólo acepta Bearer (nunca cookie), así que no hay CSRF que proteger; sin
     // Bearer la propia ruta contesta 401 en vez de un 403 confuso.
     if (url.pathname === "/mcp") return;
+    // El relay de la caja de Stalwart firma con HMAC y nunca manda cookie.
+    if (url.pathname === "/api/internal/outbound") return;
     // Skip CSRF for Bearer token auth (inherently CSRF-safe)
     const authHeader = request.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) return;
@@ -6088,6 +6090,12 @@ const app = new Elysia({ adapter: node() })
 
   // --- SES bounce/complaint events ---
 
+  // Salida de los buzones IMAP: el relay de la caja de Stalwart entrega aquí lo que manda
+  // Apple Mail (outbound-relay.ts). Autenticada por HMAC; ignora cookies a propósito.
+  .post("/api/internal/outbound", ({ request }) => handleInternalOutbound(request), {
+    detail: { hide: true },
+  })
+
   .post("/api/webhooks/ses-events", async ({ request }) => {
     const body = await request.json();
 
@@ -7642,17 +7650,6 @@ if (esServidor) {
   app.listen({ port, hostname: "0.0.0.0" }, () => {
     console.log(`MailMask running on port ${port}`);
   });
-}
-
-// Salida única de los buzones: Stalwart entrega aquí lo que manda Apple Mail (ver
-// `outbound-relay.ts`). Escucha siempre en el servidor; sin `OUTBOUND_RELAY_SECRET`
-// rechaza toda autenticación.
-if (esServidor) {
-  try {
-    startOutboundRelay();
-  } catch (err) {
-    log("error", "ses", "No se pudo arrancar el relay SMTP", { error: String(err) });
-  }
 }
 
 // Graceful shutdown. Without these handlers the process ignored SIGINT/SIGTERM and Fly

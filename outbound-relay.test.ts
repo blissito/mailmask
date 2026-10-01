@@ -1,9 +1,8 @@
 // Salida única de los buzones (outbound-relay.ts): lo que manda Apple Mail vía Stalwart
 // pasa por la app — cuota, supresión, log y Bandeja — y no directo a SES.
-// SES es un doble inyectado; el transporte SMTP se ejercita con un socket de verdad.
+// SES es un doble inyectado; la ruta interna se ejercita con Requests firmados de verdad.
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import * as net from "node:net";
 
 const suffix = Date.now();
 const owner = `relay-${suffix}@example.com`;
@@ -69,6 +68,7 @@ describe("Relay de salida: lo que manda un buzón pasa por la app", () => {
     const raw = mime({ dkim: true, bcc: "oculto@x.com", messageId: "<m1@apple.test>" });
     const r = await relay.relayOutbound(env(["cliente@gmail.com", "oculto@x.com"]), raw, deps);
     assert.equal(r.ok, true);
+    assert.deepEqual(r.perRcpt, { "cliente@gmail.com": "ok", "oculto@x.com": "ok" });
 
     const s = sent[sent.length - 1];
     assert.equal(s.source, ana);
@@ -140,14 +140,19 @@ describe("Relay de salida: lo que manda un buzón pasa por la app", () => {
     assert.ok("code" in relay.resolveSender(`nadie@otro-${suffix}.com`));
   });
 
-  it("aplica la lista de supresión", async () => {
+  it("supresión por destinatario: el suprimido se rechaza solo y el resto sale", async () => {
     db.addSuppression(domainId, "rebota@gmail.com", "bounce");
     const n = sent.length;
-    const r = await relay.relayOutbound(env(["rebota@gmail.com"]), mime({ to: "rebota@gmail.com" }), deps);
-    assert.equal(r.ok, false);
-    assert.equal(r.code, 550);
-    assert.match(r.message, /supresión/);
-    assert.equal(sent.length, n);
+    const solo = await relay.relayOutbound(env(["rebota@gmail.com"]), mime({ to: "rebota@gmail.com" }), deps);
+    assert.equal(solo.ok, true);
+    assert.match(solo.perRcpt["rebota@gmail.com"], /^rejected:550 .*supresión/);
+    assert.equal(sent.length, n, "nadie aceptado: no sale nada");
+
+    const mixto = await relay.relayOutbound(env(["rebota@gmail.com", "cliente@gmail.com"]),
+      mime({ to: "rebota@gmail.com, cliente@gmail.com" }), deps);
+    assert.equal(mixto.perRcpt["cliente@gmail.com"], "ok");
+    assert.match(mixto.perRcpt["rebota@gmail.com"], /^rejected:550/);
+    assert.deepEqual(sent[sent.length - 1].destinations, ["cliente@gmail.com"]);
   });
 
   it("SES caído = 451 (Stalwart reintenta) y devuelve la cuota; el reintento sí sale", async () => {
@@ -195,102 +200,94 @@ describe("Relay de salida: lo que manda un buzón pasa por la app", () => {
   });
 });
 
-// --- Transporte: un cliente SMTP mínimo sobre un socket real ---
+// --- Ruta interna: POST /api/internal/outbound ---
 
-function smtpSession(port: number) {
-  const sock = net.connect(port, "127.0.0.1");
-  let buf = "";
-  const waiters: ((line: string) => void)[] = [];
-  sock.on("data", (d) => {
-    buf += d.toString();
-    let i;
-    // Una respuesta termina en una línea "NNN " (sin guion).
-    while ((i = buf.search(/^\d{3} .*\r\n/m)) >= 0) {
-      const end = buf.indexOf("\r\n", i) + 2;
-      const resp = buf.slice(0, end);
-      buf = buf.slice(end);
-      waiters.shift()?.(resp);
+describe("Relay de salida: ruta interna firmada", () => {
+  const SECRET = "s3cret-relay";
+  const prev = process.env.OUTBOUND_RELAY_SECRET;
+  before(() => { process.env.OUTBOUND_RELAY_SECRET = SECRET; });
+  after(() => { if (prev === undefined) delete process.env.OUTBOUND_RELAY_SECRET; else process.env.OUTBOUND_RELAY_SECRET = prev; });
+
+  function req(payload: unknown, o: { secret?: string; ts?: number; cookie?: string; signature?: string } = {}) {
+    const body = JSON.stringify(payload);
+    const ts = String(o.ts ?? Math.floor(Date.now() / 1000));
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      "x-mailmask-timestamp": ts,
+      "x-mailmask-signature": o.signature ?? relay.signRelayBody(o.secret ?? SECRET, ts, body),
+    };
+    if (o.cookie) headers.cookie = o.cookie;
+    return new Request("http://localhost/api/internal/outbound", { method: "POST", headers, body });
+  }
+  const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64");
+
+  it("firma con otra clave: 401 y nada sale", async () => {
+    const n = sent.length;
+    const res = await relay.handleInternalOutbound(req({ mailFrom: ana, rcptTo: ["cliente@gmail.com"], raw: b64(mime()) }, { secret: "otra" }), deps);
+    assert.equal(res.status, 401);
+    assert.equal(sent.length, n);
+  });
+
+  it("marca de tiempo vencida (> 300 s): 401 aunque la firma cuadre", async () => {
+    const res = await relay.handleInternalOutbound(
+      req({ mailFrom: ana, rcptTo: ["cliente@gmail.com"], raw: b64(mime()) }, { ts: Math.floor(Date.now() / 1000) - 301 }), deps);
+    assert.equal(res.status, 401);
+  });
+
+  it("sin OUTBOUND_RELAY_SECRET en el servidor: cerrado", async () => {
+    delete process.env.OUTBOUND_RELAY_SECRET;
+    try {
+      const res = await relay.handleInternalOutbound(req({ mailFrom: ana, rcptTo: ["c@gmail.com"], raw: b64(mime()) }, { secret: "" }), deps);
+      assert.equal(res.status, 401);
+    } finally {
+      process.env.OUTBOUND_RELAY_SECRET = SECRET;
     }
   });
-  const next = () => new Promise<string>((r) => waiters.push(r));
-  return {
-    greeting: next(),
-    async cmd(line: string): Promise<string> {
-      const p = next();
-      sock.write(line + "\r\n");
-      return await p;
-    },
-    close: () => sock.destroy(),
-  };
-}
 
-describe("Relay de salida: transporte SMTP", () => {
-  // deno-lint-ignore no-explicit-any
-  let server: any;
-  // deno-lint-ignore no-explicit-any
-  let closed: any;
-  const port = 25000 + Math.floor(Math.random() * 20000);
-  const portNoSecret = port + 1;
-  const plain = (u: string, p: string) => Buffer.from(`\0${u}\0${p}`).toString("base64");
-
-  before(() => {
-    server = relay.startOutboundRelay({ port, host: "127.0.0.1", secret: "s3cret", deps });
-    closed = relay.startOutboundRelay({ port: portNoSecret, host: "127.0.0.1", secret: "", deps });
-  });
-  after(async () => {
-    await new Promise((r) => server.close(r));
-    await new Promise((r) => closed.close(r));
+  it("firmada: 200 con resultado por destinatario", async () => {
+    const res = await relay.handleInternalOutbound(
+      req({ mailFrom: ana, rcptTo: ["cliente@gmail.com", "rebota@gmail.com"], raw: b64(mime({ messageId: "<route-1@apple.test>" })) }), deps);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.perRcpt["cliente@gmail.com"], "ok");
+    assert.match(data.perRcpt["rebota@gmail.com"], /^rejected:550/);
+    assert.match(data.sesMessageId, /^ses-/);
   });
 
-  it("sin autenticarse no acepta remitente, y con la clave mala da 535", async () => {
-    const c = smtpSession(port);
-    assert.match(await c.greeting, /^220/);
-    assert.match(await c.cmd("EHLO stalwart"), /^250/);
-    assert.match(await c.cmd(`MAIL FROM:<${ana}>`), /^530/);
-    assert.match(await c.cmd(`AUTH PLAIN ${plain("stalwart", "mala")}`), /^535/);
-    c.close();
-  });
-
-  it("sin OUTBOUND_RELAY_SECRET escucha pero cierra: 535 aun con cualquier clave", async () => {
-    const c = smtpSession(portNoSecret);
-    await c.greeting;
-    await c.cmd("EHLO stalwart");
-    assert.match(await c.cmd(`AUTH PLAIN ${plain("stalwart", "")}`), /^535/);
-    c.close();
-  });
-
-  it("transacción completa: rechaza al remitente ajeno y al suprimido, entrega el resto con 250", async () => {
-    const c = smtpSession(port);
-    await c.greeting;
-    await c.cmd("EHLO stalwart");
-    assert.match(await c.cmd(`AUTH PLAIN ${plain("stalwart", "s3cret")}`), /^235/);
-    assert.match(await c.cmd(`MAIL FROM:<hola@${domainName}>`), /^550/, "máscara sin buzón");
-    assert.match(await c.cmd("RSET"), /^250/);
-    assert.match(await c.cmd(`MAIL FROM:<${ana}>`), /^250/);
-    assert.match(await c.cmd("RCPT TO:<rebota@gmail.com>"), /^550/, "suprimido: sólo ese destinatario");
-    assert.match(await c.cmd("RCPT TO:<cliente@gmail.com>"), /^250/);
-    assert.match(await c.cmd("DATA"), /^354/);
+  it("idempotente: el mismo mensaje otra vez no sale de nuevo", async () => {
+    const payload = { mailFrom: ana, rcptTo: ["cliente@gmail.com"], raw: b64(mime({ messageId: "<route-2@apple.test>" })) };
+    await relay.handleInternalOutbound(req(payload), deps);
     const n = sent.length;
-    const body = mime({ messageId: "<smtp-1@apple.test>" }).replace(/\r\n\./g, "\r\n..");
-    const resp = await c.cmd(body + "\r\n.");
-    assert.match(resp, /^250 .*queued as ses-/);
-    assert.equal(sent.length, n + 1);
-    assert.deepEqual(sent[sent.length - 1].destinations, ["cliente@gmail.com"]);
-    c.close();
+    const res = await relay.handleInternalOutbound(req(payload), deps);
+    const data = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(data.duplicate, true);
+    assert.equal(data.perRcpt["cliente@gmail.com"], "ok");
+    assert.equal(sent.length, n);
   });
 
-  it("si SES falla, contesta 4xx: el mensaje se queda en la cola de Stalwart", async () => {
-    const c = smtpSession(port);
-    await c.greeting;
-    await c.cmd("EHLO stalwart");
-    await c.cmd(`AUTH PLAIN ${plain("stalwart", "s3cret")}`);
-    await c.cmd(`MAIL FROM:<${ana}>`);
-    await c.cmd("RCPT TO:<cliente@gmail.com>");
-    await c.cmd("DATA");
+  it("política sobre el mensaje entero: 422 con el código SMTP (From ≠ sobre → 550)", async () => {
+    const res = await relay.handleInternalOutbound(
+      req({ mailFrom: ana, rcptTo: ["cliente@gmail.com"], raw: b64(mime({ from: `hola@${domainName}` })) }), deps);
+    assert.equal(res.status, 422);
+    assert.equal((await res.json()).code, 550);
+  });
+
+  it("SES caído: 503 (la caja lo vuelve 451 y Stalwart reintenta)", async () => {
     sesBehavior = "transient";
-    const resp = await c.cmd(mime({ messageId: "<smtp-2@apple.test>" }) + "\r\n.");
-    sesBehavior = "ok";
-    assert.match(resp, /^451/);
-    c.close();
+    try {
+      const res = await relay.handleInternalOutbound(
+        req({ mailFrom: ana, rcptTo: ["cliente@gmail.com"], raw: b64(mime()) }), deps);
+      assert.equal(res.status, 503);
+    } finally {
+      sesBehavior = "ok";
+    }
+  });
+
+  it("montada en la app: exenta de CSRF y una cookie no sirve de nada", async () => {
+    const { app } = await import("./main.ts");
+    const res = await app.fetch(req({ mailFrom: ana, rcptTo: ["c@gmail.com"], raw: b64(mime()) },
+      { signature: "sha256=00", cookie: "token=algo; csrf_token=x" }));
+    assert.equal(res.status, 401, "ni 403 de CSRF ni sesión por cookie: sólo la firma");
   });
 });

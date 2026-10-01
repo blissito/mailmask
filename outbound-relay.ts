@@ -1,26 +1,27 @@
-// Salida única de los buzones: Stalwart entrega aquí, por SMTP, lo que manda Apple Mail.
+// Salida única de los buzones: lo que manda Apple Mail pasa por la app.
 //
 // Antes la ruta `ses` de Stalwart iba directo a SES, así que lo enviado desde un buzón
 // no aparecía en la Bandeja (los hilos quedaban con sólo lo entrante), no descontaba de
-// los envíos diarios del dominio y no entraba al log. Ahora esa ruta apunta a este
-// listener y la app hace lo mismo que con cualquier envío: valida al remitente, aplica
-// la lista de supresión, reserva cuota, manda por SES, registra y engancha el hilo.
+// los envíos diarios del dominio y no entraba al log. Ahora esa ruta apunta a un relay
+// LMTP mínimo que corre en la MISMA caja que Stalwart (`box/outbound-relay/`, sólo en
+// 127.0.0.1:2525), y ese relay hace `POST /api/internal/outbound` aquí. La app hace lo
+// mismo que con cualquier envío: valida al remitente, aplica la lista de supresión,
+// reserva cuota, manda por SES, registra y engancha el hilo.
 //
-// Por qué SMTP y no un webhook: la ruta `Relay` de Stalwart trae gratis la semántica de
-// cola. Si la app está caída o contesta 4xx, el mensaje se queda en la cola de Stalwart
-// y se reintenta; si contesta 5xx, Stalwart le devuelve a quien envió un aviso de no
-// entrega (DSN) con nuestro texto. Nada se pierde y nada se salta la app en silencio.
-// Los MTA Hooks de Stalwart no sirven para esto: el de salida (`delivery`) corre
-// DESPUÉS de cada intento de entrega y sólo admite `continue`/`cancel`.
+// Por qué así: la ruta `Relay` de Stalwart trae gratis la semántica de cola. Si el relay
+// contesta 4xx (la app caída, timeout, SES caído) el mensaje se queda en la cola de
+// Stalwart y se reintenta; si contesta 5xx, Stalwart le devuelve a quien envió un aviso
+// de no entrega (DSN). Nada se pierde y nada se salta la app en silencio. LMTP y no SMTP
+// porque LMTP contesta POR DESTINATARIO: un suprimido se rechaza solo, sin tumbar al resto.
+// Los MTA Hooks no sirven: el de salida corre DESPUÉS de cada intento y sólo admite
+// `continue`/`cancel`. Y nada de puerto TCP en Fly: el relay habla HTTPS como cualquiera.
 //
-// El TLS lo termina el borde de Fly (handler `tls` en `fly.toml`); aquí llega en claro
-// por la red interna. La autenticación es una sola credencial compartida con Stalwart
-// (`OUTBOUND_RELAY_SECRET`): la identidad del usuario ya la comprobó Stalwart con
-// `mustMatchSender`, y aquí se comprueba además que el `From` visible coincida con el
-// sobre, porque Stalwart sólo mira el sobre.
+// La ruta interna se autentica con HMAC del cuerpo y una marca de tiempo (±300 s) con
+// `OUTBOUND_RELAY_SECRET`; nunca con cookie. La identidad del usuario ya la comprobó
+// Stalwart con `mustMatchSender`, y aquí se comprueba además que el `From` visible
+// coincida con el sobre, porque Stalwart sólo mira el sobre.
 
-import { createHash, timingSafeEqual } from "node:crypto";
-import { SMTPServer, type SMTPServerSession } from "smtp-server";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import PostalMime from "postal-mime";
 import {
   getDomainByName, getAlias, getUser, derechosDeDominio, isSuppressed,
@@ -137,8 +138,11 @@ export interface RelayDeps {
 
 const defaultDeps: RelayDeps = { sendRaw: sendRawFromDomain };
 
+/** Por destinatario: `"ok"` o `"rejected:<código> <motivo>"`, que el relay LMTP traduce. */
+export type PerRcpt = Record<string, string>;
+
 export type RelayResult =
-  | { ok: true; sesMessageId: string; duplicate?: boolean; conversationId?: string }
+  | { ok: true; sesMessageId: string; perRcpt: PerRcpt; duplicate?: boolean; conversationId?: string }
   | ({ ok: false } & SmtpReject);
 
 /**
@@ -180,10 +184,17 @@ export async function relayOutbound(
   const rcpts = [...new Set(envelope.rcptTo.map((r) => normalizeAddress(r).toLowerCase()).filter(Boolean))];
   if (!rcpts.length) return { ok: false, code: 554, message: "5.5.1 Sin destinatarios" };
   if (rcpts.length > MAX_RELAY_RECIPIENTS) return { ok: false, code: 452, message: "4.5.3 Demasiados destinatarios" };
+
+  // Resultado por destinatario: un suprimido se rechaza solo y el resto sale.
+  const perRcpt: PerRcpt = {};
+  const accepted: string[] = [];
   for (const r of rcpts) {
     const bad = checkRecipient(sender, r);
-    if (bad) return { ok: false, ...bad };
+    if (bad) perRcpt[r] = `rejected:${bad.code} ${bad.message}`;
+    else { perRcpt[r] = "ok"; accepted.push(r); }
   }
+  // Nadie aceptado: no se envía ni se cobra nada.
+  if (!accepted.length) return { ok: true, sesMessageId: "", perRcpt };
 
   const messageId = (parsed.messageId ?? "").trim();
   const subject = parsed.subject ?? "";
@@ -193,11 +204,11 @@ export async function relayOutbound(
   // veces y la cuota se cobraría doble. Se reclama ANTES de enviar —así dos reintentos
   // simultáneos tampoco salen los dos— y se suelta si el envío falla.
   const idemKey = createHash("sha256")
-    .update(`${domain.id}\n${messageId || createHash("sha256").update(raw).digest("hex")}\n${[...rcpts].sort().join(",")}`)
+    .update(`${domain.id}\n${messageId || createHash("sha256").update(raw).digest("hex")}\n${[...accepted].sort().join(",")}`)
     .digest("hex");
   if (!claimOnce("relay-sent", idemKey, 3)) {
     log("info", "ses", "Relay: mensaje repetido, ya había salido", { domainId: domain.id, messageId });
-    return { ok: true, sesMessageId: "", duplicate: true };
+    return { ok: true, sesMessageId: "", perRcpt, duplicate: true };
   }
 
   // Cuenta como `POST /send`: un mensaje es un envío, lleve los Cc que lleve. Responder
@@ -213,7 +224,7 @@ export async function relayOutbound(
 
   let sesMessageId: string;
   try {
-    sesMessageId = await deps.sendRaw(prepareForSes(raw), address, rcpts, getConfigSetName(domain.domain));
+    sesMessageId = await deps.sendRaw(prepareForSes(raw), address, accepted, getConfigSetName(domain.domain));
   } catch (err: any) {
     decrementSendCount(domain.id);
     releaseClaim("relay-sent", idemKey);
@@ -230,23 +241,23 @@ export async function relayOutbound(
   // reintentaría y saldría dos veces (la idempotencia lo frenaría, pero el log mentiría).
   const text = parsed.text ?? "";
   const html = parsed.html ?? "";
-  logOutbound(domain.id, address, rcpts.join(", "), subject, html || text, sesMessageId, limits.logDays);
+  logOutbound(domain.id, address, accepted.join(", "), subject, html || text, sesMessageId, limits.logDays);
   emitEvent(domain.id, "email.sent", {
-    to: rcpts[0], recipients: rcpts, subject, from: address, messageId, sesMessageId, via: "mailbox",
+    to: accepted[0], recipients: accepted, subject, from: address, messageId, sesMessageId, via: "mailbox",
   });
 
   let conversationId: string | undefined;
   try {
-    conversationId = threadIntoBandeja({ domain, address, parsed, rcpts, messageId, sesMessageId, text, html, subject });
+    conversationId = threadIntoBandeja({ domain, address, parsed, rcpts: accepted, messageId, sesMessageId, text, html, subject });
   } catch (err) {
     log("error", "mesa", "Relay: salió pero no se pudo guardar en la Bandeja", { domainId: domain.id, messageId, error: String(err) });
   }
 
   log("info", "ses", "Relay: enviado desde buzón", {
-    domainId: domain.id, from: address, recipients: rcpts.length, messageId, sesMessageId,
+    domainId: domain.id, from: address, recipients: accepted.length, messageId, sesMessageId,
     sendsUsed: reserved, sendsLimit: limits.sends, conversationId,
   });
-  return { ok: true, sesMessageId, conversationId };
+  return { ok: true, sesMessageId, perRcpt, conversationId };
 }
 
 /**
@@ -319,93 +330,71 @@ function threadIntoBandeja(o: {
   return conv.id;
 }
 
-// --- Transporte SMTP ---
+// --- Ruta interna: POST /api/internal/outbound ---
 
-function reject(r: SmtpReject): Error {
-  const err = new Error(r.message) as Error & { responseCode: number };
-  err.responseCode = r.code;
-  return err;
+export const RELAY_SIGNATURE_WINDOW_S = 300;
+
+/** `sha256=<hex>` de HMAC(secreto, `${timestamp}.${cuerpo}`): el mismo esquema que los webhooks. */
+export function signRelayBody(secret: string, timestamp: string, body: string): string {
+  return "sha256=" + createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
 }
 
-function secretMatches(given: string, expected: string): boolean {
-  const a = Buffer.from(given ?? "", "utf8");
-  const b = Buffer.from(expected, "utf8");
-  return a.length === b.length && timingSafeEqual(a, b);
+function json(status: number, data: unknown): Response {
+  return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
 }
 
 /**
- * Arranca el listener. Sin `OUTBOUND_RELAY_SECRET` igual escucha —para que el chequeo
- * TCP de Fly pase y un deploy no se trabe— pero rechaza toda autenticación: sin
- * secreto, cerrado. Y sin autenticarse no se acepta ni un MAIL FROM.
+ * Cuerpo: `{ mailFrom, rcptTo[], raw }` con `raw` = MIME en base64. Respuestas, que el
+ * relay de la caja traduce a LMTP:
+ * - 200 `{ perRcpt, sesMessageId }`: lo que se decidió por destinatario.
+ * - 422 `{ error, code }`: política sobre el mensaje entero (`code` es el SMTP: 5xx → DSN,
+ *   4xx → reintento).
+ * - 401 firma mala o vencida, 400 cuerpo ilegible, 503 SES caído: todo eso es 451 en la
+ *   caja. Una firma mala es un error de configuración y no puede rebotar el correo.
  */
-export function startOutboundRelay(o: { port?: number; host?: string; secret?: string; deps?: RelayDeps } = {}): SMTPServer {
-  const secret = o.secret ?? process.env.OUTBOUND_RELAY_SECRET ?? "";
-  const user = process.env.OUTBOUND_RELAY_USER ?? "stalwart";
-  const deps = o.deps ?? defaultDeps;
+export async function handleInternalOutbound(request: Request, deps: RelayDeps = defaultDeps): Promise<Response> {
+  const secret = process.env.OUTBOUND_RELAY_SECRET ?? "";
+  // Sin secreto, cerrado: no hay forma de que esto quede abierto por un despiste.
+  if (!secret) return json(401, { error: "Relay no configurado" });
 
-  const server = new SMTPServer({
-    name: "relay.mailmask.studio",
-    banner: "MailMask relay",
-    // El TLS lo termina el borde de Fly; aquí no hay certificado ni STARTTLS que ofrecer.
-    secure: false,
-    disabledCommands: ["STARTTLS"],
-    allowInsecureAuth: true,
-    authMethods: ["PLAIN", "LOGIN"],
-    authOptional: false,
-    size: MAX_RAW_MESSAGE_BYTES,
-    disableReverseLookup: true,
-    logger: false,
-    onAuth(auth, _session, cb) {
-      if (!secret || auth.username !== user || !secretMatches(auth.password ?? "", secret)) {
-        log("warn", "ses", "Relay: autenticación rechazada", { user: auth.username });
-        return cb(reject({ code: 535, message: "5.7.8 Credenciales inválidas" }));
-      }
-      cb(null, { user });
-    },
-    onMailFrom(address, _session, cb) {
-      // `<>` (avisos del servidor) se decide en DATA con el From del mensaje.
-      if (!address.address) return cb();
-      const s = resolveSender(address.address);
-      cb("code" in s ? reject(s) : undefined);
-    },
-    onRcptTo(address, session: SMTPServerSession, cb) {
-      if (session.envelope.rcptTo.length >= MAX_RELAY_RECIPIENTS) {
-        return cb(reject({ code: 452, message: "4.5.3 Demasiados destinatarios en esta transacción" }));
-      }
-      const from = session.envelope.mailFrom && session.envelope.mailFrom.address;
-      if (!from) return cb();
-      const s = resolveSender(from);
-      if ("code" in s) return cb(reject(s));
-      const bad = checkRecipient(s, address.address);
-      cb(bad ? reject(bad) : undefined);
-    },
-    onData(stream, session, cb) {
-      const chunks: Buffer[] = [];
-      stream.on("data", (c: Buffer) => chunks.push(c));
-      stream.on("error", (err) => cb(reject({ code: 451, message: `4.3.0 ${String(err)}` })));
-      stream.on("end", async () => {
-        if ((stream as any).sizeExceeded) {
-          return cb(reject({ code: 552, message: "5.3.4 El correo excede el tamaño máximo" }));
-        }
-        try {
-          const r = await relayOutbound({
-            mailFrom: session.envelope.mailFrom ? session.envelope.mailFrom.address : "",
-            rcptTo: session.envelope.rcptTo.map((r) => r.address),
-          }, Buffer.concat(chunks).toString("utf8"), deps);
-          if (r.ok) return cb(null, `2.0.0 Ok: queued as ${r.sesMessageId || "duplicate"}`);
-          cb(reject(r));
-        } catch (err) {
-          // Lo inesperado se reintenta: fallar seguro es no perder el correo.
-          log("error", "ses", "Relay: error inesperado", { error: String(err) });
-          cb(reject({ code: 451, message: "4.3.0 Error temporal; se reintentará" }));
-        }
-      });
-    },
-  });
+  const timestamp = request.headers.get("x-mailmask-timestamp") ?? "";
+  const signature = request.headers.get("x-mailmask-signature") ?? "";
+  const ts = Number(timestamp);
+  if (!timestamp || !Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > RELAY_SIGNATURE_WINDOW_S) {
+    return json(401, { error: "Marca de tiempo ausente o vencida" });
+  }
 
-  server.on("error", (err) => log("error", "ses", "Relay SMTP: error del listener", { error: String(err) }));
-  const port = o.port ?? parseInt(process.env.OUTBOUND_RELAY_PORT ?? "2525", 10);
-  server.listen(port, o.host ?? "0.0.0.0");
-  if (!secret) log("warn", "ses", "Relay SMTP sin OUTBOUND_RELAY_SECRET: escucha pero rechaza toda autenticación", { port });
-  return server;
+  let body: string;
+  try {
+    body = await request.text();
+  } catch {
+    return json(400, { error: "Cuerpo ilegible" });
+  }
+  const expected = Buffer.from(signRelayBody(secret, timestamp, body));
+  const given = Buffer.from(signature);
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) {
+    log("warn", "ses", "Relay: firma inválida en /api/internal/outbound");
+    return json(401, { error: "Firma inválida" });
+  }
+
+  let payload: { mailFrom?: unknown; rcptTo?: unknown; raw?: unknown };
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return json(400, { error: "JSON inválido" });
+  }
+  if (!Array.isArray(payload.rcptTo) || typeof payload.raw !== "string") {
+    return json(400, { error: "mailFrom, rcptTo[] y raw (base64) requeridos" });
+  }
+  const raw = Buffer.from(payload.raw, "base64").toString("utf8");
+
+  try {
+    const r = await relayOutbound({ mailFrom: String(payload.mailFrom ?? ""), rcptTo: payload.rcptTo.map(String) }, raw, deps);
+    if (r.ok) return json(200, { perRcpt: r.perRcpt, sesMessageId: r.sesMessageId, duplicate: r.duplicate ?? false, conversationId: r.conversationId });
+    if (r.code === 451) return json(503, { error: r.message, code: r.code });
+    return json(422, { error: r.message, code: r.code });
+  } catch (err) {
+    log("error", "ses", "Relay: error inesperado", { error: String(err) });
+    return json(503, { error: "Error temporal", code: 451 });
+  }
 }

@@ -675,43 +675,53 @@ Bandeja **y** en el buzón. Es el producto entero funcionando sobre un dominio d
    **Contador del 465**: hoy lo que sale de Apple Mail no descuenta de los 50/día. Hasta
    entonces "+100 envíos" no se publica como comprable.
 
-   **Construido el 1-oct-2026, sin aplicar en producción.** La app ya tiene las dos mitades:
-   - `outbound-relay.ts`: listener SMTP (`smtp-server`) en el 2525, publicado en Fly como
-     `2465` con TLS terminado en el borde (`[[services]]` de `fly.toml`). Auth PLAIN con una
-     sola credencial (`OUTBOUND_RELAY_USER`=`stalwart` / `OUTBOUND_RELAY_SECRET`); sin
-     secreto escucha pero rechaza todo. Exige que el remitente sea una máscara **con buzón**
-     de un dominio verificado y activado, que el `From:` visible sea el sobre (Stalwart sólo
-     valida el sobre), supresión por destinatario en RCPT, reserva un envío por mensaje
-     (las respuestas desde Apple Mail también cuentan), quita DKIM/Bcc/Return-Path, manda con
-     `sendRawFromDomain`, `logOutbound` y engancha el hilo (o lo abre; si todos los destinos
-     son del propio dominio no abre nada porque vuelve a entrar por SES). Idempotente por
-     Message-ID+destinatarios (`claimOnce("relay-sent")`), porque Stalwart reintenta si el
-     250 no le llega. **Fallar seguro**: SES caído o error inesperado = `451` y el mensaje
-     se queda en la cola de Stalwart; tope, supresión o rechazo de SES = `5xx` y Stalwart le
-     manda el DSN a quien envió. Se eligió SMTP y no MTA Hooks porque el hook de salida
-     corre *después* de cada intento y sólo admite `continue`/`cancel`.
+   **Construido el 1-oct-2026, sin aplicar en producción.** Nada de puertos en Fly (decisión
+   de bliss): el relay vive en la caja de Stalwart y habla con la app por HTTPS.
+
+       Apple Mail ─465→ Stalwart ─ruta `ses`, LMTP→ 127.0.0.1:2525 (box/outbound-relay)
+                 ─HTTPS + HMAC→ POST /api/internal/outbound ─→ SES · email_logs · Bandeja
+
+   - **App** (`outbound-relay.ts`, `handleInternalOutbound`): firma `X-MailMask-Signature:
+     sha256=HMAC(OUTBOUND_RELAY_SECRET, "<ts>.<cuerpo>")` + `X-MailMask-Timestamp` (±300 s);
+     exenta de CSRF, nunca mira cookies, sin secreto = 401 siempre. Cuerpo
+     `{mailFrom, rcptTo[], raw: base64}`. Exige máscara **con buzón** de dominio verificado y
+     activado y `From:` visible = sobre (Stalwart sólo valida el sobre); supresión **por
+     destinatario**; un envío del tope diario por mensaje (las respuestas desde Apple Mail
+     también cuentan); quita DKIM/Bcc/Return-Path; `sendRawFromDomain`; `logOutbound`;
+     `email.sent`; engancha el hilo (o lo abre; si todos los destinos son del propio dominio no
+     abre nada, vuelve a entrar por SES) con SSE. Idempotente por Message-ID + destinatarios
+     aceptados (`claimOnce("relay-sent")`). Respuestas: 200 `{perRcpt: {addr: "ok" |
+     "rejected:<código> <motivo>"}}`, 422 `{code}` política del mensaje entero, 503 SES caído.
+   - **Caja** (`box/outbound-relay/`: `relay.mjs` con `smtp-server`, unidad systemd con usuario
+     `mailmask-relay` sin privilegios, `install.sh` idempotente que instala Node si falta).
+     **LMTP** y no SMTP porque contesta por destinatario. Traducción: 200 → 250/5xx por
+     destinatario; 422 → el 5xx de la app (Stalwart manda el DSN); 401, 5xx, timeout, red →
+     **451** y Stalwart reintenta. Nunca cae a SES directo.
    - `copyToSentFolder` (`imap-store.ts`): reply, redactar y `POST /send` copian el MIME a
-     Enviados (rol `sent`, `$seen`) si la máscara tiene `mailboxEnabled`. Con el Message-ID
-     que pone SES, para que Apple Mail enganche la respuesta. `void`, 8 s de tope, nunca
-     bloquea ni falla el envío.
-   - Pruebas: `outbound-relay.test.ts` (lógica + socket SMTP real) y `sent-copy.test.ts`.
+     Enviados (rol `sent`, `$seen`) si la máscara tiene `mailboxEnabled`, con el Message-ID
+     que pone SES. `void`, 8 s de tope, nunca bloquea el envío.
+   - Pruebas: `outbound-relay.test.ts`, `box-relay.test.ts`, `sent-copy.test.ts`.
 
    **Falta aplicar, en este orden:**
-   1. `fly ips allocate-v4 -a mailmask` (≈$2 USD/mes; el 2465 no sale por la IPv4 compartida)
-      y `fly secrets set OUTBOUND_RELAY_SECRET=$(openssl rand -hex 32)`.
-   2. Deploy desde worktree limpio. Comprobar: `openssl s_client -connect mailmask.fly.dev:2465 -quiet` → `220 … MailMask relay`.
-   3. `npx tsx scripts/stalwart-outbound-via-app.ts` (dry-run: compara el parche con el
-      extracto de `MtaRoute` de `/api/schema`) y luego `--apply`. Guarda la ruta original en
-      `~/.mailmask-stalwart-ses-route.json`; `--rollback` la restaura.
-   4. Verificar: mandar desde Apple Mail a un Gmail → aparece en la Bandeja (hilo saliente),
-      fila `sent` en `email_logs` con `ses_message_id`, `sends` del día +1, y en `fly logs`
+   1. `fly secrets set OUTBOUND_RELAY_SECRET=$(openssl rand -hex 32)` (guárdalo: va también en
+      la caja) y deploy desde worktree limpio. Sin el secreto la ruta contesta 401 a todo.
+   2. Copiar `box/outbound-relay/` a la caja y correr ahí
+      `sudo OUTBOUND_RELAY_SECRET=<el mismo> ./install.sh`. Comprobar
+      `journalctl -u mailmask-outbound-relay` → "Escuchando".
+   3. Con `STALWART_ADMIN_*` y el mismo secreto: `npx tsx scripts/stalwart-outbound-via-app.ts`
+      (dry-run: compara el parche con el extracto de `MtaRoute` de `/api/schema`), luego
+      `--apply`. Guarda la ruta original en `~/.mailmask-stalwart-ses-route.json`;
+      `--rollback` la restaura. Si el envío no llega, `systemctl restart stalwart`; si el
+      journal del relay muestra 530/535, Stalwart no autentica por LMTP:
+      `RELAY_REQUIRE_AUTH=false` en `/etc/mailmask-relay.env` (sigue siendo loopback).
+   4. Verificar: Apple Mail → Gmail aparece en la Bandeja (hilo saliente), fila `sent` en
+      `email_logs` con `ses_message_id`, `sends` del día +1, `fly logs` con
       `Relay: enviado desde buzón`. Responder desde la Bandeja → aparece en Enviados del buzón.
-   5. Después, revocar `mailmask-stalwart-relay` en IAM (ya no hace falta salvo para el rollback;
-      mejor esperar una semana).
+   5. Pasada una semana, revocar `mailmask-stalwart-relay` en IAM (sólo sirve para el rollback).
 
-   Riesgos: si la app está caída, el correo de Apple Mail se encola en Stalwart (no se pierde,
-   pero se retrasa); el relay corre en la misma máquina única que el resto; y Stalwart puede
-   necesitar `systemctl restart stalwart` para tomar la ruta nueva.
+   Riesgos: con la app caída el correo de Apple Mail se encola en Stalwart (se retrasa, no se
+   pierde); `/opt/mailmask-relay` y `/etc/mailmask-relay.env` no están en los `dataPaths` de la
+   caja, pero `install.sh` los rehace desde el repo — el secreto sale de Fly.
 3. **Una compra real en MercadoPago** del add-on `domain` (nunca se ha ejercitado contra MP;
    el webhook con `addon:` sí).
 4. **Bootstrap reproducible de la caja** + simulacro cronometrado, y comprobar que el dump
