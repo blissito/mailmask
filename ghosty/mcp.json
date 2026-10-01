@@ -1,0 +1,1 @@
+[{"name":"mailmask","type":"http","url":"https://www.mailmask.studio/mcp","headers":{"Authorization":"Bearer ${turn.token}"}}]
