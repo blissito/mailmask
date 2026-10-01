@@ -36,6 +36,23 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   `cli/src/output.ts` muestra sólo cabeza y cola; úsala para cualquier API key,
   contraseña de buzón, secreto de webhook o credencial SMTP que un comando nuevo
   tenga que confirmar en pantalla.
+- **Seguridad del keychain y del device-code** (hallazgos de la vuelta 3 de check):
+  `cli/src/keychain.ts` engancha `child.stdin.on("error", () => {})` antes de
+  escribir — si `secret-tool`/`security` sale antes de leer stdin, el EPIPE no
+  mata el proceso y `writeCredentials` cae a archivo en vez de quedarse a medias.
+  En macOS, `security add-generic-password -w <key>` pasa la llave como argumento
+  (visible un instante en `ps` para otros procesos del mismo usuario): es una
+  limitación del binario `security`, que no soporta leer `-w` desde stdin como sí
+  hace `secret-tool store` en Linux — no hay forma de evitarlo sin dejar de usar
+  `security`. `POST /api/cli/device/start` es público (no hay sesión con la que
+  pedir CSRF) pero sí lleva `rateLimitGuard` por IP y `createDeviceAuthStore` tiene
+  un tope (`maxPending`, 500 por defecto) de device-codes pendientes a la vez, para
+  que no se pueda inflar sin fin la memoria del proceso. `/cli/authorize` prellena
+  el código desde la URL (como `gh auth login`) y por diseño eso abre una vía de
+  phishing — un enlace armado por un atacante con su propio código, para que la
+  víctima sólo dé clic en "Autorizar" sin comparar nada. La mitigación es avisar,
+  no impedir: el botón muestra antes del clic que va a crear una llave de API con
+  acceso completo a la cuenta.
 
 ## Convención dura — no se negocia en ningún comando futuro
 

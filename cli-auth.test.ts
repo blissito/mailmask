@@ -5,12 +5,13 @@ import assert from "node:assert/strict";
 
 import { createDeviceAuthStore } from "./cli-auth.ts";
 
-function store(ttlMs?: number) {
+function store(ttlMs?: number, maxPending?: number) {
   const created: string[] = [];
   return {
     created,
     store: createDeviceAuthStore({
       ttlMs,
+      maxPending,
       createKey: async (email: string) => {
         created.push(email);
         return { plaintextKey: `mk_test_${email}` };
@@ -74,5 +75,12 @@ describe("cli-auth: device code", () => {
     await new Promise((r) => setTimeout(r, 20));
     assert.deepEqual(s.poll(start.deviceCode), { status: "expired" });
     assert.equal(await s.confirm(start.userCode, "ana@example.com"), false);
+  });
+
+  it("limita cuántos device-codes pueden quedar pendientes a la vez", () => {
+    const { store: s } = store(undefined, 2);
+    s.start("https://www.mailmask.studio");
+    s.start("https://www.mailmask.studio");
+    assert.throws(() => s.start("https://www.mailmask.studio"));
   });
 });

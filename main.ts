@@ -7485,13 +7485,23 @@ const app = new Elysia({ adapter: node() })
 
   // --- CLI device auth ---
 
-  .post("/api/cli/device/start", ({ request }) => {
+  .post("/api/cli/device/start", async ({ request }) => {
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 10, 60_000);
+    if (limited) return limited;
     const url = new URL(request.url);
     const base = `${url.protocol}//${url.host}`;
-    return new Response(JSON.stringify(deviceAuth.start(base)), {
-      status: 201,
-      headers: { "content-type": "application/json" },
-    });
+    try {
+      return new Response(JSON.stringify(deviceAuth.start(base)), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      });
+    } catch {
+      return new Response(JSON.stringify({ error: "Demasiadas solicitudes" }), {
+        status: 429,
+        headers: { "content-type": "application/json" },
+      });
+    }
   }, {
     detail: { tags: ["CLI"], summary: "Start a CLI device-code login" },
   })

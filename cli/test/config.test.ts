@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, test } from "node:test";
@@ -65,5 +65,39 @@ describe("config: sin keychain (MAILMASK_NO_KEYCHAIN)", () => {
     await writeCredentials({ apiKey: "mk_test_123" });
     assert.equal(await clearCredentials(), true);
     assert.equal(await clearCredentials(), false);
+  });
+});
+
+describe("config: el keychain está disponible pero falla al escribir", () => {
+  test("writeCredentials cae a archivo si secret-tool sale sin leer stdin (no se queda a medias)", async () => {
+    // A diferencia del describe de arriba, aquí SÍ queremos que resolveAuth
+    // intente el keychain real — por eso se quita MAILMASK_NO_KEYCHAIN y se
+    // fuerza "linux" para que la prueba sea determinista en cualquier host.
+    delete process.env.MAILMASK_NO_KEYCHAIN;
+    const originalPlatform = process.platform;
+    const originalPath = process.env.PATH;
+    Object.defineProperty(process, "platform", { value: "linux" });
+    const fakeDir = mkdtempSync(join(tmpdir(), "mailmask-fake-bin-"));
+    writeFileSync(join(fakeDir, "secret-tool"), "#!/bin/sh\nexit 1\n");
+    chmodSync(join(fakeDir, "secret-tool"), 0o755);
+    process.env.PATH = `${fakeDir}:${originalPath}`;
+    try {
+      const { writeCredentials, resolveAuth, credentialsFilePath } = await import("../src/config.js");
+      const { source } = await writeCredentials({ apiKey: "mk_test_456" });
+      assert.equal(source, "file");
+
+      const auth = await resolveAuth();
+      assert.equal(auth?.apiKey, "mk_test_456");
+      assert.equal(auth?.source, "file");
+
+      const { statSync } = await import("node:fs");
+      const mode = statSync(credentialsFilePath()).mode & 0o777;
+      assert.equal(mode, 0o600);
+    } finally {
+      process.env.PATH = originalPath;
+      rmSync(fakeDir, { recursive: true, force: true });
+      Object.defineProperty(process, "platform", { value: originalPlatform });
+      process.env.MAILMASK_NO_KEYCHAIN = "1";
+    }
   });
 });

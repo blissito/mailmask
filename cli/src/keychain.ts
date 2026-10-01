@@ -27,6 +27,12 @@ function run(cmd: string, args: string[], input?: string): Promise<string> {
       if (code === 0) resolve(stdout);
       else reject(new Error(stderr.trim() || `${cmd} salió con código ${code}`));
     });
+    // Si el binario sale antes de leer stdin (p. ej. secret-tool sin Secret
+    // Service encendido), escribirle dispara EPIPE como evento 'error' en el
+    // stream; sin este handler Node lo trata como no manejado y mata el
+    // proceso entero. El 'close' de arriba ya captura el código de salida
+    // real y rechaza — este handler sólo evita el crash.
+    child.stdin.on("error", () => {});
     if (input !== undefined) child.stdin.write(input);
     child.stdin.end();
   });
@@ -74,6 +80,13 @@ export async function set(apiKey: string): Promise<void> {
   if (!b) throw new Error("Keychain no disponible en esta plataforma");
   if (b === "macos") {
     // -U: si ya existe una entrada previa, la actualiza en vez de fallar.
+    // Riesgo conocido: a diferencia de `secret-tool store` (Linux), el
+    // binario `security` no tiene forma de leer `-w` desde stdin — sin
+    // valor abre un diálogo interactivo del Keychain, que no sirve para un
+    // proceso no interactivo. La api key queda como argumento de ESTE
+    // proceso y es visible un instante en `ps` para otros procesos del
+    // mismo usuario. Es una limitación de `security`, no de este código;
+    // documentado también en docs/agents/mailmask-cli.md.
     await run("security", ["add-generic-password", "-U", "-s", SERVICE, "-a", ACCOUNT, "-w", apiKey]);
     return;
   }

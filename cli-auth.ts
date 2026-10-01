@@ -8,6 +8,10 @@ import { randomBytes, randomUUID } from "node:crypto";
 
 const TTL_MS = 5 * 60 * 1000;
 const POLL_INTERVAL_S = 3;
+// Tope de device-codes pendientes a la vez: sin esto, /api/cli/device/start
+// (sin auth, sólo con rate limit por IP) podría inflar sin fin la memoria
+// del único proceso del server rotando de IP.
+const MAX_PENDING = 500;
 // Sin 0/O/1/I: nadie debería dudar si lo que ve en pantalla es una letra o un número.
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -44,8 +48,10 @@ export interface DeviceAuthStore {
 export function createDeviceAuthStore(opts: {
   createKey: (email: string) => Promise<{ plaintextKey: string }>;
   ttlMs?: number;
+  maxPending?: number;
 }): DeviceAuthStore {
   const ttlMs = opts.ttlMs ?? TTL_MS;
+  const maxPending = opts.maxPending ?? MAX_PENDING;
   const byDeviceCode = new Map<string, DeviceRecord>();
   const byUserCode = new Map<string, string>();
 
@@ -68,6 +74,9 @@ export function createDeviceAuthStore(opts: {
   return {
     start(verificationBase: string): DeviceStartResult {
       sweep();
+      if (byDeviceCode.size >= maxPending) {
+        throw new Error("Demasiadas solicitudes de autorización pendientes");
+      }
       const deviceCode = randomUUID();
       let userCode = generateUserCode();
       while (byUserCode.has(userCode)) userCode = generateUserCode();
