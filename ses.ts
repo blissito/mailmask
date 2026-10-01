@@ -483,7 +483,7 @@ export async function fetchEmailFromS3(bucketName: string, objectKey: string): P
 
 // Remove headers (and their folded continuation lines) from the header block only,
 // never from the body. Used to drop signatures that no longer apply after we rewrite From.
-function stripHeaders(raw: string, names: string[]): string {
+export function stripHeaders(raw: string, names: string[]): string {
   const sepMatch = raw.match(/\r?\n\r?\n/);
   const sepIdx = sepMatch?.index ?? -1;
   const headerBlock = sepIdx >= 0 ? raw.slice(0, sepIdx) : raw;
@@ -627,7 +627,16 @@ export const MAX_RAW_MESSAGE_BYTES = 9 * 1024 * 1024;
  * el que viene en sus eventos de entrega, rebote y queja. Sólo con el segundo se
  * puede cruzar un evento con el mensaje que lo originó.
  */
-export interface SentEmail { messageId: string; sesMessageId: string }
+export interface SentEmail {
+  messageId: string;
+  sesMessageId: string;
+  /**
+   * El MIME tal como se entregó a SES (sin Bcc en los headers). Hace falta para
+   * guardar la copia en Enviados del buzón IMAP; es opcional porque los dobles de
+   * prueba no lo traen y nadie más lo necesita.
+   */
+  raw?: string;
+}
 
 /**
  * Referencias de hilo de un saliente. SES reescribe el Message-ID que generamos por
@@ -642,9 +651,6 @@ export function threadRefsFor(sent: SentEmail): string[] {
 }
 
 export async function sendFromDomain(from: string, to: string, subject: string, body: string, opts?: { html?: string; replyTo?: string; configSet?: string; inReplyTo?: string; references?: string; inlineImages?: InlineImage[]; attachments?: Attachment[]; cc?: string[]; bcc?: string[] }): Promise<SentEmail> {
-  const ses = await getSesOutbound();
-  const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
-
   // El header From conserva el display name si viene ("MailMask <alertas@...>"); el
   // sobre de SES necesita la dirección pelada.
   const fromAddr = normalizeAddress(from);
@@ -775,31 +781,56 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
     // destinatarios lo vean.
     Destinations: [toAddr, ...ccList, ...bccList],
   };
-  if (opts?.configSet) cmd.ConfigurationSetName = opts.configSet;
 
+  const sesMessageId = await sendRawCommand(cmd, fromAddr.split("@")[1] ?? "", opts?.configSet);
+  return { messageId, sesMessageId, raw: rawEmail };
+}
+
+
+/**
+ * `SendRawEmail` con el config set del dominio. Si el set no existe se crea y el correo
+ * sale igual, sin él: SES no publicaría un solo evento y el mensaje se quedaría en
+ * "enviado" para siempre, así que se avisa. Compartido por `sendFromDomain` y por la
+ * salida de los buzones (`sendRawFromDomain`), para que los dos caminos se comporten
+ * igual ante el mismo error.
+ */
+// deno-lint-ignore no-explicit-any
+async function sendRawCommand(cmd: any, domain: string, configSet?: string): Promise<string> {
+  const ses = await getSesOutbound();
+  const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
+  if (configSet) cmd.ConfigurationSetName = configSet;
   let res: { MessageId?: string } | undefined;
   try {
     res = await ses.send(new SendRawEmailCommand(cmd));
   } catch (err: any) {
-    // Auto-create configuration set if it doesn't exist in this region
-    if (opts?.configSet && String(err).includes("ConfigurationSetDoesNotExist")) {
-      const domain = from.split("@")[1] ?? "";
+    if (configSet && String(err).includes("ConfigurationSetDoesNotExist")) {
       try { await createConfigurationSet(domain); } catch { /* best effort */ }
-      // El correo sale igual, pero sin config set SES no publica un solo evento:
-      // este mensaje se queda en "enviado" para siempre aunque llegue bien. El
-      // set ya quedó creado arriba, así que esto sólo debería verse una vez por
-      // dominio; si se repite, algo impide crearlo.
-      log("error", "ses", "Envío sin config set: este correo no tendrá estado de entrega", {
-        domain,
-        configSet: opts.configSet,
-      });
+      log("error", "ses", "Envío sin config set: este correo no tendrá estado de entrega", { domain, configSet });
       delete cmd.ConfigurationSetName;
       res = await ses.send(new SendRawEmailCommand(cmd));
     } else {
       throw err;
     }
   }
-  return { messageId, sesMessageId: res?.MessageId ?? "" };
+  return res?.MessageId ?? "";
+}
+
+/**
+ * Manda un MIME ya armado por otro (Apple Mail vía Stalwart) tal cual, con el sobre
+ * que trae. Devuelve el id de SES. El llamador ya quitó las firmas DKIM ajenas: SES
+ * firma por el dominio y rechaza con `554 Duplicate header 'DKIM-Signature'` si
+ * encuentra otra.
+ */
+export async function sendRawFromDomain(raw: string, source: string, destinations: string[], configSet?: string): Promise<string> {
+  if (Buffer.byteLength(raw, "utf8") > MAX_RAW_MESSAGE_BYTES) {
+    throw new Error("El correo excede el tamaño máximo. Usa archivos más ligeros.");
+  }
+  const cmd = {
+    RawMessage: { Data: new TextEncoder().encode(raw) },
+    Source: source,
+    Destinations: destinations,
+  };
+  return await sendRawCommand(cmd, source.split("@")[1] ?? "", configSet);
 }
 
 // --- Delete S3 object (for purge) ---

@@ -31,6 +31,28 @@ primary_region = "dfw"
     method = "GET"
     path = "/healthz"
 
+# Relay SMTP de salida de los buzones (outbound-relay.ts): Stalwart entrega aquí lo que
+# manda Apple Mail. El TLS lo termina el borde de Fly (handler "tls", certificado de
+# mailmask.fly.dev) y la app escucha en claro en 2525. Un puerto TCP que no es 80/443
+# necesita IPv4 dedicada (`fly ips allocate-v4`); sin ella sólo responde por IPv6.
+# La app escucha aunque falte OUTBOUND_RELAY_SECRET (rechaza toda autenticación), así
+# que el chequeo TCP pasa y el deploy no se traba.
+[[services]]
+  internal_port = 2525
+  protocol = "tcp"
+  processes = ["app"]
+  auto_stop_machines = "off"
+  auto_start_machines = true
+
+  [[services.ports]]
+    port = 2465
+    handlers = ["tls"]
+
+  [[services.tcp_checks]]
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "5s"
+
 [mounts]
   source = "mailmask_data"
   destination = "/app/data"
