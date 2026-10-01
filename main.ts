@@ -555,9 +555,11 @@ async function rateLimitGuard(
 
 // --- Admin check ---
 
-// Mientras el asistente se prueba, sólo lo ven los admins; ASSISTANT_PUBLIC=1 lo abre a todos.
+// Mientras el asistente se prueba, sólo lo ven los admins y ASSISTANT_EMAILS; ASSISTANT_PUBLIC=1 lo abre a todos.
 function assistantEnabledFor(email: string): boolean {
-  return process.env.ASSISTANT_PUBLIC === "1" || isAdmin(email);
+  if (process.env.ASSISTANT_PUBLIC === "1" || isAdmin(email)) return true;
+  // Probadores: correos separados por coma en ASSISTANT_EMAILS.
+  return (process.env.ASSISTANT_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).includes(email.toLowerCase());
 }
 
 function isAdmin(email: string): boolean {
