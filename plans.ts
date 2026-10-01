@@ -66,6 +66,10 @@ export const ADDONS = {
   sends100:  { price: 99_00, sends: 100, label: "+100 envíos al día" },
 } as const;
 
+// Pago anual del dominio activado: $999 en vez de 12 × $99 (dos meses de regalo). Sólo
+// `domain`: los bloques de disco y envíos se compran cuando hacen falta, no por adelantado.
+export const DOMAIN_ANNUAL_PRICE = 999_00;
+
 // Add-ons de antes del 7-sep-2026. Si una cuenta los tiene, se respetan (sin `domainId`,
 // aplican a todos sus dominios); no se venden. `domain` viejo (cupo de dominio extra) se
 // migró a "dominio activado" asignándole un `domainId` con scripts/migrar-modelo-99.ts.

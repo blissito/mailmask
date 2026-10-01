@@ -41,6 +41,7 @@ import {
   getForwardCounts,
   PLANS,
   ADDONS,
+  DOMAIN_ANNUAL_PRICE,
   listAddons,
   listEffectiveAddons,
   getAddonById,
@@ -3258,7 +3259,8 @@ const app = new Elysia({ adapter: node() })
             const startDate = sub.auto_recurring?.start_date ? new Date(sub.auto_recurring.start_date) : null;
             const deferred = !!startDate && !Number.isNaN(startDate.getTime()) && startDate.getTime() > Date.now() + 86_400_000;
             const end = deferred ? startDate! : new Date();
-            end.setDate(end.getDate() + 35);
+            // Gracia de 5 días sobre el ciclo: 35 para el mensual, 370 para el anual.
+            end.setDate(end.getDate() + (sub.auto_recurring?.frequency === 12 ? 370 : 35));
             updateAddon(addon.id, {
               status: "active",
               mpPreapprovalId: body.data.id,
@@ -3726,7 +3728,7 @@ const app = new Elysia({ adapter: node() })
         if (renewingAddon) {
           const prev = renewingAddon.currentPeriodEnd ? new Date(renewingAddon.currentPeriodEnd) : new Date();
           const base = prev > new Date() ? prev : new Date();
-          base.setDate(base.getDate() + 35);
+          base.setDate(base.getDate() + (ap.type === "yearly" || (ap.transaction_amount ?? 0) * 100 >= DOMAIN_ANNUAL_PRICE ? 370 : 35));
           updateAddon(renewingAddon.id, { status: "active", currentPeriodEnd: base.toISOString() });
           log("info", "billing", "Add-on renovado", { addonId: renewingAddon.id, kind: renewingAddon.kind, until: base.toISOString() });
 
@@ -3997,9 +3999,13 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
 
-    const { kind, domainId, payerEmail: rawPayerEmail } = addonBody;
+    const { kind, domainId, payerEmail: rawPayerEmail, period } = addonBody;
     if (!(kind in ADDONS)) {
       return new Response(JSON.stringify({ error: "Add-on inválido" }), { status: 400 });
+    }
+    const annual = period === "annual";
+    if (annual && kind !== "domain") {
+      return new Response(JSON.stringify({ error: "Sólo la activación del dominio se paga anual" }), { status: 400 });
     }
     const addonKind = kind as AddonKind;
 
@@ -4055,11 +4061,11 @@ const app = new Elysia({ adapter: node() })
           // Sin la palabra "Plan": el webhook tiene un regex /Plan (\w+)/i que activaría
           // un plan por accidente. Salimos antes por el prefijo addon:, pero no hay razón
           // para dejar la mina puesta.
-          reason: `MailMask — ${ADDONS[addonKind].label} · ${dominio.domain}`,
+          reason: `MailMask — ${ADDONS[addonKind].label}${annual ? " (anual)" : ""} · ${dominio.domain}`,
           auto_recurring: {
-            frequency: 1,
+            frequency: annual ? 12 : 1,
             frequency_type: "months",
-            transaction_amount: ADDONS[addonKind].price / 100,
+            transaction_amount: (annual ? DOMAIN_ANNUAL_PRICE : ADDONS[addonKind].price) / 100,
             currency_id: "MXN",
           },
           payer_email: payerEmail,
@@ -4080,7 +4086,7 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Error creando la suscripción del add-on" }), { status: 500 });
     }
   }, {
-    body: t.Object({ kind: t.String(), domainId: t.String(), payerEmail: t.Optional(t.String()) }),
+    body: t.Object({ kind: t.String(), domainId: t.String(), payerEmail: t.Optional(t.String()), period: t.Optional(t.Union([t.Literal("monthly"), t.Literal("annual")])) }),
     detail: { tags: ["Billing"], summary: "Start add-on subscription checkout for a domain", security: [{ cookieAuth: [] }] },
   })
 

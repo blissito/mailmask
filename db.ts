@@ -132,6 +132,7 @@ import {
   isLegacyPlan,
   PLANS_FOR_SALE,
   ADDONS,
+  DOMAIN_ANNUAL_PRICE,
   planLabel,
   planPriceCents,
   addonLabel,
@@ -140,7 +141,7 @@ import {
 } from "./plans.js";
 import type { AddonKind, PlanKey } from "./plans.js";
 
-export { PLANS, ADDONS, LEGACY_ADDONS, ADDONS_FOR_SALE, DOMINIO_ACTIVADO, DOMINIO_GRATIS, planLabel, planPriceCents, addonLabel, addonPriceCents, LEGACY_PLANS, isLegacyPlan, PLANS_FOR_SALE };
+export { PLANS, ADDONS, DOMAIN_ANNUAL_PRICE, LEGACY_ADDONS, ADDONS_FOR_SALE, DOMINIO_ACTIVADO, DOMINIO_GRATIS, planLabel, planPriceCents, addonLabel, addonPriceCents, LEGACY_PLANS, isLegacyPlan, PLANS_FOR_SALE };
 export type { AddonKind, PlanKey };
 
 export interface Addon {
