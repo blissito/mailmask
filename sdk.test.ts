@@ -80,8 +80,26 @@ describe("SDK ↔ servidor: contrato", () => {
         ensureHostedZone: async () => ({ hostedZoneId: "ZSDK", nameservers: ["ns-1.awsdns-01.com"], created: true }),
         configureDnsRecords: async () => undefined,
         deleteHostedZone: async () => undefined,
+        // Registro y transferencia: sólo interesa que las rutas existan y su forma.
+        checkAvailability: async (d: string) => ({ domain: d, available: !d.startsWith("ocupado") }),
+        checkTransferability: async () => ({ transferable: true, motivo: null }),
+        resendTransferEmail: async () => undefined,
+        disableDomainTransferLock: async () => undefined,
+        retrieveDomainAuthCode: async () => "EPP-NO-DEBE-SALIR",
+        listTldPrice: async () => null,
       },
     });
+    // RDAP sale a internet; aquí el requisito se da por bueno.
+    const realTransfer = await import("./domain-transfer.ts");
+    mock.module("./domain-transfer.ts", {
+      namedExports: {
+        ...realTransfer,
+        checkDomainReadiness: async () => ({ listo: true, requisitos: [{ clave: "aws", ok: true, texto: "El registrador actual permite la transferencia" }] }),
+      },
+    });
+    // MercadoPago: cada cobro devuelve una liga falsa; ninguna ruta debe darlo por pagado.
+    class MpFalso { async create() { return { id: `mp-${crypto.randomUUID()}`, init_point: "https://mp.test/checkout" }; } }
+    mock.module("mercadopago", { namedExports: { MercadoPagoConfig: class {}, PreApproval: MpFalso, Preference: MpFalso } });
     mock.module("./dns-import.ts", {
       namedExports: {
         snapshotDns: async () => ({ found: [], nameservers: [], warning: "aviso" }),
@@ -614,5 +632,151 @@ describe("SDK ↔ servidor: contrato", () => {
       () => mm.dns.upsert(domainId, { name: "x", type: "A", values: ["1.2.3.4"], ttl: 5 }),
       (e: MailMaskError) => e.status === 400 && /60/.test(e.message),
     );
+  });
+
+  // --- Lo que el usuario hace por la UI y ahora también un agente (asistente, sep-2026) ---
+
+  it("domains.dnsSetup: los registros que se pegan en el registrador", async () => {
+    const r = await mm.domains.dnsSetup(domainId);
+    assert.equal(r.domain, dominio);
+    assert.equal(r.live, false);
+    const mx = r.records.find((x) => x.id === "mx")!;
+    assert.equal(mx.type, "MX");
+    assert.equal(mx.name, "@");
+    assert.equal(mx.value, "10 inbound-smtp.us-east-1.amazonaws.com");
+    assert.equal(mx.priority, 10);
+    const ver = r.records.find((x) => x.id === "verification")!;
+    assert.equal(ver.name, "_amazonses");
+    assert.equal(ver.value, "verify1");
+    assert.equal(r.records.filter((x) => x.type === "CNAME").length, 1, "un CNAME por token de DKIM");
+    assert.equal(r.records.find((x) => x.id === "dkim1")!.fqdn, `dkim1._domainkey.${dominio}`);
+    assert.equal(r.records.find((x) => x.id === "spf")!.level, "recomendado");
+    assert.equal(r.records.find((x) => x.id === "dmarc")!.level, "opcional");
+    await assert.rejects(() => sinEnvios.domains.dnsSetup(domainId), (e: MailMaskError) => e.status === 404);
+  });
+
+  it("billing: status, addons y la liga de activación (nunca pagada)", async () => {
+    assert.ok((await mm.billing.status()).subscription);
+    const addons = await mm.billing.addons();
+    assert.ok(addons.catalog.domain);
+    assert.ok(Array.isArray(addons.mine));
+
+    // Un 2.º dominio nace bloqueado: la activación da la liga de MercadoPago.
+    const bloqueado = dbmod.createDomain(email, `bloq-${suffix}.com`, ["dk"], "vf");
+    const link = await mm.billing.checkout(bloqueado.id);
+    assert.equal(link.init_point, "https://mp.test/checkout");
+    assert.ok(link.addonId);
+    const pendiente = (await mm.billing.addons()).mine.find((a) => a.id === link.addonId)!;
+    assert.equal(pendiente.status, "pending", "dar la liga no activa nada");
+    assert.equal(pendiente.domainId, bloqueado.id);
+    // Dos ligas seguidas crearían dos suscripciones.
+    await assert.rejects(() => mm.billing.checkout(bloqueado.id), (e: MailMaskError) => e.status === 409);
+    // El dominio ya activado (por la prueba de DNS) no se vuelve a cobrar.
+    await assert.rejects(() => mm.billing.checkout(domainId), (e: MailMaskError) => e.status === 409);
+  });
+
+  it("registrations: search, tlds, register (liga de pago) y list", async () => {
+    const libre = await mm.registrations.search(`libre-${suffix}.com`);
+    assert.equal(libre.available, true);
+    assert.equal(libre.tld, ".com");
+    assert.equal(typeof libre.price, "number");
+    assert.equal((await mm.registrations.search(`ocupado-${suffix}.com`)).available, false);
+    await assert.rejects(() => mm.registrations.search("sinextension"), (e: MailMaskError) => e.status === 400);
+
+    const tlds = await mm.registrations.tlds();
+    assert.ok(tlds.some((t) => t.tld === ".com" && t.renewPrice > 0));
+
+    const reg = await mm.registrations.register(`libre-${suffix}.com`);
+    assert.equal(reg.initPoint, "https://mp.test/checkout");
+    const lista = await mm.registrations.list();
+    const fila = lista.find((r) => r.id === reg.registrationId)!;
+    assert.equal(fila.domainName, `libre-${suffix}.com`);
+    assert.equal(fila.awsCostCents, undefined, "nuestro costo no sale al cliente");
+    // Sin registrar todavía: ni salida ni renovación.
+    await assert.rejects(() => mm.registrations.transferOut(reg.registrationId), (e: MailMaskError) => e.status === 409);
+    await assert.rejects(() => mm.registrations.renewal(reg.registrationId), (e: MailMaskError) => e.status === 409);
+  });
+
+  it("registrations: transferOut manda el EPP por correo, no en la respuesta; renewal da liga", async () => {
+    const reg = dbmod.createDomainRegistration({ domainName: `mio-${suffix}.com`, ownerEmail: email, tld: ".com", priceCents: 30000, awsCostCents: 1500 });
+    dbmod.updateDomainRegistration(reg.id, { status: "registered", expiresAt: new Date(Date.now() + 300 * 864e5).toISOString() });
+    const salida = await mm.registrations.transferOut(reg.id);
+    assert.equal(salida.ok, true);
+    assert.ok(!JSON.stringify(salida).includes("EPP-NO-DEBE-SALIR"));
+    const ren = await mm.registrations.renewal(reg.id);
+    assert.equal(ren.init_point, "https://mp.test/checkout");
+    assert.ok(ren.nextChargeAt);
+    // Otra cuenta no la ve.
+    await assert.rejects(() => sinEnvios.registrations.transferOut(reg.id), (e: MailMaskError) => e.status === 404);
+  });
+
+  it("transfers: check, inventario DNS (leer, corregir, aprobar) y reenviar el correo", async () => {
+    const c = await mm.transfers.check(`traer-${suffix}.com`);
+    assert.equal(c.domain, `traer-${suffix}.com`);
+    assert.equal(typeof c.price, "number");
+    assert.ok(Array.isArray(c.requisitos));
+    assert.ok(Array.isArray(c.dns.found));
+
+    const d = `traer-${suffix}.com`;
+    const reg = dbmod.createDomainRegistration({
+      domainName: d, ownerEmail: email, tld: ".com", priceCents: 30000, awsCostCents: 1500, kind: "transfer",
+      dnsSnapshot: [{ name: `www.${d}`, type: "CNAME", ttl: 300, values: ["sitio.vercel.app"] }],
+    });
+    const inv = await mm.transfers.dns(reg.id);
+    assert.equal(inv.records.length, 1);
+    await mm.transfers.setDns(reg.id, [
+      { name: `www.${d}`, type: "CNAME", ttl: 300, values: ["sitio.vercel.app"] },
+      { name: d, type: "A", ttl: 300, values: ["1.2.3.4"] },
+    ]);
+    assert.equal((await mm.transfers.dns(reg.id)).records.length, 2);
+    await assert.rejects(() => mm.transfers.setDns(reg.id, [{ name: d, type: "A", values: ["no-es-ip"] }]), (e: MailMaskError) => e.status === 400);
+    assert.equal((await mm.transfers.approveDns(reg.id)).ok, true);
+    assert.equal((await mm.transfers.dns(reg.id)).status, "approved");
+    assert.equal((await mm.transfers.resendEmail(reg.id)).ok, true);
+    await assert.rejects(() => sinEnvios.transfers.dns(reg.id), (e: MailMaskError) => e.status === 404);
+  });
+
+  it("members: invitar, listar, cancelar invitación y quitar; el gratis no invita", async () => {
+    const inv = await dev.members.invite(devDomainId, { email: `colega-${suffix}@example.com`, name: "Colega" });
+    assert.match(inv.inviteUrl, /\/api\/agents\/accept\?token=/);
+    let lista = await dev.members.list(devDomainId);
+    const invitacion = lista.invites.find((i) => i.email === `colega-${suffix}@example.com`)!;
+    assert.ok(invitacion.token);
+    assert.equal((await dev.members.cancelInvite(devDomainId, invitacion.token)).ok, true);
+
+    const agente = dbmod.createAgent({ domainId: devDomainId, email: `agente-${suffix}@example.com`, name: "Agente", role: "agent" });
+    lista = await dev.members.list(devDomainId);
+    assert.ok(lista.members.some((m) => m.id === agente.id));
+    assert.equal((await dev.members.remove(devDomainId, agente.id)).ok, true);
+    await assert.rejects(() => dev.members.remove(devDomainId, agente.id), (e: MailMaskError) => e.status === 404);
+
+    const gratis = dbmod.createDomain(`sdk-noenvios-${suffix}@example.com`, `gratis-eq-${suffix}.com`, ["dk"], "vf");
+    await assert.rejects(() => sinEnvios.members.invite(gratis.id, { email: "x@example.com", name: "X" }), (e: MailMaskError) => e.status === 403 || e.status === 404);
+  });
+
+  it("signature y respuestas guardadas", async () => {
+    assert.equal((await mm.signature.set(domainId, "**Brenda** · Ventas")).signature, "**Brenda** · Ventas");
+    assert.equal((await mm.signature.get(domainId)).signature, "**Brenda** · Ventas");
+    assert.equal((await mm.signature.set(domainId, "")).signature, null);
+    await assert.rejects(() => mm.signature.set(domainId, "x".repeat(2001)), (e: MailMaskError) => e.status === 400);
+
+    const r = await mm.canned.create(domainId, { title: "Horario", body: "Atendemos de 9 a 6." });
+    assert.equal(r.title, "Horario");
+    assert.ok((await mm.canned.list(domainId)).some((c) => c.id === r.id));
+    assert.equal((await mm.canned.delete(domainId, r.id)).ok, true);
+    await assert.rejects(() => mm.canned.delete(domainId, r.id), (e: MailMaskError) => e.status === 404);
+    await assert.rejects(() => mm.canned.create(domainId, { title: "", body: "" }), (e: MailMaskError) => e.status === 400);
+  });
+
+  it("aliases.appleProfile y exportMbox pegan a sus rutas", async () => {
+    await mm.aliases.create(domainId, { alias: "perfil", destinations: ["p@example.com"] });
+    // Sin buzón: la ruta contesta su propio 404, con mensaje, no el de "ruta inexistente".
+    await assert.rejects(() => mm.aliases.appleProfile(domainId, "perfil"), (e: MailMaskError) => e.status === 404 && /buzón/.test(e.message));
+    await assert.rejects(() => mm.aliases.exportMbox(domainId, "perfil"), (e: MailMaskError) => e.status === 404 && /buzón/.test(e.message));
+
+    sqlite.prepare("UPDATE alias SET mailbox_enabled = 1 WHERE domain_id = ? AND alias = ?").run(domainId, "perfil");
+    const plist = await mm.aliases.appleProfile(domainId, "perfil");
+    assert.match(plist, /<plist/);
+    assert.ok(plist.includes(`perfil@${dominio}`));
   });
 });

@@ -393,3 +393,168 @@ export interface DnsChangeResult {
 export type DnsPreset =
   | "vercel" | "netlify" | "github-pages" | "cloudflare-pages" | "render" | "fly"
   | "redirect-a-www" | "dmarc";
+
+// --- Registros a pegar en el registrador ---
+
+export interface DnsSetupRecord {
+  id: string;
+  type: "MX" | "TXT" | "CNAME";
+  /** Relativo al dominio, como lo piden casi todos los paneles ('@', '_amazonses'). */
+  name: string;
+  fqdn: string;
+  value: string;
+  /** Sólo MX, para paneles con campo de prioridad aparte (entonces el valor es `host`). */
+  priority?: number;
+  host?: string;
+  level: "requerido" | "recomendado" | "opcional";
+  purpose: string;
+  benefit?: string;
+  /** Ayuda en texto con **negritas** estilo markdown. */
+  hints: string[];
+  /** Sólo con `live`: si el DNS público ya lo tiene; null = no se pudo consultar. */
+  ok?: boolean | null;
+  observed?: string[];
+  /** SPF: valor fusionado cuando ya existe otro SPF (se edita ése, no se crea otro). */
+  suggestedValue?: string;
+}
+
+export interface DnsSetup {
+  domain: string;
+  records: DnsSetupRecord[];
+  live: boolean;
+  nameservers?: string[];
+  /** Panel donde se pegan, deducido de los nameservers. */
+  registrarHint?: { provider: string; label: string; note: string } | null;
+  summary?: string;
+}
+
+// --- Cobro ---
+
+export interface BillingStatus {
+  subscription: { plan: string; status: string; currentPeriodEnd?: string; [k: string]: unknown };
+}
+
+export interface Addon {
+  id: string;
+  kind: string;
+  /** Dominio al que aplica; sin él es un add-on legado de toda la cuenta. */
+  domainId?: string;
+  status: "pending" | "active" | "cancelled" | "expired";
+  priceCents: number;
+  currentPeriodEnd?: string;
+  createdAt: string;
+  cancelledAt?: string;
+  source: "purchase" | "courtesy" | "migration";
+}
+
+export interface AddonsResponse {
+  catalog: Record<string, { price: number; label: string }>;
+  forSale: string[];
+  mine: Addon[];
+}
+
+/** Liga de pago de MercadoPago. Nada cambia hasta que el usuario la abre y paga. */
+export interface CheckoutLink {
+  init_point: string;
+  addonId: string;
+}
+
+// --- Registro y transferencia de dominios ---
+
+export interface DomainSearchResult {
+  available: boolean;
+  domain: string;
+  tld: string;
+  /** Centavos MXN por año. */
+  price: number;
+  currency: "MXN";
+}
+
+export interface TldPrice {
+  tld: string;
+  /** Centavos MXN. */
+  price: number;
+  renewPrice: number;
+  transferPrice: number;
+  popular: boolean;
+}
+
+export interface DomainRegistrationCreated {
+  /** Liga de pago de MercadoPago; el registro arranca al pagar. */
+  initPoint: string;
+  registrationId: string;
+}
+
+export interface DomainRegistration {
+  id: string;
+  domainId: string | null;
+  domainName: string;
+  kind: "register" | "transfer";
+  status: string;
+  expiresAt: string | null;
+  priceCents: number;
+  renewalStatus: string;
+  renewalPriceCents: number | null;
+  nextChargeAt: string | null;
+  dnsImportStatus: string;
+  transferAuthCodeHint: string | null;
+  lastError: string | null;
+  createdAt: string;
+  [k: string]: unknown;
+}
+
+export interface TransferRequirement {
+  texto: string;
+  ok: boolean | null;
+  ayuda?: string;
+}
+
+export interface TransferCheck {
+  domain: string;
+  /** Centavos MXN; incluye un año de renovación. */
+  price: number;
+  currency: "MXN";
+  requisitos: TransferRequirement[];
+  dns: { found: unknown[]; nameservers?: string[]; warning?: string; truncado?: boolean };
+  [k: string]: unknown;
+}
+
+export interface TransferDnsInventory {
+  records: unknown[];
+  status: string;
+  takenAt: string | null;
+}
+
+export interface RenewalLink {
+  init_point: string;
+  nextChargeAt: string;
+}
+
+// --- Equipo y Bandeja ---
+
+export interface DomainMember {
+  id: string;
+  domainId: string;
+  email: string;
+  name: string;
+  role: "admin" | "agent";
+  createdAt: string;
+}
+
+export interface DomainInvite {
+  token: string;
+  email: string;
+  name: string;
+  role: "admin" | "agent";
+  expiresAt: string;
+  inviteUrl: string;
+}
+
+export interface CannedReply {
+  id: string;
+  domainId: string;
+  title: string;
+  /** Markdown. */
+  body: string;
+  createdAt: string;
+}

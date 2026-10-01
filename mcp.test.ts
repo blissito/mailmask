@@ -50,6 +50,14 @@ describe("MCP: agentes contra la app", () => {
       },
     });
 
+    const realTransfer = await import("./domain-transfer.ts");
+    mock.module("./domain-transfer.ts", { namedExports: {
+      ...realTransfer,
+      checkDomainReadiness: async () => ({ listo: true, requisitos: [{ clave: "aws", ok: true, texto: "El registrador actual permite la transferencia" }] }),
+    } });
+    class MpFalso { async create() { return { id: `mp-${crypto.randomUUID()}`, init_point: "https://mp.test/checkout" }; } }
+    mock.module("mercadopago", { namedExports: { MercadoPagoConfig: class {}, PreApproval: MpFalso, Preference: MpFalso } });
+
     mock.module("./ses.ts", { namedExports: {
       ...realSes,
       verifyDomain: async () => ({ verificationToken: "tok", dkimTokens: ["d1", "d2", "d3"] }),
@@ -190,5 +198,61 @@ describe("MCP: agentes contra la app", () => {
     assert.match(r.json.result.content[0].text, /HTTP 409/);
     // El texto le dice al agente cuál es la salida legítima, para que no busque un force.
     assert.match(r.json.result.content[0].text, /elimina el dominio de MailMask/);
+  });
+
+  it("initialize trae la guía de onboarding (≤ 6000 caracteres) con lo que no se negocia", async () => {
+    const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "0" } });
+    const g: string = init.json.result.instructions;
+    assert.ok(g, "sin instructions");
+    assert.ok(g.length <= 6000, `instructions mide ${g.length}`);
+    for (const p of ["domain_dns_setup", "verify_domain", "activation_link", "Bloqueado", "EPP", "MercadoPago"]) assert.ok(g.includes(p), p);
+  });
+
+  it("las herramientas nuevas están en el catálogo y search_tools las encuentra en español", async () => {
+    const nombres = (await rpc("tools/list")).json.result.tools.map((t: { name: string }) => t.name);
+    for (const n of ["domain_dns_setup", "activation_link", "billing_status", "list_addons", "search_domains", "domain_prices", "register_domain",
+      "list_registrations", "transfer_check", "transfer_start", "transfer_status", "transfer_dns", "update_transfer_dns", "approve_transfer_dns",
+      "resend_transfer_email", "transfer_out", "renewal_status", "renewal_link", "list_members", "invite_member", "remove_member", "cancel_invite",
+      "get_signature", "set_signature", "list_canned_replies", "create_canned_reply", "delete_canned_reply", "apple_profile_link", "mailbox_export_link"]) {
+      assert.ok(nombres.includes(n), n);
+    }
+    const buscar = async (q: string) => (await call("search_tools", { query: q })).json.result.structuredContent.result.map((t: { name: string }) => t.name);
+    assert.ok((await buscar("renovacion")).includes("renewal_status"), "sin acento también");
+    assert.ok((await buscar("hostinger")).includes("domain_dns_setup"));
+    assert.ok((await buscar("firma")).includes("set_signature"));
+    assert.ok((await buscar("invitar")).includes("invite_member"));
+  });
+
+  it("transfer_start no recibe el EPP: devuelve la liga al formulario de la app", async () => {
+    const tools = (await rpc("tools/list")).json.result.tools;
+    const schema = tools.find((t: { name: string }) => t.name === "transfer_start").inputSchema;
+    assert.deepEqual(Object.keys(schema.properties), ["domain"], "el código EPP no puede ser un parámetro");
+    const r = await call("transfer_start", { domain: `traer-${suffix}.com` });
+    assert.ok(!r.json.result.isError, JSON.stringify(r.json.result));
+    const out = r.json.result.structuredContent;
+    assert.equal(out.ready, true);
+    assert.match(out.formUrl, new RegExp(`/app#transfer=traer-${suffix}\\.com$`));
+  });
+
+  it("activation_link da la liga de pago y deja claro que no está pagado", async () => {
+    const segundo = dbmod.createDomain(`mcp-gratis-${suffix}@example.com`, `mcp-bloq-${suffix}.com`, ["dk"], "vf");
+    const r = await call("activation_link", { domainId: segundo.id }, keyGratis);
+    assert.ok(!r.json.result.isError, JSON.stringify(r.json.result));
+    assert.equal(r.json.result.structuredContent.paymentUrl, "https://mp.test/checkout");
+    assert.equal(r.json.result.structuredContent.paid, false);
+  });
+
+  it("domain_dns_setup sin live devuelve los registros a pegar", async () => {
+    const r = await call("domain_dns_setup", { domainId: dominioGratisId, live: false }, keyGratis);
+    assert.ok(!r.json.result.isError, JSON.stringify(r.json.result));
+    const recs = r.json.result.structuredContent.records;
+    assert.equal(recs.find((x: { id: string }) => x.id === "mx").value, "10 inbound-smtp.us-east-1.amazonaws.com");
+    assert.equal(recs.find((x: { id: string }) => x.id === "verification").value, "vf");
+  });
+
+  it("apple_profile_link sin buzón es isError con la salida, no una liga rota", async () => {
+    const r = await call("apple_profile_link", { domainId: dominioGratisId, alias: "nadie" }, keyGratis);
+    assert.equal(r.json.result.isError, true);
+    assert.match(r.json.result.content[0].text, /create_mailbox/);
   });
 });

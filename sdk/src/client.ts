@@ -5,7 +5,9 @@ import type {
   ApiKey, SendOptions, UploadAttachmentInput, UploadedAttachment, Suppression,
   Webhook, WebhookCreated, CreateWebhookInput, UpdateWebhookInput, WebhookDelivery,
   DnsRecordType, DnsRRSet, DnsListResponse, DnsZoneCreated, DnsDelegation, DnsImportResult,
-  DnsChangeResult, DnsPreset,
+  DnsChangeResult, DnsPreset, DnsSetup,
+  BillingStatus, AddonsResponse, CheckoutLink, DomainSearchResult, TldPrice, DomainRegistrationCreated,
+  DomainRegistration, TransferCheck, TransferDnsInventory, RenewalLink, DomainMember, DomainInvite, CannedReply,
 } from "./types.js";
 
 class MailMaskError extends Error {
@@ -27,6 +29,16 @@ async function request<T>(baseUrl: string, apiKey: string, path: string, opts?: 
   return res.json() as Promise<T>;
 }
 
+// Para lo que no es JSON (el perfil de Apple, el .mbox): mismo auth y mismo manejo de error.
+async function requestRaw(baseUrl: string, apiKey: string, path: string, doFetch: typeof fetch = fetch): Promise<Response> {
+  const res = await doFetch(`${baseUrl}${path}`, { headers: { "Authorization": `Bearer ${apiKey}` } });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new MailMaskError(res.status, body.error || res.statusText);
+  }
+  return res;
+}
+
 export class MailMask {
   private baseUrl: string;
   private apiKey: string;
@@ -42,6 +54,12 @@ export class MailMask {
   smtp: SmtpResource;
   apiKeys: ApiKeysResource;
   dns: DnsResource;
+  billing: BillingResource;
+  registrations: RegistrationsResource;
+  transfers: TransfersResource;
+  members: MembersResource;
+  signature: SignatureResource;
+  canned: CannedResource;
 
   constructor(config: MailMaskConfig) {
     this.apiKey = config.apiKey;
@@ -52,7 +70,7 @@ export class MailMask {
     const req = <T>(path: string, opts?: RequestInit) => request<T>(this.baseUrl, this.apiKey, path, opts, doFetch);
 
     this.domains = new DomainsResource(req);
-    this.aliases = new AliasesResource(req);
+    this.aliases = new AliasesResource(req, (path) => requestRaw(this.baseUrl, this.apiKey, path, doFetch));
     this.rules = new RulesResource(req);
     this.logs = new LogsResource(req);
     this.send = new SendResource(req);
@@ -62,6 +80,12 @@ export class MailMask {
     this.smtp = new SmtpResource(req);
     this.apiKeys = new ApiKeysResource(req);
     this.dns = new DnsResource(req);
+    this.billing = new BillingResource(req);
+    this.registrations = new RegistrationsResource(req);
+    this.transfers = new TransfersResource(req);
+    this.members = new MembersResource(req);
+    this.signature = new SignatureResource(req);
+    this.canned = new CannedResource(req);
   }
 }
 
@@ -75,6 +99,8 @@ class DomainsResource {
   delete(id: string) { return this.req<{ ok: boolean }>(`/api/domains/${id}`, { method: "DELETE" }); }
   health(id: string) { return this.req<Record<string, unknown>>(`/api/domains/${id}/health`); }
   verify(id: string) { return this.req<DomainVerification>(`/api/domains/${id}/verify`, { method: "POST" }); }
+  /** Registros a pegar en el registrador. Con `live` los compara con el DNS público y deduce el panel. */
+  dnsSetup(id: string, opts?: { live?: boolean }) { return this.req<DnsSetup>(`/api/domains/${id}/dns-setup${opts?.live ? "?live=1" : ""}`); }
 }
 
 class DnsResource {
@@ -96,7 +122,13 @@ class DnsResource {
 }
 
 class AliasesResource {
-  constructor(private req: Req) {}
+  constructor(private req: Req, private raw: (path: string) => Promise<Response>) {}
+  /** Perfil de configuración de Apple Mail (plist) para el buzón de una máscara. */
+  async appleProfile(domainId: string, alias: string) {
+    return (await this.raw(`/api/domains/${domainId}/apple-profile?alias=${encodeURIComponent(alias)}`)).text();
+  }
+  /** Exporta el buzón en formato mbox. Devuelve la respuesta en streaming: un buzón puede pesar GB. */
+  exportMbox(domainId: string, alias: string) { return this.raw(`/api/domains/${domainId}/alias/${alias}/mailbox/export`); }
   list(domainId: string) { return this.req<Alias[]>(`/api/domains/${domainId}/alias`); }
   create(domainId: string, input: CreateAliasInput) { return this.req<AliasCreated>(`/api/domains/${domainId}/alias`, { method: "POST", body: JSON.stringify({ ...input, destinations: input.destinations ?? [] }) }); }
   /** Crea un buzón IMAP para una máscara existente. La contraseña sólo se devuelve aquí. */
@@ -178,6 +210,78 @@ class ApiKeysResource {
   list() { return this.req<ApiKey[]>("/api/api-keys"); }
   create(name: string) { return this.req<ApiKey & { key: string }>("/api/api-keys", { method: "POST", body: JSON.stringify({ name }) }); }
   revoke(id: string) { return this.req<{ ok: boolean }>(`/api/api-keys/${id}`, { method: "DELETE" }); }
+}
+
+class BillingResource {
+  constructor(private req: Req) {}
+  status() { return this.req<BillingStatus>("/api/billing/status"); }
+  addons() { return this.req<AddonsResponse>("/api/addons"); }
+  /**
+   * Liga de MercadoPago para un add-on de un dominio (`domain` = activarlo, $99/mes).
+   * El usuario la abre y paga; hasta entonces no cambia nada.
+   */
+  checkout(domainId: string, kind: "domain" | "storage50" | "sends100" = "domain", opts?: { payerEmail?: string }) {
+    return this.req<CheckoutLink>("/api/addons/checkout", { method: "POST", body: JSON.stringify({ kind, domainId, payerEmail: opts?.payerEmail }) });
+  }
+}
+
+class RegistrationsResource {
+  constructor(private req: Req) {}
+  search(domain: string) { return this.req<DomainSearchResult>(`/api/domains/search?q=${encodeURIComponent(domain)}`); }
+  tlds() { return this.req<TldPrice[]>("/api/domains/tlds"); }
+  /** Crea el registro pendiente y devuelve la liga de pago; el dominio se registra al pagar. */
+  register(domain: string) { return this.req<DomainRegistrationCreated>("/api/domains/register", { method: "POST", body: JSON.stringify({ domain }) }); }
+  list() { return this.req<DomainRegistration[]>("/api/domains/registrations"); }
+  /** Pide el traslado a otro registrador. El código EPP llega por correo al dueño, nunca en la respuesta. */
+  transferOut(regId: string) { return this.req<{ ok: boolean; aviso: string }>(`/api/domains/registrations/${regId}/transfer-out`, { method: "POST" }); }
+  /** Liga de MercadoPago para la suscripción de renovación anual. */
+  renewal(regId: string, opts?: { payerEmail?: string }) {
+    return this.req<RenewalLink>(`/api/domains/registrations/${regId}/renewal`, { method: "POST", body: JSON.stringify({ payerEmail: opts?.payerEmail }) });
+  }
+}
+
+class TransfersResource {
+  constructor(private req: Req) {}
+  /** Requisitos, precio e inventario del DNS actual. No cobra ni crea nada. */
+  check(domain: string) { return this.req<TransferCheck>("/api/domains/transfer/check", { method: "POST", body: JSON.stringify({ domain }) }); }
+  dns(regId: string) { return this.req<TransferDnsInventory>(`/api/domains/transfer/${regId}/dns`); }
+  /** Reemplaza el inventario completo (RRSets). Vuelve a quedar pendiente de aprobar. */
+  setDns(regId: string, records: { name: string; type: string; ttl?: number; values: string[] }[]) {
+    return this.req<{ records: unknown[] }>(`/api/domains/transfer/${regId}/dns`, { method: "PUT", body: JSON.stringify({ records }) });
+  }
+  approveDns(regId: string) { return this.req<{ ok: boolean }>(`/api/domains/transfer/${regId}/dns/approve`, { method: "POST" }); }
+  resendEmail(regId: string) { return this.req<{ ok: boolean }>(`/api/domains/transfer/${regId}/resend-email`, { method: "POST" }); }
+}
+
+class MembersResource {
+  constructor(private req: Req) {}
+  list(domainId: string) { return this.req<{ members: DomainMember[]; invites: DomainInvite[] }>(`/api/domains/${domainId}/agents`); }
+  invite(domainId: string, input: { email: string; name: string; role?: "admin" | "agent" }) {
+    return this.req<{ ok: boolean; inviteUrl: string }>(`/api/domains/${domainId}/agents/invite`, { method: "POST", body: JSON.stringify(input) });
+  }
+  remove(domainId: string, memberId: string) { return this.req<{ ok: boolean }>(`/api/domains/${domainId}/agents/${memberId}`, { method: "DELETE" }); }
+  cancelInvite(domainId: string, token: string) { return this.req<{ ok: boolean }>(`/api/domains/${domainId}/agents/invites/${token}`, { method: "DELETE" }); }
+}
+
+class SignatureResource {
+  constructor(private req: Req) {}
+  async get(domainId: string) {
+    const d = await this.req<{ signature?: string | null }>(`/api/domains/${domainId}`);
+    return { signature: d.signature ?? null };
+  }
+  /** Markdown, máx. 2000 caracteres. Cadena vacía la borra. */
+  set(domainId: string, signature: string) {
+    return this.req<{ ok: boolean; signature: string | null }>(`/api/domains/${domainId}/signature`, { method: "PUT", body: JSON.stringify({ signature }) });
+  }
+}
+
+class CannedResource {
+  constructor(private req: Req) {}
+  list(domainId: string) { return this.req<CannedReply[]>(`/api/domains/${domainId}/canned`); }
+  create(domainId: string, input: { title: string; body: string }) {
+    return this.req<CannedReply>(`/api/domains/${domainId}/canned`, { method: "POST", body: JSON.stringify(input) });
+  }
+  delete(domainId: string, cannedId: string) { return this.req<{ ok: boolean }>(`/api/domains/${domainId}/canned/${cannedId}`, { method: "DELETE" }); }
 }
 
 export { MailMaskError };
