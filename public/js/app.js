@@ -582,6 +582,50 @@ document.addEventListener("click", (e) => {
   if (b) showAddonsModal(b.dataset.domainId);
 });
 
+// --- Asistente (React, public/js/asistente/) ---
+// Qué está mirando el usuario: lo lee el dock y lo manda como contexto del turno.
+let currentTab = null;
+function publishScreen() {
+  window.mailmaskScreen = { domainId: selectedDomain?.id ?? null, tab: selectedDomain ? currentTab : null };
+  window.dispatchEvent(new CustomEvent("mailmask:screen"));
+}
+
+// "Pídeselo al asistente": abre el dock con el texto ya escrito.
+function askAssistantButton(text) {
+  return `<button type="button" data-action="ask-assistant" data-text="${esc(text)}" class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg border border-line text-fg-muted hover:text-fg hover:border-accent transition-colors whitespace-nowrap"><img src="/favicon.svg" alt="" class="h-4 w-4">Pídeselo al asistente</button>`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-action='ask-assistant']");
+  if (b) window.mailmaskAssistant?.open({ text: b.dataset.text });
+});
+
+// Botones [[ir:dominio/<id>[/<pestaña>]]] del asistente (ver navMarker.ts).
+window.mailmaskNav = async (to) => {
+  const m = /^dominio\/([A-Za-z0-9_-]+)(?:\/([a-z]+))?$/.exec(String(to));
+  if (!m) return;
+  const [, id, tab] = m;
+  if (!domains.some(d => d.id === id)) await loadDomains();
+  if (!domains.some(d => d.id === id)) { showToast("Ese dominio ya no está en tu cuenta", true); return; }
+  if (selectedDomain?.id !== id) await selectDomain(id);
+  if (tab && document.getElementById(`tab-${tab}`)) switchTab(tab);
+  document.getElementById("domain-detail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+// Al terminar un turno el agente pudo cambiar datos (crear alias, DNS, activar…):
+// se recarga la lista y, si hay dominio abierto, su banner, su salud y la pestaña actual.
+window.addEventListener("assistant:turn-end", async () => {
+  const openId = selectedDomain?.id;
+  await refreshUsage().catch(() => {});
+  await loadDomains();
+  if (!openId) return;
+  const fresh = domains.find(d => d.id === openId);
+  if (!fresh) { goBack(); return; }
+  selectedDomain = fresh;
+  renderActivacion();
+  loadDomainHealth();
+  if (currentTab) switchTab(currentTab);
+});
+
 // --- Referral credit banner ---
 function renderReferralBanner() {
   const container = document.getElementById("referral-credit-banner");
@@ -985,13 +1029,16 @@ function renderActivacion() {
   const el = document.getElementById("detail-activation");
   if (!el || !selectedDomain) return;
   const r = derechosDe(selectedDomain.id);
+  const pedir = askAssistantButton(r.activado
+    ? `Revisa que ${selectedDomain.domain} esté bien configurado`
+    : `¿Qué incluye activar ${selectedDomain.domain} y cómo lo hago?`);
   const btn = (label, primario = true) => `<button data-action="open-addons" data-domain-id="${esc(selectedDomain.id)}" class="${primario ? "bg-accent hover:bg-accent/90 text-white" : "bg-bg-inset hover:bg-line text-fg"} text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">${label}</button>`;
   if (r.activado) {
     el.innerHTML = `
       <div class="flex flex-wrap items-center gap-3 bg-bg-elev border border-line rounded-xl px-4 py-3">
         <span class="text-sm text-accent-text font-semibold">Dominio activado</span>
         <span class="text-xs text-fg-muted">personas ilimitadas · buzones IMAP · ${r.sends} correos nuevos al día · ${Math.round((r.mailboxBytes ?? 0) / GB)} GB</span>
-        <span class="ml-auto">${btn("+50 GB · +100 envíos", false)}</span>
+        <span class="ml-auto flex flex-wrap gap-2">${pedir}${btn("+50 GB · +100 envíos", false)}</span>
       </div>
       ${barraAlmacenamiento(r)}`;
   } else if (r.bloqueado) {
@@ -999,14 +1046,14 @@ function renderActivacion() {
       <div class="flex flex-wrap items-center gap-3 bg-amber-500/15 border border-amber-500/30 rounded-xl px-4 py-3">
         <span class="text-sm text-amber-600 font-semibold">Este dominio guarda el correo pero no lo reenvía</span>
         <span class="text-xs text-fg-muted">Tu primer dominio es gratis; los demás se activan por $99 al mes.</span>
-        <span class="ml-auto">${btn("Activar dominio · $99/mes")}</span>
+        <span class="ml-auto flex flex-wrap gap-2">${pedir}${btn("Activar dominio · $99/mes")}</span>
       </div>`;
   } else {
     el.innerHTML = `
       <div class="flex flex-wrap items-center gap-3 bg-bg-elev border border-line rounded-xl px-4 py-3">
         <span class="text-sm text-fg font-semibold">Dominio gratis</span>
         <span class="text-xs text-fg-muted">${r.aliases} máscaras · la Bandeja muestra 7 días · sin correo nuevo ni equipo</span>
-        <span class="ml-auto">${btn("Activar · $99/mes")}</span>
+        <span class="ml-auto flex flex-wrap gap-2">${pedir}${btn("Activar · $99/mes")}</span>
       </div>`;
   }
 }
@@ -1021,6 +1068,7 @@ function goBack() {
   document.getElementById("referrals-section")?.classList.remove("hidden");
   document.getElementById("referral-credit-banner")?.classList.remove("hidden");
   renderDomains();
+  publishScreen();
 }
 
 async function deleteDomain() {
@@ -1997,7 +2045,12 @@ function renderHealthPanel() {
           </div>`;
         }).join("")}
       </div>
-      <button id="btn-refresh-health" class="mt-3 text-xs text-fg-subtle hover:text-fg transition-colors">Actualizar diagnóstico</button>
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <button id="btn-refresh-health" class="text-xs text-fg-subtle hover:text-fg transition-colors">Actualizar diagnóstico</button>
+        ${askAssistantButton(health.status === "ok"
+          ? `Revisa la configuración de ${selectedDomain.domain}`
+          : `¿Por qué ${selectedDomain.domain} dice "${({ warning: "Atención", error: "Error" })[health.status] ?? health.status}"? Ayúdame a arreglarlo.`)}
+      </div>
     </div>`;
   document.getElementById("btn-refresh-health")?.addEventListener("click", loadDomainHealth);
 }
@@ -2753,6 +2806,8 @@ async function revokeApiKeyUI(id) {
 // --- Tabs ---
 
 function switchTab(tab) {
+  currentTab = tab;
+  publishScreen();
   document.querySelectorAll(".tab-content").forEach(el => el.classList.add("hidden"));
   document.querySelectorAll(".tab-btn").forEach(el => {
     el.classList.remove("active-tab", "text-fg");
