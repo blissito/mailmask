@@ -28,6 +28,14 @@ function stripHtml(html: string): string {
     .replace(/&uacute;/g, "ú")
     .replace(/&eacute;/g, "é")
     .replace(/&Uacute;/g, "Ú")
+    .replace(/&ntilde;/g, "ñ")
+    .replace(/&iexcl;/g, "¡")
+    .replace(/&ordm;/g, "º")
+    .replace(/&middot;/g, "·")
+    .replace(/&hellip;/g, "…")
+    .replace(/&laquo;/g, "«")
+    .replace(/&raquo;/g, "»")
+    .replace(/&rarr;/g, "→")
     .replace(/&nbsp;/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -198,19 +206,49 @@ Configuración para Claude Desktop, Cursor y otros (mcp.json):
   }
 }
 
-Herramientas (cada una es un método del SDK, con las mismas reglas y límites):
-- Dominios: list_domains, get_domain, create_domain (devuelve los registros DNS: MX, TXT de verificación, CNAME de DKIM, SPF), verify_domain, domain_health, delete_domain.
-- Máscaras y buzones: list_aliases, create_alias (con mailbox: true crea también el buzón IMAP y devuelve la contraseña una sola vez), update_alias, delete_alias, create_mailbox, delete_mailbox, reset_mailbox_password (genera una contraseña nueva para el buzón y la devuelve una sola vez).
+Son 70 herramientas (cada una es un método del SDK, con las mismas reglas y límites). Al conectarse, el cliente recibe además una guía con el orden para conectar un dominio, qué significa gratis/activado/bloqueado y cómo funcionan los pagos.
+- Dominios: list_domains, get_domain, create_domain (devuelve los registros DNS: MX, TXT de verificación, CNAME de DKIM, SPF), domain_dns_setup (los registros exactos para pegar en el registrador, cuáles ya se ven en el DNS público y en qué panel van: Hostinger, GoDaddy, Cloudflare, Namecheap, Route 53), verify_domain, domain_health, delete_domain.
+- Máscaras y buzones: list_aliases, create_alias (con mailbox: true crea también el buzón IMAP y devuelve la contraseña una sola vez), update_alias, delete_alias, create_mailbox, delete_mailbox, reset_mailbox_password (genera una contraseña nueva para el buzón y la devuelve una sola vez), apple_profile_link (liga al perfil que configura el buzón en iPhone, iPad o Mac), mailbox_export_link (liga para descargar el buzón en .mbox).
+- Activación y cobro: activation_link (liga de MercadoPago para activar un dominio a $99 MXN/mes, o sumarle +50 GB o +100 envíos/día), list_addons, billing_status.
+- Comprar y renovar dominios: search_domains, domain_prices, register_domain (devuelve la liga de pago), list_registrations, renewal_status, renewal_link.
+- Transferencias: transfer_check (requisitos y precio, no cobra), transfer_start (devuelve la liga al formulario seguro de la app donde se pega el código EPP y se paga; el código EPP NUNCA se da en el chat), transfer_status, transfer_dns, update_transfer_dns, approve_transfer_dns, resend_transfer_email, transfer_out (el código EPP llega por correo al dueño).
+- Equipo: list_members, invite_member, remove_member, cancel_invite.
+- Bandeja: get_signature, set_signature, list_canned_replies, create_canned_reply, delete_canned_reply.
 - Reglas: list_rules, create_rule, update_rule, delete_rule.
 - Webhooks: list_webhooks, create_webhook, update_webhook, delete_webhook, test_webhook, webhook_deliveries.
 - DNS: list_dns_records, create_dns_zone, dns_delegation_status, set_dns_record, delete_dns_record, import_dns_records, point_domain_to (apunta el dominio a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render o Fly sin saber qué registros hacen falta).
 - Envío: send_email (acepta idempotencyKey), bulk_send, bulk_status.
 - Operación: list_logs, list_suppressions, add_suppression, remove_suppression, list_smtp_credentials, create_smtp_credential, revoke_smtp_credential.
-- search_tools: busca herramientas por palabra clave.
+- search_tools: busca herramientas por palabra clave (sin acentos: "renovacion" encuentra renewal_link).
+
+Pagos por MCP: activation_link, register_domain y renewal_link devuelven una liga de MercadoPago que abre y paga una persona; nada queda pagado ni activado por dar la liga (paid: false). Se confirma después con list_addons, list_registrations o domain_health.
 
 Sobre el DNS: set_dns_record REEMPLAZA el conjunto de valores de ese nombre y tipo, así que para añadir un valor hay que leer primero con list_dns_records e incluir también los que ya estaban. Los registros que MailMask necesita para el correo (MX, TXT de verificación, SPF y CNAME de DKIM) vienen marcados con managed y no se pueden borrar: el agente recibe un 409 explicando por qué. create_dns_zone importa lo que encuentre del proveedor anterior y devuelve los nameservers que hay que cambiar en el registrador; hasta que se cambien, nada de lo que se edite tiene efecto.
 
-Un error del servidor (por ejemplo, un dominio gratis pidiendo un buzón, que requiere dominio activado a $99 MXN/mes) llega al agente como resultado con isError y el mensaje tal cual. Las API keys no se crean ni revocan por MCP. Límite: 60 peticiones por minuto por llave. No hay Bandeja ni facturación por MCP. No existe un paquete npm de MCP: el servidor es la URL.`,
+Un error del servidor (por ejemplo, un dominio gratis pidiendo un buzón, que requiere dominio activado a $99 MXN/mes) llega al agente como resultado con isError y el mensaje tal cual. Las API keys no se crean ni revocan por MCP. Límite: 60 peticiones por minuto por llave. Las conversaciones de la Bandeja no se leen ni responden por MCP (sí la firma y las respuestas guardadas). No existe un paquete npm de MCP: el servidor es la URL.
+
+Con una API key mk_ las acciones irreversibles se ejecutan directo. Con el token de turno del asistente de la app (mt_, dura 5 minutos), borrar un dominio, una máscara, un buzón o un registro DNS, sacar a un miembro o transferir un dominio fuera NO se ejecuta: la ruta responde 409 needs_confirmation y el usuario lo aprueba en una tarjeta de la app.`,
+  },
+  {
+    title: "Mask, el asistente dentro de la app",
+    content: `Mask es el asistente de MailMask dentro de la app (mailmask.studio/app): un chat en la esquina de la pantalla que HACE las cosas por ti en lugar de explicarte cómo hacerlas. Habla español, corto y claro, y pensado para quien no es técnico.
+
+Qué puede hacer Mask:
+- Dar de alta un dominio y dictarte los registros DNS exactos para pegar en tu registrador (Hostinger, GoDaddy, Cloudflare, Namecheap, Route 53), con el menú donde van. Después verifica y diagnostica la salud del dominio (MX, SPF, DKIM).
+- Crear, cambiar y borrar máscaras; crear buzones IMAP, regenerar su contraseña y darte la liga para configurarlos en iPhone o Mac, o para descargar el buzón en .mbox.
+- Explicar por qué un dominio está "bloqueado" (el 2.º dominio sin activar guarda el correo pero no lo reenvía) y darte la liga de pago para activarlo.
+- Buscar y comprar dominios, renovarlos y transferirlos a MailMask (o fuera de MailMask).
+- Editar el DNS cuando MailMask lleva tu zona y apuntar tu dominio a Vercel, Netlify, GitHub Pages y similares.
+- Reglas, webhooks, credenciales SMTP, equipo de la Bandeja (invitar y quitar personas), firma y respuestas guardadas.
+- Llevarte a la pantalla correcta de la app con un enlace.
+- Recibir imágenes, PDF o texto que le adjuntes (por ejemplo, una captura del panel de tu registrador), hasta 10 MB.
+
+Lo que Mask NUNCA hace:
+- Pagar: todo cobro es una liga de MercadoPago que tú abres y pagas. Mask no dice que algo quedó pagado hasta confirmarlo.
+- Pedirte el código EPP de una transferencia ni contraseñas en el chat: para eso te manda a un formulario seguro de la app. Si se lo pegas, te dirá que no lo compartas.
+- Ejecutar una acción irreversible sin tu permiso. Borrar un dominio, una máscara, un buzón o un registro DNS, sacar a alguien del equipo o transferir un dominio fuera te muestra una tarjeta con lo que va a pasar, armada con los datos reales de tu cuenta; la acción sólo corre cuando tú la apruebas. Si no la apruebas en 15 minutos, caduca.
+
+Mask actúa con tu cuenta, con los mismos permisos que tienes en la app, mediante una credencial temporal que dura 5 minutos por mensaje; nunca usa ni ve tus API keys. Por ahora está disponible para un grupo de cuentas en prueba; después se abrirá a todas.`,
   },
   {
     title: "Bandeja de Entrada (Inbox)",

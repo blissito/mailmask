@@ -186,6 +186,7 @@
         <a href="#webhooks">Webhooks</a>
         <a href="#smtp">Credenciales SMTP</a>
         <a href="#api-keys">API Keys</a>
+        <a href="#cuenta">Cobro, compra y equipo</a>
         <a href="#errores">Manejo de errores</a>
         <a href="#mcp">MCP Server</a>
         <a href="#referencia">Referencia API</a>
@@ -278,7 +279,12 @@ dnsRecords.spf;          <span class="cm">// { type: "TXT", name, value: "v=spf1
 <span class="kw">await</span> mm.domains.<span class="fn">verify</span>(<span class="str">"domain-id"</span>);
 
 <span class="cm">// Estado de salud</span>
-<span class="kw">const</span> health = <span class="kw">await</span> mm.domains.<span class="fn">health</span>(<span class="str">"domain-id"</span>);</code></pre>
+<span class="kw">const</span> health = <span class="kw">await</span> mm.domains.<span class="fn">health</span>(<span class="str">"domain-id"</span>);
+
+<span class="cm">// Registros listos para pegar en tu registrador; con live los compara con el DNS p&uacute;blico</span>
+<span class="kw">const</span> setup = <span class="kw">await</span> mm.domains.<span class="fn">dnsSetup</span>(<span class="str">"domain-id"</span>, { live: <span class="kw">true</span> });
+setup.records;       <span class="cm">// [{ type, name: "@", fqdn, value, level: "requerido" | "recomendado" | "opcional" }]</span>
+setup.registrarHint; <span class="cm">// { provider, label, note } &mdash; en qu&eacute; panel se pegan (Hostinger, GoDaddy, Cloudflare&hellip;)</span></code></pre>
 
       <!-- Aliases -->
       <h2 id="aliases" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Aliases</h2>
@@ -317,7 +323,13 @@ ventas.errorBuzon; <span class="cm">// texto si el alias se cre&oacute; pero el 
 <span class="cm">// Borrar el buz&oacute;n Y SU CORREO (el alias conserva sus destinos)</span>
 <span class="cm">// Contrase&ntilde;a nueva (se devuelve una sola vez)</span>
 <span class="kw">const</span> { password } = <span class="kw">await</span> mm.aliases.<span class="fn">resetMailboxPassword</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
-<span class="kw">await</span> mm.aliases.<span class="fn">deleteMailbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);</code></pre>
+<span class="kw">await</span> mm.aliases.<span class="fn">deleteMailbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
+
+<span class="cm">// Perfil de Apple Mail (plist, texto) para iPhone, iPad y Mac</span>
+<span class="kw">const</span> plist = <span class="kw">await</span> mm.aliases.<span class="fn">appleProfile</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
+
+<span class="cm">// Exportar todo el buz&oacute;n en .mbox: devuelve el Response en streaming (puede pesar GB)</span>
+<span class="kw">const</span> res = <span class="kw">await</span> mm.aliases.<span class="fn">exportMbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);</code></pre>
 
       <!-- DNS -->
       <h2 id="dns" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">DNS</h2>
@@ -525,6 +537,47 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
 <span class="cm">// Revocar key</span>
 <span class="kw">await</span> mm.apiKeys.<span class="fn">revoke</span>(<span class="str">"key-id"</span>);</code></pre>
 
+      <!-- Cobro, compra y equipo -->
+      <h2 id="cuenta" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Cobro, compra de dominios y equipo</h2>
+      <p class="text-fg-muted mb-4">Todo cobro es una <strong class="text-fg">liga de MercadoPago que abre y paga una persona</strong>: el SDK nunca cobra por s&iacute; solo, y nada queda activado hasta que MercadoPago confirma el pago. Compru&eacute;balo despu&eacute;s con <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">billing.addons()</code> o <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">registrations.list()</code>.</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Activaci&oacute;n y add-ons (por dominio)</span>
+<span class="kw">const</span> { catalog, mine } = <span class="kw">await</span> mm.billing.<span class="fn">addons</span>();
+<span class="kw">const</span> { init_point } = <span class="kw">await</span> mm.billing.<span class="fn">checkout</span>(<span class="str">"domain-id"</span>, <span class="str">"domain"</span>); <span class="cm">// o "storage50", "sends100"</span>
+<span class="kw">await</span> mm.billing.<span class="fn">status</span>(); <span class="cm">// suscripci&oacute;n legado, si existe</span>
+
+<span class="cm">// Comprar un dominio (un a&ntilde;o; se registra y configura solo al pagar)</span>
+<span class="kw">const</span> r = <span class="kw">await</span> mm.registrations.<span class="fn">search</span>(<span class="str">"miempresa.com"</span>); <span class="cm">// { available, price (centavos MXN) }</span>
+<span class="kw">const</span> tlds = <span class="kw">await</span> mm.registrations.<span class="fn">tlds</span>();
+<span class="kw">const</span> { initPoint, registrationId } = <span class="kw">await</span> mm.registrations.<span class="fn">register</span>(<span class="str">"miempresa.com"</span>);
+<span class="kw">const</span> regs = <span class="kw">await</span> mm.registrations.<span class="fn">list</span>();
+<span class="kw">await</span> mm.registrations.<span class="fn">renewal</span>(registrationId);     <span class="cm">// liga de la renovaci&oacute;n anual</span>
+<span class="kw">await</span> mm.registrations.<span class="fn">transferOut</span>(registrationId); <span class="cm">// el c&oacute;digo EPP llega por correo al due&ntilde;o</span>
+
+<span class="cm">// Transferir un dominio a MailMask</span>
+<span class="kw">const</span> check = <span class="kw">await</span> mm.transfers.<span class="fn">check</span>(<span class="str">"miempresa.com"</span>); <span class="cm">// requisitos, precio y DNS actual; no cobra</span>
+<span class="kw">const</span> inv = <span class="kw">await</span> mm.transfers.<span class="fn">dns</span>(registrationId);
+<span class="kw">await</span> mm.transfers.<span class="fn">setDns</span>(registrationId, records); <span class="cm">// reemplaza el inventario completo</span>
+<span class="kw">await</span> mm.transfers.<span class="fn">approveDns</span>(registrationId);
+<span class="kw">await</span> mm.transfers.<span class="fn">resendEmail</span>(registrationId);
+
+<span class="cm">// Equipo de la Bandeja</span>
+<span class="kw">const</span> { members, invites } = <span class="kw">await</span> mm.members.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
+<span class="kw">await</span> mm.members.<span class="fn">invite</span>(<span class="str">"domain-id"</span>, { email: <span class="str">"ana@empresa.com"</span>, name: <span class="str">"Ana"</span>, role: <span class="str">"agent"</span> });
+<span class="kw">await</span> mm.members.<span class="fn">remove</span>(<span class="str">"domain-id"</span>, <span class="str">"member-id"</span>);
+<span class="kw">await</span> mm.members.<span class="fn">cancelInvite</span>(<span class="str">"domain-id"</span>, <span class="str">"token"</span>);
+
+<span class="cm">// Firma (markdown, m&aacute;x. 2000; vac&iacute;a la borra) y respuestas guardadas</span>
+<span class="kw">await</span> mm.signature.<span class="fn">set</span>(<span class="str">"domain-id"</span>, <span class="str">"**Ana** &middot; Ventas"</span>);
+<span class="kw">const</span> { signature } = <span class="kw">await</span> mm.signature.<span class="fn">get</span>(<span class="str">"domain-id"</span>);
+<span class="kw">const</span> canned = <span class="kw">await</span> mm.canned.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
+<span class="kw">await</span> mm.canned.<span class="fn">create</span>(<span class="str">"domain-id"</span>, { title: <span class="str">"Gracias"</span>, body: <span class="str">"&iexcl;Gracias por escribir!"</span> });
+<span class="kw">await</span> mm.canned.<span class="fn">delete</span>(<span class="str">"domain-id"</span>, <span class="str">"canned-id"</span>);</code></pre>
+      <h3 id="activacion-anual" class="text-lg font-semibold text-fg mt-8 mb-2">Activaci&oacute;n anual</h3>
+      <p class="text-fg-muted mb-4">La activaci&oacute;n del dominio tambi&eacute;n se paga por a&ntilde;o: <strong class="text-fg">$999 MXN cada 12 meses</strong> en vez de $99 al mes. Por HTTP se pide con <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">period: "annual"</code> en <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">POST /api/addons/checkout</code> (por omisi&oacute;n <code class="text-fg">"monthly"</code>). S&oacute;lo aplica a <code class="text-fg">kind: "domain"</code>: los bloques de espacio y env&iacute;os son mensuales y responden 400 si se piden anuales. El m&eacute;todo <code class="text-fg">billing.checkout()</code> del SDK todav&iacute;a no expone <code class="text-fg">period</code>.</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>POST /api/addons/checkout
+{ <span class="str">"kind"</span>: <span class="str">"domain"</span>, <span class="str">"domainId"</span>: <span class="str">"domain-id"</span>, <span class="str">"period"</span>: <span class="str">"annual"</span> }
+<span class="cm">// &rarr; { "init_point": "https://www.mercadopago.com.mx/...", "addonId": "..." }</span></code></pre>
+
       <!-- Errores -->
       <h2 id="errores" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Manejo de errores</h2>
       <p class="text-fg-muted mb-4">El SDK lanza <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">MailMaskError</code> para respuestas HTTP no exitosas. Incluye el c&oacute;digo de estado y el mensaje del servidor.</p>
@@ -554,20 +607,29 @@ claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \
     }
   }
 }</code></pre>
-      <p class="text-fg-muted mb-2">Herramientas (cada una es un m&eacute;todo del SDK, con las mismas reglas y l&iacute;mites):</p>
+      <p class="text-fg-muted mb-2">Son 70 herramientas; cada una es un m&eacute;todo del SDK, con las mismas reglas y l&iacute;mites. Al conectarse, el cliente recibe adem&aacute;s una gu&iacute;a (<code>instructions</code>) con el orden para conectar un dominio, qu&eacute; significa gratis, activado y bloqueado, y c&oacute;mo funcionan los pagos.</p>
       <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-4">
-        <li><strong>Dominios</strong>: <code>list_domains</code>, <code>get_domain</code>, <code>create_domain</code> (devuelve los registros DNS: MX, TXT, DKIM, SPF), <code>verify_domain</code>, <code>domain_health</code>, <code>delete_domain</code>.</li>
-        <li><strong>M&aacute;scaras y buzones</strong>: <code>list_aliases</code>, <code>create_alias</code> (con <code>mailbox: true</code> crea tambi&eacute;n el buz&oacute;n IMAP), <code>update_alias</code>, <code>delete_alias</code>, <code>create_mailbox</code>, <code>delete_mailbox</code>, <code>reset_mailbox_password</code> (contrase&ntilde;a nueva, devuelta una sola vez).</li>
+        <li><strong>Dominios</strong>: <code>list_domains</code>, <code>get_domain</code>, <code>create_domain</code> (devuelve los registros DNS: MX, TXT, DKIM, SPF), <code>domain_dns_setup</code> (los registros exactos para pegar en tu registrador, cu&aacute;les ya se ven y en qu&eacute; panel van), <code>verify_domain</code>, <code>domain_health</code>, <code>delete_domain</code>.</li>
+        <li><strong>M&aacute;scaras y buzones</strong>: <code>list_aliases</code>, <code>create_alias</code> (con <code>mailbox: true</code> crea tambi&eacute;n el buz&oacute;n IMAP), <code>update_alias</code>, <code>delete_alias</code>, <code>create_mailbox</code>, <code>delete_mailbox</code>, <code>reset_mailbox_password</code> (contrase&ntilde;a nueva, devuelta una sola vez), <code>apple_profile_link</code> (liga al perfil de Apple Mail), <code>mailbox_export_link</code> (liga para descargar el <code>.mbox</code>).</li>
+        <li><strong>DNS</strong>: <code>list_dns_records</code>, <code>create_dns_zone</code>, <code>dns_delegation_status</code>, <code>set_dns_record</code>, <code>delete_dns_record</code>, <code>import_dns_records</code>, <code>point_domain_to</code> (apunta el dominio a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render o Fly sin saber qu&eacute; registros hacen falta).</li>
+        <li><strong>Activaci&oacute;n y cobro</strong>: <code>activation_link</code> (liga de MercadoPago para activar el dominio o sumarle un bloque), <code>list_addons</code>, <code>billing_status</code>.</li>
+        <li><strong>Comprar y renovar dominios</strong>: <code>search_domains</code>, <code>domain_prices</code>, <code>register_domain</code>, <code>list_registrations</code>, <code>renewal_status</code>, <code>renewal_link</code>.</li>
+        <li><strong>Transferencias</strong>: <code>transfer_check</code>, <code>transfer_start</code> (devuelve la liga al formulario seguro donde se pega el c&oacute;digo EPP: <strong>el c&oacute;digo nunca pasa por el chat</strong>), <code>transfer_status</code>, <code>transfer_dns</code>, <code>update_transfer_dns</code>, <code>approve_transfer_dns</code>, <code>resend_transfer_email</code>, <code>transfer_out</code> (el EPP llega por correo al due&ntilde;o).</li>
+        <li><strong>Equipo</strong>: <code>list_members</code>, <code>invite_member</code>, <code>remove_member</code>, <code>cancel_invite</code>.</li>
+        <li><strong>Bandeja</strong>: <code>get_signature</code>, <code>set_signature</code>, <code>list_canned_replies</code>, <code>create_canned_reply</code>, <code>delete_canned_reply</code>.</li>
         <li><strong>Reglas</strong>: <code>list_rules</code>, <code>create_rule</code>, <code>update_rule</code>, <code>delete_rule</code>.</li>
         <li><strong>Webhooks</strong>: <code>list_webhooks</code>, <code>create_webhook</code>, <code>update_webhook</code>, <code>delete_webhook</code>, <code>test_webhook</code>, <code>webhook_deliveries</code>.</li>
-        <li><strong>DNS</strong>: <code>list_dns_records</code>, <code>create_dns_zone</code>, <code>dns_delegation_status</code>, <code>set_dns_record</code>, <code>delete_dns_record</code>, <code>import_dns_records</code>, <code>point_domain_to</code> (apunta el dominio a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render o Fly sin saber qu&eacute; registros hacen falta).</li>
         <li><strong>Env&iacute;o</strong>: <code>send_email</code> (con <code>idempotencyKey</code>), <code>bulk_send</code>, <code>bulk_status</code>.</li>
         <li><strong>Operaci&oacute;n</strong>: <code>list_logs</code>, <code>list_suppressions</code>, <code>add_suppression</code>, <code>remove_suppression</code>, <code>list_smtp_credentials</code>, <code>create_smtp_credential</code>, <code>revoke_smtp_credential</code>.</li>
-        <li><code>search_tools</code>: busca herramientas por palabra clave, para clientes que cargan el cat&aacute;logo bajo demanda.</li>
+        <li><code>search_tools</code>: busca herramientas por palabra clave (sin acentos: &laquo;renovacion&raquo; encuentra <code>renewal_link</code>), para clientes que cargan el cat&aacute;logo bajo demanda.</li>
       </ul>
+      <p class="text-fg-muted text-sm mb-4">Las ligas de pago (<code>activation_link</code>, <code>register_domain</code>, <code>renewal_link</code>) las abre y paga una persona; la herramienta devuelve <code>paid: false</code> y el agente debe confirmarlo despu&eacute;s con <code>list_addons</code> o <code>list_registrations</code>.</p>
       <p class="text-fg-muted text-sm mb-4">Sobre el DNS: <code>set_dns_record</code> <strong>reemplaza</strong> el conjunto de valores de ese nombre y tipo, as&iacute; que para a&ntilde;adir un valor hay que leer primero con <code>list_dns_records</code> e incluir tambi&eacute;n los que ya estaban. Los registros que MailMask necesita para tu correo (el MX, el TXT de verificaci&oacute;n, el SPF y los CNAME de DKIM) vienen marcados con <code>managed</code> y no se pueden borrar: el agente recibe un 409 explicando por qu&eacute;.</p>
 
       <p class="text-fg-muted text-sm mb-4">Un error del servidor (por ejemplo, un dominio gratis pidiendo un buz&oacute;n) llega al agente como resultado con <code>isError</code> y el mensaje tal cual, no como fallo del protocolo. Las API keys no se crean ni revocan por MCP: un agente con una llave no puede fabricar m&aacute;s. El l&iacute;mite es el mismo de la API: 60 peticiones por minuto por llave.</p>
+
+      <h3 id="confirmacion" class="text-lg font-semibold text-fg mt-8 mb-2">Acciones que piden confirmaci&oacute;n</h3>
+      <p class="text-fg-muted text-sm mb-4">Cuando quien llama es <strong class="text-fg">Mask, el asistente de la app</strong>, no lleva tu API key sino un token de turno (<code>mt_&hellip;</code>) que dura 5 minutos. Con ese token, lo irreversible <strong class="text-fg">no se ejecuta</strong>: borrar un dominio, una m&aacute;scara, un buz&oacute;n o un registro DNS, sacar a un miembro y transferir un dominio fuera. La ruta guarda la acci&oacute;n y responde <code>409</code> con <code>{"error": "needs_confirmation", "actionId", "summary"}</code>; por MCP llega como resultado normal con <code>needsConfirmation: true</code>, no como error, para que el agente no reintente. A ti te aparece una tarjeta en el asistente, armada con los datos reales de la base (no con el texto del modelo), y la acci&oacute;n s&oacute;lo corre cuando la apruebas con tu sesi&oacute;n. Si no la apruebas en 15 minutos, caduca. Con una API key <code>mk_</code> estas acciones se ejecutan directo, como siempre.</p>
 
       <!-- Referencia -->
       <h2 id="referencia" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Referencia API</h2>
