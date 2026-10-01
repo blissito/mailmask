@@ -160,6 +160,7 @@
         <a href="#smtp">Credenciales SMTP</a>
         <a href="#api-keys">API Keys</a>
         <a href="#errores">Manejo de errores</a>
+        <a href="#cli">CLI</a>
         <a href="#mcp">MCP Server</a>
         <a href="#referencia">Referencia API</a>
       </nav>
@@ -500,6 +501,38 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
     console.<span class="fn">error</span>(err.status, err.message);
   }
 }</code></pre>
+
+      <!-- CLI -->
+      <h2 id="cli" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">CLI</h2>
+      <p class="text-fg-muted mb-2">CLI de terminal sobre este mismo SDK: un subcomando por recurso, sin modelo declarativo encima. En construcci&oacute;n (PR en revisi&oacute;n) &mdash; esta primera entrega trae <code class="text-fg">login</code>, <code class="text-fg">logout</code> y <code class="text-fg">whoami</code>; el resto de recursos (<code class="text-fg">domains</code>, <code class="text-fg">aliases</code>, <code class="text-fg">dns</code>, <code class="text-fg">rules</code>, <code class="text-fg">webhooks</code>, <code class="text-fg">send</code>, <code class="text-fg">smtp</code>, <code class="text-fg">apikeys</code>, <code class="text-fg">logs</code>, <code class="text-fg">suppressions</code>) llega en pr&oacute;ximos PRs.</p>
+      <p class="text-fg-subtle text-xs mb-4">Nombre del paquete y del binario (hoy <code>mailmask-cli</code> / <code>mailmask</code>) son provisionales, pendientes de confirmaci&oacute;n antes de publicarse a npm.</p>
+
+      <p class="text-sm font-bold mb-1">Instalaci&oacute;n</p>
+      <p class="text-fg-muted text-sm mb-2">Todav&iacute;a no est&aacute; publicada en npm. Mientras tanto, se corre desde el repo:</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm"># dentro de cli/</span>
+npm install
+npm run build
+node dist/index.js --help</code></pre>
+
+      <p class="text-sm font-bold mb-1">Comandos</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask login [--api-key mk_...] [--base-url https://...]
+mailmask whoami [--json]
+mailmask logout</code></pre>
+      <p class="text-fg-muted text-sm mb-4">Sin <code>--api-key</code>, <code>login</code> la pide de forma interactiva (necesita una terminal con TTY; si no la hay, falla de inmediato en vez de colgarse).</p>
+
+      <p class="text-sm font-bold mb-1">Variable de entorno</p>
+      <p class="text-fg-muted text-sm mb-4"><code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">MAILMASK_API_KEY</code> tiene prioridad sobre la sesi&oacute;n guardada &mdash; es la v&iacute;a recomendada para CI o para un agente de c&oacute;digo.</p>
+
+      <p class="text-sm font-bold mb-1">D&oacute;nde se guarda la sesi&oacute;n</p>
+      <p class="text-fg-muted text-sm mb-4"><code>login</code> guarda la API key en <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">~/.config/mailmask/credentials.json</code>, con permisos <code>600</code>. Es el fallback de archivo mientras no hay integraci&oacute;n con el keychain del sistema operativo.</p>
+
+      <p class="text-sm font-bold mb-1">C&oacute;digos de salida</p>
+      <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-4">
+        <li><code>0</code> &mdash; &eacute;xito.</li>
+        <li><code>1</code> &mdash; error gen&eacute;rico.</li>
+        <li><code>2</code> &mdash; no hay API key activa, o MailMask la rechaz&oacute;.</li>
+      </ul>
+      <p class="text-fg-muted text-sm mb-4">El resto de la taxonom&iacute;a de c&oacute;digos y el contrato <code>--json</code>/<code>--yes</code> para el resto de comandos llegan en un PR aparte.</p>
 
       <!-- MCP -->
       <h2 id="mcp" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">MCP Server</h2>
