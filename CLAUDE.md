@@ -667,7 +667,12 @@ Bandeja **y** en el buzón. Es el producto entero funcionando sobre un dominio d
 1. **SES Tenants** (un cliente no puede tumbar la reputación de todos). Verificar de entrada
    si el tenant se puede indicar por SMTP; si no, Stalwart debe entregar a la app en vez de
    a SES — un solo camino de salida que además da el contador de envíos y el log.
-2. **Contador del 465**: hoy lo que sale de Apple Mail no descuenta de los 50/día. Hasta
+2. **Un solo camino de salida (pedido el 1-oct-2026, va después del asistente).** Lo que sale de
+   Apple Mail por el 465 va de Stalwart directo a SES: **no aparece en la Bandeja** (los hilos quedan
+   con sólo lo entrante, visto con insightslab.com.mx), no descuenta de los 50/día y no entra al log.
+   Arreglo: la ruta de salida de Stalwart entrega a la app (que registra, cuenta y manda a SES) y,
+   al revés, lo que se responde desde la Bandeja se copia a Enviados del buzón con `Email/import`.
+   **Contador del 465**: hoy lo que sale de Apple Mail no descuenta de los 50/día. Hasta
    entonces "+100 envíos" no se publica como comprable.
 3. **Una compra real en MercadoPago** del add-on `domain` (nunca se ha ejercitado contra MP;
    el webhook con `addon:` sí).
