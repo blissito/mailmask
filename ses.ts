@@ -1293,6 +1293,27 @@ export async function getEmailFileFromS3(key: string): Promise<{ body: Uint8Arra
   }
 }
 
+// Adjuntos que el usuario le manda al asistente de /app. Prefijo aparte de `inbound/`
+// para que la lifecycle de 90 días del correo entrante no los toque y viceversa.
+const ASSISTANT_UPLOAD_PREFIX = "assistant-uploads/";
+
+export async function putAssistantUploadToS3(key: string, body: Uint8Array, contentType: string): Promise<void> {
+  const s3 = await getS3();
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new PutObjectCommand({ Bucket: S3_BUCKET, Key: `${ASSISTANT_UPLOAD_PREFIX}${key}`, Body: body, ContentType: contentType }));
+}
+
+export async function getAssistantUploadFromS3(key: string): Promise<{ body: Uint8Array; contentType: string } | null> {
+  const s3 = await getS3();
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  try {
+    const res = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: `${ASSISTANT_UPLOAD_PREFIX}${key}` }));
+    return { body: await res.Body!.transformToByteArray(), contentType: res.ContentType ?? "application/octet-stream" };
+  } catch {
+    return null;
+  }
+}
+
 export async function deleteEmailFileFromS3(key: string): Promise<void> {
   const s3 = await getS3();
   const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");

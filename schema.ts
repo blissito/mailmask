@@ -26,6 +26,8 @@ export const users = sqliteTable("users", {
   utmSource: text("utm_source"),
   utmMedium: text("utm_medium"),
   utmCampaign: text("utm_campaign"),
+  // Nonce del hilo del asistente: rotarlo ("Nueva conversación") cambia el groupId en Ghosty.
+  assistantNonce: text("assistant_nonce"),
 });
 
 export const domains = sqliteTable("domains", {
@@ -547,4 +549,31 @@ export const webhookDeliveries = sqliteTable("webhook_deliveries", {
 }, (table) => [
   index("idx_webhook_deliveries_pending").on(table.status, table.nextAt),
   index("idx_webhook_deliveries_webhook").on(table.webhookId, table.createdAt),
+]);
+
+// --- Asistente de /app (migración 0024) ---
+export const assistantMessages = sqliteTable("assistant_messages", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  userEmail: text("user_email").notNull().references(() => users.email, { onDelete: "cascade" }),
+  role: text("role").notNull(), // user | assistant
+  content: text("content").notNull(),
+  status: text("status").notNull().default("ok"), // ok | failed | stopped
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  index("idx_assistant_messages_user").on(table.userEmail, table.createdAt),
+]);
+
+export const pendingAgentActions = sqliteTable("pending_agent_actions", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  userEmail: text("user_email").notNull().references(() => users.email, { onDelete: "cascade" }),
+  domainId: text("domain_id"),
+  intent: text("intent").notNull(),
+  payload: text("payload", { mode: "json" }).notNull(),
+  summary: text("summary", { mode: "json" }).notNull(),
+  status: text("status").notNull().default("pending"), // pending | executed | failed | rejected | expired
+  result: text("result", { mode: "json" }),
+  createdAt: text("created_at").notNull(),
+  decidedAt: text("decided_at"),
+}, (table) => [
+  index("idx_pending_agent_actions_user").on(table.userEmail, table.status),
 ]);

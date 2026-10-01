@@ -169,6 +169,13 @@
       "when": 1788900500000,
       "tag": "0023_transfer_auth_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1788900600000,
+      "tag": "0024_asistente",
+      "breakpoints": true
     }
   ]
 }
