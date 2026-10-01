@@ -30,7 +30,7 @@
         <a id="admin-link" href="/admin" class="hidden admin">Admin</a>
       </div>
       <div class="app-me">
-        <button type="button" id="assistant-trigger" aria-expanded="false" title="Asistente (⌘K)" class="inline-flex h-8 items-center gap-1.5 rounded-full border border-line px-2.5 text-sm font-semibold text-fg-muted hover:text-fg hover:border-accent transition-colors">
+        <button type="button" id="assistant-trigger" hidden aria-expanded="false" title="Asistente (⌘K)" class="inline-flex h-8 items-center gap-1.5 rounded-full border border-line px-2.5 text-sm font-semibold text-fg-muted hover:text-fg hover:border-accent transition-colors">
           <img src="/favicon.svg" alt="" class="h-4 w-4">
           <span class="hidden sm:inline" data-assistant-name>Mask</span>
         </button>
@@ -595,6 +595,5 @@
   <!-- Asistente (React, public/js/asistente/main.tsx → npm run build:chat) -->
   <div id="assistant-root"></div>
   <script src="/js/app.js"></script>
-  <script type="module" src="/js/asistente.js"></script>
 </body>
 </html>

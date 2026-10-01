@@ -162,6 +162,13 @@ async function checkAuth() {
   currentUser = await res.json();
   document.getElementById("user-email").textContent = currentUser.email;
   if (currentUser.isAdmin) document.getElementById("admin-link")?.classList.remove("hidden");
+  // El asistente se enciende por cuenta mientras se prueba (ASSISTANT_PUBLIC en el servidor).
+  if (currentUser.assistant && !document.getElementById("assistant-script")) {
+    document.getElementById("assistant-trigger")?.removeAttribute("hidden");
+    const s = document.createElement("script");
+    s.type = "module"; s.src = "/js/asistente.js"; s.id = "assistant-script";
+    document.body.appendChild(s);
+  }
 
   // Plan badge in nav
   const badge = document.getElementById("plan-badge");
@@ -592,6 +599,7 @@ function publishScreen() {
 
 // "Pídeselo al asistente": abre el dock con el texto ya escrito.
 function askAssistantButton(text) {
+  if (!currentUser?.assistant) return "";
   return `<button type="button" data-action="ask-assistant" data-text="${esc(text)}" class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg border border-line text-fg-muted hover:text-fg hover:border-accent transition-colors whitespace-nowrap"><img src="/favicon.svg" alt="" class="h-4 w-4">Pídeselo al asistente</button>`;
 }
 document.addEventListener("click", (e) => {
