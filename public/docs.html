@@ -518,13 +518,13 @@ node dist/index.js --help</code></pre>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask login [--api-key mk_...] [--base-url https://...]
 mailmask whoami [--json]
 mailmask logout</code></pre>
-      <p class="text-fg-muted text-sm mb-4">Sin <code>--api-key</code>, <code>login</code> la pide de forma interactiva (necesita una terminal con TTY; si no la hay, falla de inmediato en vez de colgarse).</p>
+      <p class="text-fg-muted text-sm mb-4">Sin <code>--api-key</code>, <code>login</code> abre el navegador para autorizar el dispositivo (device-code, como <code>gh auth login</code>) &mdash; no hace falta copiar y pegar nada. Con <code>--api-key</code> se salta ese paso y guarda la llave directo.</p>
 
       <p class="text-sm font-bold mb-1">Variable de entorno</p>
       <p class="text-fg-muted text-sm mb-4"><code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">MAILMASK_API_KEY</code> tiene prioridad sobre la sesi&oacute;n guardada &mdash; es la v&iacute;a recomendada para CI o para un agente de c&oacute;digo.</p>
 
       <p class="text-sm font-bold mb-1">D&oacute;nde se guarda la sesi&oacute;n</p>
-      <p class="text-fg-muted text-sm mb-4"><code>login</code> guarda la API key en <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">~/.config/mailmask/credentials.json</code>, con permisos <code>600</code>. Es el fallback de archivo mientras no hay integraci&oacute;n con el keychain del sistema operativo.</p>
+      <p class="text-fg-muted text-sm mb-4">En el keychain del sistema operativo (Keychain en macOS, Secret Service/<code>secret-tool</code> en Linux). Si no hay keychain disponible &mdash;Windows, o un Linux sin Secret Service&mdash; cae a <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">~/.config/mailmask/credentials.json</code> con permisos <code>600</code>. <code>mailmask logout</code> la borra de donde haya quedado.</p>
 
       <p class="text-sm font-bold mb-1">C&oacute;digos de salida</p>
       <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-4">
