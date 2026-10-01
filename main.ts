@@ -6,6 +6,7 @@ import * as path from "node:path";
 import * as dns from "node:dns/promises";
 import { programar, esServidor } from "./scheduler.js";
 import { revisarPatron } from "./regex-guard.js";
+import { buildDnsSetup } from "./dns-setup.js";
 import { verificarTurnstile } from "./turnstile.js";
 import { generarPerfilApple, nombreArchivoPerfil, IMAP_HOST } from "./apple-profile.js";
 import { addSseClient, notifyBandeja, setPresence, clearPresence, listPresence, notifyPresence } from "./sse-hub.js";
@@ -2295,6 +2296,19 @@ const app = new Elysia({ adapter: node() })
     });
   }, {
     detail: { tags: ["Domains", "SDK"], summary: "Check domain health and DNS configuration", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  // Los registros que el cliente pega en su registrador. `?live=1` además los compara con el
+  // DNS público y adivina el panel por los NS; la tabla de /app no lo pide (sería lenta).
+  .get("/api/domains/:id/dns-setup", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const live = new URL(request.url).searchParams.get("live") === "1";
+    return Response.json(await buildDnsSetup(access.domain, { live }));
+  }, {
+    detail: { tags: ["Domains", "SDK"], summary: "DNS records to paste at the registrar, optionally checked against live DNS", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
   .post("/api/domains/:id/verify", async ({ request, params }) => {

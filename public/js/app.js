@@ -863,6 +863,14 @@ async function loadDomains() {
     switchTab("apikeys");
   }
 
+  // `/app#transfer=dominio.com` (liga que da el asistente con `transfer_start`): abre el
+  // formulario de transferencia, que es donde se pega el código EPP — nunca en el chat.
+  const transferHash = window.location.hash.match(/^#transfer=([a-z0-9.-]+\.[a-z0-9-]+)$/i);
+  if (transferHash) {
+    history.replaceState(null, "", "/app");
+    iniciarTransferencia(decodeURIComponent(transferHash[1]).toLowerCase());
+  }
+
   // Load referrals list
   try {
     const rRes = await fetch("/api/referrals");
@@ -2006,64 +2014,27 @@ function renderHealthPanel() {
 
 // Los registros que hay que copiar a mano en el proveedor del cliente. No desaparece con
 // el editor: hay quien no va a delegar nunca su DNS con nosotros, y está bien.
-function renderDnsRecords(contenedor) {
+// La lista sale de `GET /api/domains/:id/dns-setup` — la misma que lee el asistente por MCP —
+// para que el registro que dicta el agente y el que ve el cliente no puedan discrepar.
+async function renderDnsRecords(contenedor) {
   if (!selectedDomain) return;
   const records = contenedor || document.getElementById("dns-records");
+  const domainId = selectedDomain.id;
 
-  const d = selectedDomain.domain;
-  const dnsItems = [
-    {
-      type: "MX",
-      name: "@",
-      value: "10 inbound-smtp.us-east-1.amazonaws.com",
-      hints: [
-        `<strong>@</strong> significa el dominio raíz (<strong>${esc(d)}</strong>). La mayoría de proveedores usan <strong>@</strong>.`,
-        `Si tu proveedor tiene un campo separado de <strong>Prioridad</strong>, pon <strong>10</strong> ahí y solo la dirección como valor.`,
-      ],
-    },
-    {
-      type: "TXT",
-      name: "_amazonses",
-      value: selectedDomain.verificationToken,
-      hints: [
-        `Pon solo <strong>_amazonses</strong> como nombre — tu proveedor agrega <strong>.${esc(d)}</strong> automáticamente.`,
-        `Si tu proveedor pide comillas alrededor del valor, agrégalas: <strong>"${esc(selectedDomain.verificationToken)}"</strong>.`,
-      ],
-    },
-    ...selectedDomain.dkimTokens.map(token => ({
-      type: "CNAME",
-      name: `${token}._domainkey`,
-      value: `${token}.dkim.amazonses.com`,
-      hints: [
-        `Pon solo <strong>${esc(token)}._domainkey</strong> como nombre — tu proveedor agrega <strong>.${esc(d)}</strong> automáticamente.`,
-      ],
-    })),
-    {
-      type: "TXT",
-      name: "@",
-      value: "v=spf1 include:amazonses.com ~all",
-      level: "recomendado",
-      benefit: "Algunos receptores revisan SPF además de DKIM. Con este registro, tus correos llegan a más bandejas y menos a spam.",
-      hints: [
-        `Este registro <strong>SPF</strong> autoriza a Amazon SES a enviar emails en nombre de tu dominio.`,
-        `Si ya tienes un registro SPF, agrega <strong>include:amazonses.com</strong> antes del <strong>~all</strong> existente en vez de crear uno nuevo.`,
-      ],
-    },
-    {
-      type: "TXT",
-      name: "_dmarc",
-      value: `v=DMARC1; p=none; rua=mailto:dmarc@${d}`,
-      level: "opcional",
-      benefit: "Gmail y Yahoo tratan mejor a los dominios con política DMARC, y te llegan reportes de quién envía en tu nombre. Tu firma DKIM ya cumple, así que se activa sin riesgo.",
-      hints: [
-        `<strong>p=none</strong> solo observa: nada se bloquea. Cuando veas que todo pasa, súbelo a <strong>p=quarantine</strong> para que los receptores rechacen a quien se haga pasar por ti.`,
-        `Los reportes llegan a <strong>dmarc@${esc(d)}</strong>. Crea ese alias en MailMask, o cambia la dirección por otra tuya.`,
-      ],
-    },
-  ];
+  let dnsItems;
+  try {
+    const res = await fetch(`/api/domains/${domainId}/dns-setup`);
+    if (!res.ok) throw new Error("dns-setup");
+    dnsItems = (await res.json()).records;
+  } catch {
+    records.innerHTML = `<div class="px-4 py-4 text-sm text-fg-muted">No pudimos cargar los registros. Recarga la página.</div>`;
+    return;
+  }
+  // El usuario pudo cambiar de dominio mientras llegaba la respuesta.
+  if (selectedDomain?.id !== domainId) return;
 
-  const sharedDkimHint = `Los 3 registros CNAME son para <strong>DKIM</strong> — la firma digital que evita que tus emails caigan en spam.`;
-  if (dnsItems.length > 2) dnsItems[2].hints.unshift(sharedDkimHint);
+  // Las pistas vienen con **negritas** estilo markdown; todo lo demás se escapa.
+  const hintHtml = (h) => esc(h).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 
   const copyBtn = (val) => `<button data-action="copy" data-copy-value="${esc(val)}" class="text-fg-subtle hover:text-white transition-colors shrink-0 p-1 rounded hover:bg-line" title="Copiar"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>`;
 
@@ -2101,12 +2072,12 @@ function renderDnsRecords(contenedor) {
           </div>
           <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 sm:pl-[80px]">
             <span class="hidden sm:inline">${levelPill(r)}</span>
-            ${r.benefit ? `<span class="text-xs text-fg-muted">${r.benefit}</span>` : ""}
+            ${r.benefit ? `<span class="text-xs text-fg-muted">${esc(r.benefit)}</span>` : ""}
             ${r.hints.length ? `
               <details class="text-xs">
                 <summary class="cursor-pointer text-fg-subtle hover:text-fg select-none">Ayuda</summary>
                 <ul class="mt-1.5 space-y-1 text-fg-subtle leading-relaxed list-disc pl-4">
-                  ${r.hints.map(h => `<li>${h}</li>`).join("")}
+                  ${r.hints.map(h => `<li>${hintHtml(h)}</li>`).join("")}
                 </ul>
               </details>` : ""}
           </div>
