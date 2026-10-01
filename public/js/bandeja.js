@@ -810,10 +810,30 @@ function cuerpoMensaje(item) {
   // El HTML manda cuando existe: en un correo sólo-HTML el `body` es texto derivado
   // (etiquetas fuera) y se ve peor que el original en el iframe.
   if (!item.html) return item.body ? esc(item.body) : "";
+  // Lo que salió del compositor lleva nuestra plantilla (fondo crema, columna de 600 px
+  // centrada): dentro de la Bandeja eso se veía como una caja blanca con el texto en
+  // medio. Se le quita el "papel" y hereda el tema, como un mensaje más del hilo.
+  const propio = item.html.includes('class="email-wrapper"');
+  const html = propio ? item.html.replace("</head>", `${estiloPlantillaPropia()}</head>`) : item.html;
   // srcdoc escapado: el HTML del correo viaja como atributo, no como marcado.
   // `allow-same-origin` (sin `allow-scripts`) deja que el padre lo mida: dentro
   // sigue sin correr JavaScript. El alto lo pone ajustarIframe.
-  return `<div class="mesa-msg-html-wrap"><iframe class="mesa-msg-html" sandbox="allow-same-origin" referrerpolicy="no-referrer" srcdoc="${esc(item.html)}"></iframe></div>`;
+  return `<div class="mesa-msg-html-wrap"><iframe class="mesa-msg-html${propio ? " is-propio" : ""}" sandbox="allow-same-origin" referrerpolicy="no-referrer" srcdoc="${esc(html)}"></iframe></div>`;
+}
+
+// `!important` en hoja gana a los estilos inline que dejó juice, y CSS gana al `bgcolor`.
+function estiloPlantillaPropia() {
+  const css = getComputedStyle(document.documentElement);
+  const color = (v) => `rgb(${css.getPropertyValue(v).trim().split(/\s+/).join(",")})`;
+  return `<style>
+html,body,.email-wrapper,.email-wrapper td{background:transparent!important}
+body{margin:0!important;color-scheme:light dark}
+.email-content{max-width:none!important;margin:0!important;width:100%!important}
+.email-wrapper>tbody>tr>td,.email-wrapper>tr>td{text-align:left!important}
+.email-body{padding:2px 0!important;color:${color("--fg")}!important}
+.email-body :is(p,li,h1,h2,h3,h4,h5,h6,strong,em,b,i,span,blockquote,td.email-body){color:inherit!important}
+.email-body a{color:${color("--accent-text")}!important}
+</style>`;
 }
 
 function renderMessages(messages, notes) {

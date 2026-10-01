@@ -1526,6 +1526,8 @@ body.mm-composer-locked { overflow: hidden; }
   background: var(--mesa-paper);
 }
 .mesa-msg-html.is-medido { opacity: 1; }
+/* Lo que mandamos nosotros: sin papel ni borde, el texto va directo sobre el hilo. */
+.mesa-msg-html.is-propio { background: transparent; border: 0; border-radius: 0; }
 /* Envoltorio del iframe: si el correo es más ancho que el hueco, ajustarIframe lo
    escala con transform y le pone aquí el alto ya escalado. */
 .mesa-msg-html-wrap { overflow: hidden; max-width: 100%; }
