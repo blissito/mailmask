@@ -75,8 +75,16 @@
     .sidebar a { display: block; padding: 6px 16px; font-size: 14px; color: rgb(var(--fg-muted)); border-left: 2px solid transparent; transition: all 0.15s; }
     .sidebar a:hover, .sidebar a.active { color: rgb(var(--accent-text)); border-left-color: rgb(var(--accent)); }
     pre { position: relative; }
-    .copy-btn { position: absolute; top: 8px; right: 8px; padding: 4px 10px; font-size: 12px; background: rgb(var(--bg-inset)); border: 1px solid rgb(var(--line)); border-radius: 6px; color: rgb(var(--fg-muted)); cursor: pointer; transition: all 0.15s; }
+    pre:has(.copy-btn) { padding-right: 52px; }
+    .copy-btn { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgb(var(--bg-inset)); border: 1px solid rgb(var(--line)); border-radius: 6px; color: rgb(var(--fg-muted)); cursor: pointer; transition: color 0.15s, border-color 0.15s; }
     .copy-btn:hover { color: rgb(var(--fg)); border-color: rgb(var(--fg-subtle)); }
+    .copy-btn svg { position: absolute; transition: opacity 0.15s, transform 0.2s cubic-bezier(.34,1.56,.64,1); }
+    .copy-btn .i-ok, .copy-btn .i-err { opacity: 0; transform: scale(0.5); }
+    .copy-btn[data-state="ok"] { color: rgb(var(--mask-500)); border-color: rgb(var(--mask-500)); }
+    .copy-btn[data-state="err"] { color: #ef4444; border-color: #ef4444; }
+    .copy-btn[data-state="ok"] .i-copy, .copy-btn[data-state="err"] .i-copy { opacity: 0; transform: scale(0.5); }
+    .copy-btn[data-state="ok"] .i-ok, .copy-btn[data-state="err"] .i-err { opacity: 1; transform: scale(1); }
+    pre.multiline .copy-btn { top: 10px; transform: none; }
     code .kw { color: rgb(var(--accent-text)); }
     code .str { color: rgb(var(--mask-700)); }
     code .cm { color: rgb(var(--fg-subtle)); }
@@ -190,30 +198,40 @@
       <!-- Skills: la puerta recomendada -->
       <section id="skills" class="mt-2 mb-12 rounded-xl border-2 border-mask-500 bg-mask-500/10 p-6">
         <p class="text-xs font-bold uppercase tracking-widest text-mask-500 mb-2">Recomendado</p>
-        <h2 class="text-2xl font-bold mb-3">Usa MailMask con tu agente</h2>
-        <p class="text-fg-muted mb-4">No hace falta leer esta p&aacute;gina: inst&aacute;lale a tu agente (Claude Code, Cursor, Codex, Copilot&hellip;) las <strong class="text-fg">skills oficiales</strong> y p&iacute;dele lo que necesitas en espa&ntilde;ol &mdash; &ldquo;crea hola@ que reenv&iacute;e a mi Gmail&rdquo;, &ldquo;apunta el dominio a Vercel&rdquo;, &ldquo;av&iacute;sale a mi app cuando llegue correo&rdquo;. Las skills saben qu&eacute; puede hacer cada plan, qu&eacute; secretos salen una sola vez y qu&eacute; no se debe borrar.</p>
-        <p class="text-sm font-bold mb-1">1. Instala las skills</p>
-        <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-4"><code>npx skills add https://www.mailmask.studio</code></pre>
-        <div id="docs-key" class="rounded-lg border border-line bg-bg p-4 mb-4">
-          <p class="text-sm font-bold mb-1">2. Dale una API key a tu agente</p>
-          <div data-anon class="hidden text-sm text-fg-muted">
-            <a href="/login" class="text-accent-text hover:underline">Inicia sesi&oacute;n</a> y gen&eacute;rala aqu&iacute; mismo, o cr&eacute;ala en el <a href="/app#apikeys" class="text-accent-text hover:underline">Dashboard &rarr; API Keys</a>. Es gratis y da acceso a toda la cuenta.
-          </div>
-          <div data-auth class="hidden text-sm text-fg-muted">
-            <p class="mb-3">Sesi&oacute;n de <strong class="text-fg" data-email></strong>. Tambi&eacute;n puedes administrarlas en <a href="/app#apikeys" class="text-accent-text hover:underline">Dashboard &rarr; API Keys</a>.</p>
-            <button data-generate class="btn-primary text-sm px-4 py-2">Generar API key para mi agente</button>
-            <div data-result class="hidden mt-3"></div>
-          </div>
-        </div>
-        <p class="text-fg-muted text-sm mb-3">3. Conecta el <a href="#mcp" class="text-accent-text hover:underline">servidor MCP</a> con esa llave y el agente opera la cuenta por ti. Cinco skills, instala todas o solo la que necesitas:</p>
-        <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-3">
-          <li><code>mailmask-account</code>: opera la cuenta entera en tu nombre (dominios, m&aacute;scaras, buzones, reglas, webhooks, env&iacute;o) con sus reglas de seguridad.</li>
-          <li><code>mailmask-mcp</code>: conecta el cliente MCP y sabe leer sus resultados (403 con precio, 409 con <code>suggestedValues</code>, secretos que salen una sola vez).</li>
-          <li><code>mailmask-sdk</code>: usa <code>@easybits.cloud/mailmask</code> desde c&oacute;digo, incluida la verificaci&oacute;n de firma de webhooks.</li>
-          <li><code>mailmask-dns</code>: apunta el dominio a Vercel, Netlify, GitHub Pages&hellip; sin romper el correo.</li>
-          <li><code>mailmask-docs</code>: lee esta documentaci&oacute;n, <code>llms.txt</code> y el OpenAPI sin scrapear.</li>
-        </ul>
-        <p class="text-fg-subtle text-xs">Formato <a href="https://agentskills.io" class="text-accent-text hover:underline" rel="noopener" target="_blank">Agent Skills</a>. Espejo en GitHub: <code>npx skills add blissito/mailmask-skills</code>. &Iacute;ndice en <code>/.well-known/agent-skills/index.json</code>; cada skill en <code>/skills/&lt;nombre&gt;/SKILL.md</code>.</p>
+        <h2 class="text-2xl font-bold mb-2">Usa MailMask con tu agente</h2>
+        <p class="text-fg-muted mb-5">Instala las skills en Claude Code, Cursor, Codex o Copilot y p&iacute;dele lo que necesitas en espa&ntilde;ol: &ldquo;crea hola@ que reenv&iacute;e a mi Gmail&rdquo;.</p>
+        <ol class="space-y-4">
+          <li>
+            <p class="text-sm font-bold mb-2">1. Instala las skills</p>
+            <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono"><code>npx skills add https://www.mailmask.studio</code></pre>
+          </li>
+          <li id="docs-key">
+            <p class="text-sm font-bold mb-1">2. Dale una API key</p>
+            <div data-anon class="hidden text-sm text-fg-muted">
+              <a href="/login" class="text-accent-text hover:underline">Inicia sesi&oacute;n</a> y gen&eacute;rala aqu&iacute;, o en <a href="/app#apikeys" class="text-accent-text hover:underline">Dashboard &rarr; API Keys</a>. Es gratis.
+            </div>
+            <div data-auth class="hidden text-sm text-fg-muted">
+              <p class="mb-3">Sesi&oacute;n de <strong class="text-fg" data-email></strong>.</p>
+              <button data-generate class="btn-primary text-sm px-4 py-2">Generar API key para mi agente</button>
+              <div data-result class="hidden mt-3"></div>
+            </div>
+          </li>
+          <li>
+            <p class="text-sm font-bold mb-1">3. Conecta el MCP</p>
+            <p class="text-sm text-fg-muted">Con esa llave, el <a href="#mcp" class="text-accent-text hover:underline">servidor MCP</a> deja que el agente opere la cuenta por ti.</p>
+          </li>
+        </ol>
+        <details class="mt-5 text-sm text-fg-muted">
+          <summary class="cursor-pointer text-fg-subtle hover:text-fg">Qu&eacute; trae cada una de las 5 skills</summary>
+          <ul class="list-disc pl-6 space-y-1 mt-3">
+            <li><code>mailmask-account</code>: opera la cuenta entera (dominios, m&aacute;scaras, buzones, reglas, webhooks, env&iacute;o).</li>
+            <li><code>mailmask-mcp</code>: conecta el cliente MCP y sabe leer sus respuestas.</li>
+            <li><code>mailmask-sdk</code>: usa <code>@easybits.cloud/mailmask</code> desde c&oacute;digo.</li>
+            <li><code>mailmask-dns</code>: apunta el dominio a Vercel, Netlify o GitHub Pages sin romper el correo.</li>
+            <li><code>mailmask-docs</code>: lee esta documentaci&oacute;n, <code>llms.txt</code> y el OpenAPI.</li>
+          </ul>
+          <p class="text-fg-subtle text-xs mt-3">Formato <a href="https://agentskills.io" class="text-accent-text hover:underline" rel="noopener" target="_blank">Agent Skills</a>. Espejo: <code>npx skills add blissito/mailmask-skills</code>.</p>
+        </details>
       </section>
 
       <!-- Instalacion -->
@@ -569,19 +587,67 @@ claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \
   <script type="module" src="/js/docs-chat.js"></script>
   <script src="/js/docs-keys.js" defer></script>
   <script>
-    // Copy buttons
-    document.querySelectorAll('pre').forEach(pre => {
+    // Botón de copiar con icono: copiar → palomita (o tache si el portapapeles falla)
+    const ICON = (cls, d) => `<svg class="${cls}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+    const COPY_ICONS =
+      ICON('i-copy', '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>') +
+      ICON('i-ok', '<path d="M20 6 9 17l-5-5"/>') +
+      ICON('i-err', '<path d="M18 6 6 18M6 6l12 12"/>');
+    function tick(ok) {
+      try {
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(ok ? 660 : 220, ctx.currentTime);
+        if (ok) osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.08);
+        gain.gain.value = 0.06;
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+        osc.start(); osc.stop(ctx.currentTime + 0.12);
+      } catch {}
+    }
+    // La API del portapapeles puede quedarse esperando un permiso; tras 600 ms se usa execCommand
+    async function copyText(text) {
+      try {
+        const r = await Promise.race([
+          navigator.clipboard.writeText(text).then(() => true),
+          new Promise((res) => setTimeout(() => res(false), 600)),
+        ]);
+        if (r) return;
+      } catch {}
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      if (!ok) throw new Error('copy failed');
+    }
+    window.addCopyButton = (pre) => {
+      if (pre.querySelector('.copy-btn')) return;
       const btn = document.createElement('button');
+      btn.type = 'button';
       btn.className = 'copy-btn';
-      btn.textContent = 'Copiar';
+      btn.title = 'Copiar';
+      btn.setAttribute('aria-label', 'Copiar');
+      btn.innerHTML = COPY_ICONS;
+      let timer;
       btn.addEventListener('click', async () => {
-        const code = pre.querySelector('code').textContent;
-        await navigator.clipboard.writeText(code);
-        btn.textContent = 'Copiado!';
-        setTimeout(() => btn.textContent = 'Copiar', 1500);
+        let ok = true;
+        try { await copyText(pre.querySelector('code').textContent); } catch { ok = false; }
+        btn.dataset.state = ok ? 'ok' : 'err';
+        btn.title = ok ? 'Copiado' : 'No se pudo copiar';
+        tick(ok);
+        clearTimeout(timer);
+        timer = setTimeout(() => { delete btn.dataset.state; btn.title = 'Copiar'; }, 1500);
       });
+      if (pre.querySelector('code').textContent.trim().includes('\n')) pre.classList.add('multiline');
       pre.appendChild(btn);
-    });
+    };
+    document.querySelectorAll('pre').forEach(window.addCopyButton);
 
     // Active sidebar link on scroll
     const sections = document.querySelectorAll('h2[id]');
