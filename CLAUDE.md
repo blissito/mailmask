@@ -42,14 +42,18 @@ comprueba "no es 404" ya vale: eso solo habría atrapado 6 de los 10 bugs.
 
 `POST /mcp` es un servidor MCP Streamable HTTP **sin sesiones** (`@modelcontextprotocol/sdk`,
 `WebStandardStreamableHTTPServerTransport`, `enableJsonResponse`), autenticado sólo con
-`Authorization: Bearer mk_…` (la API key normal; sin ella 401, y `/mcp` está exento de CSRF
-porque nunca acepta cookie). **Cada herramienta es el SDK real** (`sdk/src`, que sí viaja
+`Authorization: Bearer mk_…` (la API key normal) o `Bearer mt_…` (turn token del asistente,
+ver "Asistente Mask"); sin ellas 401, y `/mcp` está exento de CSRF porque nunca acepta cookie.
+70 herramientas desde el 1-oct-2026 (cobro por liga, compra/transferencia/renovación de
+dominios, equipo, firma, respuestas guardadas, `domain_dns_setup`) y `MCP_INSTRUCTIONS`
+(≤6000 caracteres, lo fija `mcp.test.ts`): es todo lo que un agente partner sabe del producto. **Cada herramienta es el SDK real** (`sdk/src`, que sí viaja
 en la imagen) hablando con la app en proceso vía `app.fetch` — el mismo truco de
 `sdk.test.ts` —, así que no puede desalinearse de una ruta sin que `sdk.test.ts` lo cace.
 Para añadir una: método en el SDK → caso en `sdk.test.ts` → `tool()` en `mcp.ts`. Un
 `MailMaskError` sale como `isError` con `HTTP <status>: <mensaje>` (el 403 del precio es
 información útil para el agente). No se exponen las API keys (un agente con una llave no
-fabrica más), ni Bandeja ni billing. Pruebas en `mcp.test.ts`. Docs en `docs.html#mcp` y
+fabrica más) ni las conversaciones de la Bandeja; un pago siempre es una liga que abre el
+usuario (`paid: false`). Pruebas en `mcp.test.ts`. Docs en `docs.html#mcp` y
 `EXTRA_DOCS` de `upload-docs.ts`. GET/DELETE dan 405: sin sesiones no hay stream ni cierre.
 
 ## MCP Registry oficial (`studio.mailmask/mailmask`, 19-sep-2026)
@@ -79,6 +83,54 @@ generado **no se commitea**: lo produce el `RUN` del Dockerfile (por eso `.docke
 `npm test`. Rutas en `main.ts`: `/skills/*`, `/.well-known/agent-skills/index.json`,
 `/.well-known/skills/index.json`. **Al tocar una skill**: `npm run skills:publish` (subtree push
 al espejo, manual) y, si cambió la sección `#skills` de `docs.html`, re-subir la KB de Formmy.
+
+## Asistente Mask (1-oct-2026)
+
+Chat "Mask" dentro de `/app` que **hace** las cosas con el MCP de MailMask. El cerebro corre en
+Ghosty; MailMask sólo firma, acuña credenciales y guarda el historial.
+
+**Camino de un turno:** dock (`public/js/asistente/`, portado del de agenda; bundle
+`public/js/asistente.js`) → `/api/asistente*` (`main.ts`, cliente en `assistant.ts`) → Ghosty
+`POST /api/v2/fleet-agents/:id/message-stream` firmado con HMAC (`X-Ghosty-Key` = `gpk_…`,
+secreto `gps_…`, canónico `${ts}.${keyId}.${rawBody}`, ±300 s) → claude-worker con el MCP
+`mailmask` → `gs mcp-proxy` → nuestro `/mcp` con `Authorization: Bearer ${turn.token}`. Ese token
+es un `mt_…` (`issueTurnToken` en `auth.ts`): JWT `aud: "assistant"`, **300 s**, uno nuevo por
+turno, 120 req/min por usuario. Un `mt_` no sirve como cookie ni una cookie como `mt_`.
+`GHOSTY_RUNTIME=partner` usa `/api/v2/partner/turns` (motor sólo-MCP) en vez de la flota.
+
+**Env:** `GHOSTY_PARTNER_KEY`, `GHOSTY_PARTNER_SECRET`, `GHOSTY_AGENT_ID` (obligatorio en
+`fleet`), `GHOSTY_RUNTIME` (`fleet` por defecto), `ASSISTANT_EMAILS` (probadores, por comas) y
+`ASSISTANT_PUBLIC=1` para abrirlo a todos; mientras no, sólo lo ven los admins y esa lista.
+
+**Ghosty, configurado por CLI** (no hay nada en el repo que lo cree): space `mailmask`, agente
+**Mask** `cmuq2rfma0008gewlanomot6g`; `ghosty mcp set` con `ghosty/mcp.json` (el header lleva el
+literal `${turn.token}`, que Ghosty sustituye por turno); prompt en `ghosty/prompt.md`; tope de
+modelo 4 y llave de Claude de la casa. Si cambias el prompt o el MCP en el repo, vuelve a
+subirlos con el CLI: no se sincronizan solos.
+
+**Confirmación de lo destructivo** (`agent-actions.ts`, tabla `pending_agent_actions`,
+migración 0024): con `via: "turn"`, `delete_domain`, `delete_alias`, `delete_mailbox`,
+`delete_dns_record`, `remove_member` y `transfer_out` **no ejecutan**: guardan la petición y
+responden `409 { error: "needs_confirmation", actionId, summary }`. `mcp.ts` lo convierte en
+resultado normal con `needsConfirmation: true` (si pareciera error, el modelo reintentaría) y el
+dock pinta `PendingActionCard`. El resumen sale de la base, nunca del texto del modelo; aprobar
+(`POST /api/agent-actions`) exige cookie + CSRF y rechaza todo Bearer (si no, el agente se
+aprobaría solo); `UPDATE … WHERE status='pending'` evita doble ejecución; caduca a los 15 min.
+Con `mk_` todo sigue ejecutándose directo.
+
+**Añadir una herramienta = método en el SDK → caso en `sdk.test.ts` → `tool()` en `mcp.ts` →
+etiqueta en `public/js/asistente/toolLabel.ts`** (la traza del dock; sin ella sale el nombre
+crudo). Si es destructiva, además `requireConfirmation()` en la ruta y un `AgentIntent` nuevo.
+
+**Activación anual:** `POST /api/addons/checkout` acepta `period: "annual"` (sólo `kind:
+"domain"`): preapproval de `DOMAIN_ANNUAL_PRICE` = $999 MXN con `frequency: 12`, y el webhook
+da 370 días de vigencia (35 al mensual). `billing.checkout()` del SDK y `activation_link` aún no
+exponen `period`.
+
+**MercadoPago bloquea el checkout si el pagador usa la tarjeta guardada de la cuenta
+cobradora** (1-oct-2026, insightslab con la Visa 8439): misma familia que "Payer and collector
+cannot be the same user". Hay que pagar con otra tarjeta u otra cuenta de MP, nunca con la
+guardada en la cuenta que cobra.
 
 ## Dominios: registro, renovación, transferencias y DNS (7-sep-2026)
 
