@@ -42,6 +42,10 @@ const EXACT: Record<string, string> = {
   delete_domain: "Eliminando el dominio",
   domain_dns_setup: "Preparando los registros DNS",
   activation_link: "Generando el enlace para activar",
+  // Perfil de la cuenta.
+  get_profile: "Consultando tu perfil",
+  update_profile: "Cambiando el nombre de tu perfil",
+  set_profile_photo: "Poniendo tu foto de perfil",
   // Alias y buzones.
   list_aliases: "Consultando los alias",
   create_alias: "Creando el alias",

@@ -8,6 +8,7 @@ import type {
   DnsChangeResult, DnsPreset, DnsSetup,
   BillingStatus, AddonsResponse, CheckoutLink, DomainSearchResult, TldPrice, DomainRegistrationCreated,
   DomainRegistration, TransferCheck, TransferDnsInventory, RenewalLink, DomainMember, DomainInvite, CannedReply,
+  AccountProfile,
 } from "./types.js";
 
 class MailMaskError extends Error {
@@ -60,6 +61,7 @@ export class MailMask {
   members: MembersResource;
   signature: SignatureResource;
   canned: CannedResource;
+  account: AccountResource;
 
   constructor(config: MailMaskConfig) {
     this.apiKey = config.apiKey;
@@ -86,6 +88,7 @@ export class MailMask {
     this.members = new MembersResource(req);
     this.signature = new SignatureResource(req);
     this.canned = new CannedResource(req);
+    this.account = new AccountResource(req);
   }
 }
 
@@ -282,6 +285,26 @@ class CannedResource {
     return this.req<CannedReply>(`/api/domains/${domainId}/canned`, { method: "POST", body: JSON.stringify(input) });
   }
   delete(domainId: string, cannedId: string) { return this.req<{ ok: boolean }>(`/api/domains/${domainId}/canned/${cannedId}`, { method: "DELETE" }); }
+}
+
+class AccountResource {
+  constructor(private req: Req) {}
+  getProfile() { return this.req<AccountProfile>("/api/profile"); }
+  /** Nombre visible (máx. 60 caracteres). Cadena vacía lo borra. */
+  updateProfile(input: { displayName: string | null }) {
+    return this.req<AccountProfile>("/api/profile", { method: "PUT", body: JSON.stringify(input) });
+  }
+  /** Foto desde un adjunto que el usuario subió al asistente (URL firmada de `/api/asistente/files/*`). */
+  setAvatarFromUrl(url: string) {
+    return this.req<AccountProfile & { ok: boolean }>("/api/profile/avatar", { method: "POST", body: JSON.stringify({ fromUrl: url }) });
+  }
+  /** Foto desde bytes (PNG, JPG o WebP; máx. 2 MB). */
+  setAvatar(file: Blob, filename = "avatar") {
+    const form = new FormData();
+    form.append("file", file, filename);
+    return this.req<AccountProfile & { ok: boolean }>("/api/profile/avatar", { method: "POST", body: form });
+  }
+  removeAvatar() { return this.req<AccountProfile & { ok: boolean }>("/api/profile/avatar", { method: "DELETE" }); }
 }
 
 export { MailMaskError };

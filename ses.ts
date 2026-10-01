@@ -1314,6 +1314,39 @@ export async function getAssistantUploadFromS3(key: string): Promise<{ body: Uin
   }
 }
 
+// Fotos de perfil de las cuentas (`profile.ts`). Permanentes como el logo de la firma:
+// nada las barre. La llave lleva un UUID nuevo en cada subida y se sirve inmutable.
+const USER_AVATAR_PREFIX = "user-avatars/";
+
+export async function putUserAvatarToS3(key: string, body: Uint8Array, contentType: string): Promise<void> {
+  const s3 = await getS3();
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: `${USER_AVATAR_PREFIX}${key}`,
+    Body: body,
+    ContentType: contentType,
+    CacheControl: "public, max-age=31536000, immutable",
+  }));
+}
+
+export async function getUserAvatarFromS3(key: string): Promise<{ body: Uint8Array; contentType: string } | null> {
+  const s3 = await getS3();
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  try {
+    const res = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: `${USER_AVATAR_PREFIX}${key}` }));
+    return { body: await res.Body!.transformToByteArray(), contentType: res.ContentType ?? "application/octet-stream" };
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteUserAvatarFromS3(key: string): Promise<void> {
+  const s3 = await getS3();
+  const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: `${USER_AVATAR_PREFIX}${key}` }));
+}
+
 export async function deleteEmailFileFromS3(key: string): Promise<void> {
   const s3 = await getS3();
   const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");

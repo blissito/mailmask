@@ -571,7 +571,13 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
 <span class="kw">const</span> { signature } = <span class="kw">await</span> mm.signature.<span class="fn">get</span>(<span class="str">"domain-id"</span>);
 <span class="kw">const</span> canned = <span class="kw">await</span> mm.canned.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
 <span class="kw">await</span> mm.canned.<span class="fn">create</span>(<span class="str">"domain-id"</span>, { title: <span class="str">"Gracias"</span>, body: <span class="str">"&iexcl;Gracias por escribir!"</span> });
-<span class="kw">await</span> mm.canned.<span class="fn">delete</span>(<span class="str">"domain-id"</span>, <span class="str">"canned-id"</span>);</code></pre>
+<span class="kw">await</span> mm.canned.<span class="fn">delete</span>(<span class="str">"domain-id"</span>, <span class="str">"canned-id"</span>);
+
+<span class="cm">// Perfil de la cuenta: nombre y foto con los que te ve tu equipo en la Bandeja</span>
+<span class="kw">const</span> perfil = <span class="kw">await</span> mm.account.<span class="fn">getProfile</span>(); <span class="cm">// { email, displayName, avatarUrl }</span>
+<span class="kw">await</span> mm.account.<span class="fn">updateProfile</span>({ displayName: <span class="str">"Ana Ruiz"</span> });
+<span class="kw">await</span> mm.account.<span class="fn">setAvatar</span>(archivo); <span class="cm">// PNG, JPG o WebP, m&aacute;x. 2 MB</span>
+<span class="kw">await</span> mm.account.<span class="fn">removeAvatar</span>();</code></pre>
       <h3 id="activacion-anual" class="text-lg font-semibold text-fg mt-8 mb-2">Activaci&oacute;n anual</h3>
       <p class="text-fg-muted mb-4">La activaci&oacute;n del dominio tambi&eacute;n se paga por a&ntilde;o: <strong class="text-fg">$999 MXN cada 12 meses</strong> en vez de $99 al mes. Por HTTP se pide con <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">period: "annual"</code> en <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">POST /api/addons/checkout</code> (por omisi&oacute;n <code class="text-fg">"monthly"</code>). S&oacute;lo aplica a <code class="text-fg">kind: "domain"</code>: los bloques de espacio y env&iacute;os son mensuales y responden 400 si se piden anuales. El m&eacute;todo <code class="text-fg">billing.checkout()</code> del SDK todav&iacute;a no expone <code class="text-fg">period</code>.</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>POST /api/addons/checkout
@@ -607,7 +613,7 @@ claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \
     }
   }
 }</code></pre>
-      <p class="text-fg-muted mb-2">Son 70 herramientas; cada una es un m&eacute;todo del SDK, con las mismas reglas y l&iacute;mites. Al conectarse, el cliente recibe adem&aacute;s una gu&iacute;a (<code>instructions</code>) con el orden para conectar un dominio, qu&eacute; significa gratis, activado y bloqueado, y c&oacute;mo funcionan los pagos.</p>
+      <p class="text-fg-muted mb-2">Son 73 herramientas; cada una es un m&eacute;todo del SDK, con las mismas reglas y l&iacute;mites. Al conectarse, el cliente recibe adem&aacute;s una gu&iacute;a (<code>instructions</code>) con el orden para conectar un dominio, qu&eacute; significa gratis, activado y bloqueado, y c&oacute;mo funcionan los pagos.</p>
       <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-4">
         <li><strong>Dominios</strong>: <code>list_domains</code>, <code>get_domain</code>, <code>create_domain</code> (devuelve los registros DNS: MX, TXT, DKIM, SPF), <code>domain_dns_setup</code> (los registros exactos para pegar en tu registrador, cu&aacute;les ya se ven y en qu&eacute; panel van), <code>verify_domain</code>, <code>domain_health</code>, <code>delete_domain</code>.</li>
         <li><strong>M&aacute;scaras y buzones</strong>: <code>list_aliases</code>, <code>create_alias</code> (con <code>mailbox: true</code> crea tambi&eacute;n el buz&oacute;n IMAP), <code>update_alias</code>, <code>delete_alias</code>, <code>create_mailbox</code>, <code>delete_mailbox</code>, <code>reset_mailbox_password</code> (contrase&ntilde;a nueva, devuelta una sola vez), <code>apple_profile_link</code> (liga al perfil de Apple Mail), <code>mailbox_export_link</code> (liga para descargar el <code>.mbox</code>).</li>
@@ -617,6 +623,7 @@ claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \
         <li><strong>Transferencias</strong>: <code>transfer_check</code>, <code>transfer_start</code> (devuelve la liga al formulario seguro donde se pega el c&oacute;digo EPP: <strong>el c&oacute;digo nunca pasa por el chat</strong>), <code>transfer_status</code>, <code>transfer_dns</code>, <code>update_transfer_dns</code>, <code>approve_transfer_dns</code>, <code>resend_transfer_email</code>, <code>transfer_out</code> (el EPP llega por correo al due&ntilde;o).</li>
         <li><strong>Equipo</strong>: <code>list_members</code>, <code>invite_member</code>, <code>remove_member</code>, <code>cancel_invite</code>.</li>
         <li><strong>Bandeja</strong>: <code>get_signature</code>, <code>set_signature</code>, <code>list_canned_replies</code>, <code>create_canned_reply</code>, <code>delete_canned_reply</code>.</li>
+        <li><strong>Perfil de la cuenta</strong> (tu usuario de MailMask, no una m&aacute;scara): <code>get_profile</code>, <code>update_profile</code> (nombre visible, m&aacute;x. 60), <code>set_profile_photo</code> (s&oacute;lo con una imagen que adjuntaste en el chat del asistente).</li>
         <li><strong>Reglas</strong>: <code>list_rules</code>, <code>create_rule</code>, <code>update_rule</code>, <code>delete_rule</code>.</li>
         <li><strong>Webhooks</strong>: <code>list_webhooks</code>, <code>create_webhook</code>, <code>update_webhook</code>, <code>delete_webhook</code>, <code>test_webhook</code>, <code>webhook_deliveries</code>.</li>
         <li><strong>Env&iacute;o</strong>: <code>send_email</code> (con <code>idempotencyKey</code>), <code>bulk_send</code>, <code>bulk_status</code>.</li>

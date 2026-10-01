@@ -206,7 +206,7 @@ Configuración para Claude Desktop, Cursor y otros (mcp.json):
   }
 }
 
-Son 70 herramientas (cada una es un método del SDK, con las mismas reglas y límites). Al conectarse, el cliente recibe además una guía con el orden para conectar un dominio, qué significa gratis/activado/bloqueado y cómo funcionan los pagos.
+Son 73 herramientas (cada una es un método del SDK, con las mismas reglas y límites). Al conectarse, el cliente recibe además una guía con el orden para conectar un dominio, qué significa gratis/activado/bloqueado y cómo funcionan los pagos.
 - Dominios: list_domains, get_domain, create_domain (devuelve los registros DNS: MX, TXT de verificación, CNAME de DKIM, SPF), domain_dns_setup (los registros exactos para pegar en el registrador, cuáles ya se ven en el DNS público y en qué panel van: Hostinger, GoDaddy, Cloudflare, Namecheap, Route 53), verify_domain, domain_health, delete_domain.
 - Máscaras y buzones: list_aliases, create_alias (con mailbox: true crea también el buzón IMAP y devuelve la contraseña una sola vez), update_alias, delete_alias, create_mailbox, delete_mailbox, reset_mailbox_password (genera una contraseña nueva para el buzón y la devuelve una sola vez), apple_profile_link (liga al perfil que configura el buzón en iPhone, iPad o Mac), mailbox_export_link (liga para descargar el buzón en .mbox).
 - Activación y cobro: activation_link (liga de MercadoPago para activar un dominio a $99 MXN/mes, o sumarle +50 GB o +100 envíos/día), list_addons, billing_status.
@@ -214,6 +214,7 @@ Son 70 herramientas (cada una es un método del SDK, con las mismas reglas y lí
 - Transferencias: transfer_check (requisitos y precio, no cobra), transfer_start (devuelve la liga al formulario seguro de la app donde se pega el código EPP y se paga; el código EPP NUNCA se da en el chat), transfer_status, transfer_dns, update_transfer_dns, approve_transfer_dns, resend_transfer_email, transfer_out (el código EPP llega por correo al dueño).
 - Equipo: list_members, invite_member, remove_member, cancel_invite.
 - Bandeja: get_signature, set_signature, list_canned_replies, create_canned_reply, delete_canned_reply.
+- Perfil de la cuenta (el usuario de MailMask, no una máscara ni lo que ve quien recibe el correo): get_profile, update_profile (nombre visible, máx. 60 caracteres), set_profile_photo (sólo con una imagen que el usuario adjuntó en el chat del asistente; PNG, JPG o WebP de hasta 2 MB). En la app se edita desde "Tu perfil", haciendo clic en tu nombre arriba a la derecha.
 - Reglas: list_rules, create_rule, update_rule, delete_rule.
 - Webhooks: list_webhooks, create_webhook, update_webhook, delete_webhook, test_webhook, webhook_deliveries.
 - DNS: list_dns_records, create_dns_zone, dns_delegation_status, set_dns_record, delete_dns_record, import_dns_records, point_domain_to (apunta el dominio a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render o Fly sin saber qué registros hacen falta).

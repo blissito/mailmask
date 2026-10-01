@@ -28,6 +28,10 @@ export const users = sqliteTable("users", {
   utmCampaign: text("utm_campaign"),
   // Nonce del hilo del asistente: rotarlo ("Nueva conversación") cambia el groupId en Ghosty.
   assistantNonce: text("assistant_nonce"),
+  // Perfil de la cuenta (`profile.ts`): nombre visible y llave de la foto en S3.
+  displayName: text("display_name"),
+  avatarKey: text("avatar_key"),
+  profileUpdatedAt: text("profile_updated_at"),
 });
 
 export const domains = sqliteTable("domains", {

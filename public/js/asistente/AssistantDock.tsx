@@ -35,6 +35,7 @@ import { usePendingActions } from "./usePendingActions"
 import { ASSISTANT_ICON, ASSISTANT_NAME } from "./brand"
 import { playReplyDone } from "./sound"
 import { useCurrentScreen } from "./screen"
+import { initialsOf, useUserProfile } from "./userProfile"
 
 /**
  * Nik en todas las pantallas del dash.
@@ -320,6 +321,8 @@ function DockChat({
   // La pantalla en la que está parado el usuario: el dominio y la pestaña que
   // `app.js` publica en `window.mailmaskScreen` (ver `screen.ts`).
   const screen = useCurrentScreen()
+  // Foto (o iniciales) del usuario junto a sus burbujas.
+  const me = useUserProfile()
 
   const {
     messages,
@@ -532,18 +535,27 @@ function DockChat({
                   <motion.div
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="self-end max-w-[85%] flex flex-col items-end gap-1"
+                    className="self-end max-w-[85%] flex items-end gap-2"
                   >
-                    {!!m.attachments?.length && (
-                      <AttachmentList items={m.attachments} />
-                    )}
-                    {/* `break-words` + `min-w-0`: una URL sin espacios no
-                        envuelve sola y se sale de la burbuja (a 420px del dock,
-                        por la izquierda). */}
-                    {!!m.content && (
-                      <div className="rounded-3xl rounded-br-lg bg-fg text-bg px-4 py-2.5 text-sm whitespace-pre-wrap break-words min-w-0 font-medium">
-                        {m.content}
-                      </div>
+                    <div className="flex flex-col items-end gap-1 min-w-0">
+                      {!!m.attachments?.length && (
+                        <AttachmentList items={m.attachments} />
+                      )}
+                      {/* `break-words` + `min-w-0`: una URL sin espacios no
+                          envuelve sola y se sale de la burbuja (a 420px del dock,
+                          por la izquierda). */}
+                      {!!m.content && (
+                        <div className="rounded-3xl rounded-br-lg bg-fg text-bg px-4 py-2.5 text-sm whitespace-pre-wrap break-words min-w-0 font-medium">
+                          {m.content}
+                        </div>
+                      )}
+                    </div>
+                    {me?.avatarUrl ? (
+                      <img src={me.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <span aria-hidden="true" className="w-6 h-6 rounded-full shrink-0 bg-bg-inset border border-line text-[10px] font-semibold text-fg-muted flex items-center justify-center">
+                        {initialsOf(me)}
+                      </span>
                     )}
                   </motion.div>
                 ) : (

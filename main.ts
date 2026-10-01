@@ -195,6 +195,7 @@ import {
   verifyTurnToken,
 } from "./auth.js";
 import { requireConfirmation, listPendingActions, confirmAction, rejectAction } from "./agent-actions.js";
+import { handleGetProfile, handleUpdateProfile, handleUploadAvatar, handleDeleteAvatar, handleServeAvatar, applyGoogleProfile, profileOf, profileForEmail } from "./profile.js";
 import {
   openGhostyTurn,
   relayTurn,
@@ -1644,7 +1645,8 @@ const app = new Elysia({ adapter: node() })
       client_id: clientId,
       redirect_uri: googleRedirectUri(request),
       response_type: "code",
-      scope: "openid email",
+      // `profile` trae `name` y `picture`: llenan el perfil de la cuenta si está vacío.
+      scope: "openid email profile",
       state,
       prompt: "select_account",
     });
@@ -1673,7 +1675,7 @@ const app = new Elysia({ adapter: node() })
     db.delete(tokensTable).where(eq(tokensTable.token, state)).run();
     const carried = (stateRow.value ?? {}) as { ref?: string; coupon?: string; utm?: { source?: string; medium?: string; campaign?: string } | null };
 
-    let idPayload: { email?: string; email_verified?: boolean; aud?: string; sub?: string };
+    let idPayload: { email?: string; email_verified?: boolean; aud?: string; sub?: string; name?: string; picture?: string };
     try {
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
@@ -1726,6 +1728,8 @@ const app = new Elysia({ adapter: node() })
     }
     // Google ya verificó el buzón: no tiene sentido pedirle que abra un correo nuestro.
     if (user && !user.emailVerified) verifyUserEmail(email);
+    // Nombre y foto de Google sólo donde el perfil está vacío; nunca tumba el login.
+    if (user && (!user.displayName || !user.avatarKey)) await applyGoogleProfile(email, { name: idPayload.name, picture: idPayload.picture });
 
     const token = await signJwt({ email });
     const csrfToken = generateCsrfToken();
@@ -1798,7 +1802,7 @@ const app = new Elysia({ adapter: node() })
 
     return new Response(
       JSON.stringify({
-        email: user.email,
+        ...profileOf(user), // email, displayName, avatarUrl
         isAdmin: isAdmin(user.email),
         assistant: assistantEnabledFor(user.email),
         domainsCount: domains.length,
@@ -1836,6 +1840,36 @@ const app = new Elysia({ adapter: node() })
   }, {
     detail: { tags: ["Auth"], summary: "Get current user profile and usage", security: [{ cookieAuth: [] }] },
   })
+
+  // --- Perfil de la cuenta (nombre y foto). Sesión, API key o el `mt_` del asistente:
+  // todo es del propio usuario. La lógica vive en profile.ts.
+  .get("/api/profile", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    return handleGetProfile(auth.email);
+  }, { detail: { tags: ["Profile"], summary: "Perfil de la cuenta: nombre y foto" } })
+
+  .put("/api/profile", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    return handleUpdateProfile(auth.email, body);
+  }, { detail: { tags: ["Profile"], summary: "Cambia el nombre visible de la cuenta (máx. 60)" } })
+
+  .post("/api/profile/avatar", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const rl = checkRateLimit(`avatar:${auth.email}`, 10, 60_000);
+    if (!rl.allowed) return jsonErr("Demasiadas subidas; espera un minuto.", 429);
+    return handleUploadAvatar(auth.email, request);
+  }, { detail: { tags: ["Profile"], summary: "Sube la foto de perfil (multipart `file` o `{fromUrl}` de un adjunto del asistente)" } })
+
+  .delete("/api/profile/avatar", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    return handleDeleteAvatar(auth.email);
+  }, { detail: { tags: ["Profile"], summary: "Quita la foto de perfil" } })
+
+  .get("/api/avatar/:hash/:file", ({ params }) => handleServeAvatar(params.hash, params.file), { detail: { hide: true } })
 
   .get("/api/auth/verify-email", async ({ query }) => {
     const token = query.token;
@@ -5904,19 +5938,27 @@ const app = new Elysia({ adapter: node() })
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
+    // Quien no administra el equipo (un agente de la Bandeja) también lo lee, pero sólo
+    // nombres y fotos para pintar "asignado a" y la presencia: sin invitaciones ni ligas.
     const access = await checkDomainAccess(auth.email, params.id, "manage_members");
     if (!access) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      const reader = await checkDomainAccess(auth.email, params.id, "read");
+      if (!reader) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      const members = (await listAgents(reader.domain.id)).map((m) => ({ email: m.email, name: m.name, role: m.role, ...profileForEmail(m.email) }));
+      return new Response(JSON.stringify({ owner: { email: reader.domain.ownerEmail, ...profileForEmail(reader.domain.ownerEmail) }, members, invites: [] }), {
+        headers: { "content-type": "application/json" },
+      });
     }
     const domain = access.domain;
 
-    const members = await listAgents(domain.id);
+    const members = (await listAgents(domain.id)).map((m) => ({ ...m, ...profileForEmail(m.email) }));
     // El enlace sólo lo ve quien tiene manage_members: es quien pudo crearlo.
     const invites = listAgentInvites(domain.id).map((i) => ({
       ...i,
       inviteUrl: `${getMainDomainUrl()}/api/agents/accept?token=${i.token}`,
     }));
-    return new Response(JSON.stringify({ members, invites }), {
+    const owner = { email: domain.ownerEmail, ...profileForEmail(domain.ownerEmail) };
+    return new Response(JSON.stringify({ owner, members, invites }), {
       headers: { "content-type": "application/json" },
     });
   }, {

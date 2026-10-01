@@ -141,6 +141,7 @@ async function refreshUsage() {
   const res = await fetch("/api/auth/me");
   if (!res.ok) return;
   currentUser = await res.json();
+  renderProfileHeader();
   renderAccountUI();
 }
 
@@ -151,7 +152,96 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadDomains();
   loadDomainRegistrations();
   setupEventListeners();
+  setupProfileModal();
 });
+
+// --- Perfil de la cuenta (nombre y foto) ---
+// Se ve en la cabecera, en la Bandeja de los compañeros y en el dock de Mask, que lo lee
+// de `window.mailmaskProfile` y del evento `mailmask:profile`.
+
+function profileInitials(p) {
+  const base = String(p?.displayName || (p?.email || "?").split("@")[0]).trim();
+  const parts = base.split(/[\s._-]+/).filter(Boolean);
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : base.slice(0, 2)).toUpperCase();
+}
+
+function paintAvatar(el, p) {
+  if (!el) return;
+  el.innerHTML = p?.avatarUrl ? `<img src="${esc(p.avatarUrl)}" alt="">` : esc(profileInitials(p));
+}
+
+function applyProfile(p) {
+  currentUser = { ...currentUser, email: p.email, displayName: p.displayName, avatarUrl: p.avatarUrl };
+  renderProfileHeader();
+}
+
+function renderProfileHeader() {
+  if (!currentUser) return;
+  const p = { email: currentUser.email, displayName: currentUser.displayName ?? null, avatarUrl: currentUser.avatarUrl ?? null };
+  document.getElementById("user-email").textContent = p.displayName || p.email;
+  document.getElementById("profile-trigger")?.setAttribute("title", p.displayName ? `${p.displayName} · ${p.email}` : "Tu perfil");
+  paintAvatar(document.getElementById("user-avatar"), p);
+  paintAvatar(document.getElementById("profile-preview"), p);
+  document.getElementById("profile-remove-photo")?.classList.toggle("hidden", !p.avatarUrl);
+  window.mailmaskProfile = p;
+  window.dispatchEvent(new Event("mailmask:profile"));
+}
+
+function profileError(msg) {
+  const el = document.getElementById("profile-error");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.classList.toggle("hidden", !msg);
+}
+
+function setupProfileModal() {
+  document.getElementById("profile-trigger")?.addEventListener("click", () => {
+    document.getElementById("profile-email").textContent = currentUser?.email || "";
+    document.getElementById("profile-name").value = currentUser?.displayName || "";
+    profileError("");
+    renderProfileHeader();
+    showModal("modal-profile");
+    document.getElementById("profile-name").focus();
+  });
+
+  document.getElementById("form-profile")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    profileError("");
+    const res = await fetch("/api/profile", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ displayName: document.getElementById("profile-name").value }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { profileError(data.error || "No se pudo guardar"); return; }
+    applyProfile(data);
+    hideModal("modal-profile");
+    showToast("Perfil actualizado");
+  });
+
+  document.getElementById("profile-file")?.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    profileError("");
+    if (file.size > 2 * 1024 * 1024) { profileError("La foto no puede pesar más de 2 MB"); return; }
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/profile/avatar", { method: "POST", body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { profileError(data.error || "No se pudo subir la foto"); return; }
+    applyProfile(data);
+    showToast("Foto actualizada");
+  });
+
+  document.getElementById("profile-remove-photo")?.addEventListener("click", async () => {
+    profileError("");
+    const res = await fetch("/api/profile/avatar", { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { profileError(data.error || "No se pudo quitar la foto"); return; }
+    applyProfile(data);
+  });
+}
 
 async function checkAuth() {
   const res = await fetch("/api/auth/me");
@@ -160,7 +250,7 @@ async function checkAuth() {
     return;
   }
   currentUser = await res.json();
-  document.getElementById("user-email").textContent = currentUser.email;
+  renderProfileHeader();
   if (currentUser.isAdmin) document.getElementById("admin-link")?.classList.remove("hidden");
   // El asistente se enciende por cuenta mientras se prueba (ASSISTANT_PUBLIC en el servidor).
   if (currentUser.assistant && !document.getElementById("assistant-script")) {

@@ -255,4 +255,23 @@ describe("MCP: agentes contra la app", () => {
     assert.equal(r.json.result.isError, true);
     assert.match(r.json.result.content[0].text, /create_mailbox/);
   });
+
+  it("perfil: get/update_profile y set_profile_photo rechaza una URL que no es adjunto firmado", async () => {
+    const up = await call("update_profile", { displayName: "Dueña MCP" });
+    assert.ok(!up.json.result.isError, JSON.stringify(up.json.result));
+    assert.equal(up.json.result.structuredContent.displayName, "Dueña MCP");
+    const get = await call("get_profile", {});
+    assert.equal(get.json.result.structuredContent.email, email);
+
+    const r = await call("set_profile_photo", { url: "https://ejemplo.com/foto.png" });
+    assert.equal(r.json.result.isError, true);
+    assert.match(r.json.result.content[0].text, /HTTP 400: .*adjuntaste/);
+    const forged = await call("set_profile_photo", { url: `http://localhost/api/asistente/files/abc/foto.png?exp=9999999999&sig=${"0".repeat(64)}` });
+    assert.equal(forged.json.result.isError, true);
+
+    const buscar = async (q: string) => (await call("search_tools", { query: q })).json.result.structuredContent.result.map((t: { name: string }) => t.name);
+    assert.ok((await buscar("foto")).includes("set_profile_photo"));
+    assert.ok((await buscar("avatar")).includes("set_profile_photo"));
+    assert.ok((await buscar("nombre")).includes("update_profile"));
+  });
 });

@@ -44,8 +44,8 @@ comprueba "no es 404" ya vale: eso solo habría atrapado 6 de los 10 bugs.
 `WebStandardStreamableHTTPServerTransport`, `enableJsonResponse`), autenticado sólo con
 `Authorization: Bearer mk_…` (la API key normal) o `Bearer mt_…` (turn token del asistente,
 ver "Asistente Mask"); sin ellas 401, y `/mcp` está exento de CSRF porque nunca acepta cookie.
-70 herramientas desde el 1-oct-2026 (cobro por liga, compra/transferencia/renovación de
-dominios, equipo, firma, respuestas guardadas, `domain_dns_setup`) y `MCP_INSTRUCTIONS`
+73 herramientas desde el 1-oct-2026 (cobro por liga, compra/transferencia/renovación de
+dominios, equipo, firma, respuestas guardadas, `domain_dns_setup`, perfil de la cuenta) y `MCP_INSTRUCTIONS`
 (≤6000 caracteres, lo fija `mcp.test.ts`): es todo lo que un agente partner sabe del producto. **Cada herramienta es el SDK real** (`sdk/src`, que sí viaja
 en la imagen) hablando con la app en proceso vía `app.fetch` — el mismo truco de
 `sdk.test.ts` —, así que no puede desalinearse de una ruta sin que `sdk.test.ts` lo cace.

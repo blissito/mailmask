@@ -66,6 +66,7 @@ Con zona propia (create_dns_zone y cambiar los nameservers en el registrador) pu
 ## Otros
 - Equipo: list_members, invite_member, remove_member.
 - Bandeja: get_signature y set_signature (markdown), respuestas guardadas (list/create/delete_canned_reply).
+- Perfil de la cuenta (el usuario, no una máscara): get_profile, update_profile (nombre) y set_profile_photo. Para la foto, pide que la adjunte en el chat y pasa la URL de ese adjunto.
 - Buzones IMAP: create_alias con mailbox, o create_mailbox. apple_profile_link configura iPhone y Mac; mailbox_export_link descarga el .mbox.
 - Contraseñas, secretos de webhook y credenciales SMTP salen una sola vez: entrégalas tal cual y avisa que no se pueden volver a ver.
 - Si no encuentras una herramienta, usa search_tools.`;
@@ -131,6 +132,9 @@ const KEYWORDS: Record<string, string> = {
   delete_canned_reply: "respuesta guardada plantilla borrar",
   apple_profile_link: "iphone mac apple mail configurar buzón imap perfil",
   mailbox_export_link: "exportar descargar respaldo buzón mbox",
+  get_profile: "perfil nombre foto avatar cuenta usuario",
+  update_profile: "perfil nombre cambiar cuenta usuario",
+  set_profile_photo: "perfil foto avatar imagen cambiar cuenta",
 };
 
 const domainId = z.string().describe("ID del dominio (de list_domains)");
@@ -404,6 +408,16 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
   tool("create_canned_reply", "Guarda una respuesta reutilizable (título y cuerpo en markdown; máx. 50 por dominio).",
     { domainId, title: z.string(), body: z.string() }, (a) => sdk.canned.create(a.domainId, { title: a.title, body: a.body }));
   tool("delete_canned_reply", "Borra una respuesta guardada.", { domainId, cannedId: z.string() }, (a) => sdk.canned.delete(a.domainId, a.cannedId));
+
+  // --- Perfil de la cuenta ---
+  //
+  // Es el perfil del usuario de MailMask (cabecera de /app, Bandeja, dock), no el de una
+  // máscara ni lo que ve quien recibe el correo.
+  tool("get_profile", "Perfil de la cuenta de MailMask del usuario: correo, nombre visible y foto (avatarUrl).", {}, () => sdk.account.getProfile());
+  tool("update_profile", "Cambia el nombre visible de la cuenta del usuario (máx. 60 caracteres; vacío lo borra). Es el nombre con el que lo ve su equipo en la Bandeja; no cambia el remitente de los correos.",
+    { displayName: z.string() }, (a) => sdk.account.updateProfile({ displayName: a.displayName }));
+  tool("set_profile_photo", "Pone la foto de perfil de la cuenta del usuario. SÓLO sirve con la URL de una imagen que el usuario adjuntó en este chat (PNG, JPG o WebP, máx. 2 MB); cualquier otra URL se rechaza. Si no ha adjuntado una, pídesela.",
+    { url: z.string().describe("URL del adjunto del chat (/api/asistente/files/...)") }, (a) => sdk.account.setAvatarFromUrl(a.url));
 
   // --- Buzones: ligas para el navegador del usuario ---
   //

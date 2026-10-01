@@ -62,6 +62,11 @@ describe("SDK ↔ servidor: contrato", () => {
         deleteReceiptRule: async () => undefined,
         deleteConfigurationSet: async () => undefined,
         deleteDomainIdentity: async () => undefined,
+        // Perfil: fotos y adjuntos del asistente en memoria.
+        putUserAvatarToS3: async (key: string, body: Uint8Array, contentType: string) => { archivos.set(`avatar:${key}`, { body, contentType }); },
+        getUserAvatarFromS3: async (key: string) => archivos.get(`avatar:${key}`) ?? null,
+        deleteUserAvatarFromS3: async (key: string) => { archivos.delete(`avatar:${key}`); },
+        getAssistantUploadFromS3: async (key: string) => archivos.get(`asis:${key}`) ?? null,
       },
     });
 
@@ -778,5 +783,21 @@ describe("SDK ↔ servidor: contrato", () => {
     const plist = await mm.aliases.appleProfile(domainId, "perfil");
     assert.match(plist, /<plist/);
     assert.ok(plist.includes(`perfil@${dominio}`));
+  });
+
+  it("account: perfil (nombre y foto desde un adjunto firmado del asistente)", async () => {
+    const vacio = await mm.account.getProfile();
+    assert.equal(vacio.email, email);
+    assert.equal((await mm.account.updateProfile({ displayName: "Brenda Ruiz" })).displayName, "Brenda Ruiz");
+    assert.equal((await mm.account.getProfile()).displayName, "Brenda Ruiz");
+    await assert.rejects(() => mm.account.updateProfile({ displayName: "x".repeat(61) }), (e: MailMaskError) => e.status === 400);
+
+    const { userKey, signedUploadUrl } = await import("./assistant.ts");
+    const llave = `${userKey(email)}/${crypto.randomUUID()}-foto.png`;
+    archivos.set(`asis:${llave}`, { body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]), contentType: "image/png" });
+    const puesta = await mm.account.setAvatarFromUrl(signedUploadUrl("http://localhost", llave));
+    assert.match(puesta.avatarUrl ?? "", /^\/api\/avatar\/.+\.png$/);
+    await assert.rejects(() => mm.account.setAvatarFromUrl("https://ejemplo.com/foto.png"), (e: MailMaskError) => e.status === 400);
+    assert.equal((await mm.account.removeAvatar()).avatarUrl, null);
   });
 });

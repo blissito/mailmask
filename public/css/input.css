@@ -203,6 +203,11 @@
   .app-pill { @apply whitespace-nowrap rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.12em] text-accent-text; }
   .app-mail { @apply max-w-[34vw] truncate text-[13px] text-fg-muted; }
   .app-out { @apply flex-none px-1.5 py-1 text-[13px] text-fg-subtle hover:text-fg; }
+  /* Perfil de la cuenta: foto o iniciales + nombre; abre "Tu perfil". */
+  .app-me-btn { @apply flex min-w-0 items-center gap-2 rounded-full py-0.5 pl-0.5 pr-1 hover:bg-bg-inset; }
+  .app-avatar { @apply inline-flex h-7 w-7 flex-none items-center justify-center overflow-hidden rounded-full border border-line bg-bg-inset text-[11px] font-semibold text-fg-muted; }
+  .app-avatar img { @apply h-full w-full object-cover; }
+  .app-avatar-lg { @apply h-16 w-16 text-lg; }
   @media (max-width: 640px) {
     /* Inicio y Bandeja siempre visibles: sin ellas no hay forma de llegar a la Bandeja */
     .app-nav a[href="/docs"], .app-nav a.admin { @apply hidden; }

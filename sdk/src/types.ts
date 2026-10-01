@@ -539,6 +539,9 @@ export interface DomainMember {
   name: string;
   role: "admin" | "agent";
   createdAt: string;
+  /** Del perfil de su cuenta de MailMask, si lo llenó. */
+  displayName?: string | null;
+  avatarUrl?: string | null;
 }
 
 export interface DomainInvite {
@@ -557,4 +560,12 @@ export interface CannedReply {
   /** Markdown. */
   body: string;
   createdAt: string;
+}
+
+/** Perfil de la cuenta de MailMask (el usuario, no una máscara). */
+export interface AccountProfile {
+  email: string;
+  displayName: string | null;
+  /** Ruta relativa al host de MailMask (`/api/avatar/...`), o null sin foto. */
+  avatarUrl: string | null;
 }

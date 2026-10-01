@@ -50,6 +50,10 @@ export interface User {
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
+  /** Nombre visible de la cuenta (perfil). */
+  displayName?: string;
+  /** Llave de la foto de perfil bajo `user-avatars/` en S3. */
+  avatarKey?: string;
 }
 
 export interface Domain {
@@ -230,6 +234,8 @@ function rowToUser(r: typeof users.$inferSelect): User {
     utmSource: r.utmSource ?? undefined,
     utmMedium: r.utmMedium ?? undefined,
     utmCampaign: r.utmCampaign ?? undefined,
+    displayName: r.displayName ?? undefined,
+    avatarKey: r.avatarKey ?? undefined,
   };
   if (r.subPlan) {
     user.subscription = {
@@ -1235,6 +1241,16 @@ export function deletePasswordToken(token: string): void {
 
 export function updateUserPassword(email: string, passwordHash: string): void {
   db.update(users).set({ passwordHash, passwordChangedAt: new Date().toISOString() }).where(eq(users.email, email)).run();
+}
+
+// --- Perfil de la cuenta ---
+
+/** `null` borra el campo; `undefined` lo deja como está. */
+export function updateUserProfile(email: string, fields: { displayName?: string | null; avatarKey?: string | null }): void {
+  const set: Partial<typeof users.$inferInsert> = { profileUpdatedAt: new Date().toISOString() };
+  if (fields.displayName !== undefined) set.displayName = fields.displayName;
+  if (fields.avatarKey !== undefined) set.avatarKey = fields.avatarKey;
+  db.update(users).set(set).where(eq(users.email, email)).run();
 }
 
 // --- Webhook idempotency ---

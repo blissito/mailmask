@@ -805,6 +805,23 @@ body {
 /* --- Utility --- */
 .mesa-hidden { display: none !important; }
 .mesa-user-email { font-size: 13px; color: var(--mesa-text-3); }
+/* Perfil de la cuenta: foto o iniciales (profile.ts). */
+.mesa-avatar, .mesa-avatar-sm, .mesa-avatar-xs {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  border-radius: 999px; overflow: hidden; background: var(--mesa-surface-2); color: var(--mesa-text-2);
+  font-weight: 600; line-height: 1; vertical-align: middle;
+}
+.mesa-avatar { width: 26px; height: 26px; font-size: 10px; border: 1px solid var(--mesa-border); }
+.mesa-avatar-sm { width: 22px; height: 22px; font-size: 9px; }
+.mesa-avatar-xs { width: 14px; height: 14px; font-size: 7px; margin-right: 4px; }
+.mesa-avatar img, .mesa-avatar-sm img, .mesa-avatar-xs img { width: 100%; height: 100%; object-fit: cover; }
+.mesa-tag-assigned { display: inline-flex; align-items: center; }
+.mesa-assign-team { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; max-height: 220px; overflow-y: auto; }
+.mesa-assign-person {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px;
+  background: transparent; border: 1px solid transparent; color: inherit; text-align: left; cursor: pointer; font-size: 13px;
+}
+.mesa-assign-person:hover, .mesa-assign-person:focus-visible { border-color: var(--mesa-border); background: var(--mesa-surface-2); outline: none; }
 .mesa-detail-loaded { display: flex; flex-direction: column; height: 100%; }
 .mesa-composer-right { display: flex; align-items: center; gap: 8px; }
 .mesa-composer-hint {

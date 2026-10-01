@@ -30,6 +30,7 @@
       </button>
       <a href="/app" class="mesa-nav-link">Dashboard</a>
       <a id="admin-link" href="/admin" class="mesa-nav-link" style="display:none;color:#a78bfa;">Admin</a>
+      <span id="user-avatar" class="mesa-avatar" aria-hidden="true"></span>
       <span id="user-email" class="mesa-user-email"></span>
       <button id="btn-logout" class="mesa-nav-link">Salir</button>
     </div>
@@ -194,6 +195,7 @@
   <div class="mesa-modal-overlay hidden" id="modal-assign">
     <div class="mesa-modal">
       <h3>Asignar conversación</h3>
+      <div id="assign-team" class="mesa-assign-team mesa-hidden"></div>
       <input type="email" id="assign-email" placeholder="email del agente">
       <div class="mesa-modal-actions">
         <button class="mesa-modal-cancel" id="assign-cancel">Cancelar</button>

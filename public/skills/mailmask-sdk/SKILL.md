@@ -5,7 +5,7 @@ license: MIT
 compatibility: Node 18+, Deno, Bun or Workers (uses fetch and WebCrypto only). Network access to https://www.mailmask.studio.
 metadata:
   author: mailmask
-  version: "1.1"
+  version: "1.2"
 ---
 
 # MailMask SDK
@@ -46,6 +46,7 @@ All take a `domainId` (from `mm.domains.list()`) except `domains` and `apiKeys`.
 | `mm.members` | `list(d)` → `{ members, invites }`, `invite(d, { email, name, role? })`, `remove(d, memberId)`, `cancelInvite(d, token)` |
 | `mm.signature` | `get(d)`, `set(d, markdown)` (max 2000, empty string clears) |
 | `mm.canned` | `list(d)`, `create(d, { title, body })`, `delete(d, cannedId)` |
+| `mm.account` | `getProfile()` → `{ email, displayName, avatarUrl }`, `updateProfile({ displayName })` (max 60, empty clears), `setAvatar(blob)` (PNG/JPG/WebP, max 2 MB), `setAvatarFromUrl(url)` (only a signed assistant upload), `removeAvatar()` |
 
 Payments are MercadoPago links a person opens and pays (`init_point` / `initPoint`); nothing
 changes until MercadoPago confirms, so check `billing.addons()` or `registrations.list()` after.

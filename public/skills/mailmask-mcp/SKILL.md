@@ -1,11 +1,11 @@
 ---
 name: mailmask-mcp
-description: Connect an MCP client (Claude Code, Claude Desktop, Cursor, any Streamable HTTP client) to the MailMask MCP server at https://www.mailmask.studio/mcp and use its 70 tools to manage domains, masks, IMAP mailboxes, DNS, rules, webhooks, team, payment links, domain purchases and transfers with one API key. Use when the user wants their agent wired to MailMask, asks to "add the MailMask MCP", or when a tool named list_domains, create_alias or point_domain_to is available.
+description: Connect an MCP client (Claude Code, Claude Desktop, Cursor, any Streamable HTTP client) to the MailMask MCP server at https://www.mailmask.studio/mcp and use its 73 tools to manage domains, masks, IMAP mailboxes, DNS, rules, webhooks, team, payment links, domain purchases and transfers with one API key. Use when the user wants their agent wired to MailMask, asks to "add the MailMask MCP", or when a tool named list_domains, create_alias or point_domain_to is available.
 license: MIT
 compatibility: An MCP client with Streamable HTTP transport and custom headers, or curl for the raw JSON-RPC.
 metadata:
   author: mailmask
-  version: "1.1"
+  version: "1.2"
 ---
 
 # MailMask over MCP
@@ -64,6 +64,9 @@ rules. Names, grouped:
 - **Team**: `list_members`, `invite_member` (`agent` or `admin`), `remove_member`, `cancel_invite`.
 - **Inbox settings**: `get_signature`, `set_signature` (markdown, max 2000), `list_canned_replies`,
   `create_canned_reply`, `delete_canned_reply`.
+- **Account profile** (the MailMask user, not a mask): `get_profile`, `update_profile`
+  (display name, max 60), `set_profile_photo` (only a signed URL of an image the user attached
+  in the assistant chat; any other URL is rejected).
 - **DNS**: `list_dns_records`, `create_dns_zone`, `dns_delegation_status`, `set_dns_record`,
   `delete_dns_record`, `import_dns_records`, `point_domain_to` (Vercel, Netlify, GitHub Pages,
   Cloudflare Pages, Render, Fly, redirect to www, DMARC).
