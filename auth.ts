@@ -54,10 +54,10 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
 // --- JWT (HMAC-SHA256 via Web Crypto) ---
 
-export async function signJwt(payload: Record<string, unknown>): Promise<string> {
+export async function signJwt(payload: Record<string, unknown>, ttlSeconds: number = JWT_EXPIRY): Promise<string> {
   const header = { alg: "HS256", typ: "JWT" };
   const now = Math.floor(Date.now() / 1000);
-  const body = { ...payload, iat: now, exp: now + JWT_EXPIRY };
+  const body = { ...payload, iat: now, exp: now + ttlSeconds };
 
   const headerB64 = b64url(JSON.stringify(header));
   const bodyB64 = b64url(JSON.stringify(body));
@@ -116,9 +116,53 @@ export function parseCookies(header: string | null): Record<string, string> {
 
 // --- Auth middleware helper ---
 
-export async function getAuthUser(request: Request): Promise<{ email: string } | null> {
-  // Try Bearer token (API key) first
+// --- Turn token del asistente (`mt_`) ---
+//
+// Credencial de CORTA vida (5 min) que MailMask le da a Ghosty en cada turno del
+// asistente; Ghosty la pone en el `Authorization` de su cliente MCP hacia `/mcp`.
+// Es un JWT con `aud: "assistant"` firmado con el mismo secreto que la sesión, así que
+// hay que impedir los dos cruces: un `mt_` no sirve como cookie (se rechaza su `aud`
+// abajo) y una cookie de sesión no sirve como `mt_` (exige el `aud`).
+export const TURN_TOKEN_TTL = 300;
+const TURN_AUDIENCE = "assistant";
+
+export async function issueTurnToken(email: string): Promise<string> {
+  const jwt = await signJwt({ email, aud: TURN_AUDIENCE, jti: crypto.randomUUID() }, TURN_TOKEN_TTL);
+  return `mt_${jwt}`;
+}
+
+/** Valida un `mt_…` sin gastar rate limit. Devuelve el correo del usuario o null. */
+export async function verifyTurnToken(token: string): Promise<string | null> {
+  if (!token.startsWith("mt_")) return null;
+  const payload = await verifyJwt(token.slice(3));
+  if (!payload || payload.aud !== TURN_AUDIENCE || typeof payload.email !== "string") return null;
+  const user = await getUser(payload.email);
+  if (!user) return null;
+  if (user.passwordChangedAt && payload.iat) {
+    const changedAtSec = Math.floor(new Date(user.passwordChangedAt).getTime() / 1000);
+    if ((payload.iat as number) < changedAtSec) return null;
+  }
+  return user.email;
+}
+
+/**
+ * Por dónde llegó la identidad. `turn` = el asistente actuando con un `mt_`: las rutas
+ * destructivas lo detienen y piden confirmación al usuario (`agent-actions.ts`).
+ */
+export type AuthVia = "session" | "apikey" | "turn";
+export type AuthUser = { email: string; via: AuthVia };
+
+export async function getAuthUser(request: Request): Promise<AuthUser | null> {
   const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer mt_")) {
+    const email = await verifyTurnToken(authHeader.slice(7));
+    if (!email) return null;
+    // Por usuario y no por token: cada turno acuña uno nuevo.
+    const rl = checkRateLimit(`turn:${email}`, 120, 60_000);
+    if (!rl.allowed) return null;
+    return { email, via: "turn" };
+  }
+  // Try Bearer token (API key) first
   if (authHeader?.startsWith("Bearer mk_")) {
     const key = authHeader.slice(7);
     const keyPrefix = key.slice(0, 11);
@@ -129,7 +173,7 @@ export async function getAuthUser(request: Request): Promise<{ email: string } |
     if (!user) return null;
     // La API es para todas las cuentas, gratis incluidas (7-sep-2026): lo que se vende
     // es el dominio activado, y cada endpoint mira los derechos de SU dominio.
-    return { email: user.email };
+    return { email: user.email, via: "apikey" };
   }
 
   // Fall back to cookie auth
@@ -139,6 +183,8 @@ export async function getAuthUser(request: Request): Promise<{ email: string } |
 
   const payload = await verifyJwt(token);
   if (!payload || !payload.email) return null;
+  // Un turn token puesto como cookie no es una sesión.
+  if (payload.aud !== undefined) return null;
 
   const user = await getUser(payload.email as string);
   if (!user) return null;
@@ -149,7 +195,7 @@ export async function getAuthUser(request: Request): Promise<{ email: string } |
     if ((payload.iat as number) < changedAtSec) return null;
   }
 
-  return { email: user.email };
+  return { email: user.email, via: "session" };
 }
 
 // --- CSRF (double-submit cookie) ---

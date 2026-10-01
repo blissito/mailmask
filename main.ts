@@ -19,6 +19,7 @@ import {
   createUser,
   createDomain,
   getDomain,
+  getDomainByName,
   getUserByApiKey,
   listUserDomains,
   updateDomain,
@@ -188,7 +189,26 @@ import {
   parseCookies,
   generateCsrfToken,
   makeCsrfCookie,
+  issueTurnToken,
+  verifyTurnToken,
 } from "./auth.js";
+import { requireConfirmation, listPendingActions, confirmAction, rejectAction } from "./agent-actions.js";
+import {
+  openGhostyTurn,
+  relayTurn,
+  buildScreenContext,
+  isOwnUpload,
+  attachmentMarkdown,
+  saveAssistantMessage,
+  getMessagePage,
+  clearAssistantMessages,
+  rotateAssistantNonce,
+  signedUploadUrl,
+  verifyUploadSig,
+  userKey,
+  ASSISTANT_BASE_PROMPT,
+  type AssistantAttachment,
+} from "./assistant.js";
 import { checkRateLimit } from "./rate-limit.js";
 import {
   verifyDomain,
@@ -212,13 +232,18 @@ import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, 
 import { fetchEmailFromS3, threadRefsFor, S3FetchError, degradedBodyState, repairReceiptRules, ensureDomainInbound, ensureSnsSubscription, AWS_REGION, getBackupBytesFromS3 } from "./ses.js";
 import { runDbBackup, DB_BACKUP_SUFFIX } from "./backup.js";
 import { resolveEmailBody, extractInlineImages, appendSignature, quotePrevious, MAX_EMAIL_HTML_BYTES } from "./email-html.js";
-import { putDomainAssetToS3, getDomainAssetFromS3, deleteDomainAssetFromS3, putEmailImageToS3, getEmailImageFromS3, deleteEmailImageFromS3, sweepOrphanEmailImages, putEmailFileToS3, getEmailFileFromS3, deleteEmailFileFromS3, ALLOWED_IMAGE_TYPES } from "./ses.js";
+import { putDomainAssetToS3, getDomainAssetFromS3, deleteDomainAssetFromS3, putEmailImageToS3, getEmailImageFromS3, deleteEmailImageFromS3, sweepOrphanEmailImages, putEmailFileToS3, getEmailFileFromS3, deleteEmailFileFromS3, ALLOWED_IMAGE_TYPES, putAssistantUploadToS3, getAssistantUploadFromS3 } from "./ses.js";
 import type { InlineImage, Attachment } from "./ses.js";
 import { sqlite } from "./pg.js";
 import { log } from "./logger.js";
 import { createSmtpIamCredential, revokeSmtpIamCredential } from "./ses.js";
 import { crearBuzon, cambiarPassword, borrarBuzon, exportarBuzon } from "./stalwart.js";
 import { atenderMcp } from "./mcp.js";
+
+// Adjuntos del asistente: 10 MB; imágenes rasterizadas, PDF y texto plano. Ni SVG ni
+// HTML, que se servirían desde nuestro dominio y ejecutarían script.
+const ASSISTANT_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const ASSISTANT_UPLOAD_TYPES = /^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/(plain|csv|markdown))$/;
 
 const MCP_REGISTRY_AUTH_PATH = "/.well-known/mcp-registry-auth";
 const MCP_REGISTRY_PUBLIC_KEY = "+L7eynWTl5U/ZUd1DbrylPBzJHKTE0TzU9qdO8n8Vos=";
@@ -1210,7 +1235,7 @@ const app = new Elysia({ adapter: node() })
     },
     exclude: {
       tags: ["Auth", "Billing", "Admin", "Webhooks", "Coupons", "Referrals",
-             "Export", "Bandeja", "Agents", "Domain Registration"],
+             "Export", "Bandeja", "Agents", "Domain Registration", "Assistant"],
       paths: [
         "/", "/login", "/register", "/app", "/composer-demo", "/css/*", "/js/*", "/img/*",
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/admin",
@@ -1297,6 +1322,23 @@ const app = new Elysia({ adapter: node() })
         headers: { "content-type": "application/json" },
       });
     }
+  })
+  // --- Límites del turn token del asistente (`mt_`) ---
+  // El asistente opera la cuenta, pero no fabrica credenciales que sobrevivan al turno
+  // (API keys, SMTP) ni toca el panel de admin. Y nada del propio asistente acepta Bearer:
+  // si un `mt_` alcanzara `/api/agent-actions`, el agente se aprobaría a sí mismo.
+  .onBeforeHandle(({ request }) => {
+    const path = new URL(request.url).pathname;
+    const authHeader = request.headers.get("authorization") ?? "";
+    if (authHeader.startsWith("Bearer ") && (path.startsWith("/api/asistente") || path === "/api/agent-actions")) {
+      return jsonErr("Esta ruta sólo acepta la sesión del panel.", 403);
+    }
+    if (!authHeader.startsWith("Bearer mt_")) return;
+    const forbidden =
+      path.startsWith("/api/api-keys") ||
+      path.startsWith("/api/admin/") ||
+      (/^\/api\/domains\/[^/]+\/smtp-credentials$/.test(path) && (request.method === "GET" || request.method === "POST"));
+    if (forbidden) return jsonErr("El asistente no puede crear ni listar credenciales; hazlo tú desde el panel.", 403);
   })
   .onAfterHandle(({ request, response }) => {
     const isDeploy = !!process.env.FLY_APP_NAME;
@@ -2271,8 +2313,11 @@ const app = new Elysia({ adapter: node() })
     }
 
     // Global status
+    // "error" es sólo lo técnico (SES no verifica el dominio). Un dominio sin activar
+    // funciona —guarda el correo— y pintarlo de rojo mandaba a la gente a revisar su DNS
+    // cuando lo que faltaba era activarlo (kandey.com.mx, insightslab.com.mx).
     const allOk = Object.values(checks).every(c => c.ok);
-    const hasError = !checks.verified.ok || !checks.plan.ok;
+    const hasError = !checks.verified.ok;
     const status = allOk ? "ok" : hasError ? "error" : "warning";
 
     let summary = "";
@@ -2280,6 +2325,8 @@ const app = new Elysia({ adapter: node() })
       summary = "Todo configurado correctamente — tu dominio puede enviar y recibir emails";
     } else if (!checks.verified.ok) {
       summary = "Tu dominio no está verificado — configura los registros DNS y verifica";
+    } else if (!checks.plan.ok) {
+      summary = "Falta activar este dominio: guarda el correo pero no lo reenvía";
     } else if (!checks.mx.ok) {
       summary = "Tu dominio no puede recibir emails: el registro MX no apunta a MailMask";
     } else if (!checks.spf.ok || !checks.dkim.ok) {
@@ -2399,6 +2446,28 @@ const app = new Elysia({ adapter: node() })
       );
     }
 
+    {
+      const aliasesDelDominio = listAliases(domain.id);
+      const buzones = aliasesDelDominio.filter((a) => a.mailboxEnabled).length;
+      const pendiente = requireConfirmation(user, request, {
+        intent: "delete_domain",
+        domainId: domain.id,
+        summary: {
+          title: `Borrar el dominio ${domain.domain}`,
+          lines: [
+            `${aliasesDelDominio.length} máscara${aliasesDelDominio.length === 1 ? "" : "s"}`,
+            ...(buzones ? [`${buzones} buzón${buzones === 1 ? "" : "es"} con su correo`] : []),
+          ],
+          effects: [
+            "Se borran todas sus máscaras, reglas y buzones",
+            `El correo que llegue a ${domain.domain} dejará de reenviarse`,
+          ],
+          destructive: true,
+        },
+      });
+      if (pendiente) return pendiente;
+    }
+
     // Clean up all SES resources (best effort)
     try { await deleteReceiptRule(domain.domain); } catch { /* best effort */ }
     try { await deleteConfigurationSet(domain.domain); } catch { /* best effort */ }
@@ -2422,7 +2491,8 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Método no permitido" }), { status: 405, headers: { "content-type": "application/json", allow: "POST" } });
     }
     const auth = request.headers.get("authorization") ?? "";
-    if (!auth.startsWith("Bearer mk_")) {
+    // `mt_` = turn token del asistente de /app (5 min); `mk_` = API key de siempre.
+    if (!auth.startsWith("Bearer mk_") && !auth.startsWith("Bearer mt_")) {
       return new Response(JSON.stringify({ error: "Manda tu API key: Authorization: Bearer mk_…" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": "Bearer" } });
     }
     // La llave se valida aquí sin gastar el tope por llave: cada herramienta vuelve a
@@ -2430,7 +2500,8 @@ const app = new Elysia({ adapter: node() })
     // vez de 60. Contra el escaneo de llaves queda el tope por IP.
     const limited = await rateLimitGuard(getIp(request), 120, 60_000);
     if (limited) return limited;
-    const user = await getUserByApiKey(auth.slice("Bearer ".length));
+    const bearer = auth.slice("Bearer ".length);
+    const user = bearer.startsWith("mt_") ? await verifyTurnToken(bearer) : await getUserByApiKey(bearer);
     if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: { "content-type": "application/json" } });
     const fetchLocal = ((url: string | URL | Request, init?: RequestInit) => app.fetch(new Request(url as string, init))) as unknown as typeof fetch;
     const res = await atenderMcp(request, { apiKey: auth.slice("Bearer ".length), fetchLocal });
@@ -2659,6 +2730,25 @@ const app = new Elysia({ adapter: node() })
     // que la nombre. Se borra primero allá; si falla, no se borra la fila, porque una
     // fila sin cuenta se arregla sola y una cuenta sin fila no.
     const previo = await getAlias(domain.id, params.alias);
+    if (previo) {
+      const pendiente = requireConfirmation(user, request, {
+        intent: "delete_alias",
+        domainId: domain.id,
+        summary: {
+          title: `Borrar la máscara ${previo.alias}@${domain.domain}`,
+          lines: [
+            previo.destinations.length ? `Reenvía a: ${previo.destinations.join(", ")}` : "Sin destinos de reenvío",
+            ...(previo.mailboxEnabled ? ["Tiene buzón IMAP"] : []),
+          ],
+          effects: [
+            `El correo que llegue a ${previo.alias}@${domain.domain} dejará de reenviarse`,
+            ...(previo.mailboxEnabled ? ["Se borra el buzón con todo su correo; no se puede recuperar"] : []),
+          ],
+          destructive: true,
+        },
+      });
+      if (pendiente) return pendiente;
+    }
     if (previo?.mailboxEnabled && previo.mailboxAccountId) {
       const r = await borrarBuzon(previo.mailboxAccountId, `${params.alias}@${domain.domain}`);
       if (!r.ok) {
@@ -5834,6 +5924,20 @@ const app = new Elysia({ adapter: node() })
     }
     const domain = access.domain;
 
+    const miembro = listAgents(domain.id).find((a) => a.id === params.agentId);
+    if (!miembro) return new Response(JSON.stringify({ error: "Agente no encontrado" }), { status: 404 });
+    const pendiente = requireConfirmation(auth, request, {
+      intent: "remove_member",
+      domainId: domain.id,
+      summary: {
+        title: `Quitar a ${miembro.email} de ${domain.domain}`,
+        lines: [`Rol: ${miembro.role}`],
+        effects: [`${miembro.email} deja de ver la Bandeja de ${domain.domain}`],
+        destructive: true,
+      },
+    });
+    if (pendiente) return pendiente;
+
     const deleted = await deleteAgent(domain.id, params.agentId);
     if (!deleted) return new Response(JSON.stringify({ error: "Agente no encontrado" }), { status: 404 });
 
@@ -6083,6 +6187,18 @@ const app = new Elysia({ adapter: node() })
     if (!fila.destinations.length) {
       return new Response(JSON.stringify({ error: "Agrega un destino de reenvío antes de quitar el buzón, o borra la máscara entera" }), { status: 400 });
     }
+
+    const pendienteBuzon = requireConfirmation(user, request, {
+      intent: "delete_mailbox",
+      domainId: access.domain.id,
+      summary: {
+        title: `Borrar el buzón de ${aliasName}@${access.domain.domain}`,
+        lines: [`La máscara se queda y sigue reenviando a: ${fila.destinations.join(", ")}`],
+        effects: ["Se borra todo el correo guardado en el buzón; no se puede recuperar", "Apple Mail u Outlook dejarán de conectarse a ese buzón"],
+        destructive: true,
+      },
+    });
+    if (pendienteBuzon) return pendienteBuzon;
 
     // Borrar la cuenta BORRA EL CORREO. El orden importa: si Stalwart falla, la fila
     // se queda marcada y el barrido de huérfanas no la cuenta de más.
@@ -6960,6 +7076,21 @@ const app = new Elysia({ adapter: node() })
     if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Registro no encontrado", 404);
     if (reg.status !== "registered") return jsonErr("Este dominio todavía no está registrado a tu nombre.", 409);
 
+    const pendienteTraslado = requireConfirmation(auth, request, {
+      intent: "transfer_out",
+      domainId: getDomainByName(reg.domainName)?.id ?? null,
+      summary: {
+        title: `Trasladar ${reg.domainName} a otro registrador`,
+        lines: [`Registro: ${reg.domainName}`],
+        effects: [
+          `Te llegará un correo a ${auth.email} con el código de autorización (EPP)`,
+          "Con ese código cualquiera puede llevarse el dominio: no lo compartas",
+        ],
+        destructive: true,
+      },
+    });
+    if (pendienteTraslado) return pendienteTraslado;
+
     // Entregar el auth code es entregar el dominio, así que va por correo y no en la
     // respuesta: si alguien se metió a la sesión, el código no le sirve de nada.
     const token = crypto.randomUUID();
@@ -7410,6 +7541,19 @@ const app = new Elysia({ adapter: node() })
       });
       if (bloqueo) return jsonErr(bloqueo.message, 409);
 
+      const pendiente = requireConfirmation(user, request, {
+        intent: "delete_dns_record",
+        domainId: d.id,
+        body: { name: b.name, type: b.type },
+        summary: {
+          title: `Borrar el registro ${type} de ${name}`,
+          lines: (actual.values ?? []).slice(0, 6).map((v: string) => `Valor: ${v}`),
+          effects: ["Lo que dependa de este registro (web, verificaciones, correo de otro proveedor) puede dejar de funcionar"],
+          destructive: true,
+        },
+      });
+      if (pendiente) return pendiente;
+
       // Se borra con los valores actuales: Route 53 exige que el RRSet coincida exacto.
       const { changeId } = await applyRecordChanges(d.hostedZoneId, [{ action: "DELETE", rrset: actual }], `Borrado de ${user.email}`);
       log("info", "route53", "DNS record deleted", { domain: d.domain, name, type, actor: user.email, changeId });
@@ -7474,6 +7618,182 @@ const app = new Elysia({ adapter: node() })
     }),
     detail: { tags: ["DNS", "SDK"], summary: "Apply a hosting preset (Vercel, Netlify, …)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
+
+  // --- Asistente de /app (agente en Ghosty Studio) ---
+  //
+  // Todo `/api/asistente*` y `/api/agent-actions` exige la COOKIE de sesión: el hook de
+  // arriba rechaza cualquier Bearer, y además aquí se pide `via === "session"`.
+
+  .post("/api/asistente/stream", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    const rl = checkRateLimit(`assistant:${auth.email}`, 20, 60_000);
+    if (!rl.allowed) return jsonErr("Demasiados mensajes seguidos; espera un minuto.", 429);
+
+    const b = (body ?? {}) as { text?: unknown; attachments?: unknown; screen?: unknown; screenChanged?: unknown; surface?: unknown };
+    const text = String(b.text ?? "").trim().slice(0, 8000);
+    // Sólo adjuntos que ESTE usuario subió a nuestra ruta firmada: Ghosty los descarga.
+    const files: AssistantAttachment[] = (Array.isArray(b.attachments) ? b.attachments : [])
+      .slice(0, 6)
+      .filter((a): a is Record<string, unknown> => !!a && typeof a === "object" && typeof (a as { url?: unknown }).url === "string" && isOwnUpload((a as { url: string }).url, auth.email))
+      .map((a) => ({
+        url: a.url as string,
+        name: typeof a.name === "string" ? a.name.slice(0, 200) : undefined,
+        contentType: typeof a.contentType === "string" ? a.contentType.slice(0, 100) : undefined,
+        size: typeof a.size === "number" ? a.size : undefined,
+      }));
+    if (!text && !files.length) return jsonErr("Mensaje vacío", 400);
+
+    // Se guarda ANTES del turno: si Ghosty falla, lo que el usuario escribió no se pierde.
+    // Los adjuntos van como markdown, igual que los re-hidrata el dock.
+    const saved = saveAssistantMessage(auth.email, "user", [text, ...files.map(attachmentMarkdown)].filter(Boolean).join("\n"));
+
+    const pantalla = buildScreenContext(auth.email, b.screen);
+    const appendSystemPrompt = [ASSISTANT_BASE_PROMPT, pantalla ? `Contexto de pantalla:\n${pantalla}` : null].filter(Boolean).join("\n\n");
+    // El append sólo se aplica cuando Ghosty CREA la conversación (es sticky por groupId,
+    // lección de Deník), así que cuando la pantalla cambió también viaja en el mensaje.
+    const textForGhosty = b.screenChanged === true && pantalla
+      ? `<contexto-de-pantalla>\n${pantalla}\n</contexto-de-pantalla>\n\n${text}`
+      : text;
+
+    const upstreamAbort = new AbortController();
+    let relayDone = false;
+    request.signal?.addEventListener("abort", () => { if (!relayDone) upstreamAbort.abort(); }, { once: true });
+
+    const turno = await openGhostyTurn({
+      email: auth.email,
+      text: textForGhosty || "(adjuntos)",
+      attachments: files,
+      appendSystemPrompt,
+      turnToken: await issueTurnToken(auth.email),
+      signal: upstreamAbort.signal,
+    });
+    if (!turno.ok) {
+      log("error", "assistant", "No se pudo abrir el turno en Ghosty", { email: auth.email, reason: turno.reason });
+      return jsonErr("No se pudo contactar al asistente", 502);
+    }
+
+    const stream = relayTurn(turno.body, upstreamAbort, (o) => {
+      relayDone = true;
+      if (o.status === "failed") log("warn", "assistant", "Turno fallido", { email: auth.email, error: o.error });
+      const content = o.reply || (o.status === "failed" ? "No pude completar la respuesta. Intenta de nuevo." : "");
+      if (content) saveAssistantMessage(auth.email, "assistant", content, o.status);
+    });
+    return new Response(stream, {
+      headers: {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-cache, no-transform",
+        connection: "keep-alive",
+        "x-accel-buffering": "no",
+        // El id del mensaje del usuario ya persistido: el dock reemplaza su burbuja optimista.
+        "x-message-id": saved.id,
+      },
+    });
+  }, { detail: { tags: ["Assistant"], summary: "Turno del asistente en SSE" } })
+
+  .get("/api/asistente", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    return Response.json(getMessagePage(auth.email, new URL(request.url).searchParams.get("before")));
+  }, { detail: { tags: ["Assistant"], summary: "Historial del asistente (paginado con ?before=ISO)" } })
+
+  .post("/api/asistente", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    // El dock manda FormData; se acepta también JSON.
+    const intent = String((body as { intent?: unknown } | null)?.intent ?? "");
+    if (intent === "reset") {
+      // Nueva conversación: se borra el hilo visible y un nonce nuevo cambia el groupId,
+      // así que Ghosty abre una conversación limpia en el siguiente turno.
+      clearAssistantMessages(auth.email);
+      rotateAssistantNonce(auth.email);
+      return Response.json({ ok: true });
+    }
+    // El camino síncrono de Deník no existe aquí: todo turno va por el stream.
+    if (intent === "send") return jsonErr("Usa /api/asistente/stream", 410);
+    return jsonErr("Unknown intent", 400);
+  }, { detail: { tags: ["Assistant"], summary: "Acciones del hilo del asistente (reset)" } })
+
+  // En Deník esto nombra la tool real detrás de `run_tool` (codemode). El MCP de MailMask
+  // expone cada tool con su nombre, así que no hay nada que resolver.
+  .get("/api/asistente/last-tool", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    return Response.json({ name: null });
+  }, { detail: { tags: ["Assistant"], summary: "Última tool despachada (sin uso en MailMask)" } })
+
+  .post("/api/asistente/upload", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    const rl = checkRateLimit(`assistant-upload:${auth.email}`, 20, 60_000);
+    if (!rl.allowed) return jsonErr("Demasiadas subidas; espera un minuto.", 429);
+
+    const form = await request.formData().catch(() => null);
+    const file = form?.get("file");
+    if (!(file instanceof File)) return jsonErr("Falta el archivo", 400);
+    if (file.size > ASSISTANT_UPLOAD_MAX_BYTES) return jsonErr("El archivo pesa más de 10 MB", 413);
+    const tipo = (file.type || "").toLowerCase();
+    if (!ASSISTANT_UPLOAD_TYPES.test(tipo)) return jsonErr("Sólo imágenes (PNG, JPG, GIF, WebP), PDF o texto", 415);
+
+    const safeName = file.name.replace(/[^\w.-]+/g, "_").slice(-60) || "archivo";
+    const key = `${userKey(auth.email)}/${crypto.randomUUID()}-${safeName}`;
+    try {
+      await putAssistantUploadToS3(key, new Uint8Array(await file.arrayBuffer()), tipo);
+    } catch (err) {
+      log("error", "assistant", "Upload failed", { error: String(err) });
+      return jsonErr("No se pudo subir el archivo", 500);
+    }
+    const host = new URL(request.url).host;
+    const base = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) ? `http://${host}` : getMainDomainUrl();
+    return Response.json({ ok: true, url: signedUploadUrl(base, key), name: file.name, contentType: tipo, size: file.size });
+  }, { detail: { tags: ["Assistant"], summary: "Sube un adjunto para el asistente" } })
+
+  // Descarga firmada (7 días) de un adjunto: la usan el dock (miniaturas, mismo origen
+  // para la CSP) y Ghosty, que no tiene sesión.
+  .get("/api/asistente/files/*", async ({ request, params }) => {
+    const key = decodeURIComponent(params["*"] ?? "");
+    const url = new URL(request.url);
+    if (!key || key.includes("..") || !verifyUploadSig(key, url.searchParams.get("exp"), url.searchParams.get("sig"))) {
+      return jsonErr("Enlace inválido o vencido", 403);
+    }
+    const obj = await getAssistantUploadFromS3(key);
+    if (!obj) return jsonErr("Archivo no encontrado", 404);
+    const tipo = ASSISTANT_UPLOAD_TYPES.test(obj.contentType) ? obj.contentType : "application/octet-stream";
+    return new Response(obj.body as BodyInit, {
+      headers: { "content-type": tipo, "cache-control": "private, max-age=3600", "content-disposition": "inline" },
+    });
+  }, { detail: { tags: ["Assistant"], summary: "Descarga firmada de un adjunto del asistente" } })
+
+  // --- Confirmación de acciones del asistente ---
+  .get("/api/agent-actions", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    return Response.json({ actions: listPendingActions(auth.email) });
+  }, { detail: { tags: ["Assistant"], summary: "Acciones del asistente pendientes de aprobar" } })
+
+  .post("/api/agent-actions", async ({ request, body }): Promise<Response> => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    const b = (body ?? {}) as { intent?: unknown; actionId?: unknown };
+    const actionId = String(b.actionId ?? "");
+    if (!/^[0-9a-f-]{36}$/i.test(actionId)) return jsonErr("actionId inválido", 400);
+    if (b.intent === "reject") return rejectAction(auth.email, actionId);
+    if (b.intent !== "confirm") return jsonErr("Unknown intent", 400);
+
+    // Se re-ejecuta la petición archivada contra la MISMA ruta con la sesión de quien
+    // aprueba: pasa por sus mismos permisos y validaciones, y con cookie el guardián de
+    // confirmación no vuelve a saltar.
+    const fwd: Record<string, string> = {};
+    for (const h of ["cookie", "x-csrf-token", TRUSTED_IP_HEADER, "user-agent"]) {
+      const v = request.headers.get(h);
+      if (v) fwd[h] = v;
+    }
+    return confirmAction(auth.email, actionId, (p): Promise<Response> => (app.fetch as (r: Request) => Promise<Response>)(new Request(`http://internal.local${p.path}`, {
+      method: p.method,
+      headers: p.body !== undefined ? { ...fwd, "content-type": "application/json" } : fwd,
+      body: p.body !== undefined ? JSON.stringify(p.body) : undefined,
+    })));
+  }, { detail: { tags: ["Assistant"], summary: "Aprueba o rechaza una acción del asistente" } })
 
   // --- API Keys ---
 

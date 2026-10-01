@@ -31,8 +31,25 @@ function fallo(e: unknown): Salida {
 const domainId = z.string().describe("ID del dominio (de list_domains)");
 const aliasName = z.string().describe("Parte local de la máscara, sin el dominio: 'hola' para hola@tudominio.com");
 
+// Con el turn token del asistente (`mt_`), lo destructivo contesta 409 `needs_confirmation`:
+// al usuario le aparece una tarjeta para aprobarlo. No es un error para el modelo, y si
+// lo pareciera, reintentaría.
+function pideConfirmacion(titulo: string): Salida {
+  return { content: [{ type: "text", text: `Necesita confirmación del usuario: le apareció una tarjeta en el asistente para aprobar «${titulo}». No reintentes; espera a que confirme.` }], structuredContent: { needsConfirmation: true, title: titulo } };
+}
+
 export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }): McpServer {
-  const sdk = new MailMask({ apiKey: o.apiKey, baseUrl: "http://mcp.local", fetch: o.fetchLocal });
+  // El SDK sólo conserva `error` del cuerpo; el título de la tarjeta se lee aquí.
+  let confirmacion: string | null = null;
+  const fetchLocal = (async (input: string | URL | Request, init?: RequestInit) => {
+    const res = await o.fetchLocal(input, init);
+    if (res.status === 409) {
+      const b = await res.clone().json().catch(() => null) as { error?: string; summary?: { title?: string } } | null;
+      if (b?.error === "needs_confirmation") confirmacion = b.summary?.title ?? "la acción";
+    }
+    return res;
+  }) as typeof fetch;
+  const sdk = new MailMask({ apiKey: o.apiKey, baseUrl: "http://mcp.local", fetch: fetchLocal });
   const server = new McpServer({ name: "mailmask", version: MCP_VERSION });
   const catalogo: { name: string; description: string }[] = [];
 
@@ -40,7 +57,12 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     catalogo.push({ name, description });
     // El genérico de registerTool no infiere bien con un shape genérico; el tipado real
     // de `args` lo garantiza la firma de `run`.
-    const cb = async (args: z.infer<z.ZodObject<S>>) => { try { return ok(await run(args)); } catch (e) { return fallo(e); } };
+    const cb = async (args: z.infer<z.ZodObject<S>>) => {
+      try { return ok(await run(args)); } catch (e) {
+        if (e instanceof MailMaskError && e.status === 409 && e.message === "needs_confirmation") return pideConfirmacion(confirmacion ?? "la acción");
+        return fallo(e);
+      }
+    };
     server.registerTool(name, { description, inputSchema: shape }, cb as unknown as Parameters<typeof server.registerTool>[2]);
   };
 
