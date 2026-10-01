@@ -289,7 +289,7 @@ orden (todo arreglado ese día salvo lo marcado):
   **Choque de fechas:** Hostinger tiene hasta 10 días para soltarla (≈4-oct) y el dominio
   vence un día antes. Confirmar con la clienta que la autorrenovación quedó encendida, o
   que renueve ya. **La clienta no piensa renovar** (dicho el 25-sep): pedirle que escriba al chat de
-  Hostinger para que aprueben la transferencia ya. Revisado el 28-sep: AWS sigue en el paso 7/14 sin cambios desde las
+  Hostinger para que aprueben la transferencia ya. **1-oct: la clienta pagó la renovación en Hostinger** (el whois todavía decía 3-oct; el registro tarda en reflejarlo): el riesgo de vencimiento queda cerrado y la transferencia sigue sin prisa. Revisado el 28-sep: AWS sigue en el paso 7/14 sin cambios desde las
   22:47 del 24-sep; el whois del .mx sigue en Registrar.eu (Hostinger), `ACTIVE`, y el
   NS y el MX siguen en Hostinger. Para revisar (el perfil por defecto de `aws` tiene llaves
   vencidas y da `UnrecognizedClientException`; hay que cargar las de `.env` del repo):
