@@ -1,0 +1,40 @@
+{
+  "name": "mailmask-cli",
+  "version": "0.1.0",
+  "description": "Official CLI for MailMask — manage domains, aliases, DNS, rules, webhooks and more from the terminal.",
+  "type": "module",
+  "bin": {
+    "mailmask": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/index.ts",
+    "test": "tsx --test --test-concurrency=1 test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@easybits.cloud/mailmask": "^0.4.1",
+    "citty": "^0.1.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsup": "^8.0.0",
+    "tsx": "^4",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "mailmask",
+    "email",
+    "cli",
+    "dns"
+  ],
+  "license": "MIT"
+}

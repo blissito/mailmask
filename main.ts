@@ -10,6 +10,7 @@ import { verificarTurnstile } from "./turnstile.js";
 import { generarPerfilApple, nombreArchivoPerfil, IMAP_HOST } from "./apple-profile.js";
 import { addSseClient, notifyBandeja, setPresence, clearPresence, listPresence, notifyPresence } from "./sse-hub.js";
 import { ftsDisponible } from "./pg.js";
+import { createDeviceAuthStore } from "./cli-auth.js";
 import { backfillPendiente } from "./search-backfill.js";
 import { db } from "./pg.js";
 import { users as usersTable, tokens as tokensTable } from "./schema.js";
@@ -1188,6 +1189,12 @@ async function requireBandeja(
   return { ok: true, auth, domain, role, plan };
 }
 
+// --- CLI device auth ---
+
+const deviceAuth = createDeviceAuthStore({
+  createKey: (email: string) => createApiKey(email, "CLI (device code)"),
+});
+
 // --- App ---
 
 const app = new Elysia({ adapter: node() })
@@ -1212,7 +1219,7 @@ const app = new Elysia({ adapter: node() })
       tags: ["Auth", "Billing", "Admin", "Webhooks", "Coupons", "Referrals",
              "Export", "Bandeja", "Agents", "Domain Registration"],
       paths: [
-        "/", "/login", "/register", "/app", "/composer-demo", "/css/*", "/js/*", "/img/*",
+        "/", "/login", "/register", "/app", "/composer-demo", "/cli/authorize", "/css/*", "/js/*", "/img/*",
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
@@ -1263,7 +1270,7 @@ const app = new Elysia({ adapter: node() })
     // Skip CSRF for webhook endpoints (they use HMAC/signature validation)
     if (url.pathname.startsWith("/api/webhooks/")) return;
     // Skip CSRF for auth entry points (user doesn't have token yet)
-    if (url.pathname.startsWith("/api/auth/") || url.pathname === "/api/referrals/track" || url.pathname === "/api/billing/checkout" || url.pathname === "/api/billing/guest-checkout") return;
+    if (url.pathname.startsWith("/api/auth/") || url.pathname === "/api/referrals/track" || url.pathname === "/api/billing/checkout" || url.pathname === "/api/billing/guest-checkout" || url.pathname === "/api/cli/device/start") return;
     // La vista previa no muta nada y en desarrollo se usa desde la página de demo,
     // que no tiene sesión ni cookie CSRF. En producción el endpoint exige sesión.
     if (url.pathname === "/api/email-preview" && process.env.NODE_ENV !== "production") return;
@@ -1392,6 +1399,7 @@ const app = new Elysia({ adapter: node() })
   .get("/js/*", ({ params }) => serveStatic(`/js/${params["*"]}`))
   .get("/img/*", ({ params }) => serveStatic(`/img/${params["*"]}`))
   .get("/favicon.svg", () => serveStatic("/favicon.svg"))
+  .get("/cli/authorize", () => serveStatic("/cli-authorize.html"))
   .get("/landing", () => serveStatic("/landing.html"))
   .get("/pricing", () => serveStatic("/pricing.html"))
   .get("/bandeja", () => serveStatic("/bandeja.html"))
@@ -7473,6 +7481,57 @@ const app = new Elysia({ adapter: node() })
       subdomain: t.Optional(t.String()),
     }),
     detail: { tags: ["DNS", "SDK"], summary: "Apply a hosting preset (Vercel, Netlify, …)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  // --- CLI device auth ---
+
+  .post("/api/cli/device/start", async ({ request }) => {
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 10, 60_000);
+    if (limited) return limited;
+    const url = new URL(request.url);
+    const base = `${url.protocol}//${url.host}`;
+    try {
+      return new Response(JSON.stringify(deviceAuth.start(base)), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      });
+    } catch {
+      return new Response(JSON.stringify({ error: "Demasiadas solicitudes" }), {
+        status: 429,
+        headers: { "content-type": "application/json" },
+      });
+    }
+  }, {
+    detail: { tags: ["CLI"], summary: "Start a CLI device-code login" },
+  })
+
+  .post("/api/cli/device/confirm", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401, headers: { "content-type": "application/json" } });
+    const ip = getIp(request);
+    const limited = await rateLimitGuard(ip, 10, 60_000);
+    if (limited) return limited;
+    const { userCode } = body as { userCode: string };
+    if (!userCode || typeof userCode !== "string") {
+      return new Response(JSON.stringify({ error: "Código inválido" }), { status: 400, headers: { "content-type": "application/json" } });
+    }
+    const ok = await deviceAuth.confirm(userCode, auth.email);
+    if (!ok) return new Response(JSON.stringify({ error: "Código inválido o vencido" }), { status: 404, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  }, {
+    body: t.Object({ userCode: t.String() }),
+    detail: { tags: ["CLI"], summary: "Confirm a CLI device-code login", security: [{ cookieAuth: [] }] },
+  })
+
+  .get("/api/cli/device/poll", ({ query }) => {
+    const deviceCode = query.deviceCode;
+    if (!deviceCode || typeof deviceCode !== "string") {
+      return new Response(JSON.stringify({ error: "Falta deviceCode" }), { status: 400, headers: { "content-type": "application/json" } });
+    }
+    return new Response(JSON.stringify(deviceAuth.poll(deviceCode)), { headers: { "content-type": "application/json" } });
+  }, {
+    detail: { tags: ["CLI"], summary: "Poll a CLI device-code login" },
   })
 
   // --- API Keys ---

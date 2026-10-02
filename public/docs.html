@@ -74,6 +74,15 @@
     .sidebar { position: sticky; top: 53px; height: calc(100vh - 53px); overflow-y: auto; }
     .sidebar a { display: block; padding: 6px 16px; font-size: 14px; color: rgb(var(--fg-muted)); border-left: 2px solid transparent; transition: all 0.15s; }
     .sidebar a:hover, .sidebar a.active { color: rgb(var(--accent-text)); border-left-color: rgb(var(--accent)); }
+    .cli-nav-link { display: flex !important; align-items: center; justify-content: space-between; gap: 8px; }
+    .cli-new-badge {
+      font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 1px 6px; border-radius: 9999px; line-height: 1.6;
+      background: rgb(var(--accent) / 0.12); color: rgb(var(--accent-text)); border: 1px solid rgb(var(--accent) / 0.25);
+      transition: transform 0.2s ease, background-color 0.2s ease;
+    }
+    .cli-nav-link:hover .cli-new-badge { transform: scale(1.12) rotate(-3deg); background: rgb(var(--accent) / 0.25); }
+    @media (prefers-reduced-motion: reduce) { .cli-nav-link:hover .cli-new-badge { transform: none; } }
     pre { position: relative; }
     pre:has(.copy-btn) { padding-right: 52px; }
     .copy-btn { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgb(var(--bg-inset)); border: 1px solid rgb(var(--line)); border-radius: 6px; color: rgb(var(--fg-muted)); cursor: pointer; transition: color 0.15s, border-color 0.15s; }
@@ -179,6 +188,7 @@
         <a href="#smtp">Credenciales SMTP</a>
         <a href="#api-keys">API Keys</a>
         <a href="#errores">Manejo de errores</a>
+        <a href="#cli" class="cli-nav-link">CLI<span class="cli-new-badge">nuevo</span></a>
         <a href="#mcp">MCP Server</a>
         <a href="#referencia">Referencia API</a>
       </nav>
@@ -529,6 +539,39 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
     console.<span class="fn">error</span>(err.status, err.message);
   }
 }</code></pre>
+
+      <!-- CLI -->
+      <h2 id="cli" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">CLI</h2>
+      <p class="text-fg-muted mb-2">CLI de terminal sobre este mismo SDK: un subcomando por recurso, sin modelo declarativo encima. En construcci&oacute;n (PR en revisi&oacute;n) &mdash; esta primera entrega trae <code class="text-fg">login</code>, <code class="text-fg">logout</code> y <code class="text-fg">whoami</code>; el resto de recursos (<code class="text-fg">domains</code>, <code class="text-fg">aliases</code>, <code class="text-fg">dns</code>, <code class="text-fg">rules</code>, <code class="text-fg">webhooks</code>, <code class="text-fg">send</code>, <code class="text-fg">smtp</code>, <code class="text-fg">apikeys</code>, <code class="text-fg">logs</code>, <code class="text-fg">suppressions</code>) llega en pr&oacute;ximos PRs.</p>
+      <p class="text-fg-subtle text-xs mb-4">Nombre del paquete y del binario (hoy <code>mailmask-cli</code> / <code>mailmask</code>) son provisionales, pendientes de confirmaci&oacute;n antes de publicarse a npm.</p>
+      <p class="text-fg-muted text-sm mb-6">&iquest;Quien va a operar tu cuenta es un agente de c&oacute;digo? Probablemente le convenga m&aacute;s instalarle las <a href="#skills" class="text-accent-text hover:underline">skills oficiales</a> (<code>npx skills add https://www.mailmask.studio</code>) que esta CLI: ya saben qu&eacute; puede hacer cada plan y qu&eacute; secretos salen una sola vez. Esta CLI es para cuando la persona teclea los comandos ella misma.</p>
+
+      <p class="text-sm font-bold mb-1">Instalaci&oacute;n</p>
+      <p class="text-fg-muted text-sm mb-2">Todav&iacute;a no est&aacute; publicada en npm. Mientras tanto, se corre desde el repo:</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm"># dentro de cli/</span>
+npm install
+npm run build
+node dist/index.js --help</code></pre>
+
+      <p class="text-sm font-bold mb-1">Comandos</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask login [--api-key mk_...] [--base-url https://...]
+mailmask whoami [--json]
+mailmask logout</code></pre>
+      <p class="text-fg-muted text-sm mb-4">Sin <code>--api-key</code>, <code>login</code> abre el navegador para autorizar el dispositivo (device-code, como <code>gh auth login</code>) &mdash; no hace falta copiar y pegar nada. Con <code>--api-key</code> se salta ese paso y guarda la llave directo.</p>
+
+      <p class="text-sm font-bold mb-1">Variable de entorno</p>
+      <p class="text-fg-muted text-sm mb-4"><code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">MAILMASK_API_KEY</code> tiene prioridad sobre la sesi&oacute;n guardada &mdash; es la v&iacute;a recomendada para CI o para un agente de c&oacute;digo.</p>
+
+      <p class="text-sm font-bold mb-1">D&oacute;nde se guarda la sesi&oacute;n</p>
+      <p class="text-fg-muted text-sm mb-4">En el keychain del sistema operativo (Keychain en macOS, Secret Service/<code>secret-tool</code> en Linux). Si no hay keychain disponible &mdash;Windows, o un Linux sin Secret Service&mdash; cae a <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">~/.config/mailmask/credentials.json</code> con permisos <code>600</code>. <code>mailmask logout</code> la borra de donde haya quedado.</p>
+
+      <p class="text-sm font-bold mb-1">C&oacute;digos de salida</p>
+      <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-4">
+        <li><code>0</code> &mdash; &eacute;xito.</li>
+        <li><code>1</code> &mdash; error gen&eacute;rico.</li>
+        <li><code>2</code> &mdash; no hay API key activa, o MailMask la rechaz&oacute;.</li>
+      </ul>
+      <p class="text-fg-muted text-sm mb-4">El resto de la taxonom&iacute;a de c&oacute;digos y el contrato <code>--json</code>/<code>--yes</code> para el resto de comandos llegan en un PR aparte.</p>
 
       <!-- MCP -->
       <h2 id="mcp" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">MCP Server</h2>
