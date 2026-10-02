@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createRoot } from "react-dom/client"
 import { AssistantDock, DOCK_WIDTH } from "./AssistantDock"
-import { ASSISTANT_NAME } from "./brand"
 import "./screen" // tipos globales de window.mailmask*
 
 /**
@@ -49,8 +48,6 @@ function App() {
       toggle: () => setOpen(!openRef.current),
     }
     const trigger = document.getElementById("assistant-trigger")
-    const label = trigger?.querySelector("[data-assistant-name]")
-    if (label) label.textContent = ASSISTANT_NAME
     const onClick = () => setOpen((v) => !v)
     trigger?.addEventListener("click", onClick)
     return () => trigger?.removeEventListener("click", onClick)
