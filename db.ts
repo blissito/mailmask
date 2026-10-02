@@ -1193,6 +1193,11 @@ export function claimOnce(kind: string, token: string, ttlDays = 45): boolean {
   return rows.length > 0;
 }
 
+/** Deshace un `claimOnce`: para cuando lo reclamado no llegó a pasar y debe poder reintentarse. */
+export function releaseClaim(kind: string, token: string): void {
+  db.delete(tokens).where(eq(tokens.token, `${kind}:${token}`)).run();
+}
+
 // --- Pending checkout (guest flow) ---
 
 export function createPendingCheckout(token: string, plan: string): void {

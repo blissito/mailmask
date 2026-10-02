@@ -242,6 +242,8 @@ import { log } from "./logger.js";
 import { createSmtpIamCredential, revokeSmtpIamCredential } from "./ses.js";
 import { crearBuzon, cambiarPassword, borrarBuzon, exportarBuzon } from "./stalwart.js";
 import { atenderMcp } from "./mcp.js";
+import { logOutbound, handleInternalOutbound } from "./outbound-relay.js";
+import { copyToSentFolder } from "./imap-store.js";
 
 // Adjuntos del asistente: 10 MB; imágenes rasterizadas, PDF y texto plano. Ni SVG ni
 // HTML, que se servirían desde nuestro dominio y ejecutarían script.
@@ -492,26 +494,6 @@ async function discardSentFiles(keys: string[]): Promise<void> {
 /** Días de retención de logs de un dominio, según sus derechos (gratis 7, activado 90). */
 async function ownerLogDays(domainId: string): Promise<number> {
   return derechosPorDominioId(domainId)?.logDays ?? DOMINIO_GRATIS.logDays;
-}
-
-/**
- * Registra un envío saliente en `email_logs` con status `sent`. El webhook de
- * eventos de SES lo mueve a delivered/bounced/complained por `sesMessageId`.
- * Antes los envíos por API y bulk no dejaban rastro: la pestaña Logs sólo
- * mostraba reenvíos, y un envío que rebotaba era invisible.
- */
-function logOutbound(domainId: string, from: string, to: string, subject: string, body: string, sesMessageId: string, logDays: number): void {
-  try {
-    addLog({
-      domainId, timestamp: new Date().toISOString(),
-      from, to, subject,
-      status: "sent", forwardedTo: to,
-      sizeBytes: Buffer.byteLength(body ?? "", "utf8"),
-      sesMessageId: sesMessageId || undefined,
-    }, logDays);
-  } catch (err) {
-    log("warn", "ses", "Could not log outbound send", { domainId, error: String(err) });
-  }
 }
 
 function parseCopyList(value: unknown, max = 20): string[] {
@@ -1251,7 +1233,7 @@ const app = new Elysia({ adapter: node() })
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
-        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/.well-known/mcp-registry-auth", "/health", "/healthz", "/docs", "/mcp",
+        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/.well-known/mcp-registry-auth", "/health", "/healthz", "/docs", "/mcp", "/api/internal/outbound",
       ],
       staticFile: true,
     },
@@ -1310,6 +1292,8 @@ const app = new Elysia({ adapter: node() })
     // /mcp sólo acepta Bearer (nunca cookie), así que no hay CSRF que proteger; sin
     // Bearer la propia ruta contesta 401 en vez de un 403 confuso.
     if (url.pathname === "/mcp") return;
+    // El relay de la caja de Stalwart firma con HMAC y nunca manda cookie.
+    if (url.pathname === "/api/internal/outbound") return;
     // Skip CSRF for Bearer token auth (inherently CSRF-safe)
     const authHeader = request.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) return;
@@ -4324,7 +4308,7 @@ const app = new Elysia({ adapter: node() })
       // camino que la Bandeja; el archivo se borra de S3 una vez enviado.
       const files = await collectAttachments(sendBody.attachments);
       sentFileKeys = files.keys;
-      const { messageId, sesMessageId } = await sendFromDomain(fromAddress, recipient, subject, rendered.text, {
+      const sentApi = await sendFromDomain(fromAddress, recipient, subject, rendered.text, {
         html: rendered.html,
         replyTo,
         cc: sendCc.length ? sendCc : undefined,
@@ -4334,8 +4318,11 @@ const app = new Elysia({ adapter: node() })
         attachments: files.attachments.length ? files.attachments : undefined,
         configSet: getConfigSetName(domain.domain),
       });
+      const { messageId, sesMessageId } = sentApi;
       await discardSentFiles(sentFileKeys);
       logOutbound(domain.id, bareFrom, recipient, subject, rendered.html ?? rendered.text, sesMessageId, limits.logDays);
+      // Si el remitente tiene buzón, que lo enviado por API también esté en su Enviados.
+      void copyToSentFolder(domain.id, bareFrom, sentApi);
       const result = { ok: true, messageId, sesMessageId };
       if (idemToken) {
         db.insert(tokensTable).values({
@@ -4942,14 +4929,16 @@ const app = new Elysia({ adapter: node() })
       withImages = await attachInlineImages(rendered.html);
       const files = await collectAttachments(attachRefs);
       sentFileKeys = files.keys;
-      ({ messageId, sesMessageId: composeSesId } = await sendFromDomain(fromAddress, recipient, String(subject), rendered.text, {
+      const sentCompose = await sendFromDomain(fromAddress, recipient, String(subject), rendered.text, {
         html: withImages.html,
         inlineImages: withImages.inlineImages,
         attachments: files.attachments.length ? files.attachments : undefined,
         cc: cc.length ? cc : undefined,
         bcc: bcc.length ? bcc : undefined,
         configSet: getConfigSetName(domain.domain),
-      }));
+      });
+      ({ messageId, sesMessageId: composeSesId } = sentCompose);
+      void copyToSentFolder(domain.id, fromAddress, sentCompose);
       logOutbound(domain.id, fromAddress, recipient, String(subject), withImages.html ?? rendered.text, composeSesId, limits.logDays);
     } catch (err) {
       decrementSendCount(domain.id);
@@ -5448,7 +5437,7 @@ const app = new Elysia({ adapter: node() })
       const withImages = await attachInlineImages(rendered.html);
       const files = await collectAttachments(attachRefs);
       sentFileKeys = files.keys;
-      const { messageId, sesMessageId } = await sendFromDomain(fromAddress, recipient, `Re: ${conv.subject}`, rendered.text, {
+      const sentReply = await sendFromDomain(fromAddress, recipient, `Re: ${conv.subject}`, rendered.text, {
         html: withImages.html,
         inlineImages: withImages.inlineImages,
         attachments: files.attachments.length ? files.attachments : undefined,
@@ -5458,6 +5447,10 @@ const app = new Elysia({ adapter: node() })
         inReplyTo: lastRef,
         references: conv.threadReferences.join(" "),
       });
+      const { messageId, sesMessageId } = sentReply;
+      // La respuesta desde la Bandeja también va a Enviados del buzón, si la máscara
+      // tiene uno: si no, en Apple Mail el hilo queda con sólo lo que llegó.
+      void copyToSentFolder(domain.id, fromAddress, sentReply);
       logOutbound(domain.id, fromAddress, recipient, `Re: ${conv.subject}`, withImages.html ?? rendered.text, sesMessageId, (await ownerLogDays(domain.id)));
 
       // Ya salió con imágenes y adjuntos dentro: las copias en S3 sobran.
@@ -6282,6 +6275,12 @@ const app = new Elysia({ adapter: node() })
   })
 
   // --- SES bounce/complaint events ---
+
+  // Salida de los buzones IMAP: el relay de la caja de Stalwart entrega aquí lo que manda
+  // Apple Mail (outbound-relay.ts). Autenticada por HMAC; ignora cookies a propósito.
+  .post("/api/internal/outbound", ({ request }) => handleInternalOutbound(request), {
+    detail: { hide: true },
+  })
 
   .post("/api/webhooks/ses-events", async ({ request }) => {
     const body = await request.json();

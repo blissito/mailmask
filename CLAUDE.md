@@ -726,6 +726,54 @@ Bandeja **y** en el buzón. Es el producto entero funcionando sobre un dominio d
    al revés, lo que se responde desde la Bandeja se copia a Enviados del buzón con `Email/import`.
    **Contador del 465**: hoy lo que sale de Apple Mail no descuenta de los 50/día. Hasta
    entonces "+100 envíos" no se publica como comprable.
+
+   **Construido el 1-oct-2026, sin aplicar en producción.** Nada de puertos en Fly (decisión
+   de bliss): el relay vive en la caja de Stalwart y habla con la app por HTTPS.
+
+       Apple Mail ─465→ Stalwart ─ruta `ses`, LMTP→ 127.0.0.1:2525 (box/outbound-relay)
+                 ─HTTPS + HMAC→ POST /api/internal/outbound ─→ SES · email_logs · Bandeja
+
+   - **App** (`outbound-relay.ts`, `handleInternalOutbound`): firma `X-MailMask-Signature:
+     sha256=HMAC(OUTBOUND_RELAY_SECRET, "<ts>.<cuerpo>")` + `X-MailMask-Timestamp` (±300 s);
+     exenta de CSRF, nunca mira cookies, sin secreto = 401 siempre. Cuerpo
+     `{mailFrom, rcptTo[], raw: base64}`. Exige máscara **con buzón** de dominio verificado y
+     activado y `From:` visible = sobre (Stalwart sólo valida el sobre); supresión **por
+     destinatario**; un envío del tope diario por mensaje (las respuestas desde Apple Mail
+     también cuentan); quita DKIM/Bcc/Return-Path; `sendRawFromDomain`; `logOutbound`;
+     `email.sent`; engancha el hilo (o lo abre; si todos los destinos son del propio dominio no
+     abre nada, vuelve a entrar por SES) con SSE. Idempotente por Message-ID + destinatarios
+     aceptados (`claimOnce("relay-sent")`). Respuestas: 200 `{perRcpt: {addr: "ok" |
+     "rejected:<código> <motivo>"}}`, 422 `{code}` política del mensaje entero, 503 SES caído.
+   - **Caja** (`box/outbound-relay/`: `relay.mjs` con `smtp-server`, unidad systemd con usuario
+     `mailmask-relay` sin privilegios, `install.sh` idempotente que instala Node si falta).
+     **LMTP** y no SMTP porque contesta por destinatario. Traducción: 200 → 250/5xx por
+     destinatario; 422 → el 5xx de la app (Stalwart manda el DSN); 401, 5xx, timeout, red →
+     **451** y Stalwart reintenta. Nunca cae a SES directo.
+   - `copyToSentFolder` (`imap-store.ts`): reply, redactar y `POST /send` copian el MIME a
+     Enviados (rol `sent`, `$seen`) si la máscara tiene `mailboxEnabled`, con el Message-ID
+     que pone SES. `void`, 8 s de tope, nunca bloquea el envío.
+   - Pruebas: `outbound-relay.test.ts`, `box-relay.test.ts`, `sent-copy.test.ts`.
+
+   **Falta aplicar, en este orden:**
+   1. `fly secrets set OUTBOUND_RELAY_SECRET=$(openssl rand -hex 32)` (guárdalo: va también en
+      la caja) y deploy desde worktree limpio. Sin el secreto la ruta contesta 401 a todo.
+   2. Copiar `box/outbound-relay/` a la caja y correr ahí
+      `sudo OUTBOUND_RELAY_SECRET=<el mismo> ./install.sh`. Comprobar
+      `journalctl -u mailmask-outbound-relay` → "Escuchando".
+   3. Con `STALWART_ADMIN_*` y el mismo secreto: `npx tsx scripts/stalwart-outbound-via-app.ts`
+      (dry-run: compara el parche con el extracto de `MtaRoute` de `/api/schema`), luego
+      `--apply`. Guarda la ruta original en `~/.mailmask-stalwart-ses-route.json`;
+      `--rollback` la restaura. Si el envío no llega, `systemctl restart stalwart`; si el
+      journal del relay muestra 530/535, Stalwart no autentica por LMTP:
+      `RELAY_REQUIRE_AUTH=false` en `/etc/mailmask-relay.env` (sigue siendo loopback).
+   4. Verificar: Apple Mail → Gmail aparece en la Bandeja (hilo saliente), fila `sent` en
+      `email_logs` con `ses_message_id`, `sends` del día +1, `fly logs` con
+      `Relay: enviado desde buzón`. Responder desde la Bandeja → aparece en Enviados del buzón.
+   5. Pasada una semana, revocar `mailmask-stalwart-relay` en IAM (sólo sirve para el rollback).
+
+   Riesgos: con la app caída el correo de Apple Mail se encola en Stalwart (se retrasa, no se
+   pierde); `/opt/mailmask-relay` y `/etc/mailmask-relay.env` no están en los `dataPaths` de la
+   caja, pero `install.sh` los rehace desde el repo — el secreto sale de Fly.
 3. **Una compra real en MercadoPago** del add-on `domain` (nunca se ha ejercitado contra MP;
    el webhook con `addon:` sí).
 4. **Bootstrap reproducible de la caja** + simulacro cronometrado, y comprobar que el dump
