@@ -35,9 +35,9 @@ else
     NODE_DIR=/opt/node-$NODE_VERSION
     if [ ! -x "$NODE_DIR/bin/node" ]; then
       TMP=$(mktemp -d)
-      curl -fsSL "https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-$ARCH.tar.xz" -o "$TMP/node.tar.xz"
+      curl -fsSL "https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-$ARCH.tar.gz" -o "$TMP/node.tar.gz"
       mkdir -p "$NODE_DIR"
-      tar -xJf "$TMP/node.tar.xz" -C "$NODE_DIR" --strip-components=1
+      tar -xzf "$TMP/node.tar.gz" -C "$NODE_DIR" --strip-components=1
       rm -rf "$TMP"
     fi
     NODE=$NODE_DIR/bin/node

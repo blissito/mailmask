@@ -727,7 +727,7 @@ Bandeja **y** en el buzón. Es el producto entero funcionando sobre un dominio d
    **Contador del 465**: hoy lo que sale de Apple Mail no descuenta de los 50/día. Hasta
    entonces "+100 envíos" no se publica como comprable.
 
-   **Construido el 1-oct-2026, sin aplicar en producción.** Nada de puertos en Fly (decisión
+   **✅ Aplicado en producción el 1-oct-2026 (ver "Operar el relay" abajo).** Nada de puertos en Fly (decisión
    de bliss): el relay vive en la caja de Stalwart y habla con la app por HTTPS.
 
        Apple Mail ─465→ Stalwart ─ruta `ses`, LMTP→ 127.0.0.1:2525 (box/outbound-relay)
@@ -754,26 +754,36 @@ Bandeja **y** en el buzón. Es el producto entero funcionando sobre un dominio d
      que pone SES. `void`, 8 s de tope, nunca bloquea el envío.
    - Pruebas: `outbound-relay.test.ts`, `box-relay.test.ts`, `sent-copy.test.ts`.
 
-   **Falta aplicar, en este orden:**
-   1. `fly secrets set OUTBOUND_RELAY_SECRET=$(openssl rand -hex 32)` (guárdalo: va también en
-      la caja) y deploy desde worktree limpio. Sin el secreto la ruta contesta 401 a todo.
-   2. Copiar `box/outbound-relay/` a la caja y correr ahí
-      `sudo OUTBOUND_RELAY_SECRET=<el mismo> ./install.sh`. Comprobar
-      `journalctl -u mailmask-outbound-relay` → "Escuchando".
-   3. Con `STALWART_ADMIN_*` y el mismo secreto: `npx tsx scripts/stalwart-outbound-via-app.ts`
-      (dry-run: compara el parche con el extracto de `MtaRoute` de `/api/schema`), luego
-      `--apply`. Guarda la ruta original en `~/.mailmask-stalwart-ses-route.json`;
-      `--rollback` la restaura. Si el envío no llega, `systemctl restart stalwart`; si el
-      journal del relay muestra 530/535, Stalwart no autentica por LMTP:
-      `RELAY_REQUIRE_AUTH=false` en `/etc/mailmask-relay.env` (sigue siendo loopback).
-   4. Verificar: Apple Mail → Gmail aparece en la Bandeja (hilo saliente), fila `sent` en
-      `email_logs` con `ses_message_id`, `sends` del día +1, `fly logs` con
-      `Relay: enviado desde buzón`. Responder desde la Bandeja → aparece en Enviados del buzón.
-   5. Pasada una semana, revocar `mailmask-stalwart-relay` en IAM (sólo sirve para el rollback).
+   **Operar el relay (aplicado el 1-oct-2026, verificado de punta a punta).** Prueba: buzón
+   `prueba-relay@mailmask.studio` → 465 → relay → app → SES → Gmail: `email_logs` `delivered`, hilo
+   saliente en la Bandeja, `send_counts` +1, journal "Entregado a MailMask" 200. Buzón borrado.
 
-   Riesgos: con la app caída el correo de Apple Mail se encola en Stalwart (se retrasa, no se
-   pierde); `/opt/mailmask-relay` y `/etc/mailmask-relay.env` no están en los `dataPaths` de la
-   caja, pero `install.sh` los rehace desde el repo — el secreto sale de Fly.
+   - **Entrar a la caja** (sandbox `sb_4c48dee1-819c-4481-99b0-d08b4f387e83`, host `ovh`, sin SSH
+     propio): `scripts/caja.sh exec '<cmd>'` y `scripts/caja.sh put <local> <remoto>` (API de
+     sandbox-host por `ssh ovh`, mismo patrón que `en_la_caja.sh` de ghosty-studio).
+   - **Estado:** `scripts/caja.sh exec 'systemctl is-active mailmask-outbound-relay; journalctl -u
+     mailmask-outbound-relay -n 20 --no-pager'`. Cada envío deja `Entregado a MailMask` con el
+     `sesMessageId`; en `fly logs`, `Relay: enviado desde buzón`.
+   - **Ruta de Stalwart:** el script necesita `STALWART_ADMIN_*`, que **sólo están en Fly**: se corre
+     desde producción (`base64` del script → `fly ssh console … npx tsx /tmp/sov.ts [--apply|--rollback]`).
+     Sin flags imprime la ruta actual (`ses (Relay) → 127.0.0.1:2525`).
+   - **Rollback:** `--rollback` (desde producción) devuelve `ses` a `email-smtp.us-east-1.amazonaws.com:465`.
+     El respaldo de la ruta original (trae la llave IAM del relay viejo) está en
+     `~/.mailmask-stalwart-ses-route.json` de la Mac de bliss (0600) y en `/root/` del contenedor
+     de Fly, que **se pierde en el siguiente deploy**. Después, `systemctl restart stalwart`.
+   - **Códigos:** 200 → 250 por destinatario; política (tope, remitente, supresión) → 5xx y
+     Stalwart manda el DSN al buzón; app caída/401/5xx/timeout → **451**, Stalwart reintenta (nunca
+     cae a SES directo).
+   - **Secreto:** `OUTBOUND_RELAY_SECRET` en Fly, en `/etc/mailmask-relay.env` de la caja (0640) y en
+     `.env` local. Rotarlo = los tres + `systemctl restart mailmask-outbound-relay`.
+   - **Reinstalar** (caja nueva o actualización): subir `box/outbound-relay/*` con `caja.sh put` a
+     `/root/mailmask-relay-src/` y `OUTBOUND_RELAY_SECRET=… ./install.sh`. Instala Node 20 en
+     `/opt/node-v20.18.1` (la caja **no trae `xz`**: por eso baja el `.tar.gz`).
+   - Las respuestas desde Apple Mail **cuentan** para los 50/día (decisión pendiente de producto).
+   - **Pendiente:** revocar el usuario IAM `mailmask-stalwart-relay` el ~8-oct-2026 (sólo sirve
+     para el rollback). Agregar `/opt/mailmask-relay`, `/opt/node-v20.18.1` y
+     `/etc/mailmask-relay.env` a la lista de "La caja no se sabe reconstruir".
+
 3. **Una compra real en MercadoPago** del add-on `domain` (nunca se ha ejercitado contra MP;
    el webhook con `addon:` sí).
 4. **Bootstrap reproducible de la caja** + simulacro cronometrado, y comprobar que el dump
