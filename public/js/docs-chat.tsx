@@ -33,18 +33,94 @@ function playBeep() {
   } catch {}
 }
 
-function Chat() {
+// Iconos de trazo para las tarjetas de "Para empezar"
+const iconProps = {
+  width: 18,
+  height: 18,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+
+const ICONS: Record<string, React.ReactNode> = {
+  globe: (
+    <svg {...iconProps}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" />
+    </svg>
+  ),
+  mask: (
+    <svg {...iconProps}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" />
+    </svg>
+  ),
+  send: (
+    <svg {...iconProps}>
+      <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
+    </svg>
+  ),
+  plug: (
+    <svg {...iconProps}>
+      <path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0V8zM12 18v4" />
+    </svg>
+  ),
+  code: (
+    <svg {...iconProps}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m9 10-2 2 2 2M15 10l2 2-2 2" />
+    </svg>
+  ),
+};
+
+const SUGGESTIONS = [
+  { icon: "globe", q: "\u00bfC\u00f3mo conecto mi primer dominio?" },
+  { icon: "mask", q: "\u00bfC\u00f3mo creo una m\u00e1scara que reenv\u00ede a mi Gmail?" },
+  { icon: "send", q: "\u00bfC\u00f3mo env\u00edo correo desde mi dominio con la API?" },
+  { icon: "plug", q: "\u00bfC\u00f3mo conecto MailMask a mi agente por MCP?" },
+  { icon: "code", q: "\u00bfC\u00f3mo empiezo con el SDK de Node.js?" },
+];
+
+function Sparkle({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" strokeWidth="2" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6c.5 3 2 4.5 5 6-3 .5-4.5 2-5 5-.5-3-2-4.5-5-5 3-1.5 4.5-3 5-6z" fill="rgb(var(--accent))" />
+    </svg>
+  );
+}
+
+type Mode = "docked" | "floating" | "closed";
+
+type ChatProps = {
+  mode: Mode | "mobile" | "solo";
+  onToggleDock?: () => void;
+  onClose?: () => void;
+};
+
+function IconButton({ title, onClick, children }: { title: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button className="docs-chat-iconbtn" title={title} aria-label={title} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+function Chat({ mode, onToggleDock, onClose }: ChatProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(0);
 
-  console.log("[docs-chat] Chat component mounting, AGENT_ID:", AGENT_ID, "PK:", PK.slice(0, 20) + "...");
 
   const { messages, sendMessage, status, reset, error } = useFormmyChat({
     agentId: AGENT_ID,
     onFinish: () => {
-      console.log("[docs-chat] onFinish called — message complete");
       playBeep();
     },
     onError: (err: any) => {
@@ -54,10 +130,14 @@ function Chat() {
 
   const isLoading = status === "streaming" || status === "submitted";
 
-  // Log status and error changes
   useEffect(() => {
-    console.log("[docs-chat] status:", status, "| messages:", messages.length, "| error:", error);
-  }, [status, messages.length, error]);
+    if (!menuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [menuOpen]);
 
   // Auto-scroll
   useEffect(() => {
@@ -73,10 +153,8 @@ function Chat() {
     if (!input.trim() || isLoading) return;
     const msg = input.trim();
     setInput("");
-    console.log("[docs-chat] Sending message:", msg);
     try {
       await sendMessage(msg);
-      console.log("[docs-chat] sendMessage resolved");
     } catch (err) {
       console.error("[docs-chat] sendMessage threw:", err);
     }
@@ -95,8 +173,7 @@ function Chat() {
       {/* Header */}
       <div
         style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid rgb(var(--line))",
+          padding: "12px 12px 12px 20px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -104,32 +181,78 @@ function Chat() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: "#22c55e",
-            }}
-          />
           <span style={{ fontWeight: 600, fontSize: 16, color: "rgb(var(--fg))" }}>
-            Asistente MailMask
+            Asistente IA
           </span>
+          <Sparkle />
         </div>
-        <button
-          onClick={reset}
-          style={{
-            background: "none",
-            border: "none",
-            color: "rgb(var(--fg-subtle))",
-            cursor: "pointer",
-            fontSize: 12,
-            padding: "4px 8px",
-          }}
-          title="Nueva conversaci&oacute;n"
-        >
-          Limpiar
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {onToggleDock && (
+            <IconButton
+              title={mode === "floating" ? "Acoplar al costado" : "Desacoplar"}
+              onClick={onToggleDock}
+            >
+              {mode === "floating" ? (
+                <svg {...iconProps}>
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M15 3v18" />
+                </svg>
+              ) : (
+                <svg {...iconProps}>
+                  <rect x="3" y="8" width="13" height="13" rx="2" />
+                  <path d="M8 8V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-3" />
+                </svg>
+              )}
+            </IconButton>
+          )}
+          <div ref={menuRef} style={{ position: "relative" }}>
+            <IconButton title="M\u00e1s opciones" onClick={() => setMenuOpen((v) => !v)}>
+              <svg {...iconProps}>
+                <circle cx="12" cy="5" r="1" />
+                <circle cx="12" cy="12" r="1" />
+                <circle cx="12" cy="19" r="1" />
+              </svg>
+            </IconButton>
+            {menuOpen && (
+              <div className="docs-chat-menu" role="menu">
+                <button
+                  role="menuitem"
+                  className="danger"
+                  onClick={() => {
+                    reset();
+                    setMenuOpen(false);
+                  }}
+                >
+                  <svg {...iconProps} width={16} height={16}>
+                    <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" />
+                  </svg>
+                  Limpiar conversaci&oacute;n
+                </button>
+                {mode !== "solo" && (
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      window.open("/docs?chat=solo", "_blank", "noopener");
+                      setMenuOpen(false);
+                    }}
+                  >
+                    <svg {...iconProps} width={16} height={16}>
+                      <path d="M14 3h7v7M21 3l-9 9M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5" />
+                    </svg>
+                    Abrir en pesta&ntilde;a nueva
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          {onClose && (
+            <IconButton title="Cerrar" onClick={onClose}>
+              <svg {...iconProps}>
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </IconButton>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
@@ -146,50 +269,37 @@ function Chat() {
         }}
       >
         {messages.length === 0 && !isLoading && (
-          <div
-            style={{
-              textAlign: "center",
-              color: "rgb(var(--fg-subtle))",
-              fontSize: 15,
-              marginTop: 40,
-            }}
-          >
-            <p style={{ fontSize: 24, marginBottom: 8 }}>
-              {/* mask emoji */}
-              &#129409;
-            </p>
-            <p>Pregunta sobre la API, SDK o configuraci&oacute;n de MailMask</p>
-            <div
+          <div style={{ padding: "28px 8px 0" }}>
+            <h2
               style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 6,
-                justifyContent: "center",
-                marginTop: 16,
+                fontFamily: '"Bricolage Grotesque", Inter, system-ui, sans-serif',
+                fontWeight: 800,
+                fontSize: 28,
+                lineHeight: 1.15,
+                letterSpacing: "-0.02em",
+                color: "rgb(var(--fg))",
+                margin: 0,
               }}
             >
-              {[
-                "C\u00f3mo creo un alias?",
-                "Ejemplo con Node.js",
-                "Configurar SMTP",
-              ].map((q) => (
+              &#128075; Soy el{" "}
+              <span style={{ color: "rgb(var(--accent-text))" }}>Asistente IA</span>{" "}
+              de MailMask.
+            </h2>
+            <p style={{ fontSize: 17, lineHeight: 1.5, color: "rgb(var(--fg-muted))", margin: "10px 0 0" }}>
+              Te ayudo a encontrar respuestas en la documentaci&oacute;n. &iquest;Qu&eacute; buscas?
+            </p>
+            <p style={{ fontSize: 15, color: "rgb(var(--fg-subtle))", margin: "36px 0 10px" }}>
+              Para empezar
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {SUGGESTIONS.map(({ icon, q }) => (
                 <button
                   key={q}
-                  onClick={() => {
-                    console.log("[docs-chat] Suggestion clicked:", q);
-                    sendMessage(q);
-                  }}
-                  style={{
-                    background: "rgb(var(--bg-inset))",
-                    border: "1px solid rgb(var(--line))",
-                    borderRadius: 8,
-                    padding: "6px 12px",
-                    color: "rgb(var(--fg-muted))",
-                    fontSize: 14,
-                    cursor: "pointer",
-                  }}
+                  className="docs-chat-suggestion"
+                  onClick={() => sendMessage(q)}
                 >
-                  {q}
+                  <span className="docs-chat-suggestion-icon">{ICONS[icon]}</span>
+                  <span>{q}</span>
                 </button>
               ))}
             </div>
@@ -275,56 +385,154 @@ function Chat() {
       </div>
 
       {/* Input */}
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          padding: 12,
-          borderTop: "1px solid rgb(var(--line))",
-          display: "flex",
-          gap: 8,
-          flexShrink: 0,
-        }}
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Escribe tu pregunta..."
-          disabled={isLoading}
+      <form onSubmit={handleSubmit} style={{ padding: "12px 16px 10px", flexShrink: 0 }}>
+        <div className="docs-chat-box">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter envía, Shift+Enter hace salto de línea
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                handleSubmit(e as unknown as React.FormEvent);
+              }
+            }}
+            placeholder="&iquest;En qu&eacute; te ayudo?"
+            disabled={isLoading}
+            rows={3}
+          />
+          <button
+            type="submit"
+            disabled={isLoading || !input.trim()}
+            title="Enviar"
+            aria-label="Enviar"
+          >
+            <svg {...iconProps} width={20} height={20}>
+              <path d="M4 4l16 8-16 8 3-8-3-8zM7 12h13" />
+            </svg>
+          </button>
+        </div>
+        <p
           style={{
-            flex: 1,
-            background: "rgb(var(--bg-inset))",
-            border: "1px solid rgb(var(--line))",
-            borderRadius: 10,
-            padding: "10px 14px",
-            color: "rgb(var(--fg))",
-            fontSize: 15,
-            outline: "none",
-          }}
-          onFocus={(e) =>
-            (e.currentTarget.style.borderColor = "rgb(var(--accent))")
-          }
-          onBlur={(e) => (e.currentTarget.style.borderColor = "rgb(var(--line))")}
-        />
-        <button
-          type="submit"
-          disabled={isLoading || !input.trim()}
-          style={{
-            background: "rgb(var(--accent))",
-            border: "none",
-            borderRadius: 10,
-            padding: "0 16px",
-            color: "#fff",
-            fontSize: 15,
-            fontWeight: 600,
-            cursor: isLoading || !input.trim() ? "not-allowed" : "pointer",
-            opacity: isLoading || !input.trim() ? 0.5 : 1,
+            fontSize: 12,
+            lineHeight: 1.5,
+            color: "rgb(var(--fg-subtle))",
+            textAlign: "center",
+            margin: "8px 4px 0",
           }}
         >
-          Enviar
-        </button>
+          Funciona con{" "}
+          <a href="https://www.formmy.app" target="_blank" rel="noopener" style={{ color: "inherit", textDecoration: "underline" }}>
+            Formmy
+          </a>
+          . Las respuestas generadas por IA pueden equivocarse; verif&iacute;calas antes de usarlas. No compartas informaci&oacute;n sensible.
+        </p>
       </form>
 
       <style>{`
+        .docs-chat-iconbtn {
+          background: none;
+          border: none;
+          border-radius: 6px;
+          padding: 6px;
+          display: flex;
+          color: rgb(var(--fg-muted));
+          cursor: pointer;
+        }
+        .docs-chat-iconbtn:hover { background: rgb(var(--bg-inset)); color: rgb(var(--fg)); }
+        .docs-chat-menu {
+          position: absolute;
+          right: 0;
+          top: calc(100% + 6px);
+          z-index: 20;
+          min-width: 240px;
+          padding: 6px;
+          background: rgb(var(--bg-elev));
+          border: 1px solid rgb(var(--line));
+          border-radius: 8px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        }
+        .docs-chat-menu button {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          width: 100%;
+          background: none;
+          border: none;
+          border-radius: 6px;
+          padding: 10px 12px;
+          color: rgb(var(--fg));
+          font-size: 15px;
+          text-align: left;
+          cursor: pointer;
+        }
+        .docs-chat-menu button:hover { background: rgb(var(--bg-inset)); }
+        .docs-chat-menu button.danger { color: rgb(var(--accent-text)); }
+        .docs-chat-suggestion {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          text-align: left;
+          background: rgb(var(--bg));
+          border: 1px solid rgb(var(--line));
+          border-radius: 6px;
+          padding: 12px 14px;
+          color: rgb(var(--fg));
+          font-size: 15px;
+          line-height: 1.45;
+          cursor: pointer;
+          transition: border-color 120ms, background 120ms;
+        }
+        .docs-chat-suggestion:hover {
+          border-color: rgb(var(--accent));
+          background: rgb(var(--bg-inset));
+        }
+        .docs-chat-suggestion-icon {
+          flex-shrink: 0;
+          width: 30px;
+          height: 30px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgb(var(--bg-inset));
+          color: rgb(var(--fg-muted));
+        }
+        .docs-chat-box {
+          position: relative;
+          background: rgb(var(--bg-inset));
+          border: 1px solid rgb(var(--line));
+          border-radius: 6px;
+          transition: border-color 120ms;
+        }
+        .docs-chat-box:focus-within { border-color: rgb(var(--accent)); }
+        .docs-chat-box textarea {
+          display: block;
+          width: 100%;
+          resize: none;
+          background: transparent;
+          border: none;
+          outline: none;
+          padding: 12px 44px 12px 12px;
+          color: rgb(var(--fg));
+          font: inherit;
+          font-size: 16px;
+          line-height: 1.5;
+        }
+        .docs-chat-box textarea::placeholder { color: rgb(var(--fg-subtle)); }
+        .docs-chat-box button {
+          position: absolute;
+          right: 8px;
+          bottom: 8px;
+          background: none;
+          border: none;
+          padding: 6px;
+          display: flex;
+          color: rgb(var(--accent));
+          cursor: pointer;
+        }
+        .docs-chat-box button:disabled { color: rgb(var(--fg-subtle)); cursor: not-allowed; }
         @keyframes pulse {
           0%, 100% { opacity: 0.3; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1); }
@@ -443,124 +651,174 @@ function Chat() {
   );
 }
 
-// Mobile floating button + fullscreen panel
-function MobileChat() {
-  const [open, setOpen] = useState(false);
+// El chat vive en un solo nodo que se mueve entre el costado, el panel flotante y
+// la pantalla completa: así cambiar de modo no desmonta el hook ni pierde la conversación.
+const chatHost = document.createElement("div");
+chatHost.style.height = "100%";
+
+const MODE_KEY = "docs-chat-mode";
+
+function readMode(): Mode {
+  try {
+    const v = localStorage.getItem(MODE_KEY);
+    if (v === "docked" || v === "floating" || v === "closed") return v;
+  } catch {}
+  return "docked";
+}
+
+function saveMode(m: Mode) {
+  try {
+    localStorage.setItem(MODE_KEY, m);
+  } catch {}
+}
+
+function Launcher({ onClick }: { onClick: () => void }) {
+  return (
+    <button className="docs-chat-launcher" onClick={onClick} title="Abrir asistente" aria-label="Abrir asistente">
+      <Sparkle size={20} />
+      <span>Asistente IA</span>
+    </button>
+  );
+}
+
+function App({ aside }: { aside: HTMLElement }) {
+  const solo = new URLSearchParams(location.search).get("chat") === "solo";
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  const [mode, setModeState] = useState<Mode>(readMode);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const setMode = (m: Mode) => {
+    setModeState(m);
+    saveMode(m);
+  };
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  const docked = !solo && !isMobile && mode === "docked";
+  const panelVisible = solo || (isMobile ? mobileOpen : mode === "floating");
+
+  // Sin chat acoplado, la rejilla de docs.html suelta la tercera columna
+  useEffect(() => {
+    document.documentElement.classList.toggle("docs-chat-undocked", !docked);
+  }, [docked]);
+
+  // Mover el nodo del chat a donde toque
+  useEffect(() => {
+    const target = docked ? aside : panelVisible ? panelRef.current : null;
+    if (target && chatHost.parentNode !== target) target.appendChild(chatHost);
+    if (!target && chatHost.parentNode) chatHost.parentNode.removeChild(chatHost);
+  });
+
+  const chatOpen = docked || panelVisible;
+
+  // Trigger de la barra superior: abre el chat acoplado o lo cierra
+  const toggleRef = useRef<() => void>(() => {});
+  toggleRef.current = () => {
+    if (isMobile) setMobileOpen((v) => !v);
+    else setMode(chatOpen ? "closed" : "docked");
+  };
+  useEffect(() => {
+    const btn = document.getElementById("docs-chat-trigger");
+    if (!btn) return;
+    const onClick = () => toggleRef.current();
+    btn.addEventListener("click", onClick);
+    return () => btn.removeEventListener("click", onClick);
+  }, []);
+  useEffect(() => {
+    document.getElementById("docs-chat-trigger")?.setAttribute("aria-pressed", String(chatOpen));
+  }, [chatOpen]);
+
+  const chatMode: ChatProps["mode"] = solo ? "solo" : isMobile ? "mobile" : mode;
+  const chat = createPortal(
+    <Chat
+      mode={chatMode}
+      onToggleDock={
+        solo || isMobile ? undefined : () => setMode(mode === "floating" ? "docked" : "floating")
+      }
+      onClose={solo ? undefined : () => (isMobile ? setMobileOpen(false) : setMode("closed"))}
+    />,
+    chatHost,
+  );
+
+  const panelClass = solo || isMobile ? "docs-chat-fullscreen" : "docs-chat-floating";
 
   return (
     <>
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          style={{
-            position: "fixed",
-            bottom: 20,
-            right: 20,
-            width: 52,
-            height: 52,
-            borderRadius: "50%",
-            background: "rgb(var(--accent))",
-            border: "none",
-            color: "#fff",
-            fontSize: 22,
-            cursor: "pointer",
-            boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-          title="Abrir asistente"
-        >
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-        </button>
-      )}
-
-      {open && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1001,
-            background: "rgb(var(--bg-elev))",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              padding: "8px 12px 0",
-              flexShrink: 0,
-            }}
-          >
-            <button
-              onClick={() => setOpen(false)}
-              style={{
-                background: "none",
-                border: "none",
-                color: "rgb(var(--fg-subtle))",
-                fontSize: 22,
-                cursor: "pointer",
-                padding: 4,
-              }}
-            >
-              &times;
-            </button>
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <Chat />
-          </div>
-        </div>
+      {chat}
+      {createPortal(
+        <>
+          {panelVisible && <div ref={panelRef} className={panelClass} />}
+          {!solo && isMobile && !panelVisible && (
+            <Launcher onClick={() => setMobileOpen(true)} />
+          )}
+          <style>{`
+            .docs-chat-undocked #docs-chat { display: none !important; }
+            @media (min-width: 1024px) {
+              .docs-chat-undocked .docs-layout { grid-template-columns: 240px minmax(0, 1fr); }
+            }
+            .docs-chat-floating {
+              position: fixed;
+              top: 72px;
+              right: 24px;
+              width: 440px;
+              height: min(760px, calc(100vh - 96px));
+              z-index: 1001;
+              border: 1px solid rgb(var(--line));
+              border-radius: 10px;
+              overflow: hidden;
+              box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+            }
+            .docs-chat-fullscreen {
+              position: fixed;
+              inset: 0;
+              z-index: 1001;
+            }
+            .docs-chat-launcher {
+              position: fixed;
+              bottom: 20px;
+              right: 20px;
+              z-index: 1000;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              padding: 12px 18px;
+              border-radius: 999px;
+              border: 1px solid rgb(var(--line));
+              background: rgb(var(--bg-elev));
+              color: rgb(var(--fg));
+              font-size: 15px;
+              font-weight: 600;
+              cursor: pointer;
+              box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+            }
+            .docs-chat-launcher:hover { border-color: rgb(var(--accent)); }
+          `}</style>
+        </>,
+        document.body,
       )}
     </>
   );
 }
 
-function App() {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 1024);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
-
-  // Desktop: render in the grid panel; Mobile: portal to body for floating button
-  if (!isMobile) {
-    return <Chat />;
-  }
-  return createPortal(<MobileChat />, document.body);
-}
-
-function Root() {
+function Root({ aside }: { aside: HTMLElement }) {
   return (
     // www es el host principal de Formmy; el apex formmy.app no presenta certificado TLS
     // (handshake sin peer cert), asi que todo fetch del SDK moria con "Failed to fetch".
     <FormmyProvider publishableKey={PK} baseUrl="https://www.formmy.app">
-      <App />
+      <App aside={aside} />
     </FormmyProvider>
   );
 }
 
 const el = document.getElementById("docs-chat");
-console.log("[docs-chat] Init — container element:", el ? "found" : "NOT FOUND");
 if (el) {
-  console.log("[docs-chat] Mounting React app...");
-  createRoot(el).render(<Root />);
-} else {
-  console.warn("[docs-chat] #docs-chat element not found in DOM — chat will not render");
+  // La raíz va en un nodo propio: el aside sólo recibe el chat cuando está acoplado
+  const rootEl = document.createElement("div");
+  document.body.appendChild(rootEl);
+  createRoot(rootEl).render(<Root aside={el} />);
 }

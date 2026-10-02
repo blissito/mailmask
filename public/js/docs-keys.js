@@ -46,17 +46,7 @@
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-2"><code>claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \\
   --header "Authorization: Bearer ${esc(key)}"</code></pre>`;
     out.classList.remove("hidden");
-    // Botones de copiar, igual que en el resto de la página
-    out.querySelectorAll("pre").forEach((pre) => {
-      const b = document.createElement("button");
-      b.className = "copy-btn";
-      b.textContent = "Copiar";
-      b.addEventListener("click", async () => {
-        await navigator.clipboard.writeText(pre.querySelector("code").textContent);
-        b.textContent = "Copiado!";
-        setTimeout(() => (b.textContent = "Copiar"), 1500);
-      });
-      pre.appendChild(b);
-    });
+    // Botones de copiar, los mismos del resto de la página (docs.html)
+    out.querySelectorAll("pre").forEach((pre) => window.addCopyButton?.(pre));
   });
 })();
