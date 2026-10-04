@@ -90,9 +90,16 @@ respectivamente. Quien solo reenvía nunca toca el límite de envíos.
      API Keys (empieza con `mk_`, se muestra una sola vez, da acceso a toda la cuenta y no
      se crea por API ni por MCP) y va en `Authorization: Bearer mk_…`:
      `claude mcp add --transport http mailmask https://www.mailmask.studio/mcp --header
-     "Authorization: Bearer mk_…"`. 73 herramientas: `create_domain` (devuelve los
-     registros DNS), `create_alias` (con `mailbox: true` crea el buzón IMAP), DNS, reglas,
-     webhooks, `send_email`, cobro, dominios, equipo, y `search_tools` para buscar por palabra.
+     "Authorization: Bearer mk_…"`. 95 herramientas, lo mismo que el panel: `create_domain`
+     (devuelve los registros DNS), `create_alias` (con `mailbox: true` crea el buzón IMAP), DNS,
+     reglas, webhooks, `send_email`, cobro, dominios, equipo, perfil, referidos y `search_tools`.
+   - **Un correo propio para tu agente**: en vez de darle tu Gmail, crea una máscara
+     (`agente@tudominio.com`) y deja que el agente atienda su Bandeja por MCP: `inbox_list`
+     (no leídas, por máscara, búsqueda `q`), `inbox_read` (texto, notas y adjuntos),
+     `inbox_attachment`, `inbox_reply` (contesta en el hilo desde la máscara), `inbox_send`
+     (correo nuevo con hilo; dominio activado), `inbox_mark` (leída, cerrada, pospuesta,
+     etiquetas), `inbox_assign`, `inbox_note`, `inbox_delete`/`inbox_restore`, `inbox_metrics`,
+     `upload_attachment`. Mismos permisos por dominio que la app.
    - **SDK** (con API key `mk_`): `npm i @easybits.cloud/mailmask`; `new MailMask({ apiKey })` con
      `domains`, `aliases`, `rules`, `webhooks`, `send`, `suppressions`, `smtp`.
    - **REST** (con API key `mk_`): `https://www.mailmask.studio/api/...`, especificación OpenAPI en

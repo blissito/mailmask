@@ -97,6 +97,28 @@ export function handleUpdateProfile(email: string, body: unknown): Response {
 }
 
 /**
+ * Lee un adjunto que ESTE usuario subió al chat del asistente (`/api/asistente/files/*`,
+ * firmado con HMAC). Se lee de S3 por su llave y nunca se hace fetch: no hay SSRF posible.
+ * Lo comparten la foto de perfil, el logo de la firma y los adjuntos de un correo.
+ */
+export async function readOwnUpload(
+  email: string,
+  fromUrl: unknown,
+  what = "un archivo",
+): Promise<{ ok: true; body: Uint8Array; contentType: string; filename: string } | { ok: false; res: Response }> {
+  const url = typeof fromUrl === "string" ? fromUrl : "";
+  if (!url) return { ok: false, res: json({ error: "Manda el archivo (multipart `file`) o `fromUrl`" }, 400) };
+  if (!isOwnUpload(url, email)) {
+    return { ok: false, res: json({ error: `fromUrl sólo acepta ${what} que adjuntaste en el chat del asistente` }, 400) };
+  }
+  const key = decodeURIComponent(new URL(url).pathname.slice("/api/asistente/files/".length));
+  if (key.includes("..")) return { ok: false, res: json({ error: "fromUrl inválida" }, 400) };
+  const obj = await getAssistantUploadFromS3(key);
+  if (!obj) return { ok: false, res: json({ error: "No encontré ese adjunto; vuelve a subirlo" }, 404) };
+  return { ok: true, body: obj.body, contentType: obj.contentType, filename: key.split("/").pop() || "archivo" };
+}
+
+/**
  * Multipart con `file`, o JSON `{fromUrl}`. `fromUrl` SÓLO acepta un adjunto firmado que
  * el mismo usuario subió al dock (`/api/asistente/files/*`, HMAC): se lee de S3 por su
  * llave y nunca se hace fetch, así que no hay forma de convertir esto en un SSRF.
@@ -112,16 +134,9 @@ export async function handleUploadAvatar(email: string, request: Request): Promi
     bytes = new Uint8Array(await file.arrayBuffer());
   } else {
     const b = await request.json().catch(() => null) as { fromUrl?: unknown } | null;
-    const fromUrl = typeof b?.fromUrl === "string" ? b.fromUrl : "";
-    if (!fromUrl) return json({ error: "Manda el archivo (multipart `file`) o `fromUrl`" }, 400);
-    if (!isOwnUpload(fromUrl, email)) {
-      return json({ error: "fromUrl sólo acepta una imagen que adjuntaste en el chat del asistente" }, 400);
-    }
-    const key = decodeURIComponent(new URL(fromUrl).pathname.slice("/api/asistente/files/".length));
-    if (key.includes("..")) return json({ error: "fromUrl inválida" }, 400);
-    const obj = await getAssistantUploadFromS3(key);
-    if (!obj) return json({ error: "No encontré ese adjunto; vuelve a subirlo" }, 404);
-    bytes = obj.body;
+    const r = await readOwnUpload(email, b?.fromUrl, "una imagen");
+    if (!r.ok) return r.res;
+    bytes = r.body;
   }
   const r = await storeAvatar(email, bytes);
   if (!r.ok) return json({ error: r.error }, r.status);

@@ -8,7 +8,8 @@ import type {
   DnsChangeResult, DnsPreset, DnsSetup,
   BillingStatus, AddonsResponse, CheckoutLink, DomainSearchResult, TldPrice, DomainRegistrationCreated,
   DomainRegistration, TransferCheck, TransferDnsInventory, RenewalLink, DomainMember, DomainInvite, CannedReply,
-  AccountProfile,
+  AccountProfile, InboxPage, InboxListOptions, InboxConversation, InboxConversationDetail, InboxComposeInput,
+  InboxReplyInput, InboxUpdateInput, InboxNote, OrdersPage, ReferralStats,
 } from "./types.js";
 
 class MailMaskError extends Error {
@@ -62,6 +63,8 @@ export class MailMask {
   signature: SignatureResource;
   canned: CannedResource;
   account: AccountResource;
+  inbox: InboxResource;
+  referrals: ReferralsResource;
 
   constructor(config: MailMaskConfig) {
     this.apiKey = config.apiKey;
@@ -89,6 +92,8 @@ export class MailMask {
     this.signature = new SignatureResource(req);
     this.canned = new CannedResource(req);
     this.account = new AccountResource(req);
+    this.inbox = new InboxResource(req, (path) => requestRaw(this.baseUrl, this.apiKey, path, doFetch));
+    this.referrals = new ReferralsResource(req);
   }
 }
 
@@ -104,6 +109,17 @@ class DomainsResource {
   verify(id: string) { return this.req<DomainVerification>(`/api/domains/${id}/verify`, { method: "POST" }); }
   /** Registros a pegar en el registrador. Con `live` los compara con el DNS público y deduce el panel. */
   dnsSetup(id: string, opts?: { live?: boolean }) { return this.req<DnsSetup>(`/api/domains/${id}/dns-setup${opts?.live ? "?live=1" : ""}`); }
+  /** Logo de la firma (PNG, JPG o WebP; máx. 500 KB). Se ve en todo correo en markdown. */
+  setLogo(id: string, file: Blob, filename = "logo") {
+    const form = new FormData();
+    form.append("file", file, filename);
+    return this.req<{ ok: boolean; logoUrl: string }>(`/api/domains/${id}/logo`, { method: "POST", body: form });
+  }
+  /** Logo desde un adjunto del chat del asistente (URL firmada de `/api/asistente/files/*`). */
+  setLogoFromUrl(id: string, url: string) {
+    return this.req<{ ok: boolean; logoUrl: string }>(`/api/domains/${id}/logo`, { method: "POST", body: JSON.stringify({ fromUrl: url }) });
+  }
+  removeLogo(id: string) { return this.req<{ ok: boolean }>(`/api/domains/${id}/logo`, { method: "DELETE" }); }
 }
 
 class DnsResource {
@@ -181,6 +197,10 @@ class AttachmentsResource {
     form.append("file", blob, input.filename);
     return this.req<UploadedAttachment>(`/api/domains/${domainId}/attachments`, { method: "POST", body: form });
   }
+  /** Desde un adjunto del chat del asistente (URL firmada de `/api/asistente/files/*`). */
+  uploadFromUrl(domainId: string, url: string, filename?: string) {
+    return this.req<UploadedAttachment>(`/api/domains/${domainId}/attachments`, { method: "POST", body: JSON.stringify({ fromUrl: url, filename }) });
+  }
 }
 
 class SuppressionsResource {
@@ -223,8 +243,18 @@ class BillingResource {
    * Liga de MercadoPago para un add-on de un dominio (`domain` = activarlo, $99/mes).
    * El usuario la abre y paga; hasta entonces no cambia nada.
    */
-  checkout(domainId: string, kind: "domain" | "storage50" | "sends100" = "domain", opts?: { payerEmail?: string }) {
-    return this.req<CheckoutLink>("/api/addons/checkout", { method: "POST", body: JSON.stringify({ kind, domainId, payerEmail: opts?.payerEmail }) });
+  checkout(domainId: string, kind: "domain" | "storage50" | "sends100" = "domain", opts?: { payerEmail?: string; period?: "monthly" | "annual" }) {
+    return this.req<CheckoutLink>("/api/addons/checkout", { method: "POST", body: JSON.stringify({ kind, domainId, payerEmail: opts?.payerEmail, period: opts?.period }) });
+  }
+  /** Cancela la suscripción de un add-on; el cupo sigue hasta el fin del periodo pagado. */
+  cancelAddon(addonId: string) { return this.req<{ ok: boolean; activeUntil: string | null }>(`/api/addons/${addonId}/cancel`, { method: "POST" }); }
+  /** Historial de cobros, cortesías y cancelaciones (más reciente primero). */
+  orders(opts?: { limit?: number; before?: string }) {
+    const qs = new URLSearchParams();
+    if (opts?.limit) qs.set("limit", String(opts.limit));
+    if (opts?.before) qs.set("before", opts.before);
+    const q = qs.toString();
+    return this.req<OrdersPage>(`/api/billing/orders${q ? `?${q}` : ""}`);
   }
 }
 
@@ -241,6 +271,8 @@ class RegistrationsResource {
   renewal(regId: string, opts?: { payerEmail?: string }) {
     return this.req<RenewalLink>(`/api/domains/registrations/${regId}/renewal`, { method: "POST", body: JSON.stringify({ payerEmail: opts?.payerEmail }) });
   }
+  /** Deja de cobrar la renovación anual. El dominio sigue vigente hasta su vencimiento. */
+  cancelRenewal(regId: string) { return this.req<{ ok: boolean; aviso: string }>(`/api/domains/registrations/${regId}/renewal/cancel`, { method: "POST" }); }
 }
 
 class TransfersResource {
@@ -305,6 +337,72 @@ class AccountResource {
     return this.req<AccountProfile & { ok: boolean }>("/api/profile/avatar", { method: "POST", body: form });
   }
   removeAvatar() { return this.req<AccountProfile & { ok: boolean }>("/api/profile/avatar", { method: "DELETE" }); }
+}
+
+/**
+ * La Bandeja: conversaciones del dominio. Todo pasa por los mismos permisos que la app
+ * (dueño, admin o agente invitado) y los mismos topes de envío.
+ */
+class InboxResource {
+  constructor(private req: Req, private raw: (path: string) => Promise<Response>) {}
+  list(domainId: string, opts?: InboxListOptions) {
+    const qs = new URLSearchParams({ domainId });
+    for (const [k, v] of Object.entries(opts ?? {})) if (v !== undefined && v !== "") qs.set(k, String(v));
+    return this.req<InboxPage>(`/api/bandeja/conversations?${qs}`);
+  }
+  /** Conversación con sus mensajes (los 30 más recientes, o anteriores a `before`). Abrirla la marca leída. */
+  get(domainId: string, conversationId: string, opts?: { before?: string }) {
+    const qs = new URLSearchParams({ domainId });
+    if (opts?.before) qs.set("before", opts.before);
+    return this.req<InboxConversationDetail>(`/api/bandeja/conversations/${conversationId}?${qs}`);
+  }
+  /** Un correo nuevo desde una máscara: abre un hilo. Gasta cuota de envío (dominio activado). */
+  compose(domainId: string, input: InboxComposeInput) {
+    return this.req<{ ok: boolean; conversationId: string; messageId: string }>("/api/bandeja/conversations", { method: "POST", body: JSON.stringify({ ...input, domainId }) });
+  }
+  /** Responde en el hilo desde la máscara del hilo. No gasta cuota de envío. */
+  reply(domainId: string, conversationId: string, input: InboxReplyInput) {
+    return this.req<{ ok: boolean; messageId: string }>(`/api/bandeja/conversations/${conversationId}/reply`, { method: "POST", body: JSON.stringify({ ...input, domainId }) });
+  }
+  update(domainId: string, conversationId: string, input: InboxUpdateInput) {
+    return this.req<InboxConversation>(`/api/bandeja/conversations/${conversationId}`, { method: "PATCH", body: JSON.stringify({ ...input, domainId }) });
+  }
+  markRead(domainId: string, conversationId: string) {
+    return this.req<{ ok: boolean; unreadCount: number }>(`/api/bandeja/conversations/${conversationId}/read`, { method: "POST", body: JSON.stringify({ domainId }) });
+  }
+  /** Sin `assignedTo` la deja sin asignar. */
+  assign(domainId: string, conversationId: string, assignedTo?: string) {
+    return this.req<InboxConversation>(`/api/bandeja/conversations/${conversationId}/assign`, { method: "POST", body: JSON.stringify({ domainId, assignedTo }) });
+  }
+  /** Nota interna: la ve el equipo, nunca el contacto. */
+  addNote(domainId: string, conversationId: string, body: string) {
+    return this.req<InboxNote>(`/api/bandeja/conversations/${conversationId}/note`, { method: "POST", body: JSON.stringify({ domainId, body }) });
+  }
+  /** A la papelera (se puede restaurar). Máx. 200 por llamada. */
+  delete(domainId: string, conversationIds: string[]) {
+    return this.req<{ ok: boolean; deleted: number }>("/api/bandeja/conversations/bulk-delete", { method: "POST", body: JSON.stringify({ domainId, ids: conversationIds }) });
+  }
+  restore(domainId: string, conversationId: string) {
+    return this.req<{ ok: boolean }>(`/api/bandeja/conversations/${conversationId}/restore`, { method: "POST", body: JSON.stringify({ domainId }) });
+  }
+  metrics(domainId: string, opts?: { days?: number }) {
+    const qs = new URLSearchParams({ domainId });
+    if (opts?.days) qs.set("days", String(opts.days));
+    return this.req<Record<string, unknown>>(`/api/bandeja/metrics?${qs}`);
+  }
+  /** Bytes de un adjunto de un mensaje (id del mensaje e índice de `attachments`). */
+  attachment(domainId: string, conversationId: string, messageId: string, index: number) {
+    return this.raw(`/api/bandeja/conversations/${conversationId}/attachments/${messageId}/${index}?domainId=${encodeURIComponent(domainId)}`);
+  }
+}
+
+class ReferralsResource {
+  constructor(private req: Req) {}
+  get() { return this.req<ReferralStats>("/api/referrals"); }
+  /** 3-30 caracteres: minúsculas, números y guiones. */
+  setSlug(slug: string) { return this.req<{ ok: boolean; slug: string }>("/api/referrals/slug", { method: "PUT", body: JSON.stringify({ slug }) }); }
+  /** Nombre que ven los invitados (2-40 caracteres). */
+  setName(name: string) { return this.req<{ ok: boolean }>("/api/referrals/name", { method: "PUT", body: JSON.stringify({ name }) }); }
 }
 
 export { MailMaskError };

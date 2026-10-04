@@ -13,6 +13,11 @@ export const MCP_VERSION = "1.0.0";
 type Salida = CallToolResult;
 
 function ok(valor: unknown): Salida {
+  // inbox_attachment devuelve una imagen: va como bloque `image`, no como base64 en el JSON.
+  if (valor && typeof valor === "object" && "__image" in valor) {
+    const { __image, ...meta } = valor as { __image: { data: string; mimeType: string } };
+    return { content: [{ type: "image", data: __image.data, mimeType: __image.mimeType }, { type: "text", text: JSON.stringify(meta) }], structuredContent: meta };
+  }
   const structured = valor && typeof valor === "object" && !Array.isArray(valor)
     ? (valor as Record<string, unknown>)
     : { result: valor };
@@ -58,14 +63,23 @@ transfer_check (requisitos, precio, DNS actual) → transfer_start devuelve form
 transfer_out manda el código EPP por correo al dueño, nunca al chat.
 
 ## Acciones delicadas
-Borrar dominio, máscara, buzón o registro DNS, sacar a un miembro o transferir fuera son irreversibles: confírmalo con el usuario antes. Algunas responden que necesitan confirmación: el usuario la aprueba en la app; no reintentes ni busques otra vía.
+Borrar dominio, máscara, buzón o registro DNS, sacar a un miembro, transferir fuera o cancelar un add-on o una renovación (cancel_addon, cancel_renewal) son irreversibles: confírmalo con el usuario antes. Algunas responden que necesitan confirmación: el usuario la aprueba en la app; no reintentes ni busques otra vía.
 
 ## DNS administrado por MailMask
 Con zona propia (create_dns_zone y cambiar los nameservers en el registrador) puedes editar registros: list_dns_records antes de escribir; set_dns_record reemplaza el conjunto completo; point_domain_to para Vercel, Netlify y similares. Los registros de correo están protegidos.
 
+## Bandeja: el correo de la máscara
+Cada máscara recibe en la Bandeja del dominio; desde ahí se lee y se contesta como esa máscara.
+- Lo nuevo: inbox_list con status "unread" (y alias para una máscara) → inbox_read (texto de cada mensaje, notas y adjuntos; lo marca leído) → inbox_attachment si hace falta un adjunto.
+- Contestar: inbox_reply en markdown (lleva firma y cita). Antes de enviar, enseña el texto al usuario y espera su visto bueno, salvo que te haya dado instrucciones permanentes.
+- Escribir a alguien nuevo: inbox_send desde una máscara activa (dominio activado y verificado; gasta envíos del día). send_email no deja hilo.
+- Ordenar: inbox_mark (read, closed = resuelta, snoozed, urgent, tags), inbox_assign, inbox_note (interna, el contacto no la ve), inbox_delete / inbox_restore, inbox_metrics.
+- Adjuntar: upload_attachment y pasa lo que devuelve en attachments.
+
 ## Otros
 - Equipo: list_members, invite_member, remove_member.
-- Bandeja: get_signature y set_signature (markdown), respuestas guardadas (list/create/delete_canned_reply).
+- Firma: get_signature y set_signature (markdown), set_domain_logo; respuestas guardadas (list/create/delete_canned_reply).
+- Cuenta: list_orders (cobros), cancel_addon, cancel_renewal, referral_status, export_link.
 - Perfil de la cuenta (el usuario, no una máscara): get_profile, update_profile (nombre) y set_profile_photo. Para la foto, pide que la adjunte en el chat y pasa la URL de ese adjunto.
 - Buzones IMAP: create_alias con mailbox, o create_mailbox. apple_profile_link configura iPhone y Mac; mailbox_export_link descarga el .mbox.
 - Contraseñas, secretos de webhook y credenciales SMTP salen una sola vez: entrégalas tal cual y avisa que no se pueden volver a ver.
@@ -135,9 +149,33 @@ const KEYWORDS: Record<string, string> = {
   get_profile: "perfil nombre foto avatar cuenta usuario",
   update_profile: "perfil nombre cambiar cuenta usuario",
   set_profile_photo: "perfil foto avatar imagen cambiar cuenta",
+  delete_profile_photo: "perfil foto avatar quitar borrar",
+  inbox_list: "bandeja correos recibidos conversaciones hilos leer buscar mensajes nuevos pendientes no leídos",
+  inbox_read: "bandeja abrir leer correo mensaje hilo conversación",
+  inbox_attachment: "adjunto archivo descargar leer bandeja",
+  inbox_reply: "responder contestar correo bandeja hilo",
+  inbox_send: "redactar escribir enviar correo nuevo bandeja",
+  inbox_mark: "leído cerrar archivar resolver reabrir posponer prioridad etiquetas bandeja",
+  inbox_assign: "asignar repartir bandeja equipo",
+  inbox_note: "nota interna comentario bandeja equipo",
+  inbox_delete: "borrar eliminar papelera bandeja conversación",
+  inbox_restore: "restaurar recuperar papelera bandeja",
+  inbox_metrics: "métricas estadísticas tiempos respuesta bandeja",
+  upload_attachment: "adjuntar archivo subir adjunto",
+  set_domain_logo: "logo firma imagen marca",
+  delete_domain_logo: "logo firma quitar",
+  list_orders: "pagos cobros historial facturas recibos cfdi",
+  cancel_addon: "cancelar suscripción desactivar dominio pago addon",
+  cancel_renewal: "cancelar renovación dominio",
+  referral_status: "referidos invitar liga créditos recomendar",
+  set_referral_slug: "referidos liga slug",
+  set_referral_name: "referidos nombre",
+  export_link: "exportar descargar datos respaldo json",
 };
 
 const domainId = z.string().describe("ID del dominio (de list_domains)");
+const attachmentsShape = z.array(z.object({ key: z.string(), filename: z.string(), contentType: z.string().optional() }))
+  .max(10).optional().describe("Adjuntos devueltos por upload_attachment");
 const aliasName = z.string().describe("Parte local de la máscara, sin el dominio: 'hola' para hola@tudominio.com");
 
 // Con el turn token del asistente (`mt_`), lo destructivo contesta 409 `needs_confirmation`:
@@ -275,13 +313,14 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
 
   // --- Envío ---
   tool("send_email",
-    "Envía un correo nuevo desde el dominio (dominio activado: 50 al día). `from` es la parte local de una máscara activa; sin él sale de noreply@. Cuerpo: `markdown` (lleva la firma del dominio), `html` o `body` (texto plano).",
+    "⚠️ Confirma con el usuario antes de enviar. Envía un correo suelto desde el dominio (dominio activado: 50 al día) SIN dejar hilo en la Bandeja; para conversar con alguien y ver su respuesta usa inbox_send. `from` es la parte local de una máscara activa; sin él sale de noreply@. Cuerpo: `markdown` (lleva la firma del dominio), `html` o `body` (texto plano).",
     {
       domainId, to: z.string(), subject: z.string(),
       markdown: z.string().optional(), html: z.string().optional(), body: z.string().optional(),
       from: z.string().optional(), fromName: z.string().optional(), replyTo: z.string().optional(),
       cc: z.array(z.string()).max(20).optional(), bcc: z.array(z.string()).max(20).optional(),
       inReplyTo: z.string().optional(), references: z.string().optional(),
+      attachments: attachmentsShape,
       idempotencyKey: z.string().max(128).optional().describe("Reintentar con la misma clave no reenvía ni gasta cuota (24 h)"),
     },
     ({ domainId: d, idempotencyKey, ...input }) => sdk.send.send(d, input, { idempotencyKey }));
@@ -314,9 +353,10 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
       domainId,
       kind: z.enum(["domain", "storage50", "sends100"]).optional().describe("domain = activar (por omisión); storage50 = +50 GB de buzón; sends100 = +100 envíos/día"),
       payerEmail: z.string().optional().describe("Correo de la cuenta de MercadoPago del pagador, si no es el de MailMask"),
+      period: z.enum(["monthly", "annual"]).optional().describe("Sólo para activar: monthly ($99/mes, por omisión) o annual ($999 al año)"),
     },
     async (a) => {
-      const r = await sdk.billing.checkout(a.domainId, a.kind ?? "domain", { payerEmail: a.payerEmail });
+      const r = await sdk.billing.checkout(a.domainId, a.kind ?? "domain", { payerEmail: a.payerEmail, period: a.period });
       return { paymentUrl: r.init_point, addonId: r.addonId, paid: false, note: "Liga de pago para el usuario. No está pagado hasta que MercadoPago lo confirme." };
     });
 
@@ -409,6 +449,192 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     { domainId, title: z.string(), body: z.string() }, (a) => sdk.canned.create(a.domainId, { title: a.title, body: a.body }));
   tool("delete_canned_reply", "Borra una respuesta guardada.", { domainId, cannedId: z.string() }, (a) => sdk.canned.delete(a.domainId, a.cannedId));
 
+  // --- Bandeja: el agente atiende el correo de su máscara ---
+  //
+  // Son las rutas de la app tal cual (vía SDK): mismos permisos por dominio y rol
+  // (`requireBandeja`), mismo recorte de 7 días del dominio gratis y mismos topes de envío.
+  // Lo único que se hace aquí es darle al modelo texto en vez de HTML.
+  const conversationId = z.string().describe("ID de la conversación (de inbox_list)");
+  const aDireccion = async (d: string, alias?: string) => {
+    if (!alias) return undefined;
+    if (alias.includes("@")) return alias.toLowerCase().trim();
+    return `${alias.toLowerCase().trim()}@${(await sdk.domains.get(d)).domain}`;
+  };
+  // El texto de cada mensaje se acota: un hilo con boletines HTML enteros no cabe en un turno.
+  const TOPE_TEXTO = 12_000;
+  const recorta = (t: string | undefined) => !t ? "" : t.length > TOPE_TEXTO ? `${t.slice(0, TOPE_TEXTO)}\n[… recortado: ${t.length - TOPE_TEXTO} caracteres más]` : t;
+  // "Dominio no verificado" sin pista deja al agente sin salida.
+  const conPista = async <T>(p: Promise<T>): Promise<T> => {
+    try { return await p; } catch (e) {
+      if (e instanceof MailMaskError && /no verificado/i.test(e.message)) {
+        throw new MailMaskError(e.status, `${e.message}. El DNS del dominio aún no está verificado: revisa domain_dns_setup y luego verify_domain.`);
+      }
+      throw e;
+    }
+  };
+
+  tool("inbox_list",
+    "Lista las conversaciones de la Bandeja de un dominio, de la más reciente a la más vieja. Filtra por `alias` (la máscara: 'soporte' o 'soporte@dominio.com'), `status` (open, snoozed, closed, unread = no leídas por ti, deleted = papelera) o `assignedTo`. Con `q` busca en asunto, remitente y cuerpo (tope 50, sin paginar). Para la siguiente página pasa `cursor` = nextCursor. En el dominio gratis sólo se ven los últimos 7 días.",
+    {
+      domainId,
+      alias: z.string().optional().describe("Máscara del hilo: parte local o dirección completa"),
+      status: z.enum(["open", "snoozed", "closed", "unread", "deleted"]).optional(),
+      assignedTo: z.string().optional().describe("Correo de la persona asignada"),
+      q: z.string().optional().describe("Texto a buscar"),
+      limit: z.number().int().min(1).max(100).optional().describe("Por omisión 50"),
+      cursor: z.string().optional(),
+    },
+    async (a) => {
+      const r = await sdk.inbox.list(a.domainId, { status: a.status, to: await aDireccion(a.domainId, a.alias), assignedTo: a.assignedTo, q: a.q, limit: a.limit, cursor: a.cursor });
+      return {
+        conversations: r.items.map((c) => ({
+          id: c.id, contact: c.from, alias: c.to, subject: c.subject, status: c.status, unread: c.unread ?? null,
+          assignedTo: c.assignedTo ?? null, priority: c.priority, tags: c.tags, lastMessageAt: c.lastMessageAt,
+          messageCount: c.messageCount, snoozedUntil: c.snoozedUntil ?? null, snippet: c.snippet,
+        })),
+        nextCursor: r.nextCursor,
+        unreadCount: r.unreadCount,
+        aliases: r.aliases,
+      };
+    });
+
+  tool("inbox_read",
+    "Abre una conversación: sus mensajes en texto plano (los 30 más recientes; para los anteriores pasa `before` = nextBefore), notas internas del equipo y adjuntos listados por mensaje. La marca como leída para ti. `direction` inbound = lo que escribió el contacto, outbound = lo que salió del dominio. Para el contenido de un adjunto usa inbox_attachment.",
+    { domainId, conversationId, before: z.string().optional().describe("nextBefore de una lectura anterior") },
+    async (a) => {
+      const c = await sdk.inbox.get(a.domainId, a.conversationId, { before: a.before });
+      return {
+        id: c.id, contact: c.from, alias: c.to, subject: c.subject, status: c.status, priority: c.priority,
+        assignedTo: c.assignedTo ?? null, tags: c.tags, snoozedUntil: c.snoozedUntil ?? null, deleted: !!c.deletedAt,
+        messages: c.messages.map((m) => ({
+          id: m.id, direction: m.direction, from: m.from, date: m.createdAt, text: recorta(m.body),
+          ...(m.deliveryStatus ? { deliveryStatus: m.deliveryStatus } : {}),
+          ...(m.bodyDegraded ? { bodyDegraded: m.bodyDegraded } : {}),
+          attachments: (m.attachments ?? []).map((x) => ({ index: x.index, filename: x.filename, contentType: x.contentType, size: x.size })),
+        })),
+        notes: c.notes.map((n) => ({ author: n.author, body: n.body, date: n.createdAt })),
+        totalMessages: c.totalMessages,
+        nextBefore: c.hasMore && c.messages.length ? c.messages[0].createdAt : null,
+      };
+    });
+
+  tool("inbox_attachment",
+    "Lee un adjunto de un mensaje recibido (messageId e index de inbox_read). Texto, CSV, JSON y similares vuelven como texto; imágenes de hasta 2 MB como imagen; lo demás (PDF, Office, zip) sólo con nombre y tamaño.",
+    { domainId, conversationId, messageId: z.string(), index: z.number().int().min(0) },
+    async (a) => {
+      const res = await sdk.inbox.attachment(a.domainId, a.conversationId, a.messageId, a.index);
+      const tipo = (res.headers.get("content-type") ?? "application/octet-stream").split(";")[0].trim().toLowerCase();
+      const nombre = /filename="([^"]*)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? "adjunto";
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      const meta = { filename: nombre, contentType: tipo, size: bytes.length };
+      if (/^text\/|json|xml|csv|calendar|yaml/.test(tipo)) return { ...meta, text: recorta(new TextDecoder().decode(bytes)) };
+      if (tipo.startsWith("image/") && tipo !== "image/svg+xml" && bytes.length <= 2 * 1024 * 1024) {
+        return { __image: { data: Buffer.from(bytes).toString("base64"), mimeType: tipo }, ...meta };
+      }
+      return { ...meta, note: "Este tipo de archivo no se puede leer aquí; el usuario lo abre desde la Bandeja en la app." };
+    });
+
+  tool("inbox_reply",
+    "⚠️ Confirma con el usuario el texto antes de enviar. Responde en el hilo, desde la máscara del hilo y al contacto, enhebrado (Re: asunto). Escribe en `markdown`: lleva la firma del dominio y cita el último mensaje recibido (quote: false para no citar). No gasta la cuota de envíos (tope de 200 respuestas por hora por dominio). Pide el DNS del dominio verificado.",
+    {
+      domainId, conversationId,
+      markdown: z.string().optional().describe("Cuerpo en markdown (recomendado)"),
+      body: z.string().optional().describe("Texto plano, sin firma"),
+      html: z.string().optional(),
+      cc: z.array(z.string()).max(20).optional(), bcc: z.array(z.string()).max(20).optional(),
+      quote: z.boolean().optional(),
+      attachments: attachmentsShape,
+    },
+    ({ domainId: d, conversationId: c, ...input }) => conPista(sdk.inbox.reply(d, c, input)));
+
+  tool("inbox_send",
+    "⚠️ Confirma con el usuario destinatario, asunto y texto antes de enviar. Escribe un correo nuevo desde una máscara activa del dominio y abre un hilo en la Bandeja: la respuesta del contacto llega a esa misma conversación (síguela con inbox_list/inbox_read). Requiere dominio activado ($99 MXN/mes, si no: activation_link) y verificado; gasta 1 de los envíos del día.",
+    {
+      domainId,
+      fromAlias: z.string().describe("Parte local de la máscara que envía: 'ventas'"),
+      to: z.string(), subject: z.string(),
+      markdown: z.string().optional().describe("Cuerpo en markdown (recomendado: lleva la firma)"),
+      body: z.string().optional(), html: z.string().optional(),
+      cc: z.array(z.string()).max(20).optional(), bcc: z.array(z.string()).max(20).optional(),
+      attachments: attachmentsShape,
+    },
+    ({ domainId: d, ...input }) => conPista(sdk.inbox.compose(d, input)));
+
+  tool("inbox_mark",
+    "Cambia el estado de una conversación: `read` true la marca leída para ti; `status` closed = archivarla/resolverla, open = reabrirla, snoozed = posponerla hasta `snoozedUntil` (ISO futura, máx. 90 días; un correo nuevo la despierta antes); `priority` normal o urgent; `tags` reemplaza las etiquetas.",
+    {
+      domainId, conversationId,
+      read: z.boolean().optional(),
+      status: z.enum(["open", "snoozed", "closed"]).optional(),
+      snoozedUntil: z.string().optional(),
+      priority: z.enum(["normal", "urgent"]).optional(),
+      tags: z.array(z.string()).optional().describe("La lista COMPLETA de etiquetas"),
+    },
+    async ({ domainId: d, conversationId: c, read, ...cambios }) => {
+      const hayCambios = Object.values(cambios).some((v) => v !== undefined);
+      if (!hayCambios && !read) throw new Error("Nada que cambiar: pasa read, status, priority o tags.");
+      const conv = hayCambios ? await sdk.inbox.update(d, c, cambios) : undefined;
+      const leida = read ? await sdk.inbox.markRead(d, c) : undefined;
+      return { ok: true, ...(conv ? { status: conv.status, priority: conv.priority, tags: conv.tags, snoozedUntil: conv.snoozedUntil ?? null } : {}), ...(leida ? { unreadCount: leida.unreadCount } : {}) };
+    });
+
+  tool("inbox_assign", "Asigna una conversación a una persona del equipo (correo de list_members) o, sin `assignedTo`, la deja sin asignar. Pide permiso de dueño o admin.",
+    { domainId, conversationId, assignedTo: z.string().optional() }, (a) => sdk.inbox.assign(a.domainId, a.conversationId, a.assignedTo));
+  tool("inbox_note", "Agrega una nota interna a la conversación: la ve el equipo en la Bandeja, NUNCA el contacto.",
+    { domainId, conversationId, body: z.string() }, (a) => sdk.inbox.addNote(a.domainId, a.conversationId, a.body));
+  tool("inbox_delete", "Manda conversaciones a la papelera (se pueden recuperar con inbox_restore; se vacía a los 15 días). Máx. 200 por llamada; sólo dueño o admin. Confirma con el usuario antes.",
+    { domainId, conversationIds: z.array(z.string()).min(1).max(200) }, (a) => sdk.inbox.delete(a.domainId, a.conversationIds));
+  tool("inbox_restore", "Saca una conversación de la papelera (las borradas salen en inbox_list con status deleted).",
+    { domainId, conversationId }, (a) => sdk.inbox.restore(a.domainId, a.conversationId));
+  tool("inbox_metrics", "Métricas de la Bandeja: volumen, tiempos de primera respuesta, reparto por persona y por día.",
+    { domainId, days: z.number().int().min(1).max(365).optional().describe("Por omisión 30") }, (a) => sdk.inbox.metrics(a.domainId, { days: a.days }));
+
+  tool("upload_attachment",
+    "Sube un archivo para adjuntarlo en inbox_send, inbox_reply o send_email; devuelve el objeto que va en `attachments`. Pasa `url` (un archivo que el usuario adjuntó en el chat del asistente de MailMask) o `contentBase64` con `filename`. Máx. 5 MB; ejecutables bloqueados. Vale hasta que se envía.",
+    {
+      domainId,
+      url: z.string().optional().describe("URL del adjunto del chat (/api/asistente/files/...)"),
+      contentBase64: z.string().optional(),
+      filename: z.string().optional(),
+      contentType: z.string().optional().describe("Por omisión application/octet-stream"),
+    },
+    async (a) => {
+      const r = a.url
+        ? await sdk.attachments.uploadFromUrl(a.domainId, a.url, a.filename)
+        : a.contentBase64
+          ? await sdk.attachments.upload(a.domainId, { filename: a.filename || "archivo", contentType: a.contentType || "application/octet-stream", data: Buffer.from(a.contentBase64, "base64") })
+          : (() => { throw new Error("Pasa url o contentBase64."); })();
+      return { attachment: { key: r.key, filename: r.filename, ...(a.contentType ? { contentType: a.contentType } : {}) }, size: r.size };
+    });
+
+  tool("set_domain_logo",
+    "Pone el logo que acompaña la firma de los correos del dominio (PNG, JPG o WebP; máx. 500 KB). Pasa `url` de una imagen que el usuario adjuntó en el chat del asistente, o `contentBase64` con `contentType`.",
+    { domainId, url: z.string().optional(), contentBase64: z.string().optional(), contentType: z.enum(["image/png", "image/jpeg", "image/webp"]).optional() },
+    async (a) => {
+      if (a.url) return sdk.domains.setLogoFromUrl(a.domainId, a.url);
+      if (!a.contentBase64 || !a.contentType) throw new Error("Pasa url, o contentBase64 con contentType.");
+      return sdk.domains.setLogo(a.domainId, new Blob([Buffer.from(a.contentBase64, "base64")], { type: a.contentType }), "logo");
+    });
+  tool("delete_domain_logo", "Quita el logo de la firma del dominio.", { domainId }, (a) => sdk.domains.removeLogo(a.domainId));
+
+  // --- Cuenta: cobros, cancelaciones y referidos ---
+  tool("list_orders", "Historial de cobros, cortesías y cancelaciones de la cuenta (folio, concepto, monto en centavos, periodo). Para factura (CFDI) la respuesta dice a dónde escribir.",
+    { limit: z.number().int().min(1).max(200).optional(), before: z.string().optional().describe("nextCursor de la página anterior") },
+    (a) => sdk.billing.orders({ limit: a.limit, before: a.before }));
+  tool("cancel_addon",
+    "Cancela la suscripción de un add-on (addonId de list_addons; p. ej. la activación de un dominio). Deja de cobrarse y lo incluido dura hasta el fin del periodo pagado. Las cortesías no se cancelan. Confirma con el usuario antes.",
+    { addonId: z.string() }, (a) => sdk.billing.cancelAddon(a.addonId));
+  tool("cancel_renewal",
+    "Cancela la renovación anual automática de un dominio comprado en MailMask (registrationId de list_registrations). El dominio sigue vigente hasta su vencimiento; después puede perderse. Confirma con el usuario antes; si quiere llevárselo, es transfer_out.",
+    { registrationId }, (a) => sdk.registrations.cancelRenewal(a.registrationId));
+  tool("referral_status", "Programa de referidos de la cuenta: liga propia (slug), nombre que ven los invitados, referidos y créditos disponibles.", {}, () => sdk.referrals.get());
+  tool("set_referral_slug", "Cambia la liga de referidos (3-30 caracteres: minúsculas, números y guiones). 409 si ya está tomada.",
+    { slug: z.string() }, (a) => sdk.referrals.setSlug(a.slug));
+  tool("set_referral_name", "Nombre que ven las personas invitadas («Brenda te invitó»), 2-40 caracteres.",
+    { name: z.string() }, (a) => sdk.referrals.setName(a.name));
+  tool("export_link", "Liga para descargar un JSON con todos los dominios, máscaras, reglas y últimos registros de la cuenta. Se abre en el navegador con la sesión de MailMask iniciada (5 al día).",
+    {}, async () => ({ url: appUrl("/api/export"), note: "Abrir en el navegador con sesión iniciada en MailMask." }));
+
   // --- Perfil de la cuenta ---
   //
   // Es el perfil del usuario de MailMask (cabecera de /app, Bandeja, dock), no el de una
@@ -418,6 +644,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     { displayName: z.string() }, (a) => sdk.account.updateProfile({ displayName: a.displayName }));
   tool("set_profile_photo", "Pone la foto de perfil de la cuenta del usuario. SÓLO sirve con la URL de una imagen que el usuario adjuntó en este chat (PNG, JPG o WebP, máx. 2 MB); cualquier otra URL se rechaza. Si no ha adjuntado una, pídesela.",
     { url: z.string().describe("URL del adjunto del chat (/api/asistente/files/...)") }, (a) => sdk.account.setAvatarFromUrl(a.url));
+  tool("delete_profile_photo", "Quita la foto de perfil de la cuenta del usuario.", {}, () => sdk.account.removeAvatar());
 
   // --- Buzones: ligas para el navegador del usuario ---
   //

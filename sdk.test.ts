@@ -67,6 +67,9 @@ describe("SDK ↔ servidor: contrato", () => {
         getUserAvatarFromS3: async (key: string) => archivos.get(`avatar:${key}`) ?? null,
         deleteUserAvatarFromS3: async (key: string) => { archivos.delete(`avatar:${key}`); },
         getAssistantUploadFromS3: async (key: string) => archivos.get(`asis:${key}`) ?? null,
+        // Logo de la firma.
+        putDomainAssetToS3: async (key: string, body: Uint8Array, contentType: string) => { archivos.set(`logo:${key}`, { body, contentType }); },
+        deleteDomainAssetFromS3: async (key: string) => { archivos.delete(`logo:${key}`); },
       },
     });
 
@@ -799,5 +802,87 @@ describe("SDK ↔ servidor: contrato", () => {
     assert.match(puesta.avatarUrl ?? "", /^\/api\/avatar\/.+\.png$/);
     await assert.rejects(() => mm.account.setAvatarFromUrl("https://ejemplo.com/foto.png"), (e: MailMaskError) => e.status === 400);
     assert.equal((await mm.account.removeAvatar()).avatarUrl, null);
+  });
+
+  it("inbox: listar, leer, redactar, responder, marcar, asignar, anotar, borrar, restaurar y métricas", async () => {
+    // El dominio activado (legado) de `dev`, con una máscara y un correo recibido.
+    await dev.aliases.create(devDomainId, { alias: "soporte", destinations: ["d@example.com"] });
+    const conv = dbmod.createConversation({
+      domainId: devDomainId, from: "cliente@example.com", to: `soporte@sdk-dev-${suffix}.com`, subject: "Ayuda con mi pedido",
+      status: "open", priority: "normal", lastMessageAt: new Date().toISOString(), messageCount: 1, tags: [], threadReferences: ["<orig@cliente>"],
+    });
+    dbmod.addMessage({ conversationId: conv.id, from: "cliente@example.com", body: "¿Dónde va mi pedido 123?", direction: "inbound", createdAt: new Date().toISOString(), messageId: "<orig@cliente>" });
+
+    const noLeidas = await dev.inbox.list(devDomainId, { status: "unread", to: `soporte@sdk-dev-${suffix}.com` });
+    assert.ok(noLeidas.items.some((c) => c.id === conv.id && c.unread === true));
+
+    const detalle = await dev.inbox.get(devDomainId, conv.id);
+    assert.equal(detalle.messages[0].body, "¿Dónde va mi pedido 123?");
+    assert.ok(!(await dev.inbox.list(devDomainId, { status: "unread" })).items.some((c) => c.id === conv.id), "abrirla la marca leída");
+
+    enviados.length = 0;
+    const r = await dev.inbox.reply(devDomainId, conv.id, { markdown: "Va en camino." });
+    assert.ok(r.messageId);
+    assert.equal(enviados[0].from, `soporte@sdk-dev-${suffix}.com`, "contesta desde la máscara del hilo");
+    assert.equal(enviados[0].to, "cliente@example.com");
+    assert.equal(enviados[0].subject, "Re: Ayuda con mi pedido");
+
+    const nuevo = await dev.inbox.compose(devDomainId, { fromAlias: "soporte", to: "otro@example.com", subject: "Hola", markdown: "Primer mensaje" });
+    assert.ok(nuevo.conversationId);
+    await assert.rejects(() => dev.inbox.compose(devDomainId, { fromAlias: "noexiste", to: "otro@example.com", subject: "x", body: "x" }), (e: MailMaskError) => e.status === 400);
+
+    const cerrada = await dev.inbox.update(devDomainId, conv.id, { status: "closed", priority: "urgent", tags: ["pedido"] });
+    assert.equal(cerrada.status, "closed");
+    await assert.rejects(() => dev.inbox.update(devDomainId, conv.id, { status: "snoozed" }), (e: MailMaskError) => e.status === 400);
+    assert.equal((await dev.inbox.markRead(devDomainId, conv.id)).ok, true);
+    assert.equal((await dev.inbox.assign(devDomainId, conv.id, devEmail)).assignedTo, devEmail);
+    assert.equal((await dev.inbox.addNote(devDomainId, conv.id, "Cliente frecuente")).body, "Cliente frecuente");
+    assert.equal((await dev.inbox.delete(devDomainId, [conv.id])).deleted, 1);
+    assert.ok((await dev.inbox.list(devDomainId, { status: "deleted" })).items.some((c) => c.id === conv.id));
+    assert.equal((await dev.inbox.restore(devDomainId, conv.id)).ok, true);
+    assert.equal(typeof (await dev.inbox.metrics(devDomainId, { days: 7 })), "object");
+
+    // Otra cuenta no ve esta Bandeja.
+    await assert.rejects(() => sinEnvios.inbox.list(devDomainId), (e: MailMaskError) => e.status === 403);
+    await assert.rejects(() => sinEnvios.inbox.get(devDomainId, conv.id), (e: MailMaskError) => e.status === 403);
+  });
+
+  it("inbox.compose en el dominio gratis: 403 que dice que pide dominio activado", async () => {
+    const gratis = dbmod.createDomain(`sdk-noenvios-${suffix}@example.com`, `gratis-inbox-${suffix}.com`, ["dk"], "vf");
+    await assert.rejects(() => sinEnvios.inbox.compose(gratis.id, { fromAlias: "x", to: "a@example.com", subject: "x", body: "x" }), (e: MailMaskError) => e.status === 403 && /activado/.test(e.message));
+  });
+
+  it("cuenta: pedidos, cancelar add-on y renovación, referidos, logo y adjunto desde el chat", async () => {
+    const pedidos = await mm.billing.orders({ limit: 5 });
+    assert.ok(Array.isArray(pedidos.orders));
+    assert.match(pedidos.invoiceNote, /CFDI/);
+
+    const addon = dbmod.createAddon(email, "sends100");
+    dbmod.updateAddon(addon.id, { status: "active", currentPeriodEnd: new Date(Date.now() + 10 * 864e5).toISOString() });
+    assert.equal((await mm.billing.cancelAddon(addon.id)).ok, true);
+    await assert.rejects(() => mm.billing.cancelAddon(addon.id), (e: MailMaskError) => e.status === 400);
+    await assert.rejects(() => sinEnvios.billing.cancelAddon(addon.id), (e: MailMaskError) => e.status === 404);
+
+    const reg = dbmod.createDomainRegistration({ domainName: `sinrenov-${suffix}.com`, ownerEmail: email, tld: ".com", priceCents: 30000, awsCostCents: 1500 });
+    await assert.rejects(() => mm.registrations.cancelRenewal(reg.id), (e: MailMaskError) => e.status === 409 && /renovación/.test(e.message));
+
+    const slug = `sdk${suffix}`.slice(0, 30);
+    assert.equal((await mm.referrals.setSlug(slug)).slug, slug);
+    assert.equal((await mm.referrals.setName("Brenda")).ok, true);
+    assert.equal((await mm.referrals.get()).slug, slug);
+
+    const { userKey, signedUploadUrl } = await import("./assistant.ts");
+    const llaveLogo = `${userKey(email)}/${crypto.randomUUID()}-logo.png`;
+    archivos.set(`asis:${llaveLogo}`, { body: new Uint8Array([0x89, 0x50, 0x4e, 0x47]), contentType: "image/png" });
+    const logo = await mm.domains.setLogoFromUrl(domainId, signedUploadUrl("http://localhost", llaveLogo));
+    assert.match(logo.logoUrl, /\/api\/domain-logo\//);
+    assert.equal((await mm.domains.removeLogo(domainId)).ok, true);
+    await assert.rejects(() => mm.domains.setLogoFromUrl(domainId, "https://evil.example/logo.png"), (e: MailMaskError) => e.status === 400);
+
+    const llaveDoc = `${userKey(email)}/${crypto.randomUUID()}-cotizacion.pdf`;
+    archivos.set(`asis:${llaveDoc}`, { body: new TextEncoder().encode("%PDF-1.4"), contentType: "application/pdf" });
+    const adj = await mm.attachments.uploadFromUrl(domainId, signedUploadUrl("http://localhost", llaveDoc), "cotizacion.pdf");
+    assert.equal(adj.filename, "cotizacion.pdf");
+    assert.ok(archivos.has(adj.key), "quedó en el S3 de adjuntos");
   });
 });

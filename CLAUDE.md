@@ -44,17 +44,28 @@ comprueba "no es 404" ya vale: eso solo habría atrapado 6 de los 10 bugs.
 `WebStandardStreamableHTTPServerTransport`, `enableJsonResponse`), autenticado sólo con
 `Authorization: Bearer mk_…` (la API key normal) o `Bearer mt_…` (turn token del asistente,
 ver "Asistente Mask"); sin ellas 401, y `/mcp` está exento de CSRF porque nunca acepta cookie.
-73 herramientas desde el 1-oct-2026 (cobro por liga, compra/transferencia/renovación de
-dominios, equipo, firma, respuestas guardadas, `domain_dns_setup`, perfil de la cuenta) y `MCP_INSTRUCTIONS`
+95 herramientas desde el 4-oct-2026, con paridad con el panel (cobro por liga, compra/transferencia/renovación de
+dominios, equipo, firma y logo, respuestas guardadas, `domain_dns_setup`, perfil, pedidos, referidos y la **Bandeja**: `inbox_*`) y `MCP_INSTRUCTIONS`
 (≤6000 caracteres, lo fija `mcp.test.ts`): es todo lo que un agente partner sabe del producto. **Cada herramienta es el SDK real** (`sdk/src`, que sí viaja
 en la imagen) hablando con la app en proceso vía `app.fetch` — el mismo truco de
 `sdk.test.ts` —, así que no puede desalinearse de una ruta sin que `sdk.test.ts` lo cace.
 Para añadir una: método en el SDK → caso en `sdk.test.ts` → `tool()` en `mcp.ts`. Un
 `MailMaskError` sale como `isError` con `HTTP <status>: <mensaje>` (el 403 del precio es
 información útil para el agente). No se exponen las API keys (un agente con una llave no
-fabrica más) ni las conversaciones de la Bandeja; un pago siempre es una liga que abre el
+fabrica más); un pago siempre es una liga que abre el
 usuario (`paid: false`). Pruebas en `mcp.test.ts`. Docs en `docs.html#mcp` y
 `EXTRA_DOCS` de `upload-docs.ts`. GET/DELETE dan 405: sin sesiones no hay stream ni cierre.
+
+**Bandeja por MCP (4-oct-2026).** Decisión de producto: a los clientes de Ghosty se les sugiere un
+correo propio para su agente (máscara + Bandeja) en vez de dar su Gmail. `inbox_list|read|attachment|
+reply|send|mark|assign|note|delete|restore|metrics` + `upload_attachment` son las rutas de `/api/bandeja/*`
+vía `sdk.inbox` (mismos `requireBandeja`, recorte de 7 días del gratis y topes); `inbox_read` da texto
+(12k por mensaje), no HTML. `reply`/`send`/`send_email` llevan «⚠️ Confirma» en la descripción.
+`upload_attachment`, `set_domain_logo` y la foto aceptan `{fromUrl}` (adjunto firmado del dock) vía
+`readOwnUpload` (`profile.ts`) o base64. `cancel_addon` y `cancel_renewal` piden tarjeta con `mt_`.
+`/mcp` reenvía la IP del cliente a las llamadas internas: antes todos caían en el cubo `unknown` de los
+topes por IP. Fuera a propósito: API keys, admin, presencia/SSE, EPP, confirmar transfer-out (va por
+correo), cupones y el cancel del plan legado (sin suscriptores).
 
 ## OAuth 2.1 del MCP (`oauth.ts`, 4-oct-2026)
 

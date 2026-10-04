@@ -23,7 +23,9 @@ export type AgentIntent =
   | "delete_mailbox"
   | "delete_dns_record"
   | "transfer_out"
-  | "remove_member";
+  | "remove_member"
+  | "cancel_addon"
+  | "cancel_renewal";
 
 export type ActionSummary = { title: string; lines: string[]; effects: string[]; destructive: boolean };
 type StoredPayload = { method: string; path: string; body?: unknown };

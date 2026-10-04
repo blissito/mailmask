@@ -6,6 +6,15 @@ import assert from "node:assert/strict";
 const suffix = Date.now().toString(36);
 
 const zonaDns = new Map<string, { name: string; type: string; ttl: number; values: string[] }>();
+const enviados: { from: string; to: string; subject: string }[] = [];
+const correoCrudo = [
+  "From: cliente@example.com", "To: soporte@x.com", "Subject: Factura", "MIME-Version: 1.0",
+  'Content-Type: multipart/mixed; boundary="b1"', "",
+  "--b1", "Content-Type: text/plain; charset=utf-8", "", "Les mando la lista de productos.", "",
+  "--b1", 'Content-Type: text/csv; name="lista.csv"', 'Content-Disposition: attachment; filename="lista.csv"', "",
+  "sku,cantidad", "A1,3", "",
+  "--b1--", "",
+].join("\r\n");
 
 describe("MCP: agentes contra la app", () => {
   // deno-lint-ignore no-explicit-any
@@ -65,6 +74,13 @@ describe("MCP: agentes contra la app", () => {
       deleteReceiptRule: async () => undefined,
       deleteConfigurationSet: async () => undefined,
       deleteDomainIdentity: async () => undefined,
+      // Bandeja: envíos y un correo recibido con un adjunto de texto, en memoria.
+      // deno-lint-ignore no-explicit-any
+      sendFromDomain: async (from: string, to: string, subject: string, _b: string, _o?: any) => {
+        enviados.push({ from, to, subject });
+        return { messageId: `<stub-${crypto.randomUUID()}@test>`, sesMessageId: `ses-${crypto.randomUUID()}` };
+      },
+      fetchEmailFromS3: async () => correoCrudo,
     } });
     ({ app } = await import("./main.ts"));
     dbmod = await import("./db.ts");
@@ -273,5 +289,100 @@ describe("MCP: agentes contra la app", () => {
     assert.ok((await buscar("foto")).includes("set_profile_photo"));
     assert.ok((await buscar("avatar")).includes("set_profile_photo"));
     assert.ok((await buscar("nombre")).includes("update_profile"));
+  });
+
+  it("Bandeja de punta a punta: listar no leídas por máscara, leer, adjunto, responder, cerrar, nota y redactar", async () => {
+    const dom = (await call("create_domain", { domain: `mcp-inbox-${suffix}.com` })).json.result.structuredContent.domain;
+    sqlite.prepare("UPDATE domains SET verified = 1 WHERE id = ?").run(dom.id);
+    await call("create_alias", { domainId: dom.id, alias: "soporte", destinations: ["d@example.com"] });
+    const conv = dbmod.createConversation({
+      domainId: dom.id, from: "cliente@example.com", to: `soporte@mcp-inbox-${suffix}.com`, subject: "Factura",
+      status: "open", priority: "normal", lastMessageAt: new Date().toISOString(), messageCount: 1, tags: [], threadReferences: ["<f@cliente>"],
+    });
+    const msg = dbmod.addMessage({ conversationId: conv.id, from: "cliente@example.com", direction: "inbound", createdAt: new Date().toISOString(), s3Bucket: "b", s3Key: "k", messageId: "<f@cliente>" });
+
+    const lista = await call("inbox_list", { domainId: dom.id, alias: "soporte", status: "unread" });
+    assert.ok(!lista.json.result.isError, JSON.stringify(lista.json.result));
+    const fila = lista.json.result.structuredContent.conversations.find((c: { id: string }) => c.id === conv.id);
+    assert.equal(fila.unread, true);
+    assert.equal(fila.contact, "cliente@example.com");
+
+    const leida = (await call("inbox_read", { domainId: dom.id, conversationId: conv.id })).json.result.structuredContent;
+    assert.match(leida.messages[0].text, /lista de productos/);
+    assert.deepEqual(leida.messages[0].attachments.map((x: { filename: string }) => x.filename), ["lista.csv"]);
+    assert.equal(leida.messages[0].html, undefined, "al modelo le llega texto, no HTML");
+    const despues = (await call("inbox_list", { domainId: dom.id, status: "unread" })).json.result.structuredContent.conversations;
+    assert.ok(!despues.some((c: { id: string }) => c.id === conv.id), "leerla la marca leída");
+
+    const adj = await call("inbox_attachment", { domainId: dom.id, conversationId: conv.id, messageId: msg.id, index: 0 });
+    assert.ok(!adj.json.result.isError, JSON.stringify(adj.json.result));
+    assert.match(adj.json.result.structuredContent.text, /A1,3/);
+
+    enviados.length = 0;
+    const resp = await call("inbox_reply", { domainId: dom.id, conversationId: conv.id, markdown: "Recibida, gracias." });
+    assert.ok(!resp.json.result.isError, JSON.stringify(resp.json.result));
+    assert.deepEqual(enviados[0], { from: `soporte@mcp-inbox-${suffix}.com`, to: "cliente@example.com", subject: "Re: Factura" });
+
+    const marca = await call("inbox_mark", { domainId: dom.id, conversationId: conv.id, status: "closed", tags: ["factura"], read: true });
+    assert.equal(marca.json.result.structuredContent.status, "closed");
+    assert.equal((await call("inbox_mark", { domainId: dom.id, conversationId: conv.id })).json.result.isError, true, "sin cambios es error claro");
+    assert.ok(!(await call("inbox_note", { domainId: dom.id, conversationId: conv.id, body: "Pidió factura" })).json.result.isError);
+
+    const nuevo = await call("inbox_send", { domainId: dom.id, fromAlias: "soporte", to: "prospecto@example.com", subject: "Hola", markdown: "Te escribo de..." });
+    assert.ok(!nuevo.json.result.isError, JSON.stringify(nuevo.json.result));
+    assert.ok(nuevo.json.result.structuredContent.conversationId);
+
+    // Otra cuenta (otra llave) no ve esta Bandeja.
+    const ajena = await call("inbox_list", { domainId: dom.id }, keyGratis);
+    assert.equal(ajena.json.result.isError, true);
+    assert.match(ajena.json.result.content[0].text, /HTTP 403/);
+    const ajenaLeer = await call("inbox_read", { domainId: dom.id, conversationId: conv.id }, keyGratis);
+    assert.equal(ajenaLeer.json.result.isError, true);
+  });
+
+  it("inbox_send en dominio gratis o sin verificar: el error dice qué falta", async () => {
+    const gratis = await call("inbox_send", { domainId: dominioGratisId, fromAlias: "x", to: "a@example.com", subject: "x", body: "x" }, keyGratis);
+    assert.equal(gratis.json.result.isError, true);
+    assert.match(gratis.json.result.content[0].text, /HTTP 403.*activado/);
+
+    const dom = (await call("create_domain", { domain: `mcp-noverif-${suffix}.com` })).json.result.structuredContent.domain;
+    const conv = dbmod.createConversation({
+      domainId: dom.id, from: "c@example.com", to: `hola@mcp-noverif-${suffix}.com`, subject: "x",
+      status: "open", priority: "normal", lastMessageAt: new Date().toISOString(), messageCount: 1, tags: [], threadReferences: [],
+    });
+    const r = await call("inbox_reply", { domainId: dom.id, conversationId: conv.id, body: "x" });
+    assert.equal(r.json.result.isError, true);
+    assert.match(r.json.result.content[0].text, /verify_domain/);
+  });
+
+  it("con el turn token del asistente, cancelar un add-on pide confirmación en vez de ejecutar", async () => {
+    const { issueTurnToken } = await import("./auth.ts");
+    const mt = await issueTurnToken(email);
+    const addon = dbmod.createAddon(email, "sends100");
+    dbmod.updateAddon(addon.id, { status: "active", currentPeriodEnd: new Date(Date.now() + 5 * 864e5).toISOString() });
+    const r = await call("cancel_addon", { addonId: addon.id }, mt);
+    assert.equal(r.json.result.structuredContent.needsConfirmation, true);
+    assert.match(r.json.result.structuredContent.title, /^Cancelar/);
+    assert.equal(dbmod.getAddonById(addon.id).status, "active", "no se canceló");
+    // Con la mk_ (sin asistente de por medio) sí ejecuta.
+    assert.equal((await call("cancel_addon", { addonId: addon.id })).json.result.structuredContent.ok, true);
+  });
+
+  it("el catálogo cubre la app: Bandeja, cuenta y logo, y search_tools los encuentra", async () => {
+    const nombres = (await rpc("tools/list")).json.result.tools.map((t: { name: string }) => t.name);
+    for (const n of ["inbox_list", "inbox_read", "inbox_attachment", "inbox_reply", "inbox_send", "inbox_mark", "inbox_assign", "inbox_note",
+      "inbox_delete", "inbox_restore", "inbox_metrics", "upload_attachment", "set_domain_logo", "delete_domain_logo", "delete_profile_photo",
+      "list_orders", "cancel_addon", "cancel_renewal", "referral_status", "set_referral_slug", "set_referral_name", "export_link"]) {
+      assert.ok(nombres.includes(n), n);
+    }
+    const tools = (await rpc("tools/list")).json.result.tools;
+    for (const n of ["inbox_reply", "inbox_send", "send_email"]) {
+      assert.match(tools.find((t: { name: string }) => t.name === n).description, /⚠️ Confirma/, `${n} pide confirmar antes de enviar`);
+    }
+    const buscar = async (q: string) => (await call("search_tools", { query: q })).json.result.structuredContent.result.map((t: { name: string }) => t.name);
+    assert.ok((await buscar("responder")).includes("inbox_reply"));
+    assert.ok((await buscar("correos recibidos")).includes("inbox_list"));
+    assert.ok((await buscar("archivar")).includes("inbox_mark"));
+    assert.ok((await buscar("facturas")).includes("list_orders"));
   });
 });
