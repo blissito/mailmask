@@ -3,14 +3,9 @@ import type { DnsPreset, DnsRecordType, MailMask } from "@easybits.cloud/mailmas
 import { requireClient } from "../client.js";
 import { failFromError, printJson } from "../output.js";
 import { resolveDomainId } from "../resolve.js";
+import { PRESETS, jsonArg, domainArg } from "../args.js";
 
-const PRESETS: DnsPreset[] = [
-  "vercel", "netlify", "github-pages", "cloudflare-pages", "render", "fly", "redirect-a-www", "dmarc",
-];
 const RECORD_TYPES: DnsRecordType[] = ["A", "AAAA", "CNAME", "TXT", "MX", "NS", "CAA", "SRV"];
-
-const jsonArg = { json: { type: "boolean" as const, description: "Salida en JSON para scripts/agentes" } };
-const domainArg = { domain: { type: "positional" as const, description: "Dominio (acme.com) o su id" } };
 
 function checkRecordType(type: string): asserts type is DnsRecordType {
   if (!RECORD_TYPES.includes(type as DnsRecordType)) {
@@ -22,12 +17,25 @@ function checkRecordType(type: string): asserts type is DnsRecordType {
 // Convención dura (docs/agents/mailmask-cli.md): ningún registro managed se
 // toca desde el CLI, ni con --force. El servidor también lo rechaza (409),
 // pero rehusarse aquí da un mensaje claro sin gastar la llamada de red.
-async function refuseIfManaged(client: MailMask, domainId: string, name: string, type: DnsRecordType) {
+//
+// Falla CERRADO: si no se pudo listar (red, 5xx, lo que sea), NO se deja pasar
+// la mutación — se aborta. Antes dejaba seguir cuando `dns.list` lanzaba, que
+// es exactamente el escenario en el que menos se sabe si el registro es
+// managed, y es el peor momento para arriesgarse.
+export async function refuseIfManaged(
+  client: MailMask,
+  domainId: string,
+  name: string,
+  type: DnsRecordType,
+): Promise<void> {
   let current: Awaited<ReturnType<typeof client.dns.list>>;
   try {
     current = await client.dns.list(domainId);
-  } catch {
-    return; // si no se pudo listar, deja que la mutación siga y falle con su propio error
+  } catch (err) {
+    process.stderr.write(
+      `✖ No se pudo confirmar si ${type} ${name} está protegido por MailMask; no se arriesga la mutación. (${err instanceof Error ? err.message : String(err)})\n`,
+    );
+    process.exit(1);
   }
   const match = current.records?.find((r) => r.name === name && r.type === type);
   if (match?.managed) {

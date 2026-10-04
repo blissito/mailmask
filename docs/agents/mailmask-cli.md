@@ -47,12 +47,17 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   `security`. `POST /api/cli/device/start` es público (no hay sesión con la que
   pedir CSRF) pero sí lleva `rateLimitGuard` por IP y `createDeviceAuthStore` tiene
   un tope (`maxPending`, 500 por defecto) de device-codes pendientes a la vez, para
-  que no se pueda inflar sin fin la memoria del proceso. `/cli/authorize` prellena
-  el código desde la URL (como `gh auth login`) y por diseño eso abre una vía de
-  phishing — un enlace armado por un atacante con su propio código, para que la
-  víctima sólo dé clic en "Autorizar" sin comparar nada. La mitigación es avisar,
-  no impedir: el botón muestra antes del clic que va a crear una llave de API con
-  acceso completo a la cuenta.
+  que no se pueda inflar sin fin la memoria del proceso. `/cli/authorize`
+  deliberadamente NO prellena el código desde la URL: `login.ts` abre
+  `verificationUri` (sin `user_code`) y la página (`public/js/cli-authorize.js`)
+  deja el campo vacío aunque llegara uno en la query string. La razón es la
+  misma vía de phishing de siempre (un enlace armado por un atacante con SU
+  propio código, para que la víctima sólo dé clic en "Autorizar" sin comparar
+  nada): aquí la mitigación es real, no sólo un aviso — copiar el código a mano
+  desde la terminal propia es un paso activo que un clic distraído no salta.
+  `createDeviceAuthStore` tampoco devuelve `verificationUriComplete`: ese campo
+  era exactamente el link con el código embebido, así que un cliente futuro no
+  tiene de dónde volver a sacarlo.
 
 - **Resolución de `<dominio>`:** todo comando que recibe un dominio acepta el
   nombre (`acme.com`) o el id — `cli/src/resolve.ts` lo busca en
@@ -74,11 +79,27 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   `cli/src/commands/dns.ts`. No uses `rawArgs` para esto: ya rompió una vez
   con un `--ttl` de por medio.
 - **Registros `managed` en `dns upsert`/`dns delete`:** el SDK no los protege
-  del lado del cliente (sólo el servidor, con 409). `refuseIfManaged()` en
-  `cli/src/commands/dns.ts` lista el dominio ANTES de mutar y se rehúsa en el
-  CLI si el (nombre, tipo) ya es `managed: true` — mensaje claro sin gastar la
-  llamada que de todos modos iba a fallar. Si falla el listado, deja pasar la
-  mutación para que sea el servidor el que la rechace.
+  del lado del cliente (sólo el servidor, con 409). `refuseIfManaged()` (exportada
+  desde `cli/src/commands/dns.ts`) lista el dominio ANTES de mutar y se rehúsa en
+  el CLI si el (nombre, tipo) ya es `managed: true` — mensaje claro sin gastar la
+  llamada que de todos modos iba a fallar. **Falla CERRADO:** si el listado mismo
+  falla (red, 5xx, lo que sea), NO deja pasar la mutación — aborta, porque es
+  justo el momento en que menos se sabe si el registro es managed. Pruebas en
+  `cli/test/dns.test.ts`.
+- **Args compartidos entre `domains` y `dns`:** `PRESETS`, `jsonArg` y `domainArg`
+  viven en `cli/src/args.ts`, no copiados en cada archivo de comando. Cualquier
+  lista o flag que vaya a repetirse entre dos o más comandos va ahí, no a mano en
+  cada uno.
+- **Probar un comando que muta (con el SDK simulado):** `cli/test/test-helpers.ts`
+  trae `fakeClient()` (un `MailMask` falso por `Proxy`: cada llamada queda en
+  `calls`, un método que el test no configuró revienta en vez de devolver
+  `undefined` en silencio) y `trapExit()` (mockea `process.exit` para que LANCE
+  en vez de matar el proceso de pruebas, así `assert.rejects(..., ExitSignal)`
+  comprueba el código Y detiene el flujo como un exit real). El mock de
+  `requireClient` vía `mock.module("../src/client.js", ...)` tiene que instalarse
+  ANTES del `import()` dinámico del comando — un `before()` corre demasiado
+  tarde, cuando el comando ya resolvió el import real. Ver `cli/test/dns.test.ts`
+  y `cli/test/domains.test.ts`.
 
 ## Convención dura — no se negocia en ningún comando futuro
 

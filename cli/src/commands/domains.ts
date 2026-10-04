@@ -3,13 +3,7 @@ import type { DnsPreset } from "@easybits.cloud/mailmask";
 import { requireClient } from "../client.js";
 import { failFromError, printJson } from "../output.js";
 import { resolveDomainId } from "../resolve.js";
-
-const PRESETS: DnsPreset[] = [
-  "vercel", "netlify", "github-pages", "cloudflare-pages", "render", "fly", "redirect-a-www", "dmarc",
-];
-
-const jsonArg = { json: { type: "boolean" as const, description: "Salida en JSON para scripts/agentes" } };
-const domainArg = { domain: { type: "positional" as const, description: "Dominio (acme.com) o su id" } };
+import { PRESETS, jsonArg, domainArg } from "../args.js";
 
 const list = defineCommand({
   meta: { name: "list", description: "Lista los dominios de la cuenta" },

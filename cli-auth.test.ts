@@ -25,7 +25,7 @@ describe("cli-auth: device code", () => {
     const { store: s } = store();
     const start = s.start("https://www.mailmask.studio");
     assert.match(start.userCode, /^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
-    assert.equal(start.verificationUriComplete, `https://www.mailmask.studio/cli/authorize?user_code=${start.userCode}`);
+    assert.equal(start.verificationUri, "https://www.mailmask.studio/cli/authorize");
   });
 
   it("queda pending hasta que alguien confirma con su email", async () => {

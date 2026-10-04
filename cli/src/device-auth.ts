@@ -2,7 +2,6 @@ export interface DeviceStart {
   deviceCode: string;
   userCode: string;
   verificationUri: string;
-  verificationUriComplete: string;
   expiresIn: number;
   interval: number;
 }

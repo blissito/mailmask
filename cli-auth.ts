@@ -29,7 +29,6 @@ export interface DeviceStartResult {
   deviceCode: string;
   userCode: string;
   verificationUri: string;
-  verificationUriComplete: string;
   expiresIn: number;
   interval: number;
 }
@@ -86,7 +85,6 @@ export function createDeviceAuthStore(opts: {
         deviceCode,
         userCode,
         verificationUri: `${verificationBase}/cli/authorize`,
-        verificationUriComplete: `${verificationBase}/cli/authorize?user_code=${userCode}`,
         expiresIn: Math.floor(ttlMs / 1000),
         interval: POLL_INTERVAL_S,
       };
