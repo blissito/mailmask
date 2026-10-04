@@ -2,8 +2,8 @@
 
 **Qué:** CLI en TypeScript sobre `@easybits.cloud/mailmask` (`sdk/`), un subcomando
 por recurso del SDK — sin modelo declarativo encima. Esta primera entrega (ticket 1
-del sprint) sólo trae `login`, `logout` y `whoami`; el resto de recursos
-(`domains`, `aliases`, `dns`, `rules`, `webhooks`, `send`, `smtp`, `apikeys`, `logs`,
+del sprint) trae `login`, `logout`, `whoami` y `domains`; el resto de recursos
+(`aliases`, `dns`, `rules`, `webhooks`, `send`, `smtp`, `apikeys`, `logs`,
 `suppressions`) llegan en tickets siguientes sobre esta misma base.
 
 **Por qué:** la CLI no inventa nada encima del SDK — cada comando es 1:1 con un
@@ -53,6 +53,17 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   víctima sólo dé clic en "Autorizar" sin comparar nada. La mitigación es avisar,
   no impedir: el botón muestra antes del clic que va a crear una llave de API con
   acceso completo a la cuenta.
+
+- **Resolución de `<dominio>`:** todo comando que recibe un dominio acepta el
+  nombre (`acme.com`) o el id — `cli/src/resolve.ts` lo busca en
+  `domains.list()`; si no aparece, se deja pasar tal cual para que la API
+  responda su propio 404 en vez de inventar uno aquí. Los comandos de recursos
+  futuros que cuelgan de un dominio (`aliases`, `rules`, `dns`, ...) deben
+  reusar `resolveDomainId`, no reimplementar la búsqueda.
+- **`domains create --preset` / `domains preset`:** ambos llaman a
+  `client.dns.preset()` del SDK (los mismos ocho presets que `point_domain_to`
+  del MCP). La validación del nombre del preset pasa ANTES de tocar red —
+  evita crear el dominio y sólo entonces fallar por un `--preset` mal escrito.
 
 ## Convención dura — no se negocia en ningún comando futuro
 

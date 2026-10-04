@@ -19,6 +19,14 @@ npm run dev -- whoami
 mailmask login [--api-key mk_...] [--base-url https://...]
 mailmask whoami [--json]
 mailmask logout
+
+mailmask domains list [--json]
+mailmask domains get <dominio> [--json]
+mailmask domains create <dominio> [--preset vercel|netlify|github-pages|cloudflare-pages|render|fly|redirect-a-www|dmarc] [--target ...] [--subdomain ...]
+mailmask domains preset <dominio> <preset> [--target ...] [--subdomain ...]
+mailmask domains verify <dominio>
+mailmask domains health <dominio>
+mailmask domains delete <dominio>
 ```
 
 Sin `--api-key`, `login` abre el navegador para autorizar el dispositivo
@@ -26,6 +34,11 @@ Sin `--api-key`, `login` abre el navegador para autorizar el dispositivo
 `--api-key` se salta ese paso y guarda la llave directo; también se puede fijar
 `MAILMASK_API_KEY` por variable de entorno, que tiene prioridad sobre lo
 guardado y es la vía recomendada para CI o para un agente de código.
+
+En los comandos de `domains`, `<dominio>` acepta el nombre (`acme.com`) o el
+id — se resuelve contra `domains list` (`cli/src/resolve.ts`). `create --preset`
+registra el dominio y de una vez aplica un preset de DNS; `domains preset` hace
+lo mismo sobre uno que ya existe.
 
 La sesión se guarda en el keychain del sistema operativo (Keychain en macOS,
 Secret Service/`secret-tool` en Linux). Si no hay keychain disponible —Windows,
