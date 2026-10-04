@@ -248,22 +248,6 @@ Un error del servidor (por ejemplo, un dominio gratis pidiendo un buzón, que re
 Con una API key mk_ las acciones irreversibles se ejecutan directo. Con el token de turno del asistente de la app (mt_, dura 5 minutos), borrar un dominio, una máscara, un buzón o un registro DNS, sacar a un miembro, transferir un dominio fuera o cancelar un add-on o la renovación de un dominio NO se ejecuta: la ruta responde 409 needs_confirmation y el usuario lo aprueba en una tarjeta de la app.`,
   },
   {
-    title: "¿Cómo conecto MailMask a Claude, ChatGPT o Ghosty Studio?",
-    content: `Pregunta frecuente: ¿cómo conecto MailMask a Claude, a ChatGPT, a Ghosty o a mi agente de IA?
-
-Respuesta corta: con OAuth, pegando sólo la URL https://www.mailmask.studio/mcp. No hace falta copiar ninguna API key.
-
-- Ghosty Studio (ghosty.studio): Conectores → Mailmask → Conectar. Entras a MailMask, das Permitir y tu agente de Ghosty ya tiene las herramientas de MailMask.
-- Claude.ai o Claude Desktop: Settings → Connectors → Add custom connector → nombre MailMask y URL https://www.mailmask.studio/mcp → Connect → Permitir.
-- ChatGPT: Settings → Apps & Connectors → Create (modo desarrollador) → URL https://www.mailmask.studio/mcp con OAuth → Permitir.
-- Claude Code: claude mcp add --transport http mailmask https://www.mailmask.studio/mcp, luego /mcp → mailmask → Authenticate.
-- Cualquier cliente MCP con autorización OAuth: sólo la URL.
-
-La pantalla de Permitir muestra qué cliente pide acceso y con qué cuenta entraste. La conexión puede hacer todo lo que haría una API key, menos crear llaves, entrar al admin o crear credenciales SMTP. Para cortarla, desconéctala desde el cliente; para cortar todas, cambia tu contraseña de MailMask.
-
-Sólo si el cliente no soporta OAuth (un script, un servidor, un cliente viejo), usa una API key mk_ de mailmask.studio/app → API Keys en el encabezado Authorization: Bearer mk_...`,
-  },
-  {
     title: "Mask, el asistente dentro de la app",
     content: `Mask es el asistente de MailMask dentro de la app (mailmask.studio/app): un chat en la esquina de la pantalla que HACE las cosas por ti en lugar de explicarte cómo hacerlas. Habla español, corto y claro, y pensado para quien no es técnico.
 
@@ -406,16 +390,21 @@ async function main() {
 
   const formmy = new Formmy({ secretKey, baseUrl: "https://www.formmy.app" });
 
-  // 1. Delete existing documents for idempotency
-  console.log("Listing existing documents...");
-  const { documents: existing } = await formmy.documents.list(AGENT_ID);
-  if (existing.length > 0) {
-    console.log(`Deleting ${existing.length} existing documents...`);
-    for (const doc of existing) {
+  // 1. Borrar TODO lo existente. documents.list devuelve 20 por página (con hasMore),
+  //    así que se repite hasta que la lista quede vacía; si no, quedan copias viejas
+  //    y Formmy rechaza los nuevos como «duplicados».
+  let deleted = 0;
+  for (let round = 0; round < 50; round++) {
+    const { documents: page } = await formmy.documents.list(AGENT_ID);
+    if (page.length === 0) break;
+    for (const doc of page) {
       await formmy.documents.delete(AGENT_ID, doc.id);
+      deleted++;
     }
-    console.log("Deleted.");
   }
+  const { documents: left } = await formmy.documents.list(AGENT_ID);
+  if (left.length > 0) throw new Error(`Quedaron ${left.length} documentos sin borrar`);
+  console.log(`Deleted ${deleted} existing documents.`);
 
   // 2. Extract sections from docs.html
   const docsHtml = readFileSync("public/docs.html", "utf-8");
@@ -423,31 +412,43 @@ async function main() {
   console.log(`Extracted ${sections.length} sections from docs.html`);
 
   // 3. Combine all documents
+  // Los curados van primero: Formmy rechaza lo que se parece demasiado a algo ya
+  // subido, y preferimos que el repetido que se caiga sea la sección de docs.html.
   const allDocs = [
-    ...sections.map((s) => ({
-      title: s.title,
-      content: s.content,
-      metadata: { source: "docs.html" },
-    })),
     ...EXTRA_DOCS.map((d) => ({
       title: d.title,
       content: d.content,
       metadata: { source: "manual" },
     })),
+    ...sections.map((s) => ({
+      title: s.title,
+      content: s.content,
+      metadata: { source: "docs.html" },
+    })),
   ];
 
   console.log(`Uploading ${allDocs.length} documents one by one...`);
   let created = 0;
+  let skipped = 0;
+  let failed = 0;
   for (const doc of allDocs) {
     try {
       const { document } = await formmy.documents.create(AGENT_ID, doc);
       console.log(`  ✓ ${document.title} (${document.chunkCount} chunks)`);
       created++;
     } catch (err: any) {
-      console.error(`  ✗ ${doc.title}: ${err.message}`);
+      // Formmy rechaza lo casi idéntico a un doc ya subido: ese contenido ya está.
+      if (/duplicado/i.test(err.message)) {
+        console.log(`  · ${doc.title}: omitido (ya lo cubre otro doc)`);
+        skipped++;
+      } else {
+        console.error(`  ✗ ${doc.title}: ${err.message}`);
+        failed++;
+      }
     }
   }
-  console.log(`\n${created}/${allDocs.length} documents uploaded.`);
+  console.log(`\n${created}/${allDocs.length} uploaded, ${skipped} omitidos por duplicado, ${failed} fallidos.`);
+  if (failed > 0) process.exit(1);
 
   console.log("\nDone! The agent now has access to the documentation.");
 }

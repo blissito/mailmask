@@ -196,7 +196,7 @@ import {
   verifyTurnToken,
 } from "./auth.js";
 import { requireConfirmation, listPendingActions, confirmAction, rejectAction } from "./agent-actions.js";
-import { handleGetProfile, handleUpdateProfile, handleUploadAvatar, handleDeleteAvatar, handleServeAvatar, applyGoogleProfile, profileOf, profileForEmail } from "./profile.js";
+import { handleGetProfile, handleUpdateProfile, handleUploadAvatar, handleDeleteAvatar, handleServeAvatar, applyGoogleProfile, profileOf, profileForEmail, readOwnUpload } from "./profile.js";
 import {
   openGhostyTurn,
   relayTurn,
@@ -1187,6 +1187,24 @@ type BandejaGate =
 
 function jsonErr(error: string, status: number): Response {
   return new Response(JSON.stringify({ error }), { status, headers: { "content-type": "application/json" } });
+}
+
+// Un archivo subido como multipart (`file`) o, en JSON, `{fromUrl, filename?}` con un adjunto
+// que el mismo usuario subió al chat del asistente: así un agente por MCP adjunta sin bytes.
+// Devuelve un File para que las rutas validen tipo y tamaño igual en los dos caminos.
+async function fileFromRequest(request: Request, email: string, what?: string): Promise<File | Response> {
+  const ct = (request.headers.get("content-type") ?? "").toLowerCase();
+  if (ct.startsWith("application/json")) {
+    const b = await request.json().catch(() => null) as { fromUrl?: unknown; filename?: unknown } | null;
+    const r = await readOwnUpload(email, b?.fromUrl, what);
+    if (!r.ok) return r.res;
+    const name = typeof b?.filename === "string" && b.filename.trim() ? b.filename.trim() : r.filename;
+    return new File([r.body as BlobPart], name, { type: r.contentType });
+  }
+  const form = await request.formData().catch(() => null);
+  const file = form?.get("file");
+  if (!(file instanceof File)) return jsonErr("Falta el archivo", 400);
+  return file;
 }
 
 async function requireBandeja(
@@ -2605,7 +2623,14 @@ const app = new Elysia({ adapter: node() })
       : bearer.startsWith("mo_") ? verifyOAuthAccessToken(bearer)
       : await getUserByApiKey(bearer);
     if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": challenge(', error="invalid_token"') } });
-    const fetchLocal = ((url: string | URL | Request, init?: RequestInit) => app.fetch(new Request(url as string, init))) as unknown as typeof fetch;
+    // Las llamadas internas llevan la IP del cliente: sin ella todos los agentes caían en
+    // el mismo cubo "unknown" de los topes por IP (responder, redactar, adjuntos).
+    const clientIp = getIp(request);
+    const fetchLocal = ((url: string | URL | Request, init?: RequestInit) => {
+      const req = new Request(url as string, init);
+      if (clientIp !== "unknown") req.headers.set(TRUSTED_IP_HEADER, clientIp);
+      return app.fetch(req);
+    }) as unknown as typeof fetch;
     const res = await atenderMcp(request, { apiKey: auth.slice("Bearer ".length), fetchLocal });
     res.headers.set("access-control-allow-origin", "*");
     return res;
@@ -4199,6 +4224,18 @@ const app = new Elysia({ adapter: node() })
         error: "Este add-on es una cortesía de MailMask. No tiene costo y no se puede cancelar desde aquí — escríbenos si quieres liberarlo.",
       }), { status: 400 });
     }
+    const dominioAddon = addon.domainId ? await getDomain(addon.domainId) : null;
+    const pendienteAddon = requireConfirmation(auth, request, {
+      intent: "cancel_addon",
+      domainId: addon.domainId ?? null,
+      summary: {
+        title: `Cancelar ${ADDONS[addon.kind as keyof typeof ADDONS]?.label ?? addon.kind}${dominioAddon ? ` de ${dominioAddon.domain}` : ""}`,
+        lines: [addon.currentPeriodEnd ? `Pagado hasta ${addon.currentPeriodEnd.slice(0, 10)}` : "Sin periodo pagado vigente"],
+        effects: ["Deja de cobrarse en MercadoPago", "Al terminar el periodo pagado se pierde lo que incluye"],
+        destructive: true,
+      },
+    });
+    if (pendienteAddon) return pendienteAddon;
 
     const mpAccessToken = process.env.MP_ACCESS_TOKEN;
     if (addon.mpPreapprovalId && mpAccessToken) {
@@ -4847,23 +4884,13 @@ const app = new Elysia({ adapter: node() })
   })
 
   .get("/api/bandeja/conversations/:id/attachments/:msgIdx/:attIdx", async ({ request, params }) => {
-    const auth = await getAuthUser(request);
-    if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
-
     const url = new URL(request.url);
     const domainId = url.searchParams.get("domainId");
-    if (!domainId) return new Response(JSON.stringify({ error: "domainId requerido" }), { status: 400 });
+    // Misma puerta que el resto de la Bandeja (antes era un owner||agent inline).
+    const gate = await requireBandeja(request, domainId, "read");
+    if (!gate.ok) return gate.res;
 
-    const domain = await getDomain(domainId);
-    if (!domain) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
-
-    const isOwner = domain.ownerEmail === auth.email;
-    const agent = !isOwner ? await getAgentByEmail(domainId, auth.email) : null;
-    if (!isOwner && !agent) {
-      return new Response(JSON.stringify({ error: "Sin acceso" }), { status: 403 });
-    }
-
-    const conv = await getConversation(domainId, params.id);
+    const conv = await getConversation(domainId!, params.id);
     if (!conv) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
 
     const messages = await listMessages(conv.id);
@@ -5194,11 +5221,9 @@ const app = new Elysia({ adapter: node() })
     const access = await checkDomainAccess(auth.email, params.id, "write");
     if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
 
-    const form = await request.formData().catch(() => null);
-    const file = form?.get("file");
-    if (!(file instanceof File)) {
-      return new Response(JSON.stringify({ error: "Falta el archivo" }), { status: 400 });
-    }
+    // Multipart desde la app, o JSON `{fromUrl}` con un adjunto del chat (agentes por MCP).
+    const file = await fileFromRequest(request, auth.email, "una imagen");
+    if (file instanceof Response) return file;
 
     // Sin GIF: un logo animado en cada correo del dominio es ruido, y varios
     // clientes sólo muestran el primer fotograma. Sin SVG por lo mismo que arriba.
@@ -5293,11 +5318,8 @@ const app = new Elysia({ adapter: node() })
     const access = await checkDomainAccess(auth.email, params.id, "write");
     if (!access) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
 
-    const form = await request.formData().catch(() => null);
-    const file = form?.get("file");
-    if (!(file instanceof File)) {
-      return new Response(JSON.stringify({ error: "Falta el archivo" }), { status: 400 });
-    }
+    const file = await fileFromRequest(request, auth.email);
+    if (file instanceof Response) return file;
     // Los saltos de línea y comillas romperían el header Content-Disposition.
     const filename = file.name.replace(/[\r\n"\\\x00-\x1f]/g, "").slice(0, 200) || "archivo";
     if (BLOCKED_ATTACHMENT_EXT.test(filename)) {
@@ -7376,6 +7398,17 @@ const app = new Elysia({ adapter: node() })
     const reg = getDomainRegistration(params.regId);
     if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Registro no encontrado", 404);
     if (!reg.mpPreapprovalId) return jsonErr("Este dominio no tiene renovación activa.", 409);
+    const pendienteRenov = requireConfirmation(auth, request, {
+      intent: "cancel_renewal",
+      domainId: reg.domainId ?? null,
+      summary: {
+        title: `Cancelar la renovación anual de ${reg.domainName}`,
+        lines: [`Vence ${reg.expiresAt?.slice(0, 10) ?? "?"}`],
+        effects: ["Deja de cobrarse la renovación", "Al vencer, el dominio puede perderse si no se renueva o transfiere"],
+        destructive: true,
+      },
+    });
+    if (pendienteRenov) return pendienteRenov;
 
     const mpAccessToken = process.env.MP_ACCESS_TOKEN;
     if (mpAccessToken) {
