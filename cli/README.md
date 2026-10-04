@@ -23,10 +23,16 @@ mailmask logout
 mailmask domains list [--json]
 mailmask domains get <dominio> [--json]
 mailmask domains create <dominio> [--preset vercel|netlify|github-pages|cloudflare-pages|render|fly|redirect-a-www|dmarc] [--target ...] [--subdomain ...]
-mailmask domains preset <dominio> <preset> [--target ...] [--subdomain ...]
 mailmask domains verify <dominio>
 mailmask domains health <dominio>
 mailmask domains delete <dominio>
+
+mailmask dns list <dominio> [--json]
+mailmask dns upsert <dominio> <nombre> <tipo> <valor...> [--ttl 300]
+mailmask dns delete <dominio> <nombre> <tipo>
+mailmask dns preset <dominio> <preset> [--target ...] [--subdomain ...]
+mailmask dns create-zone <dominio>
+mailmask dns delegation <dominio>
 ```
 
 Sin `--api-key`, `login` abre el navegador para autorizar el dispositivo
@@ -35,10 +41,13 @@ Sin `--api-key`, `login` abre el navegador para autorizar el dispositivo
 `MAILMASK_API_KEY` por variable de entorno, que tiene prioridad sobre lo
 guardado y es la vía recomendada para CI o para un agente de código.
 
-En los comandos de `domains`, `<dominio>` acepta el nombre (`acme.com`) o el
-id — se resuelve contra `domains list` (`cli/src/resolve.ts`). `create --preset`
-registra el dominio y de una vez aplica un preset de DNS; `domains preset` hace
-lo mismo sobre uno que ya existe.
+En los comandos de `domains` y `dns`, `<dominio>` acepta el nombre
+(`acme.com`) o el id — se resuelve contra `domains list` (`cli/src/resolve.ts`).
+`domains create --preset` registra el dominio y de una vez aplica un preset de
+DNS; `dns preset` hace lo mismo sobre uno que ya existe — es la misma llamada
+al SDK (`client.dns.preset`). `dns upsert` reemplaza el conjunto completo de
+valores de un (nombre, tipo); los registros `managed: true` (MX, verificación,
+DKIM, SPF) los protege el servidor.
 
 La sesión se guarda en el keychain del sistema operativo (Keychain en macOS,
 Secret Service/`secret-tool` en Linux). Si no hay keychain disponible —Windows,

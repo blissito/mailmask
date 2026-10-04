@@ -2,9 +2,9 @@
 
 **Qué:** CLI en TypeScript sobre `@easybits.cloud/mailmask` (`sdk/`), un subcomando
 por recurso del SDK — sin modelo declarativo encima. Esta primera entrega (ticket 1
-del sprint) trae `login`, `logout`, `whoami` y `domains`; el resto de recursos
-(`aliases`, `dns`, `rules`, `webhooks`, `send`, `smtp`, `apikeys`, `logs`,
-`suppressions`) llegan en tickets siguientes sobre esta misma base.
+del sprint) trae `login`, `logout`, `whoami`, `domains` y `dns`. Envío de
+correo y un modo pensado para agentes llegan después en PRs propios sobre esta
+misma base.
 
 **Por qué:** la CLI no inventa nada encima del SDK — cada comando es 1:1 con un
 método ya documentado, para que no haya dos formas de aprenderse la API.
@@ -57,13 +57,28 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
 - **Resolución de `<dominio>`:** todo comando que recibe un dominio acepta el
   nombre (`acme.com`) o el id — `cli/src/resolve.ts` lo busca en
   `domains.list()`; si no aparece, se deja pasar tal cual para que la API
-  responda su propio 404 en vez de inventar uno aquí. Los comandos de recursos
-  futuros que cuelgan de un dominio (`aliases`, `rules`, `dns`, ...) deben
-  reusar `resolveDomainId`, no reimplementar la búsqueda.
-- **`domains create --preset` / `domains preset`:** ambos llaman a
+  responda su propio 404 en vez de inventar uno aquí. `cli/src/commands/dns.ts`
+  ya la reusa; los comandos de recursos futuros que cuelgan de un dominio
+  (`aliases`, `rules`, ...) deben hacer lo mismo, no reimplementar la búsqueda.
+- **`domains create --preset` / `dns preset`:** ambos llaman a
   `client.dns.preset()` del SDK (los mismos ocho presets que `point_domain_to`
-  del MCP). La validación del nombre del preset pasa ANTES de tocar red —
-  evita crear el dominio y sólo entonces fallar por un `--preset` mal escrito.
+  del MCP, ver `public/skills/mailmask-dns/SKILL.md`). La validación del nombre
+  del preset pasa ANTES de tocar red — evita crear el dominio y sólo entonces
+  fallar por un `--preset` mal escrito. Deliberadamente NO hay un
+  `domains preset` separado: `dns preset` es el único lugar fuera de `create`,
+  para no tener dos comandos haciendo lo mismo.
+- **`dns upsert` y sus valores:** citty no tiene un tipo de positional "rest",
+  así que `<nombre>` y `<tipo>` se declaran como positionals normales y los
+  valores restantes se toman de `args._.slice(3)` (la lista completa de
+  positionals sin tocar, no sólo "lo que sobró") — ver el comentario en
+  `cli/src/commands/dns.ts`. No uses `rawArgs` para esto: ya rompió una vez
+  con un `--ttl` de por medio.
+- **Registros `managed` en `dns upsert`/`dns delete`:** el SDK no los protege
+  del lado del cliente (sólo el servidor, con 409). `refuseIfManaged()` en
+  `cli/src/commands/dns.ts` lista el dominio ANTES de mutar y se rehúsa en el
+  CLI si el (nombre, tipo) ya es `managed: true` — mensaje claro sin gastar la
+  llamada que de todos modos iba a fallar. Si falla el listado, deja pasar la
+  mutación para que sea el servidor el que la rechace.
 
 ## Convención dura — no se negocia en ningún comando futuro
 

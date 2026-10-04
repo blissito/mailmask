@@ -103,32 +103,6 @@ const create = defineCommand({
   },
 });
 
-const presetCmd = defineCommand({
-  meta: { name: "preset", description: "Aplica un preset de DNS a un dominio ya registrado" },
-  args: {
-    domain: { type: "positional", description: "Dominio (acme.com) o su id" },
-    preset: { type: "positional", description: `Uno de: ${PRESETS.join(", ")}` },
-    target: { type: "string", description: "Valor del registro (p. ej. el CNAME de Vercel)" },
-    subdomain: { type: "string", description: "Subdominio donde aplicarlo (por omisión, la raíz)" },
-    json: { type: "boolean", description: "Salida en JSON para scripts/agentes" },
-  },
-  async run({ args }) {
-    if (!PRESETS.includes(args.preset as DnsPreset)) {
-      process.stderr.write(`✖ Preset desconocido: "${args.preset}". Usa uno de: ${PRESETS.join(", ")}\n`);
-      process.exit(1);
-    }
-    const { client } = await requireClient();
-    const id = await resolveDomainId(client, args.domain);
-    try {
-      const result = await client.dns.preset(id, args.preset as DnsPreset, args.target, args.subdomain);
-      if (args.json) return printJson(result);
-      process.stdout.write(`✓ Preset "${args.preset}" aplicado (propagación: ${result.propagacion}).\n`);
-    } catch (err) {
-      failFromError(err);
-    }
-  },
-});
-
 const del = defineCommand({
   meta: { name: "delete", description: "Borra un dominio de la cuenta" },
   args: { ...domainArg, ...jsonArg },
@@ -182,5 +156,5 @@ const health = defineCommand({
 
 export default defineCommand({
   meta: { name: "domains", description: "Administra los dominios de la cuenta" },
-  subCommands: { list, get, create, delete: del, verify, health, preset: presetCmd },
+  subCommands: { list, get, create, delete: del, verify, health },
 });
