@@ -1,8 +1,15 @@
+// Después de entrar: de vuelta al consentimiento OAuth de un cliente MCP si de ahí venía
+// (sólo /oauth/authorize, nada de redirecciones abiertas), o al panel.
+function afterLogin() {
+  const params = new URLSearchParams(location.search);
+  const next = params.get("next");
+  if (next && next.startsWith("/oauth/authorize?")) return next;
+  const coupon = params.get("coupon");
+  return "/app" + (coupon ? "?coupon=" + encodeURIComponent(coupon) : "");
+}
+
 fetch("/api/auth/me").then(r => {
-  if (r.ok) {
-    const coupon = new URLSearchParams(location.search).get("coupon");
-    window.location.href = "/app" + (coupon ? "?coupon=" + encodeURIComponent(coupon) : "");
-  }
+  if (r.ok) window.location.href = afterLogin();
 });
 
 document.getElementById("login-form").addEventListener("submit", async (e) => {
@@ -25,8 +32,7 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
     });
 
     if (res.ok) {
-      const coupon = new URLSearchParams(location.search).get("coupon");
-      window.location.href = "/app" + (coupon ? "?coupon=" + encodeURIComponent(coupon) : "");
+      window.location.href = afterLogin();
     } else {
       const data = await res.json();
       errEl.textContent = data.error || "Error al iniciar sesión";
@@ -61,6 +67,8 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
   if (!a) return;
   const q = new URLSearchParams();
   if (coupon) q.set("coupon", coupon);
+  const next = params.get("next");
+  if (next && next.startsWith("/oauth/authorize?")) q.set("next", next);
   // Quien se registra con Google desde el login también viene de una campaña.
   try {
     const s = JSON.parse(localStorage.getItem("mailmask_utm") || "null");

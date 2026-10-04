@@ -613,6 +613,7 @@ claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \
     }
   }
 }</code></pre>
+      <p class="text-fg-muted mb-4"><strong>Sin llave, con OAuth.</strong> Si tu cliente MCP soporta autorizaci&oacute;n (Ghosty, Claude y otros), basta con la URL: <code>/mcp</code> responde 401 con la metadata OAuth, el cliente se registra solo, t&uacute; entras a MailMask y das permiso en una pantalla, y el cliente recibe un token que vence en una hora y se renueva solo. No puede crear llaves de API, y se corta revocando la conexi&oacute;n desde la aplicaci&oacute;n o cambiando tu contrase&ntilde;a.</p>
       <p class="text-fg-muted mb-2">Son 73 herramientas; cada una es un m&eacute;todo del SDK, con las mismas reglas y l&iacute;mites. Al conectarse, el cliente recibe adem&aacute;s una gu&iacute;a (<code>instructions</code>) con el orden para conectar un dominio, qu&eacute; significa gratis, activado y bloqueado, y c&oacute;mo funcionan los pagos.</p>
       <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-4">
         <li><strong>Dominios</strong>: <code>list_domains</code>, <code>get_domain</code>, <code>create_domain</code> (devuelve los registros DNS: MX, TXT, DKIM, SPF), <code>domain_dns_setup</code> (los registros exactos para pegar en tu registrador, cu&aacute;les ya se ven y en qu&eacute; panel van), <code>verify_domain</code>, <code>domain_health</code>, <code>delete_domain</code>.</li>

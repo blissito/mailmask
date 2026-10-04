@@ -242,6 +242,10 @@ import { log } from "./logger.js";
 import { createSmtpIamCredential, revokeSmtpIamCredential } from "./ses.js";
 import { crearBuzon, cambiarPassword, borrarBuzon, exportarBuzon } from "./stalwart.js";
 import { atenderMcp } from "./mcp.js";
+import {
+  protectedResourceMetadata, authorizationServerMetadata, protectedResourceMetadataUrl,
+  registerClient, authorizeGet, authorizePost, tokenEndpoint, revokeEndpoint, verifyOAuthAccessToken,
+} from "./oauth.js";
 import { logOutbound, handleInternalOutbound } from "./outbound-relay.js";
 import { copyToSentFolder } from "./imap-store.js";
 
@@ -251,6 +255,11 @@ const ASSISTANT_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 const ASSISTANT_UPLOAD_TYPES = /^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/(plain|csv|markdown))$/;
 
 const MCP_REGISTRY_AUTH_PATH = "/.well-known/mcp-registry-auth";
+
+/** Rutas que hablan con clientes MCP de cualquier origen (sólo Bearer, nunca cookie): CORS abierto. */
+function isOpenCorsPath(path: string): boolean {
+  return path === "/mcp" || path.startsWith("/.well-known/oauth-") || path === "/oauth/token" || path === "/oauth/register" || path === "/oauth/revoke";
+}
 const MCP_REGISTRY_PUBLIC_KEY = "+L7eynWTl5U/ZUd1DbrylPBzJHKTE0TzU9qdO8n8Vos=";
 import {
   sendTemplate,
@@ -292,6 +301,11 @@ function ensureEnv() {
 }
 
 // --- Helpers ---
+
+/** `next` del login: sólo de vuelta al consentimiento OAuth (nada de redirecciones abiertas). */
+function safeNext(v: unknown): string | undefined {
+  return typeof v === "string" && v.length <= 4000 && v.startsWith("/oauth/authorize?") ? v : undefined;
+}
 
 function getMainDomainUrl(): string {
   const raw = process.env.MAIN_DOMAIN ?? "www.mailmask.studio";
@@ -1260,7 +1274,7 @@ const app = new Elysia({ adapter: node() })
       : request.headers.get("origin") || "http://localhost:8000";
     if (request.method === "OPTIONS") {
       // Un cliente MCP en el navegador manda Bearer y la versión del protocolo.
-      const esMcp = new URL(request.url).pathname === "/mcp";
+      const esMcp = isOpenCorsPath(new URL(request.url).pathname);
       return new Response(null, {
         headers: {
           "access-control-allow-origin": esMcp ? "*" : corsOrigin,
@@ -1292,6 +1306,9 @@ const app = new Elysia({ adapter: node() })
     // /mcp sólo acepta Bearer (nunca cookie), así que no hay CSRF que proteger; sin
     // Bearer la propia ruta contesta 401 en vez de un 403 confuso.
     if (url.pathname === "/mcp") return;
+    // OAuth del MCP: register/token/revoke los llama un cliente sin cookie; el POST del
+    // consentimiento se protege con su ticket de un solo uso atado a la sesión (`oauth.ts`).
+    if (url.pathname.startsWith("/oauth/")) return;
     // El relay de la caja de Stalwart firma con HMAC y nunca manda cookie.
     if (url.pathname === "/api/internal/outbound") return;
     // Skip CSRF for Bearer token auth (inherently CSRF-safe)
@@ -1327,6 +1344,12 @@ const app = new Elysia({ adapter: node() })
     if (authHeader.startsWith("Bearer ") && (path.startsWith("/api/asistente") || path === "/api/agent-actions")) {
       return jsonErr("Esta ruta sólo acepta la sesión del panel.", 403);
     }
+    // Un `mo_` (OAuth de un cliente MCP) tampoco fabrica llaves ni entra al admin: revocar el
+    // permiso tiene que bastar para cortar el acceso.
+    if (authHeader.startsWith("Bearer mo_") && (path.startsWith("/api/api-keys") || path.startsWith("/api/admin/") ||
+      (/^\/api\/domains\/[^/]+\/smtp-credentials$/.test(path) && (request.method === "GET" || request.method === "POST")))) {
+      return jsonErr("Una conexión OAuth no puede crear ni listar credenciales; hazlo tú desde el panel.", 403);
+    }
     if (!authHeader.startsWith("Bearer mt_")) return;
     const forbidden =
       path.startsWith("/api/api-keys") ||
@@ -1340,8 +1363,12 @@ const app = new Elysia({ adapter: node() })
       ? getMainDomainUrl()
       : request.headers.get("origin") || "http://localhost:8000";
     if (response instanceof Response) {
-      response.headers.set("access-control-allow-origin", corsOrigin);
-      response.headers.set("access-control-allow-credentials", "true");
+      if (isOpenCorsPath(new URL(request.url).pathname)) {
+        response.headers.set("access-control-allow-origin", "*");
+      } else {
+        response.headers.set("access-control-allow-origin", corsOrigin);
+        response.headers.set("access-control-allow-credentials", "true");
+      }
       response.headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
       response.headers.set("x-frame-options", "DENY");
       response.headers.set("x-content-type-options", "nosniff");
@@ -1618,11 +1645,12 @@ const app = new Elysia({ adapter: node() })
     const state = crypto.randomUUID();
     const ref = typeof query.ref === "string" ? query.ref.slice(0, 64) : undefined;
     const coupon = typeof query.coupon === "string" ? query.coupon.slice(0, 64) : undefined;
+    const next = safeNext(query.next);
     const utm = limpiarUtm({ source: query.utm_source, medium: query.utm_medium, campaign: query.utm_campaign });
     await db.insert(tokensTable).values({
       token: state,
       kind: "oauth-state",
-      value: { ref, coupon, ...(utm ? { utm } : {}) },
+      value: { ref, coupon, ...(next ? { next } : {}), ...(utm ? { utm } : {}) },
       expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
     });
     const params = new URLSearchParams({
@@ -1657,7 +1685,7 @@ const app = new Elysia({ adapter: node() })
       .where(eq(tokensTable.token, state)).get();
     if (!stateRow || stateRow.kind !== "oauth-state" || stateRow.expiresAt < new Date().toISOString()) return fail("google-state");
     db.delete(tokensTable).where(eq(tokensTable.token, state)).run();
-    const carried = (stateRow.value ?? {}) as { ref?: string; coupon?: string; utm?: { source?: string; medium?: string; campaign?: string } | null };
+    const carried = (stateRow.value ?? {}) as { ref?: string; coupon?: string; next?: string; utm?: { source?: string; medium?: string; campaign?: string } | null };
 
     let idPayload: { email?: string; email_verified?: boolean; aud?: string; sub?: string; name?: string; picture?: string };
     try {
@@ -1717,7 +1745,10 @@ const app = new Elysia({ adapter: node() })
 
     const token = await signJwt({ email });
     const csrfToken = generateCsrfToken();
-    const headers = new Headers({ location: `${getMainDomainUrl()}/app${carried.coupon ? `?coupon=${encodeURIComponent(carried.coupon)}` : ""}` });
+    // Vuelve al consentimiento OAuth si de ahí venía (pasando por /login, que ya ve la sesión
+    // aunque la cookie Strict no viaje en esta cadena de redirects desde Google).
+    const back = safeNext(carried.next);
+    const headers = new Headers({ location: back ? `${getMainDomainUrl()}/login?next=${encodeURIComponent(back)}` : `${getMainDomainUrl()}/app${carried.coupon ? `?coupon=${encodeURIComponent(carried.coupon)}` : ""}` });
     headers.append("set-cookie", makeAuthCookie(token));
     headers.append("set-cookie", makeCsrfCookie(csrfToken));
     return new Response(null, { status: 302, headers });
@@ -2524,6 +2555,23 @@ const app = new Elysia({ adapter: node() })
 
   // --- Aliases ---
 
+  // --- OAuth 2.1 del MCP (`oauth.ts`): descubrimiento, DCR, consentimiento y tokens ---
+  .get("/.well-known/oauth-protected-resource", ({ request }) => protectedResourceMetadata(request))
+  .get("/.well-known/oauth-protected-resource/mcp", ({ request }) => protectedResourceMetadata(request))
+  .get("/.well-known/oauth-authorization-server", ({ request }) => authorizationServerMetadata(request))
+  .post("/oauth/register", ({ request, body }) => registerClient(body, getIp(request)))
+  .get("/oauth/authorize", async ({ request, query }) => {
+    const auth = await getAuthUser(request);
+    // Sólo la sesión del navegador da permiso; un Bearer nunca.
+    return authorizeGet(request, query as Record<string, unknown>, auth?.via === "session" ? auth.email : null, getIp(request));
+  })
+  .post("/oauth/authorize", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    return authorizePost(request, (body ?? {}) as Record<string, unknown>, auth?.via === "session" ? auth.email : null);
+  })
+  .post("/oauth/token", ({ request, body }) => tokenEndpoint(request, body, getIp(request)))
+  .post("/oauth/revoke", ({ request, body }) => revokeEndpoint(request, body, getIp(request)))
+
   // --- MCP: agentes de IA con la misma API key de siempre ---
   .all("/mcp", async ({ request }) => {
     if (request.method === "OPTIONS") return new Response(null, { status: 204 });
@@ -2533,8 +2581,11 @@ const app = new Elysia({ adapter: node() })
     }
     const auth = request.headers.get("authorization") ?? "";
     // `mt_` = turn token del asistente de /app (5 min); `mk_` = API key de siempre.
-    if (!auth.startsWith("Bearer mk_") && !auth.startsWith("Bearer mt_")) {
-      return new Response(JSON.stringify({ error: "Manda tu API key: Authorization: Bearer mk_…" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": "Bearer" } });
+    // Sin credencial, el 401 anuncia la metadata OAuth (spec MCP de autorización): un cliente
+    // MCP la sigue, se registra y pide permiso; una persona con `mk_` sigue igual que antes.
+    const challenge = (extra = "") => `Bearer resource_metadata="${protectedResourceMetadataUrl(request)}"${extra}`;
+    if (!auth.startsWith("Bearer mk_") && !auth.startsWith("Bearer mt_") && !auth.startsWith("Bearer mo_")) {
+      return new Response(JSON.stringify({ error: "Manda tu API key (Authorization: Bearer mk_…) o conéctate con OAuth." }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": challenge() } });
     }
     // La llave se valida aquí sin gastar el tope por llave: cada herramienta vuelve a
     // pasar por getAuthUser en la ruta interna, y contarla dos veces dejaba 30/min en
@@ -2542,8 +2593,10 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(getIp(request), 120, 60_000);
     if (limited) return limited;
     const bearer = auth.slice("Bearer ".length);
-    const user = bearer.startsWith("mt_") ? await verifyTurnToken(bearer) : await getUserByApiKey(bearer);
-    if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: { "content-type": "application/json" } });
+    const user = bearer.startsWith("mt_") ? await verifyTurnToken(bearer)
+      : bearer.startsWith("mo_") ? verifyOAuthAccessToken(bearer)
+      : await getUserByApiKey(bearer);
+    if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": challenge(', error="invalid_token"') } });
     const fetchLocal = ((url: string | URL | Request, init?: RequestInit) => app.fetch(new Request(url as string, init))) as unknown as typeof fetch;
     const res = await atenderMcp(request, { apiKey: auth.slice("Bearer ".length), fetchLocal });
     res.headers.set("access-control-allow-origin", "*");

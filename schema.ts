@@ -5,6 +5,7 @@ import {
   primaryKey,
   unique,
   index,
+  uniqueIndex,
   real,
 } from "drizzle-orm/sqlite-core";
 
@@ -580,4 +581,48 @@ export const pendingAgentActions = sqliteTable("pending_agent_actions", {
   decidedAt: text("decided_at"),
 }, (table) => [
   index("idx_pending_agent_actions_user").on(table.userEmail, table.status),
+]);
+
+// --- OAuth 2.1 del MCP (`oauth.ts`, migración 0026) ---
+
+export const oauthClients = sqliteTable("oauth_clients", {
+  clientId: text("client_id").primaryKey(),
+  clientSecretHash: text("client_secret_hash"),
+  clientName: text("client_name").notNull(),
+  clientUri: text("client_uri"),
+  logoUri: text("logo_uri"),
+  redirectUris: text("redirect_uris", { mode: "json" }).notNull(),
+  tokenEndpointAuthMethod: text("token_endpoint_auth_method").notNull().default("none"),
+  createdIp: text("created_ip"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const oauthCodes = sqliteTable("oauth_codes", {
+  codeHash: text("code_hash").primaryKey(),
+  clientId: text("client_id").notNull().references(() => oauthClients.clientId, { onDelete: "cascade" }),
+  userEmail: text("user_email").notNull().references(() => users.email, { onDelete: "cascade" }),
+  redirectUri: text("redirect_uri").notNull(),
+  codeChallenge: text("code_challenge").notNull(),
+  scope: text("scope").notNull(),
+  resource: text("resource").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+});
+
+export const oauthTokens = sqliteTable("oauth_tokens", {
+  id: text("id").primaryKey(),
+  tokenHash: text("token_hash").notNull(),
+  kind: text("kind").notNull(), // access | refresh
+  clientId: text("client_id").notNull().references(() => oauthClients.clientId, { onDelete: "cascade" }),
+  userEmail: text("user_email").notNull().references(() => users.email, { onDelete: "cascade" }),
+  scope: text("scope").notNull(),
+  resource: text("resource").notNull(),
+  familyId: text("family_id").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  revokedAt: text("revoked_at"),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_oauth_tokens_hash").on(table.tokenHash),
+  index("idx_oauth_tokens_family").on(table.familyId),
+  index("idx_oauth_tokens_user").on(table.userEmail),
 ]);

@@ -1,5 +1,6 @@
 import { getUser, getUserByApiKey, type User } from "./db.js";
 import { checkRateLimit } from "./rate-limit.js";
+import { verifyOAuthAccessToken } from "./oauth.js";
 
 const encoder = new TextEncoder();
 const JWT_SECRET = process.env.JWT_SECRET ?? (() => { throw new Error("JWT_SECRET required"); })();
@@ -161,6 +162,15 @@ export async function getAuthUser(request: Request): Promise<AuthUser | null> {
     const rl = checkRateLimit(`turn:${email}`, 120, 60_000);
     if (!rl.allowed) return null;
     return { email, via: "turn" };
+  }
+  // `mo_` = access token OAuth de un cliente MCP (`oauth.ts`): mismo alcance que una `mk_`
+  // (main.ts le niega fabricar llaves y el admin) y el mismo tope de 60/min, por token.
+  if (authHeader?.startsWith("Bearer mo_")) {
+    const t = verifyOAuthAccessToken(authHeader.slice(7));
+    if (!t) return null;
+    const rl = checkRateLimit(`oauth:${t.tokenId}`, 60, 60_000);
+    if (!rl.allowed) return null;
+    return { email: t.email, via: "apikey" };
   }
   // Try Bearer token (API key) first
   if (authHeader?.startsWith("Bearer mk_")) {

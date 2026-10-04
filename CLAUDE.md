@@ -56,6 +56,24 @@ fabrica más) ni las conversaciones de la Bandeja; un pago siempre es una liga q
 usuario (`paid: false`). Pruebas en `mcp.test.ts`. Docs en `docs.html#mcp` y
 `EXTRA_DOCS` de `upload-docs.ts`. GET/DELETE dan 405: sin sesiones no hay stream ni cierre.
 
+## OAuth 2.1 del MCP (`oauth.ts`, 4-oct-2026)
+
+Cualquier cliente MCP con el spec de autorización (Ghosty, Claude) conecta `/mcp` sólo con la URL.
+El 401 de `/mcp` lleva `WWW-Authenticate: Bearer resource_metadata=".../.well-known/oauth-protected-resource"`;
+de ahí `/.well-known/oauth-authorization-server` → `POST /oauth/register` (DCR público, 20/h por IP;
+redirect https o http a loopback) → `GET /oauth/authorize` (sólo **sesión** de navegador, PKCE S256
+obligatorio, `resource` = `<issuer>/mcp`, pantalla de consentimiento) → `POST /oauth/token` → `Bearer mo_…`.
+Tablas `oauth_clients`, `oauth_codes`, `oauth_tokens` (migración 0026); todo con SHA-256. `mo_` vive
+1 h, `mr_` 60 días y **rota**: presentar uno ya rotado revoca la familia entera (reuso = robo); reusar
+un code también. Cambiar la contraseña corta los tokens. `getAuthUser` trata un `mo_` como `mk_`
+(`via: "apikey"`, 60/min por token) pero `main.ts` le niega `/api/api-keys`, `/api/admin/*` y las
+credenciales SMTP. La cookie es SameSite=Strict: llegando desde otro sitio `/oauth/authorize` no la ve
+y manda a `/login?next=…`, que detecta la sesión con un fetch y regresa (sólo acepta `next` que empiece
+con `/oauth/authorize?`; Google lo carga en el `state`). El POST del consentimiento está exento del CSRF
+global: lo protege un ticket de un solo uso (tabla `tokens`, kind `oauth-consent`) atado a sesión y
+parámetros. El issuer es `MAIN_DOMAIN` en Fly y el origen de la petición en local. Pruebas:
+`oauth.test.ts`; e2e contra un servidor vivo: `scripts/oauth-e2e.ts` (instrucciones en su cabecera).
+
 ## MCP Registry oficial (`studio.mailmask/mailmask`, 19-sep-2026)
 
 Listado en `registry.modelcontextprotocol.io` con el manifiesto `server.json` de la raíz (sólo
