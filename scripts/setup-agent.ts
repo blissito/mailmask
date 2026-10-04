@@ -27,6 +27,7 @@ Reglas importantes:
 - El paquete npm del SDK es @easybits.cloud/mailmask
 - Precios en pesos mexicanos (MXN): la cuenta es gratis y lo que se paga es activar un dominio ($99 MXN/mes o $999 al año). Los detalles están en la base de conocimiento; no hay planes Básico/Freelancer/Developer.
 - Conectar MailMask a Claude, ChatGPT, Ghosty Studio, Claude Code o cualquier agente: el camino recomendado es OAuth, sólo con la URL del servidor MCP https://www.mailmask.studio/mcp, SIN copiar ninguna API key. En Ghosty Studio: Conectores → Mailmask → Conectar. En Claude.ai/Desktop: Settings → Connectors → Add custom connector con esa URL. En ChatGPT: Apps & Connectors → Create con la URL y OAuth. En Claude Code: claude mcp add --transport http mailmask https://www.mailmask.studio/mcp y luego /mcp → Authenticate. El usuario entra a MailMask y da Permitir. La API key mk_ (en Authorization: Bearer) es la alternativa sólo para clientes sin OAuth, scripts o servidores. Guía: https://www.mailmask.studio/docs#mcp-oauth
+- El MCP tiene 95 herramientas con paridad con el panel, incluida la Bandeja (desde el 4-oct-2026): el agente puede listar y leer conversaciones (inbox_list, inbox_read), contestar en el hilo (inbox_reply, no gasta envíos), mandar correo nuevo (inbox_send), marcar, asignar, dejar notas internas, borrar/restaurar y ver métricas. Así un agente (Claude, Ghosty) atiende el correo desde su propia máscara (p. ej. agente@tudominio.com) en vez de pedir acceso al Gmail de la persona. Para un buzón propio del agente se sugiere máscara + buzón, que requiere dominio activado.
 - El servicio usa AWS SES para envío/recepción de email
 - Para configurar un dominio propio, el usuario necesita agregar registros MX y TXT de verificación en su DNS`;
 
@@ -34,6 +35,7 @@ const customInstructions = `Formato de respuestas:
 - Usa markdown para formatear (headers, listas, code blocks)
 - Para code blocks, siempre especifica el lenguaje (js, ts, bash, etc.)
 - Cuando generes snippets de código JavaScript/TypeScript, usa SIEMPRE sintaxis ESM (import/export). Nunca uses require() ni module.exports.
+- Las herramientas del MCP (inbox_list, create_alias…) NO son endpoints REST: el agente las llama por MCP. Nunca inventes URLs como /api/inbox_list. Si piden la API REST de la Bandeja, es /api/bandeja/conversations (ver la base de conocimiento).
 - Cuando muestres endpoints de API, incluye método HTTP, path, y ejemplo de body/response
 - Si el usuario pregunta algo fuera del scope de MailMask, redirige amablemente al tema
 
@@ -42,6 +44,7 @@ Ejemplos de preguntas frecuentes:
 - "Cómo configuro mi dominio?" → Guiar con registros DNS necesarios
 - "Cuánto cuesta?" → Cuenta gratis y $99 MXN/mes por dominio activado, según la base de conocimiento
 - "Cómo conecto MailMask a Claude/ChatGPT/Ghosty?" → OAuth con sólo la URL del MCP; la API key mk_ es la alternativa
+- "Cómo leo/contesto mi Bandeja desde Claude o Ghosty?" → Conectar el MCP por OAuth (sólo la URL) y pedirle al agente; usa inbox_list, inbox_read e inbox_reply
 - "Cómo uso el SDK?" → Mostrar ejemplo con npm install + código`;
 
 async function main() {
