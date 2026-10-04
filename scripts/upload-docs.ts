@@ -28,6 +28,14 @@ function stripHtml(html: string): string {
     .replace(/&uacute;/g, "ú")
     .replace(/&eacute;/g, "é")
     .replace(/&Uacute;/g, "Ú")
+    .replace(/&ntilde;/g, "ñ")
+    .replace(/&iexcl;/g, "¡")
+    .replace(/&ordm;/g, "º")
+    .replace(/&middot;/g, "·")
+    .replace(/&hellip;/g, "…")
+    .replace(/&laquo;/g, "«")
+    .replace(/&raquo;/g, "»")
+    .replace(/&rarr;/g, "→")
     .replace(/&nbsp;/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -182,12 +190,27 @@ Revocar credencial: mm.smtp.revoke("domain-id", "cred-id")`,
   },
   {
     title: "Servidor MCP (Model Context Protocol)",
-    content: `MailMask tiene un servidor MCP (Model Context Protocol) en https://www.mailmask.studio/mcp, transporte Streamable HTTP, sin sesiones. Sirve para que un agente de IA (Claude Code, Claude Desktop, Cursor o cualquier cliente MCP) haga las altas por ti: dominios, máscaras, buzones IMAP, reglas, webhooks y envío de correo. Se autentica con la misma API key de la cuenta (prefijo mk_), en el encabezado Authorization: Bearer mk_...
+    content: `MailMask tiene un servidor MCP (Model Context Protocol) en https://www.mailmask.studio/mcp, transporte Streamable HTTP, sin sesiones. Sirve para que un agente de IA (Claude, ChatGPT, Ghosty Studio, Claude Code, Cursor o cualquier cliente MCP) haga las altas por ti: dominios, máscaras, buzones IMAP, reglas, webhooks y envío de correo.
 
-Conectar desde Claude Code:
+Hay dos formas de conectarlo. La recomendada es OAuth: sólo se pega la URL, sin copiar ninguna llave. La alternativa es una API key mk_ en el encabezado Authorization.
+
+Forma 1 (recomendada) — OAuth, sólo con la URL:
+- Ghosty Studio: Conectores → Mailmask → Conectar.
+- Claude.ai y Claude Desktop: Settings → Connectors → Add custom connector, con la URL https://www.mailmask.studio/mcp, y luego Connect.
+- ChatGPT: Settings → Apps & Connectors → Create (con el modo desarrollador), la URL y autenticación OAuth.
+- Claude Code: claude mcp add --transport http mailmask https://www.mailmask.studio/mcp y luego /mcp → mailmask → Authenticate.
+- Cualquier cliente que implemente la autorización del spec MCP: sólo la URL.
+Qué pasa: el cliente abre MailMask en el navegador; si no hay sesión pide entrar (correo o Google) y luego muestra una pantalla con el nombre del cliente y los botones Permitir y Cancelar. Al permitir, queda conectado.
+Qué puede hacer la conexión OAuth: lo mismo que una API key mk_ (las 95 herramientas, 60 peticiones por minuto), salvo crear o listar API keys, entrar al admin y crear o listar credenciales SMTP.
+Tokens: acceso mo_ de 1 hora y renovación mr_ de 60 días que rota en cada uso; el cliente los renueva solo. Para dejar de usarla se desconecta desde el cliente (los que implementan revocación llaman a POST /oauth/revoke); para cortar todas las conexiones al instante, se cambia la contraseña de MailMask.
+Detalles técnicos: /mcp sin credencial responde 401 con WWW-Authenticate: Bearer resource_metadata="https://www.mailmask.studio/.well-known/oauth-protected-resource". Metadata en /.well-known/oauth-authorization-server, registro dinámico público en POST /oauth/register, /oauth/authorize con PKCE S256, POST /oauth/token (code y refresh_token) y POST /oauth/revoke.
+
+Forma 2 (alternativa) — API key mk_, para clientes sin OAuth, scripts o servidores. La llave se crea en mailmask.studio/app → API Keys y va en Authorization: Bearer mk_...
+
+Conectar desde Claude Code con llave:
 claude mcp add --transport http mailmask https://www.mailmask.studio/mcp --header "Authorization: Bearer mk_..."
 
-Configuración para Claude Desktop, Cursor y otros (mcp.json):
+Configuración con llave para Cursor y otros (mcp.json):
 {
   "mcpServers": {
     "mailmask": {
@@ -198,19 +221,68 @@ Configuración para Claude Desktop, Cursor y otros (mcp.json):
   }
 }
 
-Herramientas (cada una es un método del SDK, con las mismas reglas y límites):
-- Dominios: list_domains, get_domain, create_domain (devuelve los registros DNS: MX, TXT de verificación, CNAME de DKIM, SPF), verify_domain, domain_health, delete_domain.
-- Máscaras y buzones: list_aliases, create_alias (con mailbox: true crea también el buzón IMAP y devuelve la contraseña una sola vez), update_alias, delete_alias, create_mailbox, delete_mailbox, reset_mailbox_password (genera una contraseña nueva para el buzón y la devuelve una sola vez).
+Son 95 herramientas que cubren lo mismo que el panel (cada una es un método del SDK, con las mismas reglas y límites). Al conectarse, el cliente recibe además una guía con el orden para conectar un dominio, qué significa gratis/activado/bloqueado y cómo funcionan los pagos.
+- Dominios: list_domains, get_domain, create_domain (devuelve los registros DNS: MX, TXT de verificación, CNAME de DKIM, SPF), domain_dns_setup (los registros exactos para pegar en el registrador, cuáles ya se ven en el DNS público y en qué panel van: Hostinger, GoDaddy, Cloudflare, Namecheap, Route 53), verify_domain, domain_health, delete_domain.
+- Máscaras y buzones: list_aliases, create_alias (con mailbox: true crea también el buzón IMAP y devuelve la contraseña una sola vez), update_alias, delete_alias, create_mailbox, delete_mailbox, reset_mailbox_password (genera una contraseña nueva para el buzón y la devuelve una sola vez), apple_profile_link (liga al perfil que configura el buzón en iPhone, iPad o Mac), mailbox_export_link (liga para descargar el buzón en .mbox).
+- Activación y cobro: activation_link (liga de MercadoPago para activar un dominio a $99 MXN/mes, o sumarle +50 GB o +100 envíos/día), list_addons, billing_status.
+- Comprar y renovar dominios: search_domains, domain_prices, register_domain (devuelve la liga de pago), list_registrations, renewal_status, renewal_link.
+- Transferencias: transfer_check (requisitos y precio, no cobra), transfer_start (devuelve la liga al formulario seguro de la app donde se pega el código EPP y se paga; el código EPP NUNCA se da en el chat), transfer_status, transfer_dns, update_transfer_dns, approve_transfer_dns, resend_transfer_email, transfer_out (el código EPP llega por correo al dueño).
+- Equipo: list_members, invite_member, remove_member, cancel_invite.
+- Bandeja (el agente atiende el correo de su máscara): inbox_list (conversaciones por máscara, estado, no leídas, búsqueda q, paginación), inbox_read (mensajes en texto, notas internas y adjuntos; la marca leída), inbox_attachment (contenido de un adjunto de texto o imagen), inbox_reply (contesta en el hilo desde la máscara del hilo; no gasta envíos), inbox_send (correo nuevo que abre hilo; dominio activado y verificado, gasta un envío del día), inbox_mark (leída, cerrada, reabierta, pospuesta, prioridad, etiquetas), inbox_assign, inbox_note (nota interna que el contacto no ve), inbox_delete, inbox_restore, inbox_metrics, upload_attachment.
+- Firma y respuestas guardadas: get_signature, set_signature, set_domain_logo, delete_domain_logo, list_canned_replies, create_canned_reply, delete_canned_reply.
+- Cuenta: delete_profile_photo, list_orders (historial de cobros), cancel_addon, cancel_renewal, referral_status, set_referral_slug, set_referral_name, export_link.
+- Perfil de la cuenta (el usuario de MailMask, no una máscara ni lo que ve quien recibe el correo): get_profile, update_profile (nombre visible, máx. 60 caracteres), set_profile_photo (sólo con una imagen que el usuario adjuntó en el chat del asistente; PNG, JPG o WebP de hasta 2 MB). En la app se edita desde "Tu perfil", haciendo clic en tu nombre arriba a la derecha.
 - Reglas: list_rules, create_rule, update_rule, delete_rule.
 - Webhooks: list_webhooks, create_webhook, update_webhook, delete_webhook, test_webhook, webhook_deliveries.
 - DNS: list_dns_records, create_dns_zone, dns_delegation_status, set_dns_record, delete_dns_record, import_dns_records, point_domain_to (apunta el dominio a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render o Fly sin saber qué registros hacen falta).
 - Envío: send_email (acepta idempotencyKey), bulk_send, bulk_status.
 - Operación: list_logs, list_suppressions, add_suppression, remove_suppression, list_smtp_credentials, create_smtp_credential, revoke_smtp_credential.
-- search_tools: busca herramientas por palabra clave.
+- search_tools: busca herramientas por palabra clave (sin acentos: "renovacion" encuentra renewal_link).
+
+Pagos por MCP: activation_link, register_domain y renewal_link devuelven una liga de MercadoPago que abre y paga una persona; nada queda pagado ni activado por dar la liga (paid: false). Se confirma después con list_addons, list_registrations o domain_health.
 
 Sobre el DNS: set_dns_record REEMPLAZA el conjunto de valores de ese nombre y tipo, así que para añadir un valor hay que leer primero con list_dns_records e incluir también los que ya estaban. Los registros que MailMask necesita para el correo (MX, TXT de verificación, SPF y CNAME de DKIM) vienen marcados con managed y no se pueden borrar: el agente recibe un 409 explicando por qué. create_dns_zone importa lo que encuentre del proveedor anterior y devuelve los nameservers que hay que cambiar en el registrador; hasta que se cambien, nada de lo que se edite tiene efecto.
 
-Un error del servidor (por ejemplo, un dominio gratis pidiendo un buzón, que requiere dominio activado a $99 MXN/mes) llega al agente como resultado con isError y el mensaje tal cual. Las API keys no se crean ni revocan por MCP. Límite: 60 peticiones por minuto por llave. No hay Bandeja ni facturación por MCP. No existe un paquete npm de MCP: el servidor es la URL.`,
+Un error del servidor (por ejemplo, un dominio gratis pidiendo un buzón, que requiere dominio activado a $99 MXN/mes) llega al agente como resultado con isError y el mensaje tal cual. Las API keys no se crean ni revocan por MCP. Límite: 60 peticiones por minuto por llave o por conexión OAuth. Desde el 4 de octubre de 2026 la Bandeja sí se trabaja por MCP, con los mismos permisos por dominio que la app: así un agente (por ejemplo de Ghosty Studio) puede tener su propio correo, una máscara como agente@tudominio.com, en vez de pedir acceso a tu Gmail. inbox_reply e inbox_send le piden al agente confirmar el texto contigo antes de enviar. No existe un paquete npm de MCP: el servidor es la URL.
+
+Con una API key mk_ las acciones irreversibles se ejecutan directo. Con el token de turno del asistente de la app (mt_, dura 5 minutos), borrar un dominio, una máscara, un buzón o un registro DNS, sacar a un miembro, transferir un dominio fuera o cancelar un add-on o la renovación de un dominio NO se ejecuta: la ruta responde 409 needs_confirmation y el usuario lo aprueba en una tarjeta de la app.`,
+  },
+  {
+    title: "¿Cómo conecto MailMask a Claude, ChatGPT o Ghosty Studio?",
+    content: `Pregunta frecuente: ¿cómo conecto MailMask a Claude, a ChatGPT, a Ghosty o a mi agente de IA?
+
+Respuesta corta: con OAuth, pegando sólo la URL https://www.mailmask.studio/mcp. No hace falta copiar ninguna API key.
+
+- Ghosty Studio (ghosty.studio): Conectores → Mailmask → Conectar. Entras a MailMask, das Permitir y tu agente de Ghosty ya tiene las herramientas de MailMask.
+- Claude.ai o Claude Desktop: Settings → Connectors → Add custom connector → nombre MailMask y URL https://www.mailmask.studio/mcp → Connect → Permitir.
+- ChatGPT: Settings → Apps & Connectors → Create (modo desarrollador) → URL https://www.mailmask.studio/mcp con OAuth → Permitir.
+- Claude Code: claude mcp add --transport http mailmask https://www.mailmask.studio/mcp, luego /mcp → mailmask → Authenticate.
+- Cualquier cliente MCP con autorización OAuth: sólo la URL.
+
+La pantalla de Permitir muestra qué cliente pide acceso y con qué cuenta entraste. La conexión puede hacer todo lo que haría una API key, menos crear llaves, entrar al admin o crear credenciales SMTP. Para cortarla, desconéctala desde el cliente; para cortar todas, cambia tu contraseña de MailMask.
+
+Sólo si el cliente no soporta OAuth (un script, un servidor, un cliente viejo), usa una API key mk_ de mailmask.studio/app → API Keys en el encabezado Authorization: Bearer mk_...`,
+  },
+  {
+    title: "Mask, el asistente dentro de la app",
+    content: `Mask es el asistente de MailMask dentro de la app (mailmask.studio/app): un chat en la esquina de la pantalla que HACE las cosas por ti en lugar de explicarte cómo hacerlas. Habla español, corto y claro, y pensado para quien no es técnico.
+
+Qué puede hacer Mask:
+- Dar de alta un dominio y dictarte los registros DNS exactos para pegar en tu registrador (Hostinger, GoDaddy, Cloudflare, Namecheap, Route 53), con el menú donde van. Después verifica y diagnostica la salud del dominio (MX, SPF, DKIM).
+- Crear, cambiar y borrar máscaras; crear buzones IMAP, regenerar su contraseña y darte la liga para configurarlos en iPhone o Mac, o para descargar el buzón en .mbox.
+- Explicar por qué un dominio está "bloqueado" (el 2.º dominio sin activar guarda el correo pero no lo reenvía) y darte la liga de pago para activarlo.
+- Buscar y comprar dominios, renovarlos y transferirlos a MailMask (o fuera de MailMask).
+- Editar el DNS cuando MailMask lleva tu zona y apuntar tu dominio a Vercel, Netlify, GitHub Pages y similares.
+- Reglas, webhooks, credenciales SMTP, equipo de la Bandeja (invitar y quitar personas), firma y respuestas guardadas.
+- Llevarte a la pantalla correcta de la app con un enlace.
+- Recibir imágenes, PDF o texto que le adjuntes (por ejemplo, una captura del panel de tu registrador), hasta 10 MB.
+
+Lo que Mask NUNCA hace:
+- Pagar: todo cobro es una liga de MercadoPago que tú abres y pagas. Mask no dice que algo quedó pagado hasta confirmarlo.
+- Pedirte el código EPP de una transferencia ni contraseñas en el chat: para eso te manda a un formulario seguro de la app. Si se lo pegas, te dirá que no lo compartas.
+- Ejecutar una acción irreversible sin tu permiso. Borrar un dominio, una máscara, un buzón o un registro DNS, sacar a alguien del equipo o transferir un dominio fuera te muestra una tarjeta con lo que va a pasar, armada con los datos reales de tu cuenta; la acción sólo corre cuando tú la apruebas. Si no la apruebas en 15 minutos, caduca.
+
+Mask actúa con tu cuenta, con los mismos permisos que tienes en la app, mediante una credencial temporal que dura 5 minutos por mensaje; nunca usa ni ve tus API keys. Por ahora está disponible para un grupo de cuentas en prueba; después se abrirá a todas.`,
   },
   {
     title: "Bandeja de Entrada (Inbox)",

@@ -62,6 +62,14 @@ describe("SDK ↔ servidor: contrato", () => {
         deleteReceiptRule: async () => undefined,
         deleteConfigurationSet: async () => undefined,
         deleteDomainIdentity: async () => undefined,
+        // Perfil: fotos y adjuntos del asistente en memoria.
+        putUserAvatarToS3: async (key: string, body: Uint8Array, contentType: string) => { archivos.set(`avatar:${key}`, { body, contentType }); },
+        getUserAvatarFromS3: async (key: string) => archivos.get(`avatar:${key}`) ?? null,
+        deleteUserAvatarFromS3: async (key: string) => { archivos.delete(`avatar:${key}`); },
+        getAssistantUploadFromS3: async (key: string) => archivos.get(`asis:${key}`) ?? null,
+        // Logo de la firma.
+        putDomainAssetToS3: async (key: string, body: Uint8Array, contentType: string) => { archivos.set(`logo:${key}`, { body, contentType }); },
+        deleteDomainAssetFromS3: async (key: string) => { archivos.delete(`logo:${key}`); },
       },
     });
 
@@ -80,8 +88,26 @@ describe("SDK ↔ servidor: contrato", () => {
         ensureHostedZone: async () => ({ hostedZoneId: "ZSDK", nameservers: ["ns-1.awsdns-01.com"], created: true }),
         configureDnsRecords: async () => undefined,
         deleteHostedZone: async () => undefined,
+        // Registro y transferencia: sólo interesa que las rutas existan y su forma.
+        checkAvailability: async (d: string) => ({ domain: d, available: !d.startsWith("ocupado") }),
+        checkTransferability: async () => ({ transferable: true, motivo: null }),
+        resendTransferEmail: async () => undefined,
+        disableDomainTransferLock: async () => undefined,
+        retrieveDomainAuthCode: async () => "EPP-NO-DEBE-SALIR",
+        listTldPrice: async () => null,
       },
     });
+    // RDAP sale a internet; aquí el requisito se da por bueno.
+    const realTransfer = await import("./domain-transfer.ts");
+    mock.module("./domain-transfer.ts", {
+      namedExports: {
+        ...realTransfer,
+        checkDomainReadiness: async () => ({ listo: true, requisitos: [{ clave: "aws", ok: true, texto: "El registrador actual permite la transferencia" }] }),
+      },
+    });
+    // MercadoPago: cada cobro devuelve una liga falsa; ninguna ruta debe darlo por pagado.
+    class MpFalso { async create() { return { id: `mp-${crypto.randomUUID()}`, init_point: "https://mp.test/checkout" }; } }
+    mock.module("mercadopago", { namedExports: { MercadoPagoConfig: class {}, PreApproval: MpFalso, Preference: MpFalso } });
     mock.module("./dns-import.ts", {
       namedExports: {
         snapshotDns: async () => ({ found: [], nameservers: [], warning: "aviso" }),
@@ -614,5 +640,249 @@ describe("SDK ↔ servidor: contrato", () => {
       () => mm.dns.upsert(domainId, { name: "x", type: "A", values: ["1.2.3.4"], ttl: 5 }),
       (e: MailMaskError) => e.status === 400 && /60/.test(e.message),
     );
+  });
+
+  // --- Lo que el usuario hace por la UI y ahora también un agente (asistente, sep-2026) ---
+
+  it("domains.dnsSetup: los registros que se pegan en el registrador", async () => {
+    const r = await mm.domains.dnsSetup(domainId);
+    assert.equal(r.domain, dominio);
+    assert.equal(r.live, false);
+    const mx = r.records.find((x) => x.id === "mx")!;
+    assert.equal(mx.type, "MX");
+    assert.equal(mx.name, "@");
+    assert.equal(mx.value, "10 inbound-smtp.us-east-1.amazonaws.com");
+    assert.equal(mx.priority, 10);
+    const ver = r.records.find((x) => x.id === "verification")!;
+    assert.equal(ver.name, "_amazonses");
+    assert.equal(ver.value, "verify1");
+    assert.equal(r.records.filter((x) => x.type === "CNAME").length, 1, "un CNAME por token de DKIM");
+    assert.equal(r.records.find((x) => x.id === "dkim1")!.fqdn, `dkim1._domainkey.${dominio}`);
+    assert.equal(r.records.find((x) => x.id === "spf")!.level, "recomendado");
+    assert.equal(r.records.find((x) => x.id === "dmarc")!.level, "opcional");
+    await assert.rejects(() => sinEnvios.domains.dnsSetup(domainId), (e: MailMaskError) => e.status === 404);
+  });
+
+  it("billing: status, addons y la liga de activación (nunca pagada)", async () => {
+    assert.ok((await mm.billing.status()).subscription);
+    const addons = await mm.billing.addons();
+    assert.ok(addons.catalog.domain);
+    assert.ok(Array.isArray(addons.mine));
+
+    // Un 2.º dominio nace bloqueado: la activación da la liga de MercadoPago.
+    const bloqueado = dbmod.createDomain(email, `bloq-${suffix}.com`, ["dk"], "vf");
+    const link = await mm.billing.checkout(bloqueado.id);
+    assert.equal(link.init_point, "https://mp.test/checkout");
+    assert.ok(link.addonId);
+    const pendiente = (await mm.billing.addons()).mine.find((a) => a.id === link.addonId)!;
+    assert.equal(pendiente.status, "pending", "dar la liga no activa nada");
+    assert.equal(pendiente.domainId, bloqueado.id);
+    // Dos ligas seguidas crearían dos suscripciones.
+    await assert.rejects(() => mm.billing.checkout(bloqueado.id), (e: MailMaskError) => e.status === 409);
+    // El dominio ya activado (por la prueba de DNS) no se vuelve a cobrar.
+    await assert.rejects(() => mm.billing.checkout(domainId), (e: MailMaskError) => e.status === 409);
+  });
+
+  it("registrations: search, tlds, register (liga de pago) y list", async () => {
+    const libre = await mm.registrations.search(`libre-${suffix}.com`);
+    assert.equal(libre.available, true);
+    assert.equal(libre.tld, ".com");
+    assert.equal(typeof libre.price, "number");
+    assert.equal((await mm.registrations.search(`ocupado-${suffix}.com`)).available, false);
+    await assert.rejects(() => mm.registrations.search("sinextension"), (e: MailMaskError) => e.status === 400);
+
+    const tlds = await mm.registrations.tlds();
+    assert.ok(tlds.some((t) => t.tld === ".com" && t.renewPrice > 0));
+
+    const reg = await mm.registrations.register(`libre-${suffix}.com`);
+    assert.equal(reg.initPoint, "https://mp.test/checkout");
+    const lista = await mm.registrations.list();
+    const fila = lista.find((r) => r.id === reg.registrationId)!;
+    assert.equal(fila.domainName, `libre-${suffix}.com`);
+    assert.equal(fila.awsCostCents, undefined, "nuestro costo no sale al cliente");
+    // Sin registrar todavía: ni salida ni renovación.
+    await assert.rejects(() => mm.registrations.transferOut(reg.registrationId), (e: MailMaskError) => e.status === 409);
+    await assert.rejects(() => mm.registrations.renewal(reg.registrationId), (e: MailMaskError) => e.status === 409);
+  });
+
+  it("registrations: transferOut manda el EPP por correo, no en la respuesta; renewal da liga", async () => {
+    const reg = dbmod.createDomainRegistration({ domainName: `mio-${suffix}.com`, ownerEmail: email, tld: ".com", priceCents: 30000, awsCostCents: 1500 });
+    dbmod.updateDomainRegistration(reg.id, { status: "registered", expiresAt: new Date(Date.now() + 300 * 864e5).toISOString() });
+    const salida = await mm.registrations.transferOut(reg.id);
+    assert.equal(salida.ok, true);
+    assert.ok(!JSON.stringify(salida).includes("EPP-NO-DEBE-SALIR"));
+    const ren = await mm.registrations.renewal(reg.id);
+    assert.equal(ren.init_point, "https://mp.test/checkout");
+    assert.ok(ren.nextChargeAt);
+    // Otra cuenta no la ve.
+    await assert.rejects(() => sinEnvios.registrations.transferOut(reg.id), (e: MailMaskError) => e.status === 404);
+  });
+
+  it("transfers: check, inventario DNS (leer, corregir, aprobar) y reenviar el correo", async () => {
+    const c = await mm.transfers.check(`traer-${suffix}.com`);
+    assert.equal(c.domain, `traer-${suffix}.com`);
+    assert.equal(typeof c.price, "number");
+    assert.ok(Array.isArray(c.requisitos));
+    assert.ok(Array.isArray(c.dns.found));
+
+    const d = `traer-${suffix}.com`;
+    const reg = dbmod.createDomainRegistration({
+      domainName: d, ownerEmail: email, tld: ".com", priceCents: 30000, awsCostCents: 1500, kind: "transfer",
+      dnsSnapshot: [{ name: `www.${d}`, type: "CNAME", ttl: 300, values: ["sitio.vercel.app"] }],
+    });
+    const inv = await mm.transfers.dns(reg.id);
+    assert.equal(inv.records.length, 1);
+    await mm.transfers.setDns(reg.id, [
+      { name: `www.${d}`, type: "CNAME", ttl: 300, values: ["sitio.vercel.app"] },
+      { name: d, type: "A", ttl: 300, values: ["1.2.3.4"] },
+    ]);
+    assert.equal((await mm.transfers.dns(reg.id)).records.length, 2);
+    await assert.rejects(() => mm.transfers.setDns(reg.id, [{ name: d, type: "A", values: ["no-es-ip"] }]), (e: MailMaskError) => e.status === 400);
+    assert.equal((await mm.transfers.approveDns(reg.id)).ok, true);
+    assert.equal((await mm.transfers.dns(reg.id)).status, "approved");
+    assert.equal((await mm.transfers.resendEmail(reg.id)).ok, true);
+    await assert.rejects(() => sinEnvios.transfers.dns(reg.id), (e: MailMaskError) => e.status === 404);
+  });
+
+  it("members: invitar, listar, cancelar invitación y quitar; el gratis no invita", async () => {
+    const inv = await dev.members.invite(devDomainId, { email: `colega-${suffix}@example.com`, name: "Colega" });
+    assert.match(inv.inviteUrl, /\/api\/agents\/accept\?token=/);
+    let lista = await dev.members.list(devDomainId);
+    const invitacion = lista.invites.find((i) => i.email === `colega-${suffix}@example.com`)!;
+    assert.ok(invitacion.token);
+    assert.equal((await dev.members.cancelInvite(devDomainId, invitacion.token)).ok, true);
+
+    const agente = dbmod.createAgent({ domainId: devDomainId, email: `agente-${suffix}@example.com`, name: "Agente", role: "agent" });
+    lista = await dev.members.list(devDomainId);
+    assert.ok(lista.members.some((m) => m.id === agente.id));
+    assert.equal((await dev.members.remove(devDomainId, agente.id)).ok, true);
+    await assert.rejects(() => dev.members.remove(devDomainId, agente.id), (e: MailMaskError) => e.status === 404);
+
+    const gratis = dbmod.createDomain(`sdk-noenvios-${suffix}@example.com`, `gratis-eq-${suffix}.com`, ["dk"], "vf");
+    await assert.rejects(() => sinEnvios.members.invite(gratis.id, { email: "x@example.com", name: "X" }), (e: MailMaskError) => e.status === 403 || e.status === 404);
+  });
+
+  it("signature y respuestas guardadas", async () => {
+    assert.equal((await mm.signature.set(domainId, "**Brenda** · Ventas")).signature, "**Brenda** · Ventas");
+    assert.equal((await mm.signature.get(domainId)).signature, "**Brenda** · Ventas");
+    assert.equal((await mm.signature.set(domainId, "")).signature, null);
+    await assert.rejects(() => mm.signature.set(domainId, "x".repeat(2001)), (e: MailMaskError) => e.status === 400);
+
+    const r = await mm.canned.create(domainId, { title: "Horario", body: "Atendemos de 9 a 6." });
+    assert.equal(r.title, "Horario");
+    assert.ok((await mm.canned.list(domainId)).some((c) => c.id === r.id));
+    assert.equal((await mm.canned.delete(domainId, r.id)).ok, true);
+    await assert.rejects(() => mm.canned.delete(domainId, r.id), (e: MailMaskError) => e.status === 404);
+    await assert.rejects(() => mm.canned.create(domainId, { title: "", body: "" }), (e: MailMaskError) => e.status === 400);
+  });
+
+  it("aliases.appleProfile y exportMbox pegan a sus rutas", async () => {
+    await mm.aliases.create(domainId, { alias: "perfil", destinations: ["p@example.com"] });
+    // Sin buzón: la ruta contesta su propio 404, con mensaje, no el de "ruta inexistente".
+    await assert.rejects(() => mm.aliases.appleProfile(domainId, "perfil"), (e: MailMaskError) => e.status === 404 && /buzón/.test(e.message));
+    await assert.rejects(() => mm.aliases.exportMbox(domainId, "perfil"), (e: MailMaskError) => e.status === 404 && /buzón/.test(e.message));
+
+    sqlite.prepare("UPDATE alias SET mailbox_enabled = 1 WHERE domain_id = ? AND alias = ?").run(domainId, "perfil");
+    const plist = await mm.aliases.appleProfile(domainId, "perfil");
+    assert.match(plist, /<plist/);
+    assert.ok(plist.includes(`perfil@${dominio}`));
+  });
+
+  it("account: perfil (nombre y foto desde un adjunto firmado del asistente)", async () => {
+    const vacio = await mm.account.getProfile();
+    assert.equal(vacio.email, email);
+    assert.equal((await mm.account.updateProfile({ displayName: "Brenda Ruiz" })).displayName, "Brenda Ruiz");
+    assert.equal((await mm.account.getProfile()).displayName, "Brenda Ruiz");
+    await assert.rejects(() => mm.account.updateProfile({ displayName: "x".repeat(61) }), (e: MailMaskError) => e.status === 400);
+
+    const { userKey, signedUploadUrl } = await import("./assistant.ts");
+    const llave = `${userKey(email)}/${crypto.randomUUID()}-foto.png`;
+    archivos.set(`asis:${llave}`, { body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]), contentType: "image/png" });
+    const puesta = await mm.account.setAvatarFromUrl(signedUploadUrl("http://localhost", llave));
+    assert.match(puesta.avatarUrl ?? "", /^\/api\/avatar\/.+\.png$/);
+    await assert.rejects(() => mm.account.setAvatarFromUrl("https://ejemplo.com/foto.png"), (e: MailMaskError) => e.status === 400);
+    assert.equal((await mm.account.removeAvatar()).avatarUrl, null);
+  });
+
+  it("inbox: listar, leer, redactar, responder, marcar, asignar, anotar, borrar, restaurar y métricas", async () => {
+    // El dominio activado (legado) de `dev`, con una máscara y un correo recibido.
+    await dev.aliases.create(devDomainId, { alias: "soporte", destinations: ["d@example.com"] });
+    const conv = dbmod.createConversation({
+      domainId: devDomainId, from: "cliente@example.com", to: `soporte@sdk-dev-${suffix}.com`, subject: "Ayuda con mi pedido",
+      status: "open", priority: "normal", lastMessageAt: new Date().toISOString(), messageCount: 1, tags: [], threadReferences: ["<orig@cliente>"],
+    });
+    dbmod.addMessage({ conversationId: conv.id, from: "cliente@example.com", body: "¿Dónde va mi pedido 123?", direction: "inbound", createdAt: new Date().toISOString(), messageId: "<orig@cliente>" });
+
+    const noLeidas = await dev.inbox.list(devDomainId, { status: "unread", to: `soporte@sdk-dev-${suffix}.com` });
+    assert.ok(noLeidas.items.some((c) => c.id === conv.id && c.unread === true));
+
+    const detalle = await dev.inbox.get(devDomainId, conv.id);
+    assert.equal(detalle.messages[0].body, "¿Dónde va mi pedido 123?");
+    assert.ok(!(await dev.inbox.list(devDomainId, { status: "unread" })).items.some((c) => c.id === conv.id), "abrirla la marca leída");
+
+    enviados.length = 0;
+    const r = await dev.inbox.reply(devDomainId, conv.id, { markdown: "Va en camino." });
+    assert.ok(r.messageId);
+    assert.equal(enviados[0].from, `soporte@sdk-dev-${suffix}.com`, "contesta desde la máscara del hilo");
+    assert.equal(enviados[0].to, "cliente@example.com");
+    assert.equal(enviados[0].subject, "Re: Ayuda con mi pedido");
+
+    const nuevo = await dev.inbox.compose(devDomainId, { fromAlias: "soporte", to: "otro@example.com", subject: "Hola", markdown: "Primer mensaje" });
+    assert.ok(nuevo.conversationId);
+    await assert.rejects(() => dev.inbox.compose(devDomainId, { fromAlias: "noexiste", to: "otro@example.com", subject: "x", body: "x" }), (e: MailMaskError) => e.status === 400);
+
+    const cerrada = await dev.inbox.update(devDomainId, conv.id, { status: "closed", priority: "urgent", tags: ["pedido"] });
+    assert.equal(cerrada.status, "closed");
+    await assert.rejects(() => dev.inbox.update(devDomainId, conv.id, { status: "snoozed" }), (e: MailMaskError) => e.status === 400);
+    assert.equal((await dev.inbox.markRead(devDomainId, conv.id)).ok, true);
+    assert.equal((await dev.inbox.assign(devDomainId, conv.id, devEmail)).assignedTo, devEmail);
+    assert.equal((await dev.inbox.addNote(devDomainId, conv.id, "Cliente frecuente")).body, "Cliente frecuente");
+    assert.equal((await dev.inbox.delete(devDomainId, [conv.id])).deleted, 1);
+    assert.ok((await dev.inbox.list(devDomainId, { status: "deleted" })).items.some((c) => c.id === conv.id));
+    assert.equal((await dev.inbox.restore(devDomainId, conv.id)).ok, true);
+    assert.equal(typeof (await dev.inbox.metrics(devDomainId, { days: 7 })), "object");
+
+    // Otra cuenta no ve esta Bandeja.
+    await assert.rejects(() => sinEnvios.inbox.list(devDomainId), (e: MailMaskError) => e.status === 403);
+    await assert.rejects(() => sinEnvios.inbox.get(devDomainId, conv.id), (e: MailMaskError) => e.status === 403);
+  });
+
+  it("inbox.compose en el dominio gratis: 403 que dice que pide dominio activado", async () => {
+    const gratis = dbmod.createDomain(`sdk-noenvios-${suffix}@example.com`, `gratis-inbox-${suffix}.com`, ["dk"], "vf");
+    await assert.rejects(() => sinEnvios.inbox.compose(gratis.id, { fromAlias: "x", to: "a@example.com", subject: "x", body: "x" }), (e: MailMaskError) => e.status === 403 && /activado/.test(e.message));
+  });
+
+  it("cuenta: pedidos, cancelar add-on y renovación, referidos, logo y adjunto desde el chat", async () => {
+    const pedidos = await mm.billing.orders({ limit: 5 });
+    assert.ok(Array.isArray(pedidos.orders));
+    assert.match(pedidos.invoiceNote, /CFDI/);
+
+    const addon = dbmod.createAddon(email, "sends100");
+    dbmod.updateAddon(addon.id, { status: "active", currentPeriodEnd: new Date(Date.now() + 10 * 864e5).toISOString() });
+    assert.equal((await mm.billing.cancelAddon(addon.id)).ok, true);
+    await assert.rejects(() => mm.billing.cancelAddon(addon.id), (e: MailMaskError) => e.status === 400);
+    await assert.rejects(() => sinEnvios.billing.cancelAddon(addon.id), (e: MailMaskError) => e.status === 404);
+
+    const reg = dbmod.createDomainRegistration({ domainName: `sinrenov-${suffix}.com`, ownerEmail: email, tld: ".com", priceCents: 30000, awsCostCents: 1500 });
+    await assert.rejects(() => mm.registrations.cancelRenewal(reg.id), (e: MailMaskError) => e.status === 409 && /renovación/.test(e.message));
+
+    const slug = `sdk${suffix}`.slice(0, 30);
+    assert.equal((await mm.referrals.setSlug(slug)).slug, slug);
+    assert.equal((await mm.referrals.setName("Brenda")).ok, true);
+    assert.equal((await mm.referrals.get()).slug, slug);
+
+    const { userKey, signedUploadUrl } = await import("./assistant.ts");
+    const llaveLogo = `${userKey(email)}/${crypto.randomUUID()}-logo.png`;
+    archivos.set(`asis:${llaveLogo}`, { body: new Uint8Array([0x89, 0x50, 0x4e, 0x47]), contentType: "image/png" });
+    const logo = await mm.domains.setLogoFromUrl(domainId, signedUploadUrl("http://localhost", llaveLogo));
+    assert.match(logo.logoUrl, /\/api\/domain-logo\//);
+    assert.equal((await mm.domains.removeLogo(domainId)).ok, true);
+    await assert.rejects(() => mm.domains.setLogoFromUrl(domainId, "https://evil.example/logo.png"), (e: MailMaskError) => e.status === 400);
+
+    const llaveDoc = `${userKey(email)}/${crypto.randomUUID()}-cotizacion.pdf`;
+    archivos.set(`asis:${llaveDoc}`, { body: new TextEncoder().encode("%PDF-1.4"), contentType: "application/pdf" });
+    const adj = await mm.attachments.uploadFromUrl(domainId, signedUploadUrl("http://localhost", llaveDoc), "cotizacion.pdf");
+    assert.equal(adj.filename, "cotizacion.pdf");
+    assert.ok(archivos.has(adj.key), "quedó en el S3 de adjuntos");
   });
 });

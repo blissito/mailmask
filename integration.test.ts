@@ -1680,7 +1680,11 @@ describe("Miembros: invitaciones pendientes", () => {
   it("la lista arranca vacía con la forma { members, invites }", async () => {
     const res = await jsonGet(`/api/domains/${domainId}/agents`, cookie);
     assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), { members: [], invites: [] });
+    const body = await res.json();
+    assert.deepEqual({ members: body.members, invites: body.invites }, { members: [], invites: [] });
+    // El dueño viene aparte, con su perfil, para pintar nombre y foto en la Bandeja.
+    assert.equal(typeof body.owner.email, "string");
+    assert.ok("displayName" in body.owner && "avatarUrl" in body.owner);
   });
 
   it("invitar deja la invitación visible con su enlace, e invitar de nuevo no duplica", async () => {

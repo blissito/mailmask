@@ -1,0 +1,10 @@
+{
+  "name": "mailmask-outbound-relay",
+  "private": true,
+  "type": "module",
+  "description": "Relay LMTP de salida de los buzones (caja de Stalwart -> POST /api/internal/outbound)",
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "smtp-server": "3.19.16"
+  }
+}

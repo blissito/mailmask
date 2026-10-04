@@ -672,21 +672,21 @@ function saveMode(m: Mode) {
   } catch {}
 }
 
-function Launcher({ onClick }: { onClick: () => void }) {
-  return (
-    <button className="docs-chat-launcher" onClick={onClick} title="Abrir asistente" aria-label="Abrir asistente">
-      <Sparkle size={20} />
-      <span>Asistente IA</span>
-    </button>
-  );
+type Size = "phone" | "tablet" | "desktop";
+
+// phone < 768 (pantalla completa), tablet 768–1279 (panel flotante), desktop ≥ 1280 (acoplable)
+function readSize(): Size {
+  const w = window.innerWidth;
+  return w < 768 ? "phone" : w < 1280 ? "tablet" : "desktop";
 }
 
 function App({ aside }: { aside: HTMLElement }) {
   const solo = new URLSearchParams(location.search).get("chat") === "solo";
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  const [size, setSize] = useState<Size>(readSize);
   const [mode, setModeState] = useState<Mode>(readMode);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [overlayOpen, setOverlayOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const desktop = size === "desktop";
 
   const setMode = (m: Mode) => {
     setModeState(m);
@@ -694,13 +694,13 @@ function App({ aside }: { aside: HTMLElement }) {
   };
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 1024);
+    const check = () => setSize(readSize());
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  const docked = !solo && !isMobile && mode === "docked";
-  const panelVisible = solo || (isMobile ? mobileOpen : mode === "floating");
+  const docked = !solo && desktop && mode === "docked";
+  const panelVisible = solo || (desktop ? mode === "floating" : overlayOpen);
 
   // Sin chat acoplado, la rejilla de docs.html suelta la tercera columna
   useEffect(() => {
@@ -716,10 +716,10 @@ function App({ aside }: { aside: HTMLElement }) {
 
   const chatOpen = docked || panelVisible;
 
-  // Trigger de la barra superior: abre el chat acoplado o lo cierra
+  // Trigger de la barra superior: abre el chat o lo cierra
   const toggleRef = useRef<() => void>(() => {});
   toggleRef.current = () => {
-    if (isMobile) setMobileOpen((v) => !v);
+    if (!desktop) setOverlayOpen((v) => !v);
     else setMode(chatOpen ? "closed" : "docked");
   };
   useEffect(() => {
@@ -733,19 +733,25 @@ function App({ aside }: { aside: HTMLElement }) {
     document.getElementById("docs-chat-trigger")?.setAttribute("aria-pressed", String(chatOpen));
   }, [chatOpen]);
 
-  const chatMode: ChatProps["mode"] = solo ? "solo" : isMobile ? "mobile" : mode;
+  const chatMode: ChatProps["mode"] = solo
+    ? "solo"
+    : size === "phone"
+      ? "mobile"
+      : desktop
+        ? mode
+        : "floating";
   const chat = createPortal(
     <Chat
       mode={chatMode}
       onToggleDock={
-        solo || isMobile ? undefined : () => setMode(mode === "floating" ? "docked" : "floating")
+        solo || !desktop ? undefined : () => setMode(mode === "floating" ? "docked" : "floating")
       }
-      onClose={solo ? undefined : () => (isMobile ? setMobileOpen(false) : setMode("closed"))}
+      onClose={solo ? undefined : () => (desktop ? setMode("closed") : setOverlayOpen(false))}
     />,
     chatHost,
   );
 
-  const panelClass = solo || isMobile ? "docs-chat-fullscreen" : "docs-chat-floating";
+  const panelClass = solo || size === "phone" ? "docs-chat-fullscreen" : "docs-chat-floating";
 
   return (
     <>
@@ -753,19 +759,16 @@ function App({ aside }: { aside: HTMLElement }) {
       {createPortal(
         <>
           {panelVisible && <div ref={panelRef} className={panelClass} />}
-          {!solo && isMobile && !panelVisible && (
-            <Launcher onClick={() => setMobileOpen(true)} />
-          )}
           <style>{`
             .docs-chat-undocked #docs-chat { display: none !important; }
-            @media (min-width: 1024px) {
+            @media (min-width: 1280px) {
               .docs-chat-undocked .docs-layout { grid-template-columns: 240px minmax(0, 1fr); }
             }
             .docs-chat-floating {
               position: fixed;
               top: 72px;
               right: 24px;
-              width: 440px;
+              width: min(440px, calc(100vw - 32px));
               height: min(760px, calc(100vh - 96px));
               z-index: 1001;
               border: 1px solid rgb(var(--line));
@@ -778,25 +781,6 @@ function App({ aside }: { aside: HTMLElement }) {
               inset: 0;
               z-index: 1001;
             }
-            .docs-chat-launcher {
-              position: fixed;
-              bottom: 20px;
-              right: 20px;
-              z-index: 1000;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-              padding: 12px 18px;
-              border-radius: 999px;
-              border: 1px solid rgb(var(--line));
-              background: rgb(var(--bg-elev));
-              color: rgb(var(--fg));
-              font-size: 15px;
-              font-weight: 600;
-              cursor: pointer;
-              box-shadow: 0 6px 24px rgba(0,0,0,0.25);
-            }
-            .docs-chat-launcher:hover { border-color: rgb(var(--accent)); }
           `}</style>
         </>,
         document.body,

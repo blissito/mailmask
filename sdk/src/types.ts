@@ -393,3 +393,330 @@ export interface DnsChangeResult {
 export type DnsPreset =
   | "vercel" | "netlify" | "github-pages" | "cloudflare-pages" | "render" | "fly"
   | "redirect-a-www" | "dmarc";
+
+// --- Registros a pegar en el registrador ---
+
+export interface DnsSetupRecord {
+  id: string;
+  type: "MX" | "TXT" | "CNAME";
+  /** Relativo al dominio, como lo piden casi todos los paneles ('@', '_amazonses'). */
+  name: string;
+  fqdn: string;
+  value: string;
+  /** Sólo MX, para paneles con campo de prioridad aparte (entonces el valor es `host`). */
+  priority?: number;
+  host?: string;
+  level: "requerido" | "recomendado" | "opcional";
+  purpose: string;
+  benefit?: string;
+  /** Ayuda en texto con **negritas** estilo markdown. */
+  hints: string[];
+  /** Sólo con `live`: si el DNS público ya lo tiene; null = no se pudo consultar. */
+  ok?: boolean | null;
+  observed?: string[];
+  /** SPF: valor fusionado cuando ya existe otro SPF (se edita ése, no se crea otro). */
+  suggestedValue?: string;
+}
+
+export interface DnsSetup {
+  domain: string;
+  records: DnsSetupRecord[];
+  live: boolean;
+  nameservers?: string[];
+  /** Panel donde se pegan, deducido de los nameservers. */
+  registrarHint?: { provider: string; label: string; note: string } | null;
+  summary?: string;
+}
+
+// --- Cobro ---
+
+export interface BillingStatus {
+  subscription: { plan: string; status: string; currentPeriodEnd?: string; [k: string]: unknown };
+}
+
+export interface Addon {
+  id: string;
+  kind: string;
+  /** Dominio al que aplica; sin él es un add-on legado de toda la cuenta. */
+  domainId?: string;
+  status: "pending" | "active" | "cancelled" | "expired";
+  priceCents: number;
+  currentPeriodEnd?: string;
+  createdAt: string;
+  cancelledAt?: string;
+  source: "purchase" | "courtesy" | "migration";
+}
+
+export interface AddonsResponse {
+  catalog: Record<string, { price: number; label: string }>;
+  forSale: string[];
+  mine: Addon[];
+}
+
+/** Liga de pago de MercadoPago. Nada cambia hasta que el usuario la abre y paga. */
+export interface CheckoutLink {
+  init_point: string;
+  addonId: string;
+}
+
+// --- Registro y transferencia de dominios ---
+
+export interface DomainSearchResult {
+  available: boolean;
+  domain: string;
+  tld: string;
+  /** Centavos MXN por año. */
+  price: number;
+  currency: "MXN";
+}
+
+export interface TldPrice {
+  tld: string;
+  /** Centavos MXN. */
+  price: number;
+  renewPrice: number;
+  transferPrice: number;
+  popular: boolean;
+}
+
+export interface DomainRegistrationCreated {
+  /** Liga de pago de MercadoPago; el registro arranca al pagar. */
+  initPoint: string;
+  registrationId: string;
+}
+
+export interface DomainRegistration {
+  id: string;
+  domainId: string | null;
+  domainName: string;
+  kind: "register" | "transfer";
+  status: string;
+  expiresAt: string | null;
+  priceCents: number;
+  renewalStatus: string;
+  renewalPriceCents: number | null;
+  nextChargeAt: string | null;
+  dnsImportStatus: string;
+  transferAuthCodeHint: string | null;
+  lastError: string | null;
+  createdAt: string;
+  [k: string]: unknown;
+}
+
+export interface TransferRequirement {
+  texto: string;
+  ok: boolean | null;
+  ayuda?: string;
+}
+
+export interface TransferCheck {
+  domain: string;
+  /** Centavos MXN; incluye un año de renovación. */
+  price: number;
+  currency: "MXN";
+  requisitos: TransferRequirement[];
+  dns: { found: unknown[]; nameservers?: string[]; warning?: string; truncado?: boolean };
+  [k: string]: unknown;
+}
+
+export interface TransferDnsInventory {
+  records: unknown[];
+  status: string;
+  takenAt: string | null;
+}
+
+export interface RenewalLink {
+  init_point: string;
+  nextChargeAt: string;
+}
+
+// --- Equipo y Bandeja ---
+
+export interface DomainMember {
+  id: string;
+  domainId: string;
+  email: string;
+  name: string;
+  role: "admin" | "agent";
+  createdAt: string;
+  /** Del perfil de su cuenta de MailMask, si lo llenó. */
+  displayName?: string | null;
+  avatarUrl?: string | null;
+}
+
+export interface DomainInvite {
+  token: string;
+  email: string;
+  name: string;
+  role: "admin" | "agent";
+  expiresAt: string;
+  inviteUrl: string;
+}
+
+export interface CannedReply {
+  id: string;
+  domainId: string;
+  title: string;
+  /** Markdown. */
+  body: string;
+  createdAt: string;
+}
+
+/** Perfil de la cuenta de MailMask (el usuario, no una máscara). */
+export interface AccountProfile {
+  email: string;
+  displayName: string | null;
+  /** Ruta relativa al host de MailMask (`/api/avatar/...`), o null sin foto. */
+  avatarUrl: string | null;
+}
+
+// --- Bandeja (inbox) ---
+
+export type InboxStatus = "open" | "snoozed" | "closed";
+
+export interface InboxConversation {
+  id: string;
+  domainId: string;
+  /** El contacto externo (en un hilo que inició el dominio, el destinatario). */
+  from: string;
+  /** La máscara del dominio por la que va el hilo (`ventas@tudominio.com`). */
+  to: string;
+  subject: string;
+  status: InboxStatus;
+  assignedTo?: string;
+  priority: "normal" | "urgent";
+  lastMessageAt: string;
+  messageCount: number;
+  tags: string[];
+  deletedAt?: string;
+  snoozedUntil?: string;
+  /** Para quien pregunta: hay mensajes que no ha visto. */
+  unread?: boolean;
+  /** Sólo en búsqueda: fragmento con la coincidencia. */
+  snippet?: string;
+  [k: string]: unknown;
+}
+
+export interface InboxListOptions {
+  /** `open`, `snoozed`, `closed`, `unread` (de quien pregunta) o `deleted` (papelera). */
+  status?: InboxStatus | "unread" | "deleted";
+  /** Dirección completa de la máscara (`ventas@tudominio.com`). */
+  to?: string;
+  assignedTo?: string;
+  /** Búsqueda en asunto, remitente y cuerpo. Con `q` no hay paginación (tope 50). */
+  q?: string;
+  /** Máx. 100. */
+  limit?: number;
+  cursor?: string;
+}
+
+export interface InboxPage {
+  items: InboxConversation[];
+  nextCursor: string | null;
+  /** Máscaras con conversaciones (sólo en la primera página). */
+  aliases?: string[];
+  mode: "list" | "search" | "search-degraded";
+  unreadCount?: number;
+  [k: string]: unknown;
+}
+
+export interface InboxAttachment {
+  index: number;
+  filename: string;
+  contentType: string;
+  size: number;
+}
+
+export interface InboxMessage {
+  id: string;
+  conversationId: string;
+  from: string;
+  /** Texto plano. */
+  body?: string;
+  html?: string;
+  direction: "inbound" | "outbound";
+  createdAt: string;
+  messageId?: string;
+  deliveryStatus?: "sent" | "delivered" | "bounced" | "complained";
+  attachments?: InboxAttachment[];
+  /** El original ya no está (retención de 90 días o pérdida): `body` puede venir del índice. */
+  bodyDegraded?: string;
+}
+
+export interface InboxNote {
+  id: string;
+  conversationId: string;
+  author: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface InboxConversationDetail extends InboxConversation {
+  messages: InboxMessage[];
+  notes: InboxNote[];
+  totalMessages: number;
+  hasMore: boolean;
+}
+
+export interface InboxComposeInput {
+  /** Parte local (o dirección completa) de una máscara activa del dominio. */
+  fromAlias: string;
+  to: string;
+  subject: string;
+  markdown?: string;
+  html?: string;
+  body?: string;
+  cc?: string[];
+  bcc?: string[];
+  attachments?: AttachmentRef[];
+}
+
+export interface InboxReplyInput {
+  markdown?: string;
+  html?: string;
+  body?: string;
+  cc?: string[];
+  bcc?: string[];
+  /** Cita el último mensaje recibido (por omisión true; sólo con markdown). */
+  quote?: boolean;
+  attachments?: AttachmentRef[];
+}
+
+export interface InboxUpdateInput {
+  status?: InboxStatus;
+  /** ISO, futura y a menos de 90 días. Obligatoria con `status: "snoozed"`. */
+  snoozedUntil?: string;
+  tags?: string[];
+  priority?: "normal" | "urgent";
+}
+
+// --- Cuenta: pedidos y referidos ---
+
+export interface Order {
+  id: string;
+  number: string;
+  date: string;
+  kind: string;
+  concept: string;
+  subject: string | null;
+  amountCents: number;
+  listPriceCents: number | null;
+  currency: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  failureReason: string | null;
+  note: string | null;
+  reference: string | null;
+}
+
+export interface OrdersPage {
+  orders: Order[];
+  nextCursor: string | null;
+  invoiceNote: string;
+}
+
+export interface ReferralStats {
+  slug?: string | null;
+  referrals: unknown[];
+  [k: string]: unknown;
+}

@@ -50,6 +50,10 @@ export interface User {
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
+  /** Nombre visible de la cuenta (perfil). */
+  displayName?: string;
+  /** Llave de la foto de perfil bajo `user-avatars/` en S3. */
+  avatarKey?: string;
 }
 
 export interface Domain {
@@ -132,6 +136,7 @@ import {
   isLegacyPlan,
   PLANS_FOR_SALE,
   ADDONS,
+  DOMAIN_ANNUAL_PRICE,
   planLabel,
   planPriceCents,
   addonLabel,
@@ -140,7 +145,7 @@ import {
 } from "./plans.js";
 import type { AddonKind, PlanKey } from "./plans.js";
 
-export { PLANS, ADDONS, LEGACY_ADDONS, ADDONS_FOR_SALE, DOMINIO_ACTIVADO, DOMINIO_GRATIS, planLabel, planPriceCents, addonLabel, addonPriceCents, LEGACY_PLANS, isLegacyPlan, PLANS_FOR_SALE };
+export { PLANS, ADDONS, DOMAIN_ANNUAL_PRICE, LEGACY_ADDONS, ADDONS_FOR_SALE, DOMINIO_ACTIVADO, DOMINIO_GRATIS, planLabel, planPriceCents, addonLabel, addonPriceCents, LEGACY_PLANS, isLegacyPlan, PLANS_FOR_SALE };
 export type { AddonKind, PlanKey };
 
 export interface Addon {
@@ -229,6 +234,8 @@ function rowToUser(r: typeof users.$inferSelect): User {
     utmSource: r.utmSource ?? undefined,
     utmMedium: r.utmMedium ?? undefined,
     utmCampaign: r.utmCampaign ?? undefined,
+    displayName: r.displayName ?? undefined,
+    avatarKey: r.avatarKey ?? undefined,
   };
   if (r.subPlan) {
     user.subscription = {
@@ -1186,6 +1193,11 @@ export function claimOnce(kind: string, token: string, ttlDays = 45): boolean {
   return rows.length > 0;
 }
 
+/** Deshace un `claimOnce`: para cuando lo reclamado no llegó a pasar y debe poder reintentarse. */
+export function releaseClaim(kind: string, token: string): void {
+  db.delete(tokens).where(eq(tokens.token, `${kind}:${token}`)).run();
+}
+
 // --- Pending checkout (guest flow) ---
 
 export function createPendingCheckout(token: string, plan: string): void {
@@ -1234,6 +1246,16 @@ export function deletePasswordToken(token: string): void {
 
 export function updateUserPassword(email: string, passwordHash: string): void {
   db.update(users).set({ passwordHash, passwordChangedAt: new Date().toISOString() }).where(eq(users.email, email)).run();
+}
+
+// --- Perfil de la cuenta ---
+
+/** `null` borra el campo; `undefined` lo deja como está. */
+export function updateUserProfile(email: string, fields: { displayName?: string | null; avatarKey?: string | null }): void {
+  const set: Partial<typeof users.$inferInsert> = { profileUpdatedAt: new Date().toISOString() };
+  if (fields.displayName !== undefined) set.displayName = fields.displayName;
+  if (fields.avatarKey !== undefined) set.avatarKey = fields.avatarKey;
+  db.update(users).set(set).where(eq(users.email, email)).run();
 }
 
 // --- Webhook idempotency ---

@@ -483,7 +483,7 @@ export async function fetchEmailFromS3(bucketName: string, objectKey: string): P
 
 // Remove headers (and their folded continuation lines) from the header block only,
 // never from the body. Used to drop signatures that no longer apply after we rewrite From.
-function stripHeaders(raw: string, names: string[]): string {
+export function stripHeaders(raw: string, names: string[]): string {
   const sepMatch = raw.match(/\r?\n\r?\n/);
   const sepIdx = sepMatch?.index ?? -1;
   const headerBlock = sepIdx >= 0 ? raw.slice(0, sepIdx) : raw;
@@ -627,7 +627,16 @@ export const MAX_RAW_MESSAGE_BYTES = 9 * 1024 * 1024;
  * el que viene en sus eventos de entrega, rebote y queja. Sólo con el segundo se
  * puede cruzar un evento con el mensaje que lo originó.
  */
-export interface SentEmail { messageId: string; sesMessageId: string }
+export interface SentEmail {
+  messageId: string;
+  sesMessageId: string;
+  /**
+   * El MIME tal como se entregó a SES (sin Bcc en los headers). Hace falta para
+   * guardar la copia en Enviados del buzón IMAP; es opcional porque los dobles de
+   * prueba no lo traen y nadie más lo necesita.
+   */
+  raw?: string;
+}
 
 /**
  * Referencias de hilo de un saliente. SES reescribe el Message-ID que generamos por
@@ -642,9 +651,6 @@ export function threadRefsFor(sent: SentEmail): string[] {
 }
 
 export async function sendFromDomain(from: string, to: string, subject: string, body: string, opts?: { html?: string; replyTo?: string; configSet?: string; inReplyTo?: string; references?: string; inlineImages?: InlineImage[]; attachments?: Attachment[]; cc?: string[]; bcc?: string[] }): Promise<SentEmail> {
-  const ses = await getSesOutbound();
-  const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
-
   // El header From conserva el display name si viene ("MailMask <alertas@...>"); el
   // sobre de SES necesita la dirección pelada.
   const fromAddr = normalizeAddress(from);
@@ -775,31 +781,56 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
     // destinatarios lo vean.
     Destinations: [toAddr, ...ccList, ...bccList],
   };
-  if (opts?.configSet) cmd.ConfigurationSetName = opts.configSet;
 
+  const sesMessageId = await sendRawCommand(cmd, fromAddr.split("@")[1] ?? "", opts?.configSet);
+  return { messageId, sesMessageId, raw: rawEmail };
+}
+
+
+/**
+ * `SendRawEmail` con el config set del dominio. Si el set no existe se crea y el correo
+ * sale igual, sin él: SES no publicaría un solo evento y el mensaje se quedaría en
+ * "enviado" para siempre, así que se avisa. Compartido por `sendFromDomain` y por la
+ * salida de los buzones (`sendRawFromDomain`), para que los dos caminos se comporten
+ * igual ante el mismo error.
+ */
+// deno-lint-ignore no-explicit-any
+async function sendRawCommand(cmd: any, domain: string, configSet?: string): Promise<string> {
+  const ses = await getSesOutbound();
+  const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
+  if (configSet) cmd.ConfigurationSetName = configSet;
   let res: { MessageId?: string } | undefined;
   try {
     res = await ses.send(new SendRawEmailCommand(cmd));
   } catch (err: any) {
-    // Auto-create configuration set if it doesn't exist in this region
-    if (opts?.configSet && String(err).includes("ConfigurationSetDoesNotExist")) {
-      const domain = from.split("@")[1] ?? "";
+    if (configSet && String(err).includes("ConfigurationSetDoesNotExist")) {
       try { await createConfigurationSet(domain); } catch { /* best effort */ }
-      // El correo sale igual, pero sin config set SES no publica un solo evento:
-      // este mensaje se queda en "enviado" para siempre aunque llegue bien. El
-      // set ya quedó creado arriba, así que esto sólo debería verse una vez por
-      // dominio; si se repite, algo impide crearlo.
-      log("error", "ses", "Envío sin config set: este correo no tendrá estado de entrega", {
-        domain,
-        configSet: opts.configSet,
-      });
+      log("error", "ses", "Envío sin config set: este correo no tendrá estado de entrega", { domain, configSet });
       delete cmd.ConfigurationSetName;
       res = await ses.send(new SendRawEmailCommand(cmd));
     } else {
       throw err;
     }
   }
-  return { messageId, sesMessageId: res?.MessageId ?? "" };
+  return res?.MessageId ?? "";
+}
+
+/**
+ * Manda un MIME ya armado por otro (Apple Mail vía Stalwart) tal cual, con el sobre
+ * que trae. Devuelve el id de SES. El llamador ya quitó las firmas DKIM ajenas: SES
+ * firma por el dominio y rechaza con `554 Duplicate header 'DKIM-Signature'` si
+ * encuentra otra.
+ */
+export async function sendRawFromDomain(raw: string, source: string, destinations: string[], configSet?: string): Promise<string> {
+  if (Buffer.byteLength(raw, "utf8") > MAX_RAW_MESSAGE_BYTES) {
+    throw new Error("El correo excede el tamaño máximo. Usa archivos más ligeros.");
+  }
+  const cmd = {
+    RawMessage: { Data: new TextEncoder().encode(raw) },
+    Source: source,
+    Destinations: destinations,
+  };
+  return await sendRawCommand(cmd, source.split("@")[1] ?? "", configSet);
 }
 
 // --- Delete S3 object (for purge) ---
@@ -1291,6 +1322,60 @@ export async function getEmailFileFromS3(key: string): Promise<{ body: Uint8Arra
   } catch {
     return null;
   }
+}
+
+// Adjuntos que el usuario le manda al asistente de /app. Prefijo aparte de `inbound/`
+// para que la lifecycle de 90 días del correo entrante no los toque y viceversa.
+const ASSISTANT_UPLOAD_PREFIX = "assistant-uploads/";
+
+export async function putAssistantUploadToS3(key: string, body: Uint8Array, contentType: string): Promise<void> {
+  const s3 = await getS3();
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new PutObjectCommand({ Bucket: S3_BUCKET, Key: `${ASSISTANT_UPLOAD_PREFIX}${key}`, Body: body, ContentType: contentType }));
+}
+
+export async function getAssistantUploadFromS3(key: string): Promise<{ body: Uint8Array; contentType: string } | null> {
+  const s3 = await getS3();
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  try {
+    const res = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: `${ASSISTANT_UPLOAD_PREFIX}${key}` }));
+    return { body: await res.Body!.transformToByteArray(), contentType: res.ContentType ?? "application/octet-stream" };
+  } catch {
+    return null;
+  }
+}
+
+// Fotos de perfil de las cuentas (`profile.ts`). Permanentes como el logo de la firma:
+// nada las barre. La llave lleva un UUID nuevo en cada subida y se sirve inmutable.
+const USER_AVATAR_PREFIX = "user-avatars/";
+
+export async function putUserAvatarToS3(key: string, body: Uint8Array, contentType: string): Promise<void> {
+  const s3 = await getS3();
+  const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: `${USER_AVATAR_PREFIX}${key}`,
+    Body: body,
+    ContentType: contentType,
+    CacheControl: "public, max-age=31536000, immutable",
+  }));
+}
+
+export async function getUserAvatarFromS3(key: string): Promise<{ body: Uint8Array; contentType: string } | null> {
+  const s3 = await getS3();
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  try {
+    const res = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: `${USER_AVATAR_PREFIX}${key}` }));
+    return { body: await res.Body!.transformToByteArray(), contentType: res.ContentType ?? "application/octet-stream" };
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteUserAvatarFromS3(key: string): Promise<void> {
+  const s3 = await getS3();
+  const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+  await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: `${USER_AVATAR_PREFIX}${key}` }));
 }
 
 export async function deleteEmailFileFromS3(key: string): Promise<void> {

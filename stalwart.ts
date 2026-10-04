@@ -371,6 +371,20 @@ export async function diasDeCertificado(): Promise<number | null> {
  * Lanza si falla; el llamador decide qué hacer (en el camino del reenvío, nada).
  */
 export async function importarMensaje(accountId: string, rawContent: string): Promise<void> {
+  await importMessageToRole(accountId, rawContent, "inbox", {});
+}
+
+/**
+ * Igual que `importarMensaje`, pero al buzón con el rol que se pida (`sent` para la
+ * copia en Enviados de lo que sale por la Bandeja o la API) y con las palabras clave
+ * dadas (`$seen`: lo que uno mismo mandó no llega como no leído).
+ */
+export async function importMessageToRole(
+  accountId: string,
+  rawContent: string,
+  role: "inbox" | "sent",
+  keywords: Record<string, boolean>,
+): Promise<void> {
   // El mensaje se sube como blob y luego se importa: es el camino de JMAP para meter
   // un correo ya formado, sin reconstruirlo campo por campo.
   const up = await fetch(`${base()}/jmap/upload/${accountId}/`, {
@@ -383,16 +397,17 @@ export async function importarMensaje(accountId: string, rawContent: string): Pr
   if (!up.ok) throw new Error(`upload ${up.status}`);
   const { blobId } = (await up.json()) as { blobId: string };
 
-  // El buzón se busca por rol (`inbox`), que es estable entre servidores e idiomas.
+  // El buzón se busca por rol, que es estable entre servidores e idiomas ("Enviados"
+  // y "Sent Messages" son el mismo `sent`).
   const q = await jmap([CORE, "urn:ietf:params:jmap:mail"], [[
-    "Mailbox/query", { accountId, filter: { role: "inbox" } }, "c0",
+    "Mailbox/query", { accountId, filter: { role } }, "c0",
   ]]);
   const mailboxId = respuesta(q)?.ids?.[0];
-  if (!mailboxId) throw new Error("la cuenta no tiene INBOX");
+  if (!mailboxId) throw new Error(`la cuenta no tiene buzón con rol ${role}`);
 
   const r = await jmap([CORE, "urn:ietf:params:jmap:mail"], [[
     "Email/import",
-    { accountId, emails: { e1: { blobId, mailboxIds: { [mailboxId]: true }, keywords: {} } } },
+    { accountId, emails: { e1: { blobId, mailboxIds: { [mailboxId]: true }, keywords } } },
     "c0",
   ]]);
   const resp = respuesta(r);

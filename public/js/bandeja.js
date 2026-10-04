@@ -169,7 +169,10 @@ async function checkAuth() {
   const res = await fetch("/api/auth/me");
   if (!res.ok) return window.location.href = "/login";
   currentUser = await res.json();
-  document.getElementById("user-email").textContent = currentUser.email;
+  document.getElementById("user-email").textContent = currentUser.displayName || currentUser.email;
+  document.getElementById("user-email").title = currentUser.email;
+  const miFoto = document.getElementById("user-avatar");
+  if (miFoto) miFoto.outerHTML = avatarHtml(currentUser.email, "mesa-avatar", { displayName: currentUser.displayName, avatarUrl: currentUser.avatarUrl });
   if (currentUser.isAdmin) { const al = document.getElementById("admin-link"); if (al) al.style.display = ""; }
 
   canDoActions = true;
@@ -204,8 +207,53 @@ async function loadDomains() {
   selectedDomainId = domains.some(d => d.id === recordado) ? recordado : domains[0].id;
   sel.value = selectedDomainId;
   await loadAliasesForCompose();
+  loadTeam();
   await loadConversations();
   connectSSE(selectedDomainId);
+}
+
+// --- Equipo: nombre y foto de cada persona del dominio ---
+//
+// `GET /api/domains/:id/agents` trae el perfil de la cuenta de cada miembro y del dueño.
+// Donde antes salía el prefijo del correo (asignado a, presencia, notas) sale el nombre,
+// y la foto o las iniciales.
+let team = new Map(); // email → { name, avatarUrl }
+
+async function loadTeam() {
+  const domainId = selectedDomainId;
+  const next = new Map();
+  if (currentUser?.email) next.set(currentUser.email, { name: currentUser.displayName || null, avatarUrl: currentUser.avatarUrl || null });
+  try {
+    const res = await fetch(`/api/domains/${domainId}/agents`);
+    if (res.ok) {
+      const data = await res.json();
+      const people = [...(data.owner ? [data.owner] : []), ...(data.members || [])];
+      for (const m of people) next.set(m.email, { name: m.displayName || m.name || null, avatarUrl: m.avatarUrl || null });
+    }
+  } catch {}
+  if (domainId !== selectedDomainId) return; // cambió de dominio mientras cargaba
+  team = next;
+  for (const c of conversations) if (c.assignedTo) renderConvRow(c.id);
+  renderPresence();
+}
+
+function personName(email) {
+  if (!email) return "";
+  return team.get(email)?.name || email.split("@")[0];
+}
+
+function personInitials(email, name) {
+  const base = String(name || (email || "?").split("@")[0]).trim();
+  const parts = base.split(/[\s._-]+/).filter(Boolean);
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : base.slice(0, 2)).toUpperCase();
+}
+
+/** Foto redonda o iniciales. `override` para el propio usuario antes de cargar el equipo. */
+function avatarHtml(email, cls = "mesa-avatar-sm", override) {
+  const p = override ? { name: override.displayName, avatarUrl: override.avatarUrl } : team.get(email);
+  const idAttr = cls === "mesa-avatar" ? ' id="user-avatar"' : "";
+  if (p?.avatarUrl) return `<span class="${cls}"${idAttr}><img src="${esc(p.avatarUrl)}" alt=""></span>`;
+  return `<span class="${cls}"${idAttr} aria-hidden="true">${esc(personInitials(email, p?.name))}</span>`;
 }
 
 // Alias reales del dominio, para el selector de remitente. Tienen que ser alias
@@ -489,7 +537,7 @@ function convRowHtml(c, i) {
       const hasta = new Date(c.snoozedUntil);
       meta += `<span class="mesa-tag mesa-tag-snoozed">💤 ${esc(hasta.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }))}</span>`;
     }
-    if (c.assignedTo) meta += `<span class="mesa-tag mesa-tag-assigned">${esc(c.assignedTo.split("@")[0])}</span>`;
+    if (c.assignedTo) meta += `<span class="mesa-tag mesa-tag-assigned" title="${esc(c.assignedTo)}">${avatarHtml(c.assignedTo, "mesa-avatar-xs")}${esc(personName(c.assignedTo))}</span>`;
 
     const puntoPresencia = presencias.some(p => p.conversationId === c.id && p.email !== currentUser?.email)
       ? `<span class="mesa-presence-dot" title="Alguien más está en este hilo"></span>` : "";
@@ -810,10 +858,30 @@ function cuerpoMensaje(item) {
   // El HTML manda cuando existe: en un correo sólo-HTML el `body` es texto derivado
   // (etiquetas fuera) y se ve peor que el original en el iframe.
   if (!item.html) return item.body ? esc(item.body) : "";
+  // Lo que salió del compositor lleva nuestra plantilla (fondo crema, columna de 600 px
+  // centrada): dentro de la Bandeja eso se veía como una caja blanca con el texto en
+  // medio. Se le quita el "papel" y hereda el tema, como un mensaje más del hilo.
+  const propio = item.html.includes('class="email-wrapper"');
+  const html = propio ? item.html.replace("</head>", `${estiloPlantillaPropia()}</head>`) : item.html;
   // srcdoc escapado: el HTML del correo viaja como atributo, no como marcado.
   // `allow-same-origin` (sin `allow-scripts`) deja que el padre lo mida: dentro
   // sigue sin correr JavaScript. El alto lo pone ajustarIframe.
-  return `<div class="mesa-msg-html-wrap"><iframe class="mesa-msg-html" sandbox="allow-same-origin" referrerpolicy="no-referrer" srcdoc="${esc(item.html)}"></iframe></div>`;
+  return `<div class="mesa-msg-html-wrap"><iframe class="mesa-msg-html${propio ? " is-propio" : ""}" sandbox="allow-same-origin" referrerpolicy="no-referrer" srcdoc="${esc(html)}"></iframe></div>`;
+}
+
+// `!important` en hoja gana a los estilos inline que dejó juice, y CSS gana al `bgcolor`.
+function estiloPlantillaPropia() {
+  const css = getComputedStyle(document.documentElement);
+  const color = (v) => `rgb(${css.getPropertyValue(v).trim().split(/\s+/).join(",")})`;
+  return `<style>
+html,body,.email-wrapper,.email-wrapper td{background:transparent!important}
+body{margin:0!important;color-scheme:light dark}
+.email-content{max-width:none!important;margin:0!important;width:100%!important}
+.email-wrapper>tbody>tr>td,.email-wrapper>tr>td{text-align:left!important}
+.email-body{padding:2px 0!important;color:${color("--fg")}!important}
+.email-body :is(p,li,h1,h2,h3,h4,h5,h6,strong,em,b,i,span,blockquote,td.email-body){color:inherit!important}
+.email-body a{color:${color("--accent-text")}!important}
+</style>`;
 }
 
 function renderMessages(messages, notes) {
@@ -830,7 +898,7 @@ function renderMessages(messages, notes) {
       return `<div class="mesa-note">
         <div class="mesa-note-header">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          ${esc(item.author)} &middot; ${formatTime(item.createdAt)}
+          ${avatarHtml(item.author, "mesa-avatar-xs")}<span title="${esc(item.author)}">${esc(personName(item.author))}</span> &middot; ${formatTime(item.createdAt)}
         </div>
         <div class="mesa-note-body">${esc(item.body)}</div>
       </div>`;
@@ -1200,8 +1268,20 @@ async function sendReply() {
 
 async function assignConversation() {
   if (!activeConv || !canDoActions) return;
+  renderAssignTeam();
   document.getElementById("modal-assign").classList.remove("hidden");
   document.getElementById("assign-email").focus();
+}
+
+// Atajo: el equipo del dominio con foto y nombre; un clic llena el correo.
+function renderAssignTeam() {
+  const cont = document.getElementById("assign-team");
+  if (!cont) return;
+  const emails = [...team.keys()];
+  cont.innerHTML = emails.map(email => `<button type="button" class="mesa-assign-person" data-email="${esc(email)}" title="${esc(email)}">
+      ${avatarHtml(email, "mesa-avatar-sm")}<span>${esc(personName(email))}${email === currentUser?.email ? " (tú)" : ""}</span>
+    </button>`).join("");
+  cont.classList.toggle("mesa-hidden", emails.length === 0);
 }
 
 // --- Posponer ---
@@ -1354,6 +1434,7 @@ function setupListeners() {
     document.getElementById("detail-loaded").classList.add("mesa-hidden");
     document.getElementById("messages-container").innerHTML = "";
     loadAliasesForCompose();
+    loadTeam();
     loadConversations();
     connectSSE(selectedDomainId);
   });
@@ -1508,12 +1589,19 @@ function setupListeners() {
     });
     document.getElementById("modal-assign").classList.add("hidden");
     if (res.ok) {
-      toast(`Asignada a ${email}`);
+      toast(`Asignada a ${personName(email)}`);
       await loadConversations();
     } else {
       const err = await res.json().catch(() => ({}));
       toast(err.error || "Error al asignar");
     }
+  });
+
+  document.getElementById("assign-team")?.addEventListener("click", (e) => {
+    const b = e.target.closest(".mesa-assign-person");
+    if (!b) return;
+    document.getElementById("assign-email").value = b.dataset.email;
+    document.getElementById("assign-confirm").click();
   });
 
   // Click outside modal to close
@@ -1939,7 +2027,7 @@ function renderPresence() {
   }
   // Escribiendo gana sobre viendo: es el aviso que de verdad evita la colisión.
   const escribiendo = otros.filter(p => p.state === "typing");
-  const nombres = (lista) => lista.map(p => esc(p.name || p.email.split("@")[0])).join(", ");
+  const nombres = (lista) => lista.map(p => avatarHtml(p.email, "mesa-avatar-xs") + esc(team.get(p.email)?.name || p.name || p.email.split("@")[0])).join(", ");
   barra.innerHTML = escribiendo.length
     ? `<span class="mesa-presence-typing">✍️ ${nombres(escribiendo)} ${escribiendo.length > 1 ? "están" : "está"} escribiendo<span class="mesa-dots"><i></i><i></i><i></i></span></span>`
     : `<span>👁 ${nombres(otros)} también ${otros.length > 1 ? "están viendo" : "está viendo"} este hilo</span>`;

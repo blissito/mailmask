@@ -1,0 +1,35 @@
+# Relay LMTP de salida de los buzones: Stalwart (ruta `ses`) → 127.0.0.1:2525 → app.
+# Lo instala box/outbound-relay/install.sh; @NODE@ lo sustituye el instalador.
+[Unit]
+Description=MailMask outbound relay (Stalwart -> MailMask API)
+After=network-online.target
+Wants=network-online.target
+Before=stalwart.service
+
+[Service]
+Type=simple
+User=mailmask-relay
+Group=mailmask-relay
+EnvironmentFile=/etc/mailmask-relay.env
+WorkingDirectory=/opt/mailmask-relay
+ExecStart=@NODE@ /opt/mailmask-relay/relay.mjs
+Restart=always
+RestartSec=2
+# Logs al journal: journalctl -u mailmask-outbound-relay
+StandardOutput=journal
+StandardError=journal
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

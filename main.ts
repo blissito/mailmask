@@ -6,6 +6,7 @@ import * as path from "node:path";
 import * as dns from "node:dns/promises";
 import { programar, esServidor } from "./scheduler.js";
 import { revisarPatron } from "./regex-guard.js";
+import { buildDnsSetup } from "./dns-setup.js";
 import { verificarTurnstile } from "./turnstile.js";
 import { generarPerfilApple, nombreArchivoPerfil, IMAP_HOST } from "./apple-profile.js";
 import { addSseClient, notifyBandeja, setPresence, clearPresence, listPresence, notifyPresence } from "./sse-hub.js";
@@ -20,6 +21,7 @@ import {
   createUser,
   createDomain,
   getDomain,
+  getDomainByName,
   getUserByApiKey,
   listUserDomains,
   updateDomain,
@@ -40,6 +42,7 @@ import {
   getForwardCounts,
   PLANS,
   ADDONS,
+  DOMAIN_ANNUAL_PRICE,
   listAddons,
   listEffectiveAddons,
   getAddonById,
@@ -189,7 +192,27 @@ import {
   parseCookies,
   generateCsrfToken,
   makeCsrfCookie,
+  issueTurnToken,
+  verifyTurnToken,
 } from "./auth.js";
+import { requireConfirmation, listPendingActions, confirmAction, rejectAction } from "./agent-actions.js";
+import { handleGetProfile, handleUpdateProfile, handleUploadAvatar, handleDeleteAvatar, handleServeAvatar, applyGoogleProfile, profileOf, profileForEmail } from "./profile.js";
+import {
+  openGhostyTurn,
+  relayTurn,
+  buildScreenContext,
+  isOwnUpload,
+  attachmentMarkdown,
+  saveAssistantMessage,
+  getMessagePage,
+  clearAssistantMessages,
+  rotateAssistantNonce,
+  signedUploadUrl,
+  verifyUploadSig,
+  userKey,
+  ASSISTANT_BASE_PROMPT,
+  type AssistantAttachment,
+} from "./assistant.js";
 import { checkRateLimit } from "./rate-limit.js";
 import {
   verifyDomain,
@@ -213,15 +236,31 @@ import { processInbound, extractPlainBody, extractHtmlBody, extractAttachments, 
 import { fetchEmailFromS3, threadRefsFor, S3FetchError, degradedBodyState, repairReceiptRules, ensureDomainInbound, ensureSnsSubscription, AWS_REGION, getBackupBytesFromS3 } from "./ses.js";
 import { runDbBackup, DB_BACKUP_SUFFIX } from "./backup.js";
 import { resolveEmailBody, extractInlineImages, appendSignature, quotePrevious, MAX_EMAIL_HTML_BYTES } from "./email-html.js";
-import { putDomainAssetToS3, getDomainAssetFromS3, deleteDomainAssetFromS3, putEmailImageToS3, getEmailImageFromS3, deleteEmailImageFromS3, sweepOrphanEmailImages, putEmailFileToS3, getEmailFileFromS3, deleteEmailFileFromS3, ALLOWED_IMAGE_TYPES } from "./ses.js";
+import { putDomainAssetToS3, getDomainAssetFromS3, deleteDomainAssetFromS3, putEmailImageToS3, getEmailImageFromS3, deleteEmailImageFromS3, sweepOrphanEmailImages, putEmailFileToS3, getEmailFileFromS3, deleteEmailFileFromS3, ALLOWED_IMAGE_TYPES, putAssistantUploadToS3, getAssistantUploadFromS3 } from "./ses.js";
 import type { InlineImage, Attachment } from "./ses.js";
 import { sqlite } from "./pg.js";
 import { log } from "./logger.js";
 import { createSmtpIamCredential, revokeSmtpIamCredential } from "./ses.js";
 import { crearBuzon, cambiarPassword, borrarBuzon, exportarBuzon } from "./stalwart.js";
 import { atenderMcp } from "./mcp.js";
+import {
+  protectedResourceMetadata, authorizationServerMetadata, protectedResourceMetadataUrl,
+  registerClient, authorizeGet, authorizePost, tokenEndpoint, revokeEndpoint, verifyOAuthAccessToken,
+} from "./oauth.js";
+import { logOutbound, handleInternalOutbound } from "./outbound-relay.js";
+import { copyToSentFolder } from "./imap-store.js";
+
+// Adjuntos del asistente: 10 MB; imágenes rasterizadas, PDF y texto plano. Ni SVG ni
+// HTML, que se servirían desde nuestro dominio y ejecutarían script.
+const ASSISTANT_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const ASSISTANT_UPLOAD_TYPES = /^(image\/(png|jpeg|gif|webp)|application\/pdf|text\/(plain|csv|markdown))$/;
 
 const MCP_REGISTRY_AUTH_PATH = "/.well-known/mcp-registry-auth";
+
+/** Rutas que hablan con clientes MCP de cualquier origen (sólo Bearer, nunca cookie): CORS abierto. */
+function isOpenCorsPath(path: string): boolean {
+  return path === "/mcp" || path.startsWith("/.well-known/oauth-") || path === "/oauth/token" || path === "/oauth/register" || path === "/oauth/revoke";
+}
 const MCP_REGISTRY_PUBLIC_KEY = "+L7eynWTl5U/ZUd1DbrylPBzJHKTE0TzU9qdO8n8Vos=";
 import {
   sendTemplate,
@@ -263,6 +302,11 @@ function ensureEnv() {
 }
 
 // --- Helpers ---
+
+/** `next` del login: sólo de vuelta al consentimiento OAuth (nada de redirecciones abiertas). */
+function safeNext(v: unknown): string | undefined {
+  return typeof v === "string" && v.length <= 4000 && v.startsWith("/oauth/authorize?") ? v : undefined;
+}
 
 function getMainDomainUrl(): string {
   const raw = process.env.MAIN_DOMAIN ?? "www.mailmask.studio";
@@ -467,26 +511,6 @@ async function ownerLogDays(domainId: string): Promise<number> {
   return derechosPorDominioId(domainId)?.logDays ?? DOMINIO_GRATIS.logDays;
 }
 
-/**
- * Registra un envío saliente en `email_logs` con status `sent`. El webhook de
- * eventos de SES lo mueve a delivered/bounced/complained por `sesMessageId`.
- * Antes los envíos por API y bulk no dejaban rastro: la pestaña Logs sólo
- * mostraba reenvíos, y un envío que rebotaba era invisible.
- */
-function logOutbound(domainId: string, from: string, to: string, subject: string, body: string, sesMessageId: string, logDays: number): void {
-  try {
-    addLog({
-      domainId, timestamp: new Date().toISOString(),
-      from, to, subject,
-      status: "sent", forwardedTo: to,
-      sizeBytes: Buffer.byteLength(body ?? "", "utf8"),
-      sesMessageId: sesMessageId || undefined,
-    }, logDays);
-  } catch (err) {
-    log("warn", "ses", "Could not log outbound send", { domainId, error: String(err) });
-  }
-}
-
 function parseCopyList(value: unknown, max = 20): string[] {
   if (!Array.isArray(value)) return [];
   const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -528,6 +552,13 @@ async function rateLimitGuard(
 }
 
 // --- Admin check ---
+
+// Mientras el asistente se prueba, sólo lo ven los admins y ASSISTANT_EMAILS; ASSISTANT_PUBLIC=1 lo abre a todos.
+function assistantEnabledFor(email: string): boolean {
+  if (process.env.ASSISTANT_PUBLIC === "1" || isAdmin(email)) return true;
+  // Probadores: correos separados por coma en ASSISTANT_EMAILS.
+  return (process.env.ASSISTANT_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).includes(email.toLowerCase());
+}
 
 function isAdmin(email: string): boolean {
   const admins = (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim().toLowerCase());
@@ -1217,13 +1248,13 @@ const app = new Elysia({ adapter: node() })
     },
     exclude: {
       tags: ["Auth", "Billing", "Admin", "Webhooks", "Coupons", "Referrals",
-             "Export", "Bandeja", "Agents", "Domain Registration"],
+             "Export", "Bandeja", "Agents", "Domain Registration", "Assistant"],
       paths: [
         "/", "/login", "/register", "/app", "/composer-demo", "/cli/authorize", "/css/*", "/js/*", "/img/*",
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
-        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/.well-known/mcp-registry-auth", "/health", "/healthz", "/docs", "/mcp",
+        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/.well-known/mcp-registry-auth", "/health", "/healthz", "/docs", "/mcp", "/api/internal/outbound",
       ],
       staticFile: true,
     },
@@ -1250,7 +1281,7 @@ const app = new Elysia({ adapter: node() })
       : request.headers.get("origin") || "http://localhost:8000";
     if (request.method === "OPTIONS") {
       // Un cliente MCP en el navegador manda Bearer y la versión del protocolo.
-      const esMcp = new URL(request.url).pathname === "/mcp";
+      const esMcp = isOpenCorsPath(new URL(request.url).pathname);
       return new Response(null, {
         headers: {
           "access-control-allow-origin": esMcp ? "*" : corsOrigin,
@@ -1282,6 +1313,11 @@ const app = new Elysia({ adapter: node() })
     // /mcp sólo acepta Bearer (nunca cookie), así que no hay CSRF que proteger; sin
     // Bearer la propia ruta contesta 401 en vez de un 403 confuso.
     if (url.pathname === "/mcp") return;
+    // OAuth del MCP: register/token/revoke los llama un cliente sin cookie; el POST del
+    // consentimiento se protege con su ticket de un solo uso atado a la sesión (`oauth.ts`).
+    if (url.pathname.startsWith("/oauth/")) return;
+    // El relay de la caja de Stalwart firma con HMAC y nunca manda cookie.
+    if (url.pathname === "/api/internal/outbound") return;
     // Skip CSRF for Bearer token auth (inherently CSRF-safe)
     const authHeader = request.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) return;
@@ -1305,14 +1341,41 @@ const app = new Elysia({ adapter: node() })
       });
     }
   })
+  // --- Límites del turn token del asistente (`mt_`) ---
+  // El asistente opera la cuenta, pero no fabrica credenciales que sobrevivan al turno
+  // (API keys, SMTP) ni toca el panel de admin. Y nada del propio asistente acepta Bearer:
+  // si un `mt_` alcanzara `/api/agent-actions`, el agente se aprobaría a sí mismo.
+  .onBeforeHandle(({ request }) => {
+    const path = new URL(request.url).pathname;
+    const authHeader = request.headers.get("authorization") ?? "";
+    if (authHeader.startsWith("Bearer ") && (path.startsWith("/api/asistente") || path === "/api/agent-actions")) {
+      return jsonErr("Esta ruta sólo acepta la sesión del panel.", 403);
+    }
+    // Un `mo_` (OAuth de un cliente MCP) tampoco fabrica llaves ni entra al admin: revocar el
+    // permiso tiene que bastar para cortar el acceso.
+    if (authHeader.startsWith("Bearer mo_") && (path.startsWith("/api/api-keys") || path.startsWith("/api/admin/") ||
+      (/^\/api\/domains\/[^/]+\/smtp-credentials$/.test(path) && (request.method === "GET" || request.method === "POST")))) {
+      return jsonErr("Una conexión OAuth no puede crear ni listar credenciales; hazlo tú desde el panel.", 403);
+    }
+    if (!authHeader.startsWith("Bearer mt_")) return;
+    const forbidden =
+      path.startsWith("/api/api-keys") ||
+      path.startsWith("/api/admin/") ||
+      (/^\/api\/domains\/[^/]+\/smtp-credentials$/.test(path) && (request.method === "GET" || request.method === "POST"));
+    if (forbidden) return jsonErr("El asistente no puede crear ni listar credenciales; hazlo tú desde el panel.", 403);
+  })
   .onAfterHandle(({ request, response }) => {
     const isDeploy = !!process.env.FLY_APP_NAME;
     const corsOrigin = isDeploy
       ? getMainDomainUrl()
       : request.headers.get("origin") || "http://localhost:8000";
     if (response instanceof Response) {
-      response.headers.set("access-control-allow-origin", corsOrigin);
-      response.headers.set("access-control-allow-credentials", "true");
+      if (isOpenCorsPath(new URL(request.url).pathname)) {
+        response.headers.set("access-control-allow-origin", "*");
+      } else {
+        response.headers.set("access-control-allow-origin", corsOrigin);
+        response.headers.set("access-control-allow-credentials", "true");
+      }
       response.headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
       response.headers.set("x-frame-options", "DENY");
       response.headers.set("x-content-type-options", "nosniff");
@@ -1590,18 +1653,20 @@ const app = new Elysia({ adapter: node() })
     const state = crypto.randomUUID();
     const ref = typeof query.ref === "string" ? query.ref.slice(0, 64) : undefined;
     const coupon = typeof query.coupon === "string" ? query.coupon.slice(0, 64) : undefined;
+    const next = safeNext(query.next);
     const utm = limpiarUtm({ source: query.utm_source, medium: query.utm_medium, campaign: query.utm_campaign });
     await db.insert(tokensTable).values({
       token: state,
       kind: "oauth-state",
-      value: { ref, coupon, ...(utm ? { utm } : {}) },
+      value: { ref, coupon, ...(next ? { next } : {}), ...(utm ? { utm } : {}) },
       expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
     });
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: googleRedirectUri(request),
       response_type: "code",
-      scope: "openid email",
+      // `profile` trae `name` y `picture`: llenan el perfil de la cuenta si está vacío.
+      scope: "openid email profile",
       state,
       prompt: "select_account",
     });
@@ -1628,9 +1693,9 @@ const app = new Elysia({ adapter: node() })
       .where(eq(tokensTable.token, state)).get();
     if (!stateRow || stateRow.kind !== "oauth-state" || stateRow.expiresAt < new Date().toISOString()) return fail("google-state");
     db.delete(tokensTable).where(eq(tokensTable.token, state)).run();
-    const carried = (stateRow.value ?? {}) as { ref?: string; coupon?: string; utm?: { source?: string; medium?: string; campaign?: string } | null };
+    const carried = (stateRow.value ?? {}) as { ref?: string; coupon?: string; next?: string; utm?: { source?: string; medium?: string; campaign?: string } | null };
 
-    let idPayload: { email?: string; email_verified?: boolean; aud?: string; sub?: string };
+    let idPayload: { email?: string; email_verified?: boolean; aud?: string; sub?: string; name?: string; picture?: string };
     try {
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
@@ -1683,10 +1748,15 @@ const app = new Elysia({ adapter: node() })
     }
     // Google ya verificó el buzón: no tiene sentido pedirle que abra un correo nuestro.
     if (user && !user.emailVerified) verifyUserEmail(email);
+    // Nombre y foto de Google sólo donde el perfil está vacío; nunca tumba el login.
+    if (user && (!user.displayName || !user.avatarKey)) await applyGoogleProfile(email, { name: idPayload.name, picture: idPayload.picture });
 
     const token = await signJwt({ email });
     const csrfToken = generateCsrfToken();
-    const headers = new Headers({ location: `${getMainDomainUrl()}/app${carried.coupon ? `?coupon=${encodeURIComponent(carried.coupon)}` : ""}` });
+    // Vuelve al consentimiento OAuth si de ahí venía (pasando por /login, que ya ve la sesión
+    // aunque la cookie Strict no viaje en esta cadena de redirects desde Google).
+    const back = safeNext(carried.next);
+    const headers = new Headers({ location: back ? `${getMainDomainUrl()}/login?next=${encodeURIComponent(back)}` : `${getMainDomainUrl()}/app${carried.coupon ? `?coupon=${encodeURIComponent(carried.coupon)}` : ""}` });
     headers.append("set-cookie", makeAuthCookie(token));
     headers.append("set-cookie", makeCsrfCookie(csrfToken));
     return new Response(null, { status: 302, headers });
@@ -1755,8 +1825,9 @@ const app = new Elysia({ adapter: node() })
 
     return new Response(
       JSON.stringify({
-        email: user.email,
+        ...profileOf(user), // email, displayName, avatarUrl
         isAdmin: isAdmin(user.email),
+        assistant: assistantEnabledFor(user.email),
         domainsCount: domains.length,
         forwards,
         subscription: {
@@ -1792,6 +1863,36 @@ const app = new Elysia({ adapter: node() })
   }, {
     detail: { tags: ["Auth"], summary: "Get current user profile and usage", security: [{ cookieAuth: [] }] },
   })
+
+  // --- Perfil de la cuenta (nombre y foto). Sesión, API key o el `mt_` del asistente:
+  // todo es del propio usuario. La lógica vive en profile.ts.
+  .get("/api/profile", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    return handleGetProfile(auth.email);
+  }, { detail: { tags: ["Profile"], summary: "Perfil de la cuenta: nombre y foto" } })
+
+  .put("/api/profile", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    return handleUpdateProfile(auth.email, body);
+  }, { detail: { tags: ["Profile"], summary: "Cambia el nombre visible de la cuenta (máx. 60)" } })
+
+  .post("/api/profile/avatar", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const rl = checkRateLimit(`avatar:${auth.email}`, 10, 60_000);
+    if (!rl.allowed) return jsonErr("Demasiadas subidas; espera un minuto.", 429);
+    return handleUploadAvatar(auth.email, request);
+  }, { detail: { tags: ["Profile"], summary: "Sube la foto de perfil (multipart `file` o `{fromUrl}` de un adjunto del asistente)" } })
+
+  .delete("/api/profile/avatar", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    return handleDeleteAvatar(auth.email);
+  }, { detail: { tags: ["Profile"], summary: "Quita la foto de perfil" } })
+
+  .get("/api/avatar/:hash/:file", ({ params }) => handleServeAvatar(params.hash, params.file), { detail: { hide: true } })
 
   .get("/api/auth/verify-email", async ({ query }) => {
     const token = query.token;
@@ -2279,8 +2380,11 @@ const app = new Elysia({ adapter: node() })
     }
 
     // Global status
+    // "error" es sólo lo técnico (SES no verifica el dominio). Un dominio sin activar
+    // funciona —guarda el correo— y pintarlo de rojo mandaba a la gente a revisar su DNS
+    // cuando lo que faltaba era activarlo (kandey.com.mx, insightslab.com.mx).
     const allOk = Object.values(checks).every(c => c.ok);
-    const hasError = !checks.verified.ok || !checks.plan.ok;
+    const hasError = !checks.verified.ok;
     const status = allOk ? "ok" : hasError ? "error" : "warning";
 
     let summary = "";
@@ -2288,6 +2392,8 @@ const app = new Elysia({ adapter: node() })
       summary = "Todo configurado correctamente — tu dominio puede enviar y recibir emails";
     } else if (!checks.verified.ok) {
       summary = "Tu dominio no está verificado — configura los registros DNS y verifica";
+    } else if (!checks.plan.ok) {
+      summary = "Falta activar este dominio: guarda el correo pero no lo reenvía";
     } else if (!checks.mx.ok) {
       summary = "Tu dominio no puede recibir emails: el registro MX no apunta a MailMask";
     } else if (!checks.spf.ok || !checks.dkim.ok) {
@@ -2303,6 +2409,19 @@ const app = new Elysia({ adapter: node() })
     });
   }, {
     detail: { tags: ["Domains", "SDK"], summary: "Check domain health and DNS configuration", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  // Los registros que el cliente pega en su registrador. `?live=1` además los compara con el
+  // DNS público y adivina el panel por los NS; la tabla de /app no lo pide (sería lenta).
+  .get("/api/domains/:id/dns-setup", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const live = new URL(request.url).searchParams.get("live") === "1";
+    return Response.json(await buildDnsSetup(access.domain, { live }));
+  }, {
+    detail: { tags: ["Domains", "SDK"], summary: "DNS records to paste at the registrar, optionally checked against live DNS", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
   .post("/api/domains/:id/verify", async ({ request, params }) => {
@@ -2407,6 +2526,28 @@ const app = new Elysia({ adapter: node() })
       );
     }
 
+    {
+      const aliasesDelDominio = listAliases(domain.id);
+      const buzones = aliasesDelDominio.filter((a) => a.mailboxEnabled).length;
+      const pendiente = requireConfirmation(user, request, {
+        intent: "delete_domain",
+        domainId: domain.id,
+        summary: {
+          title: `Borrar el dominio ${domain.domain}`,
+          lines: [
+            `${aliasesDelDominio.length} máscara${aliasesDelDominio.length === 1 ? "" : "s"}`,
+            ...(buzones ? [`${buzones} buzón${buzones === 1 ? "" : "es"} con su correo`] : []),
+          ],
+          effects: [
+            "Se borran todas sus máscaras, reglas y buzones",
+            `El correo que llegue a ${domain.domain} dejará de reenviarse`,
+          ],
+          destructive: true,
+        },
+      });
+      if (pendiente) return pendiente;
+    }
+
     // Clean up all SES resources (best effort)
     try { await deleteReceiptRule(domain.domain); } catch { /* best effort */ }
     try { await deleteConfigurationSet(domain.domain); } catch { /* best effort */ }
@@ -2422,6 +2563,23 @@ const app = new Elysia({ adapter: node() })
 
   // --- Aliases ---
 
+  // --- OAuth 2.1 del MCP (`oauth.ts`): descubrimiento, DCR, consentimiento y tokens ---
+  .get("/.well-known/oauth-protected-resource", ({ request }) => protectedResourceMetadata(request))
+  .get("/.well-known/oauth-protected-resource/mcp", ({ request }) => protectedResourceMetadata(request))
+  .get("/.well-known/oauth-authorization-server", ({ request }) => authorizationServerMetadata(request))
+  .post("/oauth/register", ({ request, body }) => registerClient(body, getIp(request)))
+  .get("/oauth/authorize", async ({ request, query }) => {
+    const auth = await getAuthUser(request);
+    // Sólo la sesión del navegador da permiso; un Bearer nunca.
+    return authorizeGet(request, query as Record<string, unknown>, auth?.via === "session" ? auth.email : null, getIp(request));
+  })
+  .post("/oauth/authorize", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    return authorizePost(request, (body ?? {}) as Record<string, unknown>, auth?.via === "session" ? auth.email : null);
+  })
+  .post("/oauth/token", ({ request, body }) => tokenEndpoint(request, body, getIp(request)))
+  .post("/oauth/revoke", ({ request, body }) => revokeEndpoint(request, body, getIp(request)))
+
   // --- MCP: agentes de IA con la misma API key de siempre ---
   .all("/mcp", async ({ request }) => {
     if (request.method === "OPTIONS") return new Response(null, { status: 204 });
@@ -2430,16 +2588,23 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Método no permitido" }), { status: 405, headers: { "content-type": "application/json", allow: "POST" } });
     }
     const auth = request.headers.get("authorization") ?? "";
-    if (!auth.startsWith("Bearer mk_")) {
-      return new Response(JSON.stringify({ error: "Manda tu API key: Authorization: Bearer mk_…" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": "Bearer" } });
+    // `mt_` = turn token del asistente de /app (5 min); `mk_` = API key de siempre.
+    // Sin credencial, el 401 anuncia la metadata OAuth (spec MCP de autorización): un cliente
+    // MCP la sigue, se registra y pide permiso; una persona con `mk_` sigue igual que antes.
+    const challenge = (extra = "") => `Bearer resource_metadata="${protectedResourceMetadataUrl(request)}"${extra}`;
+    if (!auth.startsWith("Bearer mk_") && !auth.startsWith("Bearer mt_") && !auth.startsWith("Bearer mo_")) {
+      return new Response(JSON.stringify({ error: "Manda tu API key (Authorization: Bearer mk_…) o conéctate con OAuth." }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": challenge() } });
     }
     // La llave se valida aquí sin gastar el tope por llave: cada herramienta vuelve a
     // pasar por getAuthUser en la ruta interna, y contarla dos veces dejaba 30/min en
     // vez de 60. Contra el escaneo de llaves queda el tope por IP.
     const limited = await rateLimitGuard(getIp(request), 120, 60_000);
     if (limited) return limited;
-    const user = await getUserByApiKey(auth.slice("Bearer ".length));
-    if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: { "content-type": "application/json" } });
+    const bearer = auth.slice("Bearer ".length);
+    const user = bearer.startsWith("mt_") ? await verifyTurnToken(bearer)
+      : bearer.startsWith("mo_") ? verifyOAuthAccessToken(bearer)
+      : await getUserByApiKey(bearer);
+    if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": challenge(', error="invalid_token"') } });
     const fetchLocal = ((url: string | URL | Request, init?: RequestInit) => app.fetch(new Request(url as string, init))) as unknown as typeof fetch;
     const res = await atenderMcp(request, { apiKey: auth.slice("Bearer ".length), fetchLocal });
     res.headers.set("access-control-allow-origin", "*");
@@ -2667,6 +2832,25 @@ const app = new Elysia({ adapter: node() })
     // que la nombre. Se borra primero allá; si falla, no se borra la fila, porque una
     // fila sin cuenta se arregla sola y una cuenta sin fila no.
     const previo = await getAlias(domain.id, params.alias);
+    if (previo) {
+      const pendiente = requireConfirmation(user, request, {
+        intent: "delete_alias",
+        domainId: domain.id,
+        summary: {
+          title: `Borrar la máscara ${previo.alias}@${domain.domain}`,
+          lines: [
+            previo.destinations.length ? `Reenvía a: ${previo.destinations.join(", ")}` : "Sin destinos de reenvío",
+            ...(previo.mailboxEnabled ? ["Tiene buzón IMAP"] : []),
+          ],
+          effects: [
+            `El correo que llegue a ${previo.alias}@${domain.domain} dejará de reenviarse`,
+            ...(previo.mailboxEnabled ? ["Se borra el buzón con todo su correo; no se puede recuperar"] : []),
+          ],
+          destructive: true,
+        },
+      });
+      if (pendiente) return pendiente;
+    }
     if (previo?.mailboxEnabled && previo.mailboxAccountId) {
       const r = await borrarBuzon(previo.mailboxAccountId, `${params.alias}@${domain.domain}`);
       if (!r.ok) {
@@ -3162,7 +3346,8 @@ const app = new Elysia({ adapter: node() })
             const startDate = sub.auto_recurring?.start_date ? new Date(sub.auto_recurring.start_date) : null;
             const deferred = !!startDate && !Number.isNaN(startDate.getTime()) && startDate.getTime() > Date.now() + 86_400_000;
             const end = deferred ? startDate! : new Date();
-            end.setDate(end.getDate() + 35);
+            // Gracia de 5 días sobre el ciclo: 35 para el mensual, 370 para el anual.
+            end.setDate(end.getDate() + (sub.auto_recurring?.frequency === 12 ? 370 : 35));
             updateAddon(addon.id, {
               status: "active",
               mpPreapprovalId: body.data.id,
@@ -3630,7 +3815,7 @@ const app = new Elysia({ adapter: node() })
         if (renewingAddon) {
           const prev = renewingAddon.currentPeriodEnd ? new Date(renewingAddon.currentPeriodEnd) : new Date();
           const base = prev > new Date() ? prev : new Date();
-          base.setDate(base.getDate() + 35);
+          base.setDate(base.getDate() + (ap.type === "yearly" || (ap.transaction_amount ?? 0) * 100 >= DOMAIN_ANNUAL_PRICE ? 370 : 35));
           updateAddon(renewingAddon.id, { status: "active", currentPeriodEnd: base.toISOString() });
           log("info", "billing", "Add-on renovado", { addonId: renewingAddon.id, kind: renewingAddon.kind, until: base.toISOString() });
 
@@ -3901,9 +4086,13 @@ const app = new Elysia({ adapter: node() })
     const limited = await rateLimitGuard(ip, 5, 60_000);
     if (limited) return limited;
 
-    const { kind, domainId, payerEmail: rawPayerEmail } = addonBody;
+    const { kind, domainId, payerEmail: rawPayerEmail, period } = addonBody;
     if (!(kind in ADDONS)) {
       return new Response(JSON.stringify({ error: "Add-on inválido" }), { status: 400 });
+    }
+    const annual = period === "annual";
+    if (annual && kind !== "domain") {
+      return new Response(JSON.stringify({ error: "Sólo la activación del dominio se paga anual" }), { status: 400 });
     }
     const addonKind = kind as AddonKind;
 
@@ -3959,11 +4148,11 @@ const app = new Elysia({ adapter: node() })
           // Sin la palabra "Plan": el webhook tiene un regex /Plan (\w+)/i que activaría
           // un plan por accidente. Salimos antes por el prefijo addon:, pero no hay razón
           // para dejar la mina puesta.
-          reason: `MailMask — ${ADDONS[addonKind].label} · ${dominio.domain}`,
+          reason: `MailMask — ${ADDONS[addonKind].label}${annual ? " (anual)" : ""} · ${dominio.domain}`,
           auto_recurring: {
-            frequency: 1,
+            frequency: annual ? 12 : 1,
             frequency_type: "months",
-            transaction_amount: ADDONS[addonKind].price / 100,
+            transaction_amount: (annual ? DOMAIN_ANNUAL_PRICE : ADDONS[addonKind].price) / 100,
             currency_id: "MXN",
           },
           payer_email: payerEmail,
@@ -3984,7 +4173,7 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Error creando la suscripción del add-on" }), { status: 500 });
     }
   }, {
-    body: t.Object({ kind: t.String(), domainId: t.String(), payerEmail: t.Optional(t.String()) }),
+    body: t.Object({ kind: t.String(), domainId: t.String(), payerEmail: t.Optional(t.String()), period: t.Optional(t.Union([t.Literal("monthly"), t.Literal("annual")])) }),
     detail: { tags: ["Billing"], summary: "Start add-on subscription checkout for a domain", security: [{ cookieAuth: [] }] },
   })
 
@@ -4180,7 +4369,7 @@ const app = new Elysia({ adapter: node() })
       // camino que la Bandeja; el archivo se borra de S3 una vez enviado.
       const files = await collectAttachments(sendBody.attachments);
       sentFileKeys = files.keys;
-      const { messageId, sesMessageId } = await sendFromDomain(fromAddress, recipient, subject, rendered.text, {
+      const sentApi = await sendFromDomain(fromAddress, recipient, subject, rendered.text, {
         html: rendered.html,
         replyTo,
         cc: sendCc.length ? sendCc : undefined,
@@ -4190,8 +4379,11 @@ const app = new Elysia({ adapter: node() })
         attachments: files.attachments.length ? files.attachments : undefined,
         configSet: getConfigSetName(domain.domain),
       });
+      const { messageId, sesMessageId } = sentApi;
       await discardSentFiles(sentFileKeys);
       logOutbound(domain.id, bareFrom, recipient, subject, rendered.html ?? rendered.text, sesMessageId, limits.logDays);
+      // Si el remitente tiene buzón, que lo enviado por API también esté en su Enviados.
+      void copyToSentFolder(domain.id, bareFrom, sentApi);
       const result = { ok: true, messageId, sesMessageId };
       if (idemToken) {
         db.insert(tokensTable).values({
@@ -4798,14 +4990,16 @@ const app = new Elysia({ adapter: node() })
       withImages = await attachInlineImages(rendered.html);
       const files = await collectAttachments(attachRefs);
       sentFileKeys = files.keys;
-      ({ messageId, sesMessageId: composeSesId } = await sendFromDomain(fromAddress, recipient, String(subject), rendered.text, {
+      const sentCompose = await sendFromDomain(fromAddress, recipient, String(subject), rendered.text, {
         html: withImages.html,
         inlineImages: withImages.inlineImages,
         attachments: files.attachments.length ? files.attachments : undefined,
         cc: cc.length ? cc : undefined,
         bcc: bcc.length ? bcc : undefined,
         configSet: getConfigSetName(domain.domain),
-      }));
+      });
+      ({ messageId, sesMessageId: composeSesId } = sentCompose);
+      void copyToSentFolder(domain.id, fromAddress, sentCompose);
       logOutbound(domain.id, fromAddress, recipient, String(subject), withImages.html ?? rendered.text, composeSesId, limits.logDays);
     } catch (err) {
       decrementSendCount(domain.id);
@@ -5304,7 +5498,7 @@ const app = new Elysia({ adapter: node() })
       const withImages = await attachInlineImages(rendered.html);
       const files = await collectAttachments(attachRefs);
       sentFileKeys = files.keys;
-      const { messageId, sesMessageId } = await sendFromDomain(fromAddress, recipient, `Re: ${conv.subject}`, rendered.text, {
+      const sentReply = await sendFromDomain(fromAddress, recipient, `Re: ${conv.subject}`, rendered.text, {
         html: withImages.html,
         inlineImages: withImages.inlineImages,
         attachments: files.attachments.length ? files.attachments : undefined,
@@ -5314,6 +5508,10 @@ const app = new Elysia({ adapter: node() })
         inReplyTo: lastRef,
         references: conv.threadReferences.join(" "),
       });
+      const { messageId, sesMessageId } = sentReply;
+      // La respuesta desde la Bandeja también va a Enviados del buzón, si la máscara
+      // tiene uno: si no, en Apple Mail el hilo queda con sólo lo que llegó.
+      void copyToSentFolder(domain.id, fromAddress, sentReply);
       logOutbound(domain.id, fromAddress, recipient, `Re: ${conv.subject}`, withImages.html ?? rendered.text, sesMessageId, (await ownerLogDays(domain.id)));
 
       // Ya salió con imágenes y adjuntos dentro: las copias en S3 sobran.
@@ -5794,19 +5992,27 @@ const app = new Elysia({ adapter: node() })
     const auth = await getAuthUser(request);
     if (!auth) return new Response(JSON.stringify({ error: "No autenticado" }), { status: 401 });
 
+    // Quien no administra el equipo (un agente de la Bandeja) también lo lee, pero sólo
+    // nombres y fotos para pintar "asignado a" y la presencia: sin invitaciones ni ligas.
     const access = await checkDomainAccess(auth.email, params.id, "manage_members");
     if (!access) {
-      return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      const reader = await checkDomainAccess(auth.email, params.id, "read");
+      if (!reader) return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
+      const members = (await listAgents(reader.domain.id)).map((m) => ({ email: m.email, name: m.name, role: m.role, ...profileForEmail(m.email) }));
+      return new Response(JSON.stringify({ owner: { email: reader.domain.ownerEmail, ...profileForEmail(reader.domain.ownerEmail) }, members, invites: [] }), {
+        headers: { "content-type": "application/json" },
+      });
     }
     const domain = access.domain;
 
-    const members = await listAgents(domain.id);
+    const members = (await listAgents(domain.id)).map((m) => ({ ...m, ...profileForEmail(m.email) }));
     // El enlace sólo lo ve quien tiene manage_members: es quien pudo crearlo.
     const invites = listAgentInvites(domain.id).map((i) => ({
       ...i,
       inviteUrl: `${getMainDomainUrl()}/api/agents/accept?token=${i.token}`,
     }));
-    return new Response(JSON.stringify({ members, invites }), {
+    const owner = { email: domain.ownerEmail, ...profileForEmail(domain.ownerEmail) };
+    return new Response(JSON.stringify({ owner, members, invites }), {
       headers: { "content-type": "application/json" },
     });
   }, {
@@ -5841,6 +6047,20 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Dominio no encontrado" }), { status: 404 });
     }
     const domain = access.domain;
+
+    const miembro = listAgents(domain.id).find((a) => a.id === params.agentId);
+    if (!miembro) return new Response(JSON.stringify({ error: "Agente no encontrado" }), { status: 404 });
+    const pendiente = requireConfirmation(auth, request, {
+      intent: "remove_member",
+      domainId: domain.id,
+      summary: {
+        title: `Quitar a ${miembro.email} de ${domain.domain}`,
+        lines: [`Rol: ${miembro.role}`],
+        effects: [`${miembro.email} deja de ver la Bandeja de ${domain.domain}`],
+        destructive: true,
+      },
+    });
+    if (pendiente) return pendiente;
 
     const deleted = await deleteAgent(domain.id, params.agentId);
     if (!deleted) return new Response(JSON.stringify({ error: "Agente no encontrado" }), { status: 404 });
@@ -6092,6 +6312,18 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Agrega un destino de reenvío antes de quitar el buzón, o borra la máscara entera" }), { status: 400 });
     }
 
+    const pendienteBuzon = requireConfirmation(user, request, {
+      intent: "delete_mailbox",
+      domainId: access.domain.id,
+      summary: {
+        title: `Borrar el buzón de ${aliasName}@${access.domain.domain}`,
+        lines: [`La máscara se queda y sigue reenviando a: ${fila.destinations.join(", ")}`],
+        effects: ["Se borra todo el correo guardado en el buzón; no se puede recuperar", "Apple Mail u Outlook dejarán de conectarse a ese buzón"],
+        destructive: true,
+      },
+    });
+    if (pendienteBuzon) return pendienteBuzon;
+
     // Borrar la cuenta BORRA EL CORREO. El orden importa: si Stalwart falla, la fila
     // se queda marcada y el barrido de huérfanas no la cuenta de más.
     const r = await borrarBuzon(fila.mailboxAccountId, `${aliasName}@${access.domain.domain}`);
@@ -6104,6 +6336,12 @@ const app = new Elysia({ adapter: node() })
   })
 
   // --- SES bounce/complaint events ---
+
+  // Salida de los buzones IMAP: el relay de la caja de Stalwart entrega aquí lo que manda
+  // Apple Mail (outbound-relay.ts). Autenticada por HMAC; ignora cookies a propósito.
+  .post("/api/internal/outbound", ({ request }) => handleInternalOutbound(request), {
+    detail: { hide: true },
+  })
 
   .post("/api/webhooks/ses-events", async ({ request }) => {
     const body = await request.json();
@@ -6968,6 +7206,21 @@ const app = new Elysia({ adapter: node() })
     if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Registro no encontrado", 404);
     if (reg.status !== "registered") return jsonErr("Este dominio todavía no está registrado a tu nombre.", 409);
 
+    const pendienteTraslado = requireConfirmation(auth, request, {
+      intent: "transfer_out",
+      domainId: getDomainByName(reg.domainName)?.id ?? null,
+      summary: {
+        title: `Trasladar ${reg.domainName} a otro registrador`,
+        lines: [`Registro: ${reg.domainName}`],
+        effects: [
+          `Te llegará un correo a ${auth.email} con el código de autorización (EPP)`,
+          "Con ese código cualquiera puede llevarse el dominio: no lo compartas",
+        ],
+        destructive: true,
+      },
+    });
+    if (pendienteTraslado) return pendienteTraslado;
+
     // Entregar el auth code es entregar el dominio, así que va por correo y no en la
     // respuesta: si alguien se metió a la sesión, el código no le sirve de nada.
     const token = crypto.randomUUID();
@@ -7418,6 +7671,19 @@ const app = new Elysia({ adapter: node() })
       });
       if (bloqueo) return jsonErr(bloqueo.message, 409);
 
+      const pendiente = requireConfirmation(user, request, {
+        intent: "delete_dns_record",
+        domainId: d.id,
+        body: { name: b.name, type: b.type },
+        summary: {
+          title: `Borrar el registro ${type} de ${name}`,
+          lines: (actual.values ?? []).slice(0, 6).map((v: string) => `Valor: ${v}`),
+          effects: ["Lo que dependa de este registro (web, verificaciones, correo de otro proveedor) puede dejar de funcionar"],
+          destructive: true,
+        },
+      });
+      if (pendiente) return pendiente;
+
       // Se borra con los valores actuales: Route 53 exige que el RRSet coincida exacto.
       const { changeId } = await applyRecordChanges(d.hostedZoneId, [{ action: "DELETE", rrset: actual }], `Borrado de ${user.email}`);
       log("info", "route53", "DNS record deleted", { domain: d.domain, name, type, actor: user.email, changeId });
@@ -7533,6 +7799,182 @@ const app = new Elysia({ adapter: node() })
   }, {
     detail: { tags: ["CLI"], summary: "Poll a CLI device-code login" },
   })
+  // --- Asistente de /app (agente en Ghosty Studio) ---
+  //
+  // Todo `/api/asistente*` y `/api/agent-actions` exige la COOKIE de sesión: el hook de
+  // arriba rechaza cualquier Bearer, y además aquí se pide `via === "session"`.
+
+  .post("/api/asistente/stream", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    if (!assistantEnabledFor(auth.email)) return jsonErr("El asistente todavía no está disponible para tu cuenta.", 403);
+    const rl = checkRateLimit(`assistant:${auth.email}`, 20, 60_000);
+    if (!rl.allowed) return jsonErr("Demasiados mensajes seguidos; espera un minuto.", 429);
+
+    const b = (body ?? {}) as { text?: unknown; attachments?: unknown; screen?: unknown; screenChanged?: unknown; surface?: unknown };
+    const text = String(b.text ?? "").trim().slice(0, 8000);
+    // Sólo adjuntos que ESTE usuario subió a nuestra ruta firmada: Ghosty los descarga.
+    const files: AssistantAttachment[] = (Array.isArray(b.attachments) ? b.attachments : [])
+      .slice(0, 6)
+      .filter((a): a is Record<string, unknown> => !!a && typeof a === "object" && typeof (a as { url?: unknown }).url === "string" && isOwnUpload((a as { url: string }).url, auth.email))
+      .map((a) => ({
+        url: a.url as string,
+        name: typeof a.name === "string" ? a.name.slice(0, 200) : undefined,
+        contentType: typeof a.contentType === "string" ? a.contentType.slice(0, 100) : undefined,
+        size: typeof a.size === "number" ? a.size : undefined,
+      }));
+    if (!text && !files.length) return jsonErr("Mensaje vacío", 400);
+
+    // Se guarda ANTES del turno: si Ghosty falla, lo que el usuario escribió no se pierde.
+    // Los adjuntos van como markdown, igual que los re-hidrata el dock.
+    const saved = saveAssistantMessage(auth.email, "user", [text, ...files.map(attachmentMarkdown)].filter(Boolean).join("\n"));
+
+    const pantalla = buildScreenContext(auth.email, b.screen);
+    const appendSystemPrompt = [ASSISTANT_BASE_PROMPT, pantalla ? `Contexto de pantalla:\n${pantalla}` : null].filter(Boolean).join("\n\n");
+    // El append sólo se aplica cuando Ghosty CREA la conversación (es sticky por groupId,
+    // lección de Deník), así que cuando la pantalla cambió también viaja en el mensaje.
+    const textForGhosty = b.screenChanged === true && pantalla
+      ? `<contexto-de-pantalla>\n${pantalla}\n</contexto-de-pantalla>\n\n${text}`
+      : text;
+
+    const upstreamAbort = new AbortController();
+    let relayDone = false;
+    request.signal?.addEventListener("abort", () => { if (!relayDone) upstreamAbort.abort(); }, { once: true });
+
+    const turno = await openGhostyTurn({
+      email: auth.email,
+      text: textForGhosty || "(adjuntos)",
+      attachments: files,
+      appendSystemPrompt,
+      turnToken: await issueTurnToken(auth.email),
+      signal: upstreamAbort.signal,
+    });
+    if (!turno.ok) {
+      log("error", "assistant", "No se pudo abrir el turno en Ghosty", { email: auth.email, reason: turno.reason });
+      return jsonErr("No se pudo contactar al asistente", 502);
+    }
+
+    const stream = relayTurn(turno.body, upstreamAbort, (o) => {
+      relayDone = true;
+      if (o.status === "failed") log("warn", "assistant", "Turno fallido", { email: auth.email, error: o.error });
+      const content = o.reply || (o.status === "failed" ? "No pude completar la respuesta. Intenta de nuevo." : "");
+      if (content) saveAssistantMessage(auth.email, "assistant", content, o.status);
+    });
+    return new Response(stream, {
+      headers: {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-cache, no-transform",
+        connection: "keep-alive",
+        "x-accel-buffering": "no",
+        // El id del mensaje del usuario ya persistido: el dock reemplaza su burbuja optimista.
+        "x-message-id": saved.id,
+      },
+    });
+  }, { detail: { tags: ["Assistant"], summary: "Turno del asistente en SSE" } })
+
+  .get("/api/asistente", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    return Response.json(getMessagePage(auth.email, new URL(request.url).searchParams.get("before")));
+  }, { detail: { tags: ["Assistant"], summary: "Historial del asistente (paginado con ?before=ISO)" } })
+
+  .post("/api/asistente", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    // El dock manda FormData; se acepta también JSON.
+    const intent = String((body as { intent?: unknown } | null)?.intent ?? "");
+    if (intent === "reset") {
+      // Nueva conversación: se borra el hilo visible y un nonce nuevo cambia el groupId,
+      // así que Ghosty abre una conversación limpia en el siguiente turno.
+      clearAssistantMessages(auth.email);
+      rotateAssistantNonce(auth.email);
+      return Response.json({ ok: true });
+    }
+    // El camino síncrono de Deník no existe aquí: todo turno va por el stream.
+    if (intent === "send") return jsonErr("Usa /api/asistente/stream", 410);
+    return jsonErr("Unknown intent", 400);
+  }, { detail: { tags: ["Assistant"], summary: "Acciones del hilo del asistente (reset)" } })
+
+  // En Deník esto nombra la tool real detrás de `run_tool` (codemode). El MCP de MailMask
+  // expone cada tool con su nombre, así que no hay nada que resolver.
+  .get("/api/asistente/last-tool", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    return Response.json({ name: null });
+  }, { detail: { tags: ["Assistant"], summary: "Última tool despachada (sin uso en MailMask)" } })
+
+  .post("/api/asistente/upload", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    const rl = checkRateLimit(`assistant-upload:${auth.email}`, 20, 60_000);
+    if (!rl.allowed) return jsonErr("Demasiadas subidas; espera un minuto.", 429);
+
+    const form = await request.formData().catch(() => null);
+    const file = form?.get("file");
+    if (!(file instanceof File)) return jsonErr("Falta el archivo", 400);
+    if (file.size > ASSISTANT_UPLOAD_MAX_BYTES) return jsonErr("El archivo pesa más de 10 MB", 413);
+    const tipo = (file.type || "").toLowerCase();
+    if (!ASSISTANT_UPLOAD_TYPES.test(tipo)) return jsonErr("Sólo imágenes (PNG, JPG, GIF, WebP), PDF o texto", 415);
+
+    const safeName = file.name.replace(/[^\w.-]+/g, "_").slice(-60) || "archivo";
+    const key = `${userKey(auth.email)}/${crypto.randomUUID()}-${safeName}`;
+    try {
+      await putAssistantUploadToS3(key, new Uint8Array(await file.arrayBuffer()), tipo);
+    } catch (err) {
+      log("error", "assistant", "Upload failed", { error: String(err) });
+      return jsonErr("No se pudo subir el archivo", 500);
+    }
+    const host = new URL(request.url).host;
+    const base = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) ? `http://${host}` : getMainDomainUrl();
+    return Response.json({ ok: true, url: signedUploadUrl(base, key), name: file.name, contentType: tipo, size: file.size });
+  }, { detail: { tags: ["Assistant"], summary: "Sube un adjunto para el asistente" } })
+
+  // Descarga firmada (7 días) de un adjunto: la usan el dock (miniaturas, mismo origen
+  // para la CSP) y Ghosty, que no tiene sesión.
+  .get("/api/asistente/files/*", async ({ request, params }) => {
+    const key = decodeURIComponent(params["*"] ?? "");
+    const url = new URL(request.url);
+    if (!key || key.includes("..") || !verifyUploadSig(key, url.searchParams.get("exp"), url.searchParams.get("sig"))) {
+      return jsonErr("Enlace inválido o vencido", 403);
+    }
+    const obj = await getAssistantUploadFromS3(key);
+    if (!obj) return jsonErr("Archivo no encontrado", 404);
+    const tipo = ASSISTANT_UPLOAD_TYPES.test(obj.contentType) ? obj.contentType : "application/octet-stream";
+    return new Response(obj.body as BodyInit, {
+      headers: { "content-type": tipo, "cache-control": "private, max-age=3600", "content-disposition": "inline" },
+    });
+  }, { detail: { tags: ["Assistant"], summary: "Descarga firmada de un adjunto del asistente" } })
+
+  // --- Confirmación de acciones del asistente ---
+  .get("/api/agent-actions", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    return Response.json({ actions: listPendingActions(auth.email) });
+  }, { detail: { tags: ["Assistant"], summary: "Acciones del asistente pendientes de aprobar" } })
+
+  .post("/api/agent-actions", async ({ request, body }): Promise<Response> => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    const b = (body ?? {}) as { intent?: unknown; actionId?: unknown };
+    const actionId = String(b.actionId ?? "");
+    if (!/^[0-9a-f-]{36}$/i.test(actionId)) return jsonErr("actionId inválido", 400);
+    if (b.intent === "reject") return rejectAction(auth.email, actionId);
+    if (b.intent !== "confirm") return jsonErr("Unknown intent", 400);
+
+    // Se re-ejecuta la petición archivada contra la MISMA ruta con la sesión de quien
+    // aprueba: pasa por sus mismos permisos y validaciones, y con cookie el guardián de
+    // confirmación no vuelve a saltar.
+    const fwd: Record<string, string> = {};
+    for (const h of ["cookie", "x-csrf-token", TRUSTED_IP_HEADER, "user-agent"]) {
+      const v = request.headers.get(h);
+      if (v) fwd[h] = v;
+    }
+    return confirmAction(auth.email, actionId, (p): Promise<Response> => (app.fetch as (r: Request) => Promise<Response>)(new Request(`http://internal.local${p.path}`, {
+      method: p.method,
+      headers: p.body !== undefined ? { ...fwd, "content-type": "application/json" } : fwd,
+      body: p.body !== undefined ? JSON.stringify(p.body) : undefined,
+    })));
+  }, { detail: { tags: ["Assistant"], summary: "Aprueba o rechaza una acción del asistente" } })
 
   // --- API Keys ---
 

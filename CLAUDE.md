@@ -42,15 +42,48 @@ comprueba "no es 404" ya vale: eso solo habría atrapado 6 de los 10 bugs.
 
 `POST /mcp` es un servidor MCP Streamable HTTP **sin sesiones** (`@modelcontextprotocol/sdk`,
 `WebStandardStreamableHTTPServerTransport`, `enableJsonResponse`), autenticado sólo con
-`Authorization: Bearer mk_…` (la API key normal; sin ella 401, y `/mcp` está exento de CSRF
-porque nunca acepta cookie). **Cada herramienta es el SDK real** (`sdk/src`, que sí viaja
+`Authorization: Bearer mk_…` (la API key normal) o `Bearer mt_…` (turn token del asistente,
+ver "Asistente Mask"); sin ellas 401, y `/mcp` está exento de CSRF porque nunca acepta cookie.
+95 herramientas desde el 4-oct-2026, con paridad con el panel (cobro por liga, compra/transferencia/renovación de
+dominios, equipo, firma y logo, respuestas guardadas, `domain_dns_setup`, perfil, pedidos, referidos y la **Bandeja**: `inbox_*`) y `MCP_INSTRUCTIONS`
+(≤6000 caracteres, lo fija `mcp.test.ts`): es todo lo que un agente partner sabe del producto. **Cada herramienta es el SDK real** (`sdk/src`, que sí viaja
 en la imagen) hablando con la app en proceso vía `app.fetch` — el mismo truco de
 `sdk.test.ts` —, así que no puede desalinearse de una ruta sin que `sdk.test.ts` lo cace.
 Para añadir una: método en el SDK → caso en `sdk.test.ts` → `tool()` en `mcp.ts`. Un
 `MailMaskError` sale como `isError` con `HTTP <status>: <mensaje>` (el 403 del precio es
 información útil para el agente). No se exponen las API keys (un agente con una llave no
-fabrica más), ni Bandeja ni billing. Pruebas en `mcp.test.ts`. Docs en `docs.html#mcp` y
+fabrica más); un pago siempre es una liga que abre el
+usuario (`paid: false`). Pruebas en `mcp.test.ts`. Docs en `docs.html#mcp` y
 `EXTRA_DOCS` de `upload-docs.ts`. GET/DELETE dan 405: sin sesiones no hay stream ni cierre.
+
+**Bandeja por MCP (4-oct-2026).** Decisión de producto: a los clientes de Ghosty se les sugiere un
+correo propio para su agente (máscara + Bandeja) en vez de dar su Gmail. `inbox_list|read|attachment|
+reply|send|mark|assign|note|delete|restore|metrics` + `upload_attachment` son las rutas de `/api/bandeja/*`
+vía `sdk.inbox` (mismos `requireBandeja`, recorte de 7 días del gratis y topes); `inbox_read` da texto
+(12k por mensaje), no HTML. `reply`/`send`/`send_email` llevan «⚠️ Confirma» en la descripción.
+`upload_attachment`, `set_domain_logo` y la foto aceptan `{fromUrl}` (adjunto firmado del dock) vía
+`readOwnUpload` (`profile.ts`) o base64. `cancel_addon` y `cancel_renewal` piden tarjeta con `mt_`.
+`/mcp` reenvía la IP del cliente a las llamadas internas: antes todos caían en el cubo `unknown` de los
+topes por IP. Fuera a propósito: API keys, admin, presencia/SSE, EPP, confirmar transfer-out (va por
+correo), cupones y el cancel del plan legado (sin suscriptores).
+
+## OAuth 2.1 del MCP (`oauth.ts`, 4-oct-2026)
+
+Cualquier cliente MCP con el spec de autorización (Ghosty, Claude) conecta `/mcp` sólo con la URL.
+El 401 de `/mcp` lleva `WWW-Authenticate: Bearer resource_metadata=".../.well-known/oauth-protected-resource"`;
+de ahí `/.well-known/oauth-authorization-server` → `POST /oauth/register` (DCR público, 20/h por IP;
+redirect https o http a loopback) → `GET /oauth/authorize` (sólo **sesión** de navegador, PKCE S256
+obligatorio, `resource` = `<issuer>/mcp`, pantalla de consentimiento) → `POST /oauth/token` → `Bearer mo_…`.
+Tablas `oauth_clients`, `oauth_codes`, `oauth_tokens` (migración 0026); todo con SHA-256. `mo_` vive
+1 h, `mr_` 60 días y **rota**: presentar uno ya rotado revoca la familia entera (reuso = robo); reusar
+un code también. Cambiar la contraseña corta los tokens. `getAuthUser` trata un `mo_` como `mk_`
+(`via: "apikey"`, 60/min por token) pero `main.ts` le niega `/api/api-keys`, `/api/admin/*` y las
+credenciales SMTP. La cookie es SameSite=Strict: llegando desde otro sitio `/oauth/authorize` no la ve
+y manda a `/login?next=…`, que detecta la sesión con un fetch y regresa (sólo acepta `next` que empiece
+con `/oauth/authorize?`; Google lo carga en el `state`). El POST del consentimiento está exento del CSRF
+global: lo protege un ticket de un solo uso (tabla `tokens`, kind `oauth-consent`) atado a sesión y
+parámetros. El issuer es `MAIN_DOMAIN` en Fly y el origen de la petición en local. Pruebas:
+`oauth.test.ts`; e2e contra un servidor vivo: `scripts/oauth-e2e.ts` (instrucciones en su cabecera).
 
 ## MCP Registry oficial (`studio.mailmask/mailmask`, 19-sep-2026)
 
@@ -79,6 +112,54 @@ generado **no se commitea**: lo produce el `RUN` del Dockerfile (por eso `.docke
 `npm test`. Rutas en `main.ts`: `/skills/*`, `/.well-known/agent-skills/index.json`,
 `/.well-known/skills/index.json`. **Al tocar una skill**: `npm run skills:publish` (subtree push
 al espejo, manual) y, si cambió la sección `#skills` de `docs.html`, re-subir la KB de Formmy.
+
+## Asistente Mask (1-oct-2026)
+
+Chat "Mask" dentro de `/app` que **hace** las cosas con el MCP de MailMask. El cerebro corre en
+Ghosty; MailMask sólo firma, acuña credenciales y guarda el historial.
+
+**Camino de un turno:** dock (`public/js/asistente/`, portado del de agenda; bundle
+`public/js/asistente.js`) → `/api/asistente*` (`main.ts`, cliente en `assistant.ts`) → Ghosty
+`POST /api/v2/fleet-agents/:id/message-stream` firmado con HMAC (`X-Ghosty-Key` = `gpk_…`,
+secreto `gps_…`, canónico `${ts}.${keyId}.${rawBody}`, ±300 s) → claude-worker con el MCP
+`mailmask` → `gs mcp-proxy` → nuestro `/mcp` con `Authorization: Bearer ${turn.token}`. Ese token
+es un `mt_…` (`issueTurnToken` en `auth.ts`): JWT `aud: "assistant"`, **300 s**, uno nuevo por
+turno, 120 req/min por usuario. Un `mt_` no sirve como cookie ni una cookie como `mt_`.
+`GHOSTY_RUNTIME=partner` usa `/api/v2/partner/turns` (motor sólo-MCP) en vez de la flota.
+
+**Env:** `GHOSTY_PARTNER_KEY`, `GHOSTY_PARTNER_SECRET`, `GHOSTY_AGENT_ID` (obligatorio en
+`fleet`), `GHOSTY_RUNTIME` (`fleet` por defecto), `ASSISTANT_EMAILS` (probadores, por comas) y
+`ASSISTANT_PUBLIC=1` para abrirlo a todos; mientras no, sólo lo ven los admins y esa lista.
+
+**Ghosty, configurado por CLI** (no hay nada en el repo que lo cree): space `mailmask`, agente
+**Mask** `cmuq2rfma0008gewlanomot6g`; `ghosty mcp set` con `ghosty/mcp.json` (el header lleva el
+literal `${turn.token}`, que Ghosty sustituye por turno); prompt en `ghosty/prompt.md`; tope de
+modelo 4 y llave de Claude de la casa. Si cambias el prompt o el MCP en el repo, vuelve a
+subirlos con el CLI: no se sincronizan solos.
+
+**Confirmación de lo destructivo** (`agent-actions.ts`, tabla `pending_agent_actions`,
+migración 0024): con `via: "turn"`, `delete_domain`, `delete_alias`, `delete_mailbox`,
+`delete_dns_record`, `remove_member` y `transfer_out` **no ejecutan**: guardan la petición y
+responden `409 { error: "needs_confirmation", actionId, summary }`. `mcp.ts` lo convierte en
+resultado normal con `needsConfirmation: true` (si pareciera error, el modelo reintentaría) y el
+dock pinta `PendingActionCard`. El resumen sale de la base, nunca del texto del modelo; aprobar
+(`POST /api/agent-actions`) exige cookie + CSRF y rechaza todo Bearer (si no, el agente se
+aprobaría solo); `UPDATE … WHERE status='pending'` evita doble ejecución; caduca a los 15 min.
+Con `mk_` todo sigue ejecutándose directo.
+
+**Añadir una herramienta = método en el SDK → caso en `sdk.test.ts` → `tool()` en `mcp.ts` →
+etiqueta en `public/js/asistente/toolLabel.ts`** (la traza del dock; sin ella sale el nombre
+crudo). Si es destructiva, además `requireConfirmation()` en la ruta y un `AgentIntent` nuevo.
+
+**Activación anual:** `POST /api/addons/checkout` acepta `period: "annual"` (sólo `kind:
+"domain"`): preapproval de `DOMAIN_ANNUAL_PRICE` = $999 MXN con `frequency: 12`, y el webhook
+da 370 días de vigencia (35 al mensual). `billing.checkout()` del SDK y `activation_link` aún no
+exponen `period`.
+
+**MercadoPago bloquea el checkout si el pagador usa la tarjeta guardada de la cuenta
+cobradora** (1-oct-2026, insightslab con la Visa 8439): misma familia que "Payer and collector
+cannot be the same user". Hay que pagar con otra tarjeta u otra cuenta de MP, nunca con la
+guardada en la cuenta que cobra.
 
 ## Dominios: registro, renovación, transferencias y DNS (7-sep-2026)
 
@@ -289,7 +370,7 @@ orden (todo arreglado ese día salvo lo marcado):
   **Choque de fechas:** Hostinger tiene hasta 10 días para soltarla (≈4-oct) y el dominio
   vence un día antes. Confirmar con la clienta que la autorrenovación quedó encendida, o
   que renueve ya. **La clienta no piensa renovar** (dicho el 25-sep): pedirle que escriba al chat de
-  Hostinger para que aprueben la transferencia ya. Revisado el 28-sep: AWS sigue en el paso 7/14 sin cambios desde las
+  Hostinger para que aprueben la transferencia ya. **1-oct: la clienta pagó la renovación en Hostinger** (el whois todavía decía 3-oct; el registro tarda en reflejarlo): el riesgo de vencimiento queda cerrado y la transferencia sigue sin prisa. Revisado el 28-sep: AWS sigue en el paso 7/14 sin cambios desde las
   22:47 del 24-sep; el whois del .mx sigue en Registrar.eu (Hostinger), `ACTIVE`, y el
   NS y el MX siguen en Hostinger. Para revisar (el perfil por defecto de `aws` tiene llaves
   vencidas y da `UnrecognizedClientException`; hay que cargar las de `.env` del repo):
@@ -667,8 +748,71 @@ Bandeja **y** en el buzón. Es el producto entero funcionando sobre un dominio d
 1. **SES Tenants** (un cliente no puede tumbar la reputación de todos). Verificar de entrada
    si el tenant se puede indicar por SMTP; si no, Stalwart debe entregar a la app en vez de
    a SES — un solo camino de salida que además da el contador de envíos y el log.
-2. **Contador del 465**: hoy lo que sale de Apple Mail no descuenta de los 50/día. Hasta
+2. **Un solo camino de salida (pedido el 1-oct-2026, va después del asistente).** Lo que sale de
+   Apple Mail por el 465 va de Stalwart directo a SES: **no aparece en la Bandeja** (los hilos quedan
+   con sólo lo entrante, visto con insightslab.com.mx), no descuenta de los 50/día y no entra al log.
+   Arreglo: la ruta de salida de Stalwart entrega a la app (que registra, cuenta y manda a SES) y,
+   al revés, lo que se responde desde la Bandeja se copia a Enviados del buzón con `Email/import`.
+   **Contador del 465**: hoy lo que sale de Apple Mail no descuenta de los 50/día. Hasta
    entonces "+100 envíos" no se publica como comprable.
+
+   **✅ Aplicado en producción el 1-oct-2026 (ver "Operar el relay" abajo).** Nada de puertos en Fly (decisión
+   de bliss): el relay vive en la caja de Stalwart y habla con la app por HTTPS.
+
+       Apple Mail ─465→ Stalwart ─ruta `ses`, LMTP→ 127.0.0.1:2525 (box/outbound-relay)
+                 ─HTTPS + HMAC→ POST /api/internal/outbound ─→ SES · email_logs · Bandeja
+
+   - **App** (`outbound-relay.ts`, `handleInternalOutbound`): firma `X-MailMask-Signature:
+     sha256=HMAC(OUTBOUND_RELAY_SECRET, "<ts>.<cuerpo>")` + `X-MailMask-Timestamp` (±300 s);
+     exenta de CSRF, nunca mira cookies, sin secreto = 401 siempre. Cuerpo
+     `{mailFrom, rcptTo[], raw: base64}`. Exige máscara **con buzón** de dominio verificado y
+     activado y `From:` visible = sobre (Stalwart sólo valida el sobre); supresión **por
+     destinatario**; un envío del tope diario por mensaje (las respuestas desde Apple Mail
+     también cuentan); quita DKIM/Bcc/Return-Path; `sendRawFromDomain`; `logOutbound`;
+     `email.sent`; engancha el hilo (o lo abre; si todos los destinos son del propio dominio no
+     abre nada, vuelve a entrar por SES) con SSE. Idempotente por Message-ID + destinatarios
+     aceptados (`claimOnce("relay-sent")`). Respuestas: 200 `{perRcpt: {addr: "ok" |
+     "rejected:<código> <motivo>"}}`, 422 `{code}` política del mensaje entero, 503 SES caído.
+   - **Caja** (`box/outbound-relay/`: `relay.mjs` con `smtp-server`, unidad systemd con usuario
+     `mailmask-relay` sin privilegios, `install.sh` idempotente que instala Node si falta).
+     **LMTP** y no SMTP porque contesta por destinatario. Traducción: 200 → 250/5xx por
+     destinatario; 422 → el 5xx de la app (Stalwart manda el DSN); 401, 5xx, timeout, red →
+     **451** y Stalwart reintenta. Nunca cae a SES directo.
+   - `copyToSentFolder` (`imap-store.ts`): reply, redactar y `POST /send` copian el MIME a
+     Enviados (rol `sent`, `$seen`) si la máscara tiene `mailboxEnabled`, con el Message-ID
+     que pone SES. `void`, 8 s de tope, nunca bloquea el envío.
+   - Pruebas: `outbound-relay.test.ts`, `box-relay.test.ts`, `sent-copy.test.ts`.
+
+   **Operar el relay (aplicado el 1-oct-2026, verificado de punta a punta).** Prueba: buzón
+   `prueba-relay@mailmask.studio` → 465 → relay → app → SES → Gmail: `email_logs` `delivered`, hilo
+   saliente en la Bandeja, `send_counts` +1, journal "Entregado a MailMask" 200. Buzón borrado.
+
+   - **Entrar a la caja** (sandbox `sb_4c48dee1-819c-4481-99b0-d08b4f387e83`, host `ovh`, sin SSH
+     propio): `scripts/caja.sh exec '<cmd>'` y `scripts/caja.sh put <local> <remoto>` (API de
+     sandbox-host por `ssh ovh`, mismo patrón que `en_la_caja.sh` de ghosty-studio).
+   - **Estado:** `scripts/caja.sh exec 'systemctl is-active mailmask-outbound-relay; journalctl -u
+     mailmask-outbound-relay -n 20 --no-pager'`. Cada envío deja `Entregado a MailMask` con el
+     `sesMessageId`; en `fly logs`, `Relay: enviado desde buzón`.
+   - **Ruta de Stalwart:** el script necesita `STALWART_ADMIN_*`, que **sólo están en Fly**: se corre
+     desde producción (`base64` del script → `fly ssh console … npx tsx /tmp/sov.ts [--apply|--rollback]`).
+     Sin flags imprime la ruta actual (`ses (Relay) → 127.0.0.1:2525`).
+   - **Rollback:** `--rollback` (desde producción) devuelve `ses` a `email-smtp.us-east-1.amazonaws.com:465`.
+     El respaldo de la ruta original (trae la llave IAM del relay viejo) está en
+     `~/.mailmask-stalwart-ses-route.json` de la Mac de bliss (0600) y en `/root/` del contenedor
+     de Fly, que **se pierde en el siguiente deploy**. Después, `systemctl restart stalwart`.
+   - **Códigos:** 200 → 250 por destinatario; política (tope, remitente, supresión) → 5xx y
+     Stalwart manda el DSN al buzón; app caída/401/5xx/timeout → **451**, Stalwart reintenta (nunca
+     cae a SES directo).
+   - **Secreto:** `OUTBOUND_RELAY_SECRET` en Fly, en `/etc/mailmask-relay.env` de la caja (0640) y en
+     `.env` local. Rotarlo = los tres + `systemctl restart mailmask-outbound-relay`.
+   - **Reinstalar** (caja nueva o actualización): subir `box/outbound-relay/*` con `caja.sh put` a
+     `/root/mailmask-relay-src/` y `OUTBOUND_RELAY_SECRET=… ./install.sh`. Instala Node 20 en
+     `/opt/node-v20.18.1` (la caja **no trae `xz`**: por eso baja el `.tar.gz`).
+   - Las respuestas desde Apple Mail **cuentan** para los 50/día (decisión pendiente de producto).
+   - **Pendiente:** revocar el usuario IAM `mailmask-stalwart-relay` el ~8-oct-2026 (sólo sirve
+     para el rollback). Agregar `/opt/mailmask-relay`, `/opt/node-v20.18.1` y
+     `/etc/mailmask-relay.env` a la lista de "La caja no se sabe reconstruir".
+
 3. **Una compra real en MercadoPago** del add-on `domain` (nunca se ha ejercitado contra MP;
    el webhook con `addon:` sí).
 4. **Bootstrap reproducible de la caja** + simulacro cronometrado, y comprobar que el dump

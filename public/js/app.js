@@ -141,6 +141,7 @@ async function refreshUsage() {
   const res = await fetch("/api/auth/me");
   if (!res.ok) return;
   currentUser = await res.json();
+  renderProfileHeader();
   renderAccountUI();
 }
 
@@ -151,7 +152,96 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadDomains();
   loadDomainRegistrations();
   setupEventListeners();
+  setupProfileModal();
 });
+
+// --- Perfil de la cuenta (nombre y foto) ---
+// Se ve en la cabecera, en la Bandeja de los compañeros y en el dock de Mask, que lo lee
+// de `window.mailmaskProfile` y del evento `mailmask:profile`.
+
+function profileInitials(p) {
+  const base = String(p?.displayName || (p?.email || "?").split("@")[0]).trim();
+  const parts = base.split(/[\s._-]+/).filter(Boolean);
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : base.slice(0, 2)).toUpperCase();
+}
+
+function paintAvatar(el, p) {
+  if (!el) return;
+  el.innerHTML = p?.avatarUrl ? `<img src="${esc(p.avatarUrl)}" alt="">` : esc(profileInitials(p));
+}
+
+function applyProfile(p) {
+  currentUser = { ...currentUser, email: p.email, displayName: p.displayName, avatarUrl: p.avatarUrl };
+  renderProfileHeader();
+}
+
+function renderProfileHeader() {
+  if (!currentUser) return;
+  const p = { email: currentUser.email, displayName: currentUser.displayName ?? null, avatarUrl: currentUser.avatarUrl ?? null };
+  document.getElementById("user-email").textContent = p.displayName || p.email;
+  document.getElementById("profile-trigger")?.setAttribute("title", p.displayName ? `${p.displayName} · ${p.email}` : "Tu perfil");
+  paintAvatar(document.getElementById("user-avatar"), p);
+  paintAvatar(document.getElementById("profile-preview"), p);
+  document.getElementById("profile-remove-photo")?.classList.toggle("hidden", !p.avatarUrl);
+  window.mailmaskProfile = p;
+  window.dispatchEvent(new Event("mailmask:profile"));
+}
+
+function profileError(msg) {
+  const el = document.getElementById("profile-error");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.classList.toggle("hidden", !msg);
+}
+
+function setupProfileModal() {
+  document.getElementById("profile-trigger")?.addEventListener("click", () => {
+    document.getElementById("profile-email").textContent = currentUser?.email || "";
+    document.getElementById("profile-name").value = currentUser?.displayName || "";
+    profileError("");
+    renderProfileHeader();
+    showModal("modal-profile");
+    document.getElementById("profile-name").focus();
+  });
+
+  document.getElementById("form-profile")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    profileError("");
+    const res = await fetch("/api/profile", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ displayName: document.getElementById("profile-name").value }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { profileError(data.error || "No se pudo guardar"); return; }
+    applyProfile(data);
+    hideModal("modal-profile");
+    showToast("Perfil actualizado");
+  });
+
+  document.getElementById("profile-file")?.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    profileError("");
+    if (file.size > 2 * 1024 * 1024) { profileError("La foto no puede pesar más de 2 MB"); return; }
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/profile/avatar", { method: "POST", body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { profileError(data.error || "No se pudo subir la foto"); return; }
+    applyProfile(data);
+    showToast("Foto actualizada");
+  });
+
+  document.getElementById("profile-remove-photo")?.addEventListener("click", async () => {
+    profileError("");
+    const res = await fetch("/api/profile/avatar", { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { profileError(data.error || "No se pudo quitar la foto"); return; }
+    applyProfile(data);
+  });
+}
 
 async function checkAuth() {
   const res = await fetch("/api/auth/me");
@@ -160,8 +250,15 @@ async function checkAuth() {
     return;
   }
   currentUser = await res.json();
-  document.getElementById("user-email").textContent = currentUser.email;
+  renderProfileHeader();
   if (currentUser.isAdmin) document.getElementById("admin-link")?.classList.remove("hidden");
+  // El asistente se enciende por cuenta mientras se prueba (ASSISTANT_PUBLIC en el servidor).
+  if (currentUser.assistant && !document.getElementById("assistant-script")) {
+    document.getElementById("assistant-trigger")?.removeAttribute("hidden");
+    const s = document.createElement("script");
+    s.type = "module"; s.src = "/js/asistente.js"; s.id = "assistant-script";
+    document.body.appendChild(s);
+  }
 
   // Plan badge in nav
   const badge = document.getElementById("plan-badge");
@@ -582,6 +679,51 @@ document.addEventListener("click", (e) => {
   if (b) showAddonsModal(b.dataset.domainId);
 });
 
+// --- Asistente (React, public/js/asistente/) ---
+// Qué está mirando el usuario: lo lee el dock y lo manda como contexto del turno.
+let currentTab = null;
+function publishScreen() {
+  window.mailmaskScreen = { domainId: selectedDomain?.id ?? null, tab: selectedDomain ? currentTab : null };
+  window.dispatchEvent(new CustomEvent("mailmask:screen"));
+}
+
+// "Pídeselo al asistente": abre el dock con el texto ya escrito.
+function askAssistantButton(text) {
+  if (!currentUser?.assistant) return "";
+  return `<button type="button" data-action="ask-assistant" data-text="${esc(text)}" class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg border border-line text-fg-muted hover:text-fg hover:border-accent transition-colors whitespace-nowrap"><img src="/favicon.svg" alt="" class="h-4 w-4">Pídeselo al asistente</button>`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-action='ask-assistant']");
+  if (b) window.mailmaskAssistant?.open({ text: b.dataset.text });
+});
+
+// Botones [[ir:dominio/<id>[/<pestaña>]]] del asistente (ver navMarker.ts).
+window.mailmaskNav = async (to) => {
+  const m = /^dominio\/([A-Za-z0-9_-]+)(?:\/([a-z]+))?$/.exec(String(to));
+  if (!m) return;
+  const [, id, tab] = m;
+  if (!domains.some(d => d.id === id)) await loadDomains();
+  if (!domains.some(d => d.id === id)) { showToast("Ese dominio ya no está en tu cuenta", true); return; }
+  if (selectedDomain?.id !== id) await selectDomain(id);
+  if (tab && document.getElementById(`tab-${tab}`)) switchTab(tab);
+  document.getElementById("domain-detail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+// Al terminar un turno el agente pudo cambiar datos (crear alias, DNS, activar…):
+// se recarga la lista y, si hay dominio abierto, su banner, su salud y la pestaña actual.
+window.addEventListener("assistant:turn-end", async () => {
+  const openId = selectedDomain?.id;
+  await refreshUsage().catch(() => {});
+  await loadDomains();
+  if (!openId) return;
+  const fresh = domains.find(d => d.id === openId);
+  if (!fresh) { goBack(); return; }
+  selectedDomain = fresh;
+  renderActivacion();
+  loadDomainHealth();
+  if (currentTab) switchTab(currentTab);
+});
+
 // --- Referral credit banner ---
 function renderReferralBanner() {
   const container = document.getElementById("referral-credit-banner");
@@ -863,6 +1005,14 @@ async function loadDomains() {
     switchTab("apikeys");
   }
 
+  // `/app#transfer=dominio.com` (liga que da el asistente con `transfer_start`): abre el
+  // formulario de transferencia, que es donde se pega el código EPP — nunca en el chat.
+  const transferHash = window.location.hash.match(/^#transfer=([a-z0-9.-]+\.[a-z0-9-]+)$/i);
+  if (transferHash) {
+    history.replaceState(null, "", "/app");
+    iniciarTransferencia(decodeURIComponent(transferHash[1]).toLowerCase());
+  }
+
   // Load referrals list
   try {
     const rRes = await fetch("/api/referrals");
@@ -985,13 +1135,16 @@ function renderActivacion() {
   const el = document.getElementById("detail-activation");
   if (!el || !selectedDomain) return;
   const r = derechosDe(selectedDomain.id);
+  const pedir = askAssistantButton(r.activado
+    ? `Revisa que ${selectedDomain.domain} esté bien configurado`
+    : `¿Qué incluye activar ${selectedDomain.domain} y cómo lo hago?`);
   const btn = (label, primario = true) => `<button data-action="open-addons" data-domain-id="${esc(selectedDomain.id)}" class="${primario ? "bg-accent hover:bg-accent/90 text-white" : "bg-bg-inset hover:bg-line text-fg"} text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">${label}</button>`;
   if (r.activado) {
     el.innerHTML = `
       <div class="flex flex-wrap items-center gap-3 bg-bg-elev border border-line rounded-xl px-4 py-3">
         <span class="text-sm text-accent-text font-semibold">Dominio activado</span>
         <span class="text-xs text-fg-muted">personas ilimitadas · buzones IMAP · ${r.sends} correos nuevos al día · ${Math.round((r.mailboxBytes ?? 0) / GB)} GB</span>
-        <span class="ml-auto">${btn("+50 GB · +100 envíos", false)}</span>
+        <span class="ml-auto flex flex-wrap gap-2">${pedir}${btn("+50 GB · +100 envíos", false)}</span>
       </div>
       ${barraAlmacenamiento(r)}`;
   } else if (r.bloqueado) {
@@ -999,14 +1152,14 @@ function renderActivacion() {
       <div class="flex flex-wrap items-center gap-3 bg-amber-500/15 border border-amber-500/30 rounded-xl px-4 py-3">
         <span class="text-sm text-amber-600 font-semibold">Este dominio guarda el correo pero no lo reenvía</span>
         <span class="text-xs text-fg-muted">Tu primer dominio es gratis; los demás se activan por $99 al mes.</span>
-        <span class="ml-auto">${btn("Activar dominio · $99/mes")}</span>
+        <span class="ml-auto flex flex-wrap gap-2">${pedir}${btn("Activar dominio · $99/mes")}</span>
       </div>`;
   } else {
     el.innerHTML = `
       <div class="flex flex-wrap items-center gap-3 bg-bg-elev border border-line rounded-xl px-4 py-3">
         <span class="text-sm text-fg font-semibold">Dominio gratis</span>
         <span class="text-xs text-fg-muted">${r.aliases} máscaras · la Bandeja muestra 7 días · sin correo nuevo ni equipo</span>
-        <span class="ml-auto">${btn("Activar · $99/mes")}</span>
+        <span class="ml-auto flex flex-wrap gap-2">${pedir}${btn("Activar · $99/mes")}</span>
       </div>`;
   }
 }
@@ -1021,6 +1174,7 @@ function goBack() {
   document.getElementById("referrals-section")?.classList.remove("hidden");
   document.getElementById("referral-credit-banner")?.classList.remove("hidden");
   renderDomains();
+  publishScreen();
 }
 
 async function deleteDomain() {
@@ -1997,7 +2151,12 @@ function renderHealthPanel() {
           </div>`;
         }).join("")}
       </div>
-      <button id="btn-refresh-health" class="mt-3 text-xs text-fg-subtle hover:text-fg transition-colors">Actualizar diagnóstico</button>
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <button id="btn-refresh-health" class="text-xs text-fg-subtle hover:text-fg transition-colors">Actualizar diagnóstico</button>
+        ${askAssistantButton(health.status === "ok"
+          ? `Revisa la configuración de ${selectedDomain.domain}`
+          : `¿Por qué ${selectedDomain.domain} dice "${({ warning: "Atención", error: "Error" })[health.status] ?? health.status}"? Ayúdame a arreglarlo.`)}
+      </div>
     </div>`;
   document.getElementById("btn-refresh-health")?.addEventListener("click", loadDomainHealth);
 }
@@ -2006,64 +2165,27 @@ function renderHealthPanel() {
 
 // Los registros que hay que copiar a mano en el proveedor del cliente. No desaparece con
 // el editor: hay quien no va a delegar nunca su DNS con nosotros, y está bien.
-function renderDnsRecords(contenedor) {
+// La lista sale de `GET /api/domains/:id/dns-setup` — la misma que lee el asistente por MCP —
+// para que el registro que dicta el agente y el que ve el cliente no puedan discrepar.
+async function renderDnsRecords(contenedor) {
   if (!selectedDomain) return;
   const records = contenedor || document.getElementById("dns-records");
+  const domainId = selectedDomain.id;
 
-  const d = selectedDomain.domain;
-  const dnsItems = [
-    {
-      type: "MX",
-      name: "@",
-      value: "10 inbound-smtp.us-east-1.amazonaws.com",
-      hints: [
-        `<strong>@</strong> significa el dominio raíz (<strong>${esc(d)}</strong>). La mayoría de proveedores usan <strong>@</strong>.`,
-        `Si tu proveedor tiene un campo separado de <strong>Prioridad</strong>, pon <strong>10</strong> ahí y solo la dirección como valor.`,
-      ],
-    },
-    {
-      type: "TXT",
-      name: "_amazonses",
-      value: selectedDomain.verificationToken,
-      hints: [
-        `Pon solo <strong>_amazonses</strong> como nombre — tu proveedor agrega <strong>.${esc(d)}</strong> automáticamente.`,
-        `Si tu proveedor pide comillas alrededor del valor, agrégalas: <strong>"${esc(selectedDomain.verificationToken)}"</strong>.`,
-      ],
-    },
-    ...selectedDomain.dkimTokens.map(token => ({
-      type: "CNAME",
-      name: `${token}._domainkey`,
-      value: `${token}.dkim.amazonses.com`,
-      hints: [
-        `Pon solo <strong>${esc(token)}._domainkey</strong> como nombre — tu proveedor agrega <strong>.${esc(d)}</strong> automáticamente.`,
-      ],
-    })),
-    {
-      type: "TXT",
-      name: "@",
-      value: "v=spf1 include:amazonses.com ~all",
-      level: "recomendado",
-      benefit: "Algunos receptores revisan SPF además de DKIM. Con este registro, tus correos llegan a más bandejas y menos a spam.",
-      hints: [
-        `Este registro <strong>SPF</strong> autoriza a Amazon SES a enviar emails en nombre de tu dominio.`,
-        `Si ya tienes un registro SPF, agrega <strong>include:amazonses.com</strong> antes del <strong>~all</strong> existente en vez de crear uno nuevo.`,
-      ],
-    },
-    {
-      type: "TXT",
-      name: "_dmarc",
-      value: `v=DMARC1; p=none; rua=mailto:dmarc@${d}`,
-      level: "opcional",
-      benefit: "Gmail y Yahoo tratan mejor a los dominios con política DMARC, y te llegan reportes de quién envía en tu nombre. Tu firma DKIM ya cumple, así que se activa sin riesgo.",
-      hints: [
-        `<strong>p=none</strong> solo observa: nada se bloquea. Cuando veas que todo pasa, súbelo a <strong>p=quarantine</strong> para que los receptores rechacen a quien se haga pasar por ti.`,
-        `Los reportes llegan a <strong>dmarc@${esc(d)}</strong>. Crea ese alias en MailMask, o cambia la dirección por otra tuya.`,
-      ],
-    },
-  ];
+  let dnsItems;
+  try {
+    const res = await fetch(`/api/domains/${domainId}/dns-setup`);
+    if (!res.ok) throw new Error("dns-setup");
+    dnsItems = (await res.json()).records;
+  } catch {
+    records.innerHTML = `<div class="px-4 py-4 text-sm text-fg-muted">No pudimos cargar los registros. Recarga la página.</div>`;
+    return;
+  }
+  // El usuario pudo cambiar de dominio mientras llegaba la respuesta.
+  if (selectedDomain?.id !== domainId) return;
 
-  const sharedDkimHint = `Los 3 registros CNAME son para <strong>DKIM</strong> — la firma digital que evita que tus emails caigan en spam.`;
-  if (dnsItems.length > 2) dnsItems[2].hints.unshift(sharedDkimHint);
+  // Las pistas vienen con **negritas** estilo markdown; todo lo demás se escapa.
+  const hintHtml = (h) => esc(h).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 
   const copyBtn = (val) => `<button data-action="copy" data-copy-value="${esc(val)}" class="text-fg-subtle hover:text-white transition-colors shrink-0 p-1 rounded hover:bg-line" title="Copiar"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>`;
 
@@ -2101,12 +2223,12 @@ function renderDnsRecords(contenedor) {
           </div>
           <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 sm:pl-[80px]">
             <span class="hidden sm:inline">${levelPill(r)}</span>
-            ${r.benefit ? `<span class="text-xs text-fg-muted">${r.benefit}</span>` : ""}
+            ${r.benefit ? `<span class="text-xs text-fg-muted">${esc(r.benefit)}</span>` : ""}
             ${r.hints.length ? `
               <details class="text-xs">
                 <summary class="cursor-pointer text-fg-subtle hover:text-fg select-none">Ayuda</summary>
                 <ul class="mt-1.5 space-y-1 text-fg-subtle leading-relaxed list-disc pl-4">
-                  ${r.hints.map(h => `<li>${h}</li>`).join("")}
+                  ${r.hints.map(h => `<li>${hintHtml(h)}</li>`).join("")}
                 </ul>
               </details>` : ""}
           </div>
@@ -2753,6 +2875,8 @@ async function revokeApiKeyUI(id) {
 // --- Tabs ---
 
 function switchTab(tab) {
+  currentTab = tab;
+  publishScreen();
   document.querySelectorAll(".tab-content").forEach(el => el.classList.add("hidden"));
   document.querySelectorAll(".tab-btn").forEach(el => {
     el.classList.remove("active-tab", "text-fg");

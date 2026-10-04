@@ -6,12 +6,13 @@ import { db } from "./pg.js";
 import { tokens, emailLogs, forwardQueue, rateLimits, sendCounts, bulkJobs, users, addons } from "./schema.js";
 import { lte, and, eq, inArray, isNotNull, gt, sql as rawSql } from "drizzle-orm";
 import { purgeDeletedConversations, purgarConversacionesGratis, wakeSnoozedConversations, getDomainRegistrationsByStatus, updateDomainRegistration, listEffectiveAddons, updateAddon, recordOrder, addonLabel } from "./db.js";
-import { sendTemplate, expiryWarning } from "./emails.js";
+import { sendTemplate, expiryWarning, manualActivationExpiring } from "./emails.js";
 import { reconcilePendingAddons } from "./addon-sync.js";
 import { deliverPending, purgeOldDeliveries } from "./webhooks.js";
 import { notifyBandeja } from "./sse-hub.js";
 import { ejecutarBackfill, backfillPendiente } from "./search-backfill.js";
 import { estaVivo, diasDeCertificado, leerUso, listarBuzones, congelarBuzon, borrarBuzon, stalwartConfigurado } from "./stalwart.js";
+import { getDomain, claimOnce } from "./db.js";
 import { listarBuzonesActivos, anotarUsoBuzon, buzonesDelUsuario, fijarGraciaBuzon, buzonesConGraciaVencida, desmarcarBuzon } from "./db.js";
 
 // Webhooks: entregas pendientes y reintentos vencidos.
@@ -509,5 +510,33 @@ programar("30 3 * * *", async () => {
     if (borradas.length) log("info", "cron", "Retención del gratis aplicada", { hilos: borradas.length, objetosS3: s3Keys.length });
   } catch (err) {
     log("error", "cron", "Falló la retención del dominio gratis", { error: String(err) });
+  }
+});
+
+
+// --- Activaciones pagadas a mano (pago único, sin suscripción) ---
+//
+// Un add-on `domain` con source "manual" no tiene preapproval que lo renueve: nació de un
+// pago único cuando el checkout de suscripción no funcionó (insightslab.com.mx, 1-oct-2026).
+// La última semana se le avisa al dueño una vez al día. 15:00 UTC = 9:00 en CDMX.
+programar("0 15 * * *", async () => {
+  try {
+    const ahora = Date.now();
+    const semana = ahora + 7 * 86_400_000;
+    const filas = db.select().from(addons).where(and(eq(addons.kind, "domain"), eq(addons.status, "active"), eq(addons.source, "manual"))).all();
+    for (const a of filas) {
+      if (!a.currentPeriodEnd || !a.domainId) continue;
+      const fin = new Date(a.currentPeriodEnd).getTime();
+      if (fin < ahora || fin > semana) continue;
+      const hoy = new Date().toISOString().slice(0, 10);
+      if (!claimOnce("manual-expiry", `${a.id}:${hoy}`, 10)) continue;
+      const dominio = getDomain(a.domainId);
+      if (!dominio) continue;
+      const daysLeft = Math.max(1, Math.ceil((fin - ahora) / 86_400_000));
+      await sendTemplate(a.userEmail, manualActivationExpiring({ domain: dominio.domain, endDate: a.currentPeriodEnd, daysLeft }));
+      log("info", "cron", "Aviso de activación manual por vencer", { addonId: a.id, domain: dominio.domain, daysLeft });
+    }
+  } catch (err) {
+    log("error", "cron", "Aviso de activaciones manuales falló", { error: String(err) });
   }
 });

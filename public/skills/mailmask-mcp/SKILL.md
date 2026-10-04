@@ -1,21 +1,43 @@
 ---
 name: mailmask-mcp
-description: Connect an MCP client (Claude Code, Claude Desktop, Cursor, any Streamable HTTP client) to the MailMask MCP server at https://www.mailmask.studio/mcp and use its 41 tools to manage domains, masks, IMAP mailboxes, DNS, rules and webhooks with one API key. Use when the user wants their agent wired to MailMask, asks to "add the MailMask MCP", or when a tool named list_domains, create_alias or point_domain_to is available.
+description: Connect an MCP client (Claude Code, Claude Desktop, Cursor, any Streamable HTTP client) to the MailMask MCP server at https://www.mailmask.studio/mcp and use its 95 tools to manage domains, masks, IMAP mailboxes, the inbox (read and answer mail as a mask), DNS, rules, webhooks, team, payment links, domain purchases and transfers with OAuth (just the URL) or one API key. Use when the user wants their agent wired to MailMask, asks to "add the MailMask MCP", or when a tool named list_domains, create_alias or point_domain_to is available.
 license: MIT
-compatibility: An MCP client with Streamable HTTP transport and custom headers, or curl for the raw JSON-RPC.
+compatibility: An MCP client with Streamable HTTP transport (OAuth-capable, or with custom headers for an API key), or curl for the raw JSON-RPC.
 metadata:
   author: mailmask
-  version: "1.0"
+  version: "1.4"
 ---
 
 # MailMask over MCP
 
 `https://www.mailmask.studio/mcp` is a Streamable HTTP MCP server **without sessions**:
-`POST` only, JSON responses, no `Mcp-Session-Id`, no stream to keep open. It authenticates with
-the account's API key (`mk_…`, from `/app → API Keys`). Without the header it answers `401`;
-`GET` and `DELETE` answer `405` (there is no session to open or close).
+`POST` only, JSON responses, no `Mcp-Session-Id`, no stream to keep open. It authenticates in
+two ways: **OAuth 2.1 with only the URL** (preferred) or the account's API key (`mk_…`, from
+`/app → API Keys`). `GET` and `DELETE` answer `405` (there is no session to open or close).
 
-## Connect
+## Connect with OAuth (preferred, no key to copy)
+
+Give the client the URL and no header. `/mcp` answers `401` with
+`WWW-Authenticate: Bearer resource_metadata="https://www.mailmask.studio/.well-known/oauth-protected-resource"`;
+the client reads `/.well-known/oauth-authorization-server`, registers itself
+(`POST /oauth/register`, public dynamic client registration, https or loopback redirect),
+opens `/oauth/authorize` (PKCE S256, `resource=https://www.mailmask.studio/mcp`) where the user
+signs in and clicks **Permitir**, then gets a `mo_…` access token (1 h) and a rotating `mr_…`
+refresh token (60 days) from `POST /oauth/token`. `POST /oauth/revoke` cuts it.
+
+- Ghosty Studio: Conectores → Mailmask → Conectar.
+- Claude.ai / Claude Desktop: Settings → Connectors → Add custom connector → the URL.
+- ChatGPT: Settings → Apps & Connectors → Create (developer mode) → the URL with OAuth.
+- Claude Code: `claude mcp add --transport http mailmask https://www.mailmask.studio/mcp`,
+  then `/mcp` → mailmask → Authenticate.
+
+An OAuth connection can do everything an `mk_` key can (60 req/min) except create or list API
+keys, use admin routes, or create or list SMTP credentials. Changing the MailMask password
+revokes every connection.
+
+## Connect with an API key (alternative)
+
+For clients without OAuth, scripts and servers:
 
 ```bash
 # Claude Code
@@ -24,7 +46,7 @@ claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \
 ```
 
 ```json
-// Claude Desktop, Cursor and other clients (mcp.json)
+// Cursor and other clients (mcp.json)
 { "mcpServers": { "mailmask": {
   "type": "http", "url": "https://www.mailmask.studio/mcp",
   "headers": { "Authorization": "Bearer mk_…" } } } }
@@ -41,13 +63,45 @@ curl -s https://www.mailmask.studio/mcp -H "Authorization: Bearer $MAILMASK_API_
 ## The tools
 
 Every tool is a method of the official SDK running inside the server, so it has the same
-limits and error texts as the REST API. Names, grouped:
+limits and error texts as the REST API. On `initialize` the server also sends `instructions`
+(Spanish): the order to connect a domain, what free / activated / blocked mean, and the payment
+rules. Names, grouped:
 
 - **Domains**: `list_domains`, `get_domain`, `create_domain` (returns the DNS records to set),
-  `verify_domain`, `domain_health`, `delete_domain` (irreversible).
+  `domain_dns_setup` (exact records to paste at the registrar, which ones are already live, and
+  `registrarHint` with the panel and menu), `verify_domain`, `domain_health`, `delete_domain`
+  (irreversible).
 - **Masks and mailboxes**: `list_aliases`, `create_alias` (`mailbox: true` also creates the IMAP
   mailbox), `update_alias`, `delete_alias`, `create_mailbox`, `delete_mailbox` (deletes its
-  mail), `reset_mailbox_password`.
+  mail), `reset_mailbox_password`, `apple_profile_link` (Apple Mail profile URL for iPhone/Mac),
+  `mailbox_export_link` (`.mbox` download URL). Both links open in the user's logged-in browser.
+- **Activation and billing**: `activation_link` (MercadoPago link to activate a domain, $99
+  MXN/month, or add `storage50` / `sends100`), `list_addons`, `billing_status`.
+- **Buy and renew domains**: `search_domains`, `domain_prices`, `register_domain` (payment link),
+  `list_registrations` (with `statusText`), `renewal_status`, `renewal_link`.
+- **Transfers**: `transfer_check` (requirements and price, charges nothing), `transfer_start`
+  (returns `formUrl`, the in-app form where the user pastes the EPP code and pays),
+  `transfer_status`, `transfer_dns`, `update_transfer_dns`, `approve_transfer_dns` (only with
+  the user's explicit OK), `resend_transfer_email`, `transfer_out` (EPP goes by email to the owner).
+- **Team**: `list_members`, `invite_member` (`agent` or `admin`), `remove_member`, `cancel_invite`.
+- **Inbox (Bandeja)**: the agent works the mail of its own mask. `inbox_list` (by `alias`,
+  `status` open/snoozed/closed/unread/deleted, `assignedTo`, full-text `q`, `cursor` paging),
+  `inbox_read` (plain-text messages, internal notes, attachments listed; marks it read; `before`
+  for older messages), `inbox_attachment` (text or image content), `inbox_reply` (in-thread, from
+  the thread's mask, signature and quote with `markdown`; does not use the daily send quota),
+  `inbox_send` (new mail from an active mask that opens a thread; activated and verified domain,
+  uses one daily send), `inbox_mark` (`read`, `status` closed/open/snoozed + `snoozedUntil`,
+  `priority`, `tags`), `inbox_assign`, `inbox_note` (internal, the contact never sees it),
+  `inbox_delete` / `inbox_restore` (trash, 15 days), `inbox_metrics`, `upload_attachment`
+  (from an assistant chat file `url` or `contentBase64`; pass the result in `attachments`).
+- **Signature and saved replies**: `get_signature`, `set_signature` (markdown, max 2000),
+  `set_domain_logo`, `delete_domain_logo`, `list_canned_replies`, `create_canned_reply`,
+  `delete_canned_reply`.
+- **Account profile** (the MailMask user, not a mask): `get_profile`, `update_profile`
+  (display name, max 60), `set_profile_photo` (only a signed URL of an image the user attached
+  in the assistant chat; any other URL is rejected), `delete_profile_photo`.
+- **Account**: `list_orders` (charges history), `cancel_addon`, `cancel_renewal`,
+  `referral_status`, `set_referral_slug`, `set_referral_name`, `export_link`.
 - **DNS**: `list_dns_records`, `create_dns_zone`, `dns_delegation_status`, `set_dns_record`,
   `delete_dns_record`, `import_dns_records`, `point_domain_to` (Vercel, Netlify, GitHub Pages,
   Cloudflare Pages, Render, Fly, redirect to www, DMARC).
@@ -59,10 +113,13 @@ limits and error texts as the REST API. Names, grouped:
 - **Deliverability**: `list_logs`, `list_suppressions`, `add_suppression`, `remove_suppression`.
 - **SMTP**: `list_smtp_credentials`, `create_smtp_credential` (password shown once),
   `revoke_smtp_credential`.
-- `search_tools` finds a tool by what you want to do when the list above is not loaded.
+- `search_tools` finds a tool by what you want to do when the list above is not loaded
+  (accent-insensitive, Spanish keywords work).
 
-Not exposed on purpose: API keys (an agent holding one key must not mint more), the Bandeja
-(shared inbox) and billing. Activating a domain ($99 MXN/month) happens in the browser.
+Not exposed on purpose: API keys (an agent holding one key must not mint more), SMTP passwords
+over OAuth, the EPP code and admin routes. Payments are links: `activation_link`, `register_domain` and
+`renewal_link` return `paid: false`; the **user** opens and pays in MercadoPago. Never say it is
+paid; confirm afterwards with `list_addons`, `list_registrations` or `domain_health`.
 
 ## How to read the results
 
@@ -74,11 +131,25 @@ Not exposed on purpose: API keys (an agent holding one key must not mint more), 
 - Passwords and webhook secrets appear **once** in the tool result. Hand them to the user in
   the same message.
 - Always call `list_domains` first; every other tool takes its `domainId`.
+- A result with `needsConfirmation: true` is not an error. It only happens with the in-app
+  assistant's short-lived turn token (`mt_…`, 5 min) on irreversible actions (`delete_domain`,
+  `delete_alias`, `delete_mailbox`, `delete_dns_record`, `remove_member`, `transfer_out`,
+  `cancel_addon`, `cancel_renewal`): the
+  server answered `409 needs_confirmation` and the user got an approval card in the app. Do not
+  retry or look for another way; wait. With an `mk_` key those actions run directly.
 
 ## Rules
 
 - Read before write: `list_aliases` / `list_dns_records` before creating or replacing.
-- Confirm with the user, repeating the name, before `delete_domain` or `delete_mailbox`.
+- Confirm with the user, repeating the name, before `delete_domain`, `delete_mailbox`,
+  `remove_member` or `transfer_out`.
+- Never ask for or accept an EPP (auth) code in chat; send the user to `transfer_start`'s
+  `formUrl`. Asking the old registrar for a new code invalidates the one already sent.
 - `set_dns_record` **replaces** the whole record set for a name and type: include the values
   that were already there. Prefer `point_domain_to` for hosting providers.
-- Never send email the user did not ask for.
+- Never send email the user did not ask for. Before `inbox_reply`, `inbox_send` or `send_email`,
+  show the user the recipient and text and wait for their OK, unless they gave standing
+  instructions for that mask.
+- A per-agent mailbox beats handing over a personal Gmail: create a mask such as
+  `agent@theirdomain.com`, then work it with `inbox_list` (status `unread`) → `inbox_read` →
+  `inbox_reply` → `inbox_mark` closed.

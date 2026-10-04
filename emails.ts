@@ -659,6 +659,33 @@ export function guestWelcome(d: {
   };
 }
 
+/**
+ * Un dominio activado con pago único (sin suscripción que lo renueve) está por vencer.
+ * Se manda a diario la última semana: sin cobro automático, la única red es que el dueño
+ * se entere a tiempo.
+ */
+export function manualActivationExpiring(d: { domain: string; endDate: string; daysLeft: number }): Email {
+  const fecha = shortDate(d.endDate);
+  const cuando = d.daysLeft <= 1 ? "mañana" : `en ${d.daysLeft} días`;
+  return {
+    subject: cleanSubject(`${d.domain} vence ${cuando} (${fecha})`),
+    html: layout({
+      preheader: `Tu activación de ${d.domain} no se renueva sola. Renuévala antes del ${fecha}.`,
+      heading: `${d.domain} vence ${cuando}`,
+      body: p(`La activación de ${d.domain} la pagaste por adelantado y vence el ${fecha}. No tiene cobro automático, así que no se renueva sola.`)
+        + calloutBox("Si vence, el dominio sigue guardando tu correo en la Bandeja pero deja de reenviarlo, y tus buzones y envíos quedan en pausa.", "warn")
+        + p("Renuévala desde tu panel o respóndenos a este correo y te mandamos la liga de pago."),
+      cta: { label: "Renovar mi dominio", url: `${baseUrl()}/app` },
+      billing: true,
+    }),
+    text: textBlock([
+      `La activación de ${d.domain} vence el ${fecha} y no se renueva sola.`,
+      "Si vence, el correo se guarda en la Bandeja pero deja de reenviarse.",
+      `Renuévala: ${baseUrl()}/app`,
+    ], true),
+  };
+}
+
 export function expiryWarning(d: { endDate: string; hasMpSubscription: boolean }): Email {
   const fecha = shortDate(d.endDate);
   if (d.hasMpSubscription) {

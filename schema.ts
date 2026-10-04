@@ -5,6 +5,7 @@ import {
   primaryKey,
   unique,
   index,
+  uniqueIndex,
   real,
 } from "drizzle-orm/sqlite-core";
 
@@ -26,6 +27,12 @@ export const users = sqliteTable("users", {
   utmSource: text("utm_source"),
   utmMedium: text("utm_medium"),
   utmCampaign: text("utm_campaign"),
+  // Nonce del hilo del asistente: rotarlo ("Nueva conversación") cambia el groupId en Ghosty.
+  assistantNonce: text("assistant_nonce"),
+  // Perfil de la cuenta (`profile.ts`): nombre visible y llave de la foto en S3.
+  displayName: text("display_name"),
+  avatarKey: text("avatar_key"),
+  profileUpdatedAt: text("profile_updated_at"),
 });
 
 export const domains = sqliteTable("domains", {
@@ -547,4 +554,75 @@ export const webhookDeliveries = sqliteTable("webhook_deliveries", {
 }, (table) => [
   index("idx_webhook_deliveries_pending").on(table.status, table.nextAt),
   index("idx_webhook_deliveries_webhook").on(table.webhookId, table.createdAt),
+]);
+
+// --- Asistente de /app (migración 0024) ---
+export const assistantMessages = sqliteTable("assistant_messages", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  userEmail: text("user_email").notNull().references(() => users.email, { onDelete: "cascade" }),
+  role: text("role").notNull(), // user | assistant
+  content: text("content").notNull(),
+  status: text("status").notNull().default("ok"), // ok | failed | stopped
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  index("idx_assistant_messages_user").on(table.userEmail, table.createdAt),
+]);
+
+export const pendingAgentActions = sqliteTable("pending_agent_actions", {
+  id: text("id").$defaultFn(() => crypto.randomUUID()).primaryKey(),
+  userEmail: text("user_email").notNull().references(() => users.email, { onDelete: "cascade" }),
+  domainId: text("domain_id"),
+  intent: text("intent").notNull(),
+  payload: text("payload", { mode: "json" }).notNull(),
+  summary: text("summary", { mode: "json" }).notNull(),
+  status: text("status").notNull().default("pending"), // pending | executed | failed | rejected | expired
+  result: text("result", { mode: "json" }),
+  createdAt: text("created_at").notNull(),
+  decidedAt: text("decided_at"),
+}, (table) => [
+  index("idx_pending_agent_actions_user").on(table.userEmail, table.status),
+]);
+
+// --- OAuth 2.1 del MCP (`oauth.ts`, migración 0026) ---
+
+export const oauthClients = sqliteTable("oauth_clients", {
+  clientId: text("client_id").primaryKey(),
+  clientSecretHash: text("client_secret_hash"),
+  clientName: text("client_name").notNull(),
+  clientUri: text("client_uri"),
+  logoUri: text("logo_uri"),
+  redirectUris: text("redirect_uris", { mode: "json" }).notNull(),
+  tokenEndpointAuthMethod: text("token_endpoint_auth_method").notNull().default("none"),
+  createdIp: text("created_ip"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const oauthCodes = sqliteTable("oauth_codes", {
+  codeHash: text("code_hash").primaryKey(),
+  clientId: text("client_id").notNull().references(() => oauthClients.clientId, { onDelete: "cascade" }),
+  userEmail: text("user_email").notNull().references(() => users.email, { onDelete: "cascade" }),
+  redirectUri: text("redirect_uri").notNull(),
+  codeChallenge: text("code_challenge").notNull(),
+  scope: text("scope").notNull(),
+  resource: text("resource").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+});
+
+export const oauthTokens = sqliteTable("oauth_tokens", {
+  id: text("id").primaryKey(),
+  tokenHash: text("token_hash").notNull(),
+  kind: text("kind").notNull(), // access | refresh
+  clientId: text("client_id").notNull().references(() => oauthClients.clientId, { onDelete: "cascade" }),
+  userEmail: text("user_email").notNull().references(() => users.email, { onDelete: "cascade" }),
+  scope: text("scope").notNull(),
+  resource: text("resource").notNull(),
+  familyId: text("family_id").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  revokedAt: text("revoked_at"),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_oauth_tokens_hash").on(table.tokenHash),
+  index("idx_oauth_tokens_family").on(table.familyId),
+  index("idx_oauth_tokens_user").on(table.userEmail),
 ]);

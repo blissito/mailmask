@@ -1,11 +1,11 @@
 ---
 name: mailmask-sdk
-description: Use the official MailMask JavaScript/TypeScript SDK (@easybits.cloud/mailmask on npm) to create masks (aliases), send email from a domain, manage rules, webhooks, suppressions, SMTP credentials and DNS, and to verify webhook signatures in a receiver. Use when writing code that talks to mailmask.studio, when a project imports @easybits.cloud/mailmask, or when the user needs to send or receive email through their own domain from an app.
+description: Use the official MailMask JavaScript/TypeScript SDK (@easybits.cloud/mailmask on npm) to create masks (aliases), send email from a domain, manage rules, webhooks, suppressions, SMTP credentials, DNS, team members, signatures, payment links, domain purchases and transfers, and to verify webhook signatures in a receiver. Use when writing code that talks to mailmask.studio, when a project imports @easybits.cloud/mailmask, or when the user needs to send or receive email through their own domain from an app.
 license: MIT
 compatibility: Node 18+, Deno, Bun or Workers (uses fetch and WebCrypto only). Network access to https://www.mailmask.studio.
 metadata:
   author: mailmask
-  version: "1.0"
+  version: "1.2"
 ---
 
 # MailMask SDK
@@ -29,8 +29,8 @@ All take a `domainId` (from `mm.domains.list()`) except `domains` and `apiKeys`.
 
 | Resource | Methods |
 |---|---|
-| `mm.domains` | `list()`, `get(id)`, `create(domain)` → DNS records to set, `verify(id)`, `health(id)`, `delete(id)` |
-| `mm.aliases` | `list(d)`, `create(d, { alias, destinations?, mailbox? })`, `update(d, alias, { enabled?, destinations? })`, `delete(d, alias)`, `createMailbox(d, alias)`, `deleteMailbox(d, alias)`, `resetMailboxPassword(d, alias)` |
+| `mm.domains` | `list()`, `get(id)`, `create(domain)` → DNS records to set, `dnsSetup(id, { live? })` → records to paste + `registrarHint`, `verify(id)`, `health(id)`, `delete(id)` |
+| `mm.aliases` | `list(d)`, `create(d, { alias, destinations?, mailbox? })`, `update(d, alias, { enabled?, destinations? })`, `delete(d, alias)`, `createMailbox(d, alias)`, `deleteMailbox(d, alias)`, `resetMailboxPassword(d, alias)`, `appleProfile(d, alias)` → plist text, `exportMbox(d, alias)` → streaming `Response` |
 | `mm.send` | `send(d, input, { idempotencyKey? })`, `bulkSend(d, { from, recipients, subject, html })`, `bulkStatus(d, jobId)` |
 | `mm.attachments` | `upload(d, { filename, contentType, data })` → key to pass in `send({ attachments: [key] })` |
 | `mm.rules` | `list`, `create(d, { field, match, value, action, target?, priority? })`, `update`, `delete` |
@@ -40,6 +40,18 @@ All take a `domainId` (from `mm.domains.list()`) except `domains` and `apiKeys`.
 | `mm.smtp` | `list`, `create(d, label)` → password once, `revoke(d, id)` |
 | `mm.dns` | `list`, `createZone`, `delegation`, `import`, `upsert(d, { name, type, values, ttl? })`, `delete(d, name, type)`, `preset(d, provider, target?, subdomain?)` |
 | `mm.apiKeys` | `list()`, `create(name)` → key once, `revoke(id)` |
+| `mm.billing` | `status()`, `addons()` → `{ catalog, forSale, mine }`, `checkout(d, kind = "domain", { payerEmail? })` → `{ init_point, addonId }` (`kind`: `domain`, `storage50`, `sends100`) |
+| `mm.registrations` | `search(domain)`, `tlds()`, `register(domain)` → `{ initPoint, registrationId }`, `list()`, `renewal(regId, { payerEmail? })`, `transferOut(regId)` |
+| `mm.transfers` | `check(domain)` (charges nothing), `dns(regId)`, `setDns(regId, records)` (replaces all), `approveDns(regId)`, `resendEmail(regId)` |
+| `mm.members` | `list(d)` → `{ members, invites }`, `invite(d, { email, name, role? })`, `remove(d, memberId)`, `cancelInvite(d, token)` |
+| `mm.signature` | `get(d)`, `set(d, markdown)` (max 2000, empty string clears) |
+| `mm.canned` | `list(d)`, `create(d, { title, body })`, `delete(d, cannedId)` |
+| `mm.account` | `getProfile()` → `{ email, displayName, avatarUrl }`, `updateProfile({ displayName })` (max 60, empty clears), `setAvatar(blob)` (PNG/JPG/WebP, max 2 MB), `setAvatarFromUrl(url)` (only a signed assistant upload), `removeAvatar()` |
+
+Payments are MercadoPago links a person opens and pays (`init_point` / `initPoint`); nothing
+changes until MercadoPago confirms, so check `billing.addons()` or `registrations.list()` after.
+Annual activation ($999 MXN every 12 months) is `period: "annual"` on `POST /api/addons/checkout`
+(only `kind: "domain"`); `billing.checkout()` does not expose `period` yet.
 
 ## Sending
 
