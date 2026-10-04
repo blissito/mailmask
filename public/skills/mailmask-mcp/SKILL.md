@@ -1,21 +1,43 @@
 ---
 name: mailmask-mcp
-description: Connect an MCP client (Claude Code, Claude Desktop, Cursor, any Streamable HTTP client) to the MailMask MCP server at https://www.mailmask.studio/mcp and use its 73 tools to manage domains, masks, IMAP mailboxes, DNS, rules, webhooks, team, payment links, domain purchases and transfers with one API key. Use when the user wants their agent wired to MailMask, asks to "add the MailMask MCP", or when a tool named list_domains, create_alias or point_domain_to is available.
+description: Connect an MCP client (Claude Code, Claude Desktop, Cursor, any Streamable HTTP client) to the MailMask MCP server at https://www.mailmask.studio/mcp and use its 73 tools to manage domains, masks, IMAP mailboxes, DNS, rules, webhooks, team, payment links, domain purchases and transfers with OAuth (just the URL) or one API key. Use when the user wants their agent wired to MailMask, asks to "add the MailMask MCP", or when a tool named list_domains, create_alias or point_domain_to is available.
 license: MIT
-compatibility: An MCP client with Streamable HTTP transport and custom headers, or curl for the raw JSON-RPC.
+compatibility: An MCP client with Streamable HTTP transport (OAuth-capable, or with custom headers for an API key), or curl for the raw JSON-RPC.
 metadata:
   author: mailmask
-  version: "1.2"
+  version: "1.3"
 ---
 
 # MailMask over MCP
 
 `https://www.mailmask.studio/mcp` is a Streamable HTTP MCP server **without sessions**:
-`POST` only, JSON responses, no `Mcp-Session-Id`, no stream to keep open. It authenticates with
-the account's API key (`mk_…`, from `/app → API Keys`). Without the header it answers `401`;
-`GET` and `DELETE` answer `405` (there is no session to open or close).
+`POST` only, JSON responses, no `Mcp-Session-Id`, no stream to keep open. It authenticates in
+two ways: **OAuth 2.1 with only the URL** (preferred) or the account's API key (`mk_…`, from
+`/app → API Keys`). `GET` and `DELETE` answer `405` (there is no session to open or close).
 
-## Connect
+## Connect with OAuth (preferred, no key to copy)
+
+Give the client the URL and no header. `/mcp` answers `401` with
+`WWW-Authenticate: Bearer resource_metadata="https://www.mailmask.studio/.well-known/oauth-protected-resource"`;
+the client reads `/.well-known/oauth-authorization-server`, registers itself
+(`POST /oauth/register`, public dynamic client registration, https or loopback redirect),
+opens `/oauth/authorize` (PKCE S256, `resource=https://www.mailmask.studio/mcp`) where the user
+signs in and clicks **Permitir**, then gets a `mo_…` access token (1 h) and a rotating `mr_…`
+refresh token (60 days) from `POST /oauth/token`. `POST /oauth/revoke` cuts it.
+
+- Ghosty Studio: Conectores → Mailmask → Conectar.
+- Claude.ai / Claude Desktop: Settings → Connectors → Add custom connector → the URL.
+- ChatGPT: Settings → Apps & Connectors → Create (developer mode) → the URL with OAuth.
+- Claude Code: `claude mcp add --transport http mailmask https://www.mailmask.studio/mcp`,
+  then `/mcp` → mailmask → Authenticate.
+
+An OAuth connection can do everything an `mk_` key can (60 req/min) except create or list API
+keys, use admin routes, or create or list SMTP credentials. Changing the MailMask password
+revokes every connection.
+
+## Connect with an API key (alternative)
+
+For clients without OAuth, scripts and servers:
 
 ```bash
 # Claude Code
@@ -24,7 +46,7 @@ claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \
 ```
 
 ```json
-// Claude Desktop, Cursor and other clients (mcp.json)
+// Cursor and other clients (mcp.json)
 { "mcpServers": { "mailmask": {
   "type": "http", "url": "https://www.mailmask.studio/mcp",
   "headers": { "Authorization": "Bearer mk_…" } } } }

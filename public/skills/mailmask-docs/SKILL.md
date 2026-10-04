@@ -5,7 +5,7 @@ license: MIT
 compatibility: Network access to https://www.mailmask.studio
 metadata:
   author: mailmask
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Read the MailMask docs
@@ -32,10 +32,12 @@ are English and are the contract (`destinations`, `enabled`, `events`…) — do
   +50 GB $99. Prices are MXN.
 - Inbound mail arrives through AWS SES; the original body and attachments are kept 90 days, the
   thread and its searchable text stay.
-- Auth is one API key (`mk_…`) as `Authorization: Bearer`, 60 req/min.
+- Auth is one API key (`mk_…`) as `Authorization: Bearer`, 60 req/min. The MCP also takes
+  OAuth 2.1 with just its URL (no key).
 - IMAP `imap.mailmask.studio:993`, SMTP submission `:465` for mailboxes; SMTP relay for apps
   is `email-smtp.<region>.amazonaws.com:587` with credentials from the API.
-- MCP: `https://www.mailmask.studio/mcp`, Streamable HTTP, no sessions, same key.
+- MCP: `https://www.mailmask.studio/mcp`, Streamable HTTP, no sessions; connect with only the URL
+  (OAuth: Claude.ai, ChatGPT, Ghosty Studio → Conectores → Mailmask) or the same key.
 
 ## Rules
 

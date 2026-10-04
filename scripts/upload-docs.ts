@@ -190,12 +190,27 @@ Revocar credencial: mm.smtp.revoke("domain-id", "cred-id")`,
   },
   {
     title: "Servidor MCP (Model Context Protocol)",
-    content: `MailMask tiene un servidor MCP (Model Context Protocol) en https://www.mailmask.studio/mcp, transporte Streamable HTTP, sin sesiones. Sirve para que un agente de IA (Claude Code, Claude Desktop, Cursor o cualquier cliente MCP) haga las altas por ti: dominios, máscaras, buzones IMAP, reglas, webhooks y envío de correo. Se autentica con la misma API key de la cuenta (prefijo mk_), en el encabezado Authorization: Bearer mk_...
+    content: `MailMask tiene un servidor MCP (Model Context Protocol) en https://www.mailmask.studio/mcp, transporte Streamable HTTP, sin sesiones. Sirve para que un agente de IA (Claude, ChatGPT, Ghosty Studio, Claude Code, Cursor o cualquier cliente MCP) haga las altas por ti: dominios, máscaras, buzones IMAP, reglas, webhooks y envío de correo.
 
-Conectar desde Claude Code:
+Hay dos formas de conectarlo. La recomendada es OAuth: sólo se pega la URL, sin copiar ninguna llave. La alternativa es una API key mk_ en el encabezado Authorization.
+
+Forma 1 (recomendada) — OAuth, sólo con la URL:
+- Ghosty Studio: Conectores → Mailmask → Conectar.
+- Claude.ai y Claude Desktop: Settings → Connectors → Add custom connector, con la URL https://www.mailmask.studio/mcp, y luego Connect.
+- ChatGPT: Settings → Apps & Connectors → Create (con el modo desarrollador), la URL y autenticación OAuth.
+- Claude Code: claude mcp add --transport http mailmask https://www.mailmask.studio/mcp y luego /mcp → mailmask → Authenticate.
+- Cualquier cliente que implemente la autorización del spec MCP: sólo la URL.
+Qué pasa: el cliente abre MailMask en el navegador; si no hay sesión pide entrar (correo o Google) y luego muestra una pantalla con el nombre del cliente y los botones Permitir y Cancelar. Al permitir, queda conectado.
+Qué puede hacer la conexión OAuth: lo mismo que una API key mk_ (las 73 herramientas, 60 peticiones por minuto), salvo crear o listar API keys, entrar al admin y crear o listar credenciales SMTP.
+Tokens: acceso mo_ de 1 hora y renovación mr_ de 60 días que rota en cada uso; el cliente los renueva solo. Para dejar de usarla se desconecta desde el cliente (los que implementan revocación llaman a POST /oauth/revoke); para cortar todas las conexiones al instante, se cambia la contraseña de MailMask.
+Detalles técnicos: /mcp sin credencial responde 401 con WWW-Authenticate: Bearer resource_metadata="https://www.mailmask.studio/.well-known/oauth-protected-resource". Metadata en /.well-known/oauth-authorization-server, registro dinámico público en POST /oauth/register, /oauth/authorize con PKCE S256, POST /oauth/token (code y refresh_token) y POST /oauth/revoke.
+
+Forma 2 (alternativa) — API key mk_, para clientes sin OAuth, scripts o servidores. La llave se crea en mailmask.studio/app → API Keys y va en Authorization: Bearer mk_...
+
+Conectar desde Claude Code con llave:
 claude mcp add --transport http mailmask https://www.mailmask.studio/mcp --header "Authorization: Bearer mk_..."
 
-Configuración para Claude Desktop, Cursor y otros (mcp.json):
+Configuración con llave para Cursor y otros (mcp.json):
 {
   "mcpServers": {
     "mailmask": {
@@ -226,9 +241,25 @@ Pagos por MCP: activation_link, register_domain y renewal_link devuelven una lig
 
 Sobre el DNS: set_dns_record REEMPLAZA el conjunto de valores de ese nombre y tipo, así que para añadir un valor hay que leer primero con list_dns_records e incluir también los que ya estaban. Los registros que MailMask necesita para el correo (MX, TXT de verificación, SPF y CNAME de DKIM) vienen marcados con managed y no se pueden borrar: el agente recibe un 409 explicando por qué. create_dns_zone importa lo que encuentre del proveedor anterior y devuelve los nameservers que hay que cambiar en el registrador; hasta que se cambien, nada de lo que se edite tiene efecto.
 
-Un error del servidor (por ejemplo, un dominio gratis pidiendo un buzón, que requiere dominio activado a $99 MXN/mes) llega al agente como resultado con isError y el mensaje tal cual. Las API keys no se crean ni revocan por MCP. Límite: 60 peticiones por minuto por llave. Las conversaciones de la Bandeja no se leen ni responden por MCP (sí la firma y las respuestas guardadas). No existe un paquete npm de MCP: el servidor es la URL.
+Un error del servidor (por ejemplo, un dominio gratis pidiendo un buzón, que requiere dominio activado a $99 MXN/mes) llega al agente como resultado con isError y el mensaje tal cual. Las API keys no se crean ni revocan por MCP. Límite: 60 peticiones por minuto por llave o por conexión OAuth. Las conversaciones de la Bandeja no se leen ni responden por MCP (sí la firma y las respuestas guardadas). No existe un paquete npm de MCP: el servidor es la URL.
 
 Con una API key mk_ las acciones irreversibles se ejecutan directo. Con el token de turno del asistente de la app (mt_, dura 5 minutos), borrar un dominio, una máscara, un buzón o un registro DNS, sacar a un miembro o transferir un dominio fuera NO se ejecuta: la ruta responde 409 needs_confirmation y el usuario lo aprueba en una tarjeta de la app.`,
+  },
+  {
+    title: "¿Cómo conecto MailMask a Claude, ChatGPT o Ghosty Studio?",
+    content: `Pregunta frecuente: ¿cómo conecto MailMask a Claude, a ChatGPT, a Ghosty o a mi agente de IA?
+
+Respuesta corta: con OAuth, pegando sólo la URL https://www.mailmask.studio/mcp. No hace falta copiar ninguna API key.
+
+- Ghosty Studio (ghosty.studio): Conectores → Mailmask → Conectar. Entras a MailMask, das Permitir y tu agente de Ghosty ya tiene las herramientas de MailMask.
+- Claude.ai o Claude Desktop: Settings → Connectors → Add custom connector → nombre MailMask y URL https://www.mailmask.studio/mcp → Connect → Permitir.
+- ChatGPT: Settings → Apps & Connectors → Create (modo desarrollador) → URL https://www.mailmask.studio/mcp con OAuth → Permitir.
+- Claude Code: claude mcp add --transport http mailmask https://www.mailmask.studio/mcp, luego /mcp → mailmask → Authenticate.
+- Cualquier cliente MCP con autorización OAuth: sólo la URL.
+
+La pantalla de Permitir muestra qué cliente pide acceso y con qué cuenta entraste. La conexión puede hacer todo lo que haría una API key, menos crear llaves, entrar al admin o crear credenciales SMTP. Para cortarla, desconéctala desde el cliente; para cortar todas, cambia tu contraseña de MailMask.
+
+Sólo si el cliente no soporta OAuth (un script, un servidor, un cliente viejo), usa una API key mk_ de mailmask.studio/app → API Keys en el encabezado Authorization: Bearer mk_...`,
   },
   {
     title: "Mask, el asistente dentro de la app",
