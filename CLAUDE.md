@@ -490,6 +490,7 @@ Override with env vars `S3_BUCKET` and `S3_BACKUP_BUCKET` respectively.
 
 ## Conventions
 - **Language**: Spanish for user-facing strings, English for code/comments
+- **Vocabulario: «dirección» / «máscara», nunca «alias» de cara al público** (5-oct-2026). Con buzones IMAP, «alias» ya no describía el objeto (puede tener buzón, reenvío o ambos). **Dirección** es el objeto (app, errores de la API, docs: «Nueva dirección», «Esta dirección ya existe»); **máscara** es el sinónimo de marketing y privacidad (landing, blog). No mezclarlos en la misma pantalla. El **contrato no cambia y no se retira**: rutas `/api/domains/:id/alias*` (con sinónimo `/addresses*`, que reentra por `app.fetch` en `forwardAddresses`), campo `alias`, `fromAlias`, `?alias=` del perfil Apple, tools MCP `*_alias`, `sdk.aliases` (= `sdk.addresses` desde 0.4.5), columnas e ids del DOM. Se queda «alias» a propósito en: una mención SEO por post («direcciones, también llamadas alias»), title/meta/h1 de los dos posts cuya keyword es alias (`proteger-identidad-alias-email`, `automatizar-…-aliases`), la FAQ de la landing y donde se habla de competidores (SimpleLogin, ImprovMX, alias de Google). `MCP_INSTRUCTIONS` le dice al agente que hable de direcciones.
 - **Validation**: Inline validation, only add zod if schemas are reused across endpoints
 - **Error responses**: Always JSON `{ error: "message" }` with appropriate status code
 - **Auth**: JWT in HttpOnly cookie named `token`, verified via `verifyJwt()` from `auth.ts`
