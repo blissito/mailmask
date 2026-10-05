@@ -376,10 +376,12 @@ bug de "cancelar" al día 10 (ya corregido). Estado: dominio en nuestra cuenta d
 5-nov (add-on `cancelled` con fecha, se apaga solo). Zona Route 53 `Z06501399WP47IQBW1R7`
 creada y copiada **sin delegar** (13 registros, incluidos los DKIM `hostingermail-a/b/c`), sin
 `configureDnsRecords`: el botón `/dns/zone` habría puesto nuestro MX delante del de Hostinger.
-Cobro: pago único de MP $1,588 (activación anual $999 + dominio $589), `external_reference`
-`manual:kandey-anual-2026`, porque la clienta paga sin sesión y una suscripción la exige. El
-webhook no lo procesa: al entrar, extender el add-on a 370 días, registrar la orden a mano y
-limpiar `mp_preapproval_id`/`next_charge_at` de la fila (preapproval cancelado). Antes de mover
+Cobro: suscripción anual de MP $1,588 (activación anual $999 + dominio $589) con
+`payer_email` `fresnnyy@gmail.com` (su cuenta de MP, distinta de la de MailMask) y
+`external_reference` `addon:086c825b…`: el webhook activa el add-on 370 días. La parte del
+dominio va dentro: la renovación de la fila **no** queda cobrada por `domain-renew:`; al revivirla,
+marcar `renewal_status` a mano y limpiar `mp_preapproval_id`/`next_charge_at` (preapproval cancelado).
+Las ligas anteriores (correo equivocado y pago único) se cancelaron. Antes de mover
 NS: IP del apex según el hPanel (la CDN rota), revivir la fila a `registering`.
 
 **Fue un dolor de muelas para la clienta.** Ella sola no lo hubiera logrado; hicieron
