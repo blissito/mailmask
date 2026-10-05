@@ -360,7 +360,7 @@ Pestaña "Registro" del dominio en `/app`; columnas `transfer_lock` y `transfer_
 - El transfer-out confirmado pasa por el mismo `unlockTransfer`: antes uno abandonado dejaba el
   dominio abierto para siempre. El código EPP sigue saliendo sólo por el flujo de transfer-out.
 
-### ⏳ EN ESPERA — primera transferencia real: kandey.com.mx (24-sep-2026)
+### ✅ Primera transferencia real: kandey.com.mx (24-sep → 5-oct-2026)
 
 **Estado:** mandada a AWS el 24-sep a las 22:47 (operación
 `3f62f782-b045-44c5-888d-aafd09cc44e6`), paso 7 de 14: *"esperando a que el registrador
@@ -370,19 +370,17 @@ Pago **manual** (`mpPaymentId: manual:bliss-2026-09-24`), fuera de MercadoPago, 
 no ha pagado**: paga cuando se complete la transferencia. AWS ya nos cobró $29 USD el 24-sep; si
 falla, pedir el reembolso a AWS con la operación.
 
-**5-oct-2026: AWS la completó (paso 14/14)**, pero la fila quedó en `transfer_cancelled` por el
-bug de "cancelar" al día 10 (ya corregido). Estado: dominio en nuestra cuenta de AWS, vence
-3-oct-2027, candado puesto; NS y MX **siguen en Hostinger**. Activado por cortesía hasta el
-5-nov (add-on `cancelled` con fecha, se apaga solo). Zona Route 53 `Z06501399WP47IQBW1R7`
-creada y copiada **sin delegar** (13 registros, incluidos los DKIM `hostingermail-a/b/c`), sin
-`configureDnsRecords`: el botón `/dns/zone` habría puesto nuestro MX delante del de Hostinger.
-Cobro: suscripción anual de MP $1,588 (activación anual $999 + dominio $589) con
-`payer_email` `fresnnyy@gmail.com` (su cuenta de MP, distinta de la de MailMask) y
-`external_reference` `addon:086c825b…`: el webhook activa el add-on 370 días. La parte del
-dominio va dentro: la renovación de la fila **no** queda cobrada por `domain-renew:`; al revivirla,
-marcar `renewal_status` a mano y limpiar `mp_preapproval_id`/`next_charge_at` (preapproval cancelado).
-Las ligas anteriores (correo equivocado y pago único) se cancelaron. Antes de mover
-NS: IP del apex según el hPanel (la CDN rota), revivir la fila a `registering`.
+**5-oct-2026: completada y migrada.** AWS la terminó al día 11 (la fila se había marcado
+`transfer_cancelled` por el bug del día 10, ya corregido). Pagó suscripción anual de MP $1,588
+(activación $999 + dominio $589, `payer_email` `fresnnyy@gmail.com`, distinto de su cuenta de
+MailMask; add-on `086c825b…` vigente al 10-oct-2027). La zona `Z06501399WP47IQBW1R7` se pobló
+**antes** de delegar con un script (el botón `/dns/zone` habría puesto nuestro MX delante del de
+Hostinger), la fila se revivió con ese inventario y `finalizeDomainRegistration` movió los NS:
+MX, DKIM `hostingermail-*`, `_dmarc`, `www`, `ftp` idénticos a Hostinger; SPF fusionado con
+`include:amazonses.com`. Su web ya daba 403 en Hostinger antes de migrar (no es nuestro).
+La renovación del dominio va dentro de la suscripción del add-on (`renewal_status` = none).
+Ojo al verificar: la red de bliss intercepta el DNS (`dig @ns…` contesta lo público); verificar
+desde Fly con `node:dns` y `setServers`.
 
 **Fue un dolor de muelas para la clienta.** Ella sola no lo hubiera logrado; hicieron
 falta bliss en WhatsApp y una sesión entera arreglando en producción. Lo que se topó, en
