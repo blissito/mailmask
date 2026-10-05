@@ -40,7 +40,7 @@
       "headline": "Automatiza tu email con n8n, Make y Zapier usando aliases",
       "description": "Crea aliases dedicados para automatizar workflows de email con n8n, Make o Zapier. Guía práctica con ejemplos.",
       "datePublished": "2026-02-23",
-      "dateModified": "2026-09-07",
+      "dateModified": "2026-10-05",
       "image": "https://www.mailmask.studio/blog/img/automatizar.jpg",
       "author": { "@type": "Organization", "name": "MailMask" },
       "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
@@ -62,20 +62,20 @@
     {
       "@context": "https://schema.org",
       "@type": "HowTo",
-      "name": "Cómo automatizar tu email con aliases y herramientas de automatización",
-      "description": "Guía paso a paso para crear aliases dedicados en MailMask y conectarlos con n8n, Make o Zapier para automatizar workflows de email.",
+      "name": "Cómo automatizar tu email con direcciones dedicadas y herramientas de automatización",
+      "description": "Guía paso a paso para crear direcciones dedicadas en MailMask y conectarlas con n8n, Make o Zapier para automatizar workflows de email.",
       "step": [
         {
           "@type": "HowToStep",
           "position": 1,
-          "name": "Crear un alias dedicado en MailMask",
-          "text": "En el dashboard de MailMask, crea un alias específico para tu automatización, por ejemplo leads@tudominio.com o alertas@tudominio.com."
+          "name": "Crear una dirección dedicada en MailMask",
+          "text": "En el dashboard de MailMask, crea una dirección específica para tu automatización, por ejemplo leads@tudominio.com o alertas@tudominio.com."
         },
         {
           "@type": "HowToStep",
           "position": 2,
           "name": "Configurar el reenvío hacia tu herramienta",
-          "text": "Configura el alias para reenviar a la dirección de email que tu herramienta de automatización te proporciona (n8n, Make o Zapier generan direcciones únicas para recibir emails)."
+          "text": "Configura la dirección para reenviar a la dirección de email que tu herramienta de automatización te proporciona (n8n, Make o Zapier generan direcciones únicas para recibir emails)."
         },
         {
           "@type": "HowToStep",
@@ -87,7 +87,7 @@
           "@type": "HowToStep",
           "position": 4,
           "name": "Probar y activar",
-          "text": "Envía un email de prueba al alias y verifica que el workflow se ejecute correctamente. Ajusta filtros y acciones según sea necesario."
+          "text": "Envía un email de prueba a la dirección y verifica que el workflow se ejecute correctamente. Ajusta filtros y acciones según sea necesario."
         }
       ]
     }
@@ -114,15 +114,15 @@
       </figure>
 
       <div class="blog-content">
-        <p>El email sigue siendo el canal principal de comunicación para negocios, pero procesarlo manualmente consume horas cada semana. La combinación de aliases dedicados con herramientas de automatización como n8n, Make o Zapier te permite crear workflows que procesan, clasifican y responden emails sin intervención manual.</p>
+        <p>El email sigue siendo el canal principal de comunicación para negocios, pero procesarlo manualmente consume horas cada semana. La combinación de direcciones dedicadas (también llamadas alias) con herramientas de automatización como n8n, Make o Zapier te permite crear workflows que procesan, clasifican y responden emails sin intervención manual.</p>
 
-        <p>En esta guía te mostramos cómo configurar aliases en <a href="/">MailMask</a> como triggers para tus automatizaciones, con ejemplos concretos que puedes implementar hoy.</p>
+        <p>En esta guía te mostramos cómo configurar direcciones en <a href="/">MailMask</a> como triggers para tus automatizaciones, con ejemplos concretos que puedes implementar hoy.</p>
 
-        <h2>¿Por qué un alias dedicado para automatización?</h2>
+        <h2>¿Por qué una dirección dedicada para automatización?</h2>
 
         <p>La mayoría de las herramientas de automatización ofrecen un trigger de email: una dirección generada por la plataforma que activa un workflow cuando recibe un mensaje. El problema es que esas direcciones son largas, genéricas y poco profesionales — algo como <code>hook-a7f3x@hooks.zapier.com</code>.</p>
 
-        <p>Con un alias de MailMask, pones tu dominio al frente:</p>
+        <p>Con una dirección de MailMask, pones tu dominio al frente:</p>
 
         <ul>
           <li><code>leads@tudominio.com</code> reenvía a tu trigger de Zapier para capturar leads</li>
@@ -130,13 +130,13 @@
           <li><code>alertas@tudominio.com</code> reenvía a n8n para clasificar y notificar</li>
         </ul>
 
-        <p>El resultado: dirección profesional por fuera, automatización por dentro. Y si cambias de herramienta (de Zapier a n8n, por ejemplo), solo actualizas el destino del alias — el email público no cambia.</p>
+        <p>El resultado: dirección profesional por fuera, automatización por dentro. Y si cambias de herramienta (de Zapier a n8n, por ejemplo), solo actualizas el destino de la dirección — el email público no cambia.</p>
 
         <h2>Configuración paso a paso</h2>
 
-        <h3>Paso 1: Crea el alias en MailMask</h3>
+        <h3>Paso 1: Crea la dirección en MailMask</h3>
 
-        <p>En el dashboard de MailMask, ve a tu dominio y crea un alias nuevo. Dale un nombre descriptivo según su función:</p>
+        <p>En el dashboard de MailMask, ve a tu dominio y crea una dirección nueva. Dale un nombre descriptivo según su función:</p>
 
         <ul>
           <li><code>leads@</code> para captura de prospectos</li>
@@ -151,11 +151,11 @@
 
         <p><strong>En Make (antes Integromat)</strong>: usa el módulo "Email > Watch Emails" o "Mailhook". Make genera un webhook con dirección de email que activa tu escenario.</p>
 
-        <p><strong>En n8n</strong>: usa el nodo "Email Trigger (IMAP)" apuntando a un buzón que reciba los emails, o configura un webhook que procese el contenido reenviado. Si usas n8n self-hosted, también puedes configurar IMAP directo: con el dominio activado, MailMask le da a la máscara un buzón IMAP propio, así que el trigger apunta a MailMask y no a un Gmail intermedio.</p>
+        <p><strong>En n8n</strong>: usa el nodo "Email Trigger (IMAP)" apuntando a un buzón que reciba los emails, o configura un webhook que procese el contenido reenviado. Si usas n8n self-hosted, también puedes configurar IMAP directo: con el dominio activado, MailMask le da a la dirección un buzón IMAP propio, así que el trigger apunta a MailMask y no a un Gmail intermedio.</p>
 
-        <h3>Paso 3: Conecta el alias al trigger</h3>
+        <h3>Paso 3: Conecta la dirección al trigger</h3>
 
-        <p>En MailMask, edita el alias y configura el destino de reenvío con la dirección de trigger que obtuviste. Todo email que llegue al alias se reenviará automáticamente a tu herramienta de automatización.</p>
+        <p>En MailMask, edita la dirección y configura como destino de reenvío la del trigger que obtuviste. Todo email que llegue ahí se reenviará automáticamente a tu herramienta de automatización.</p>
 
         <h3>Paso 4: Diseña tu workflow</h3>
 
@@ -175,7 +175,7 @@
           <li>Activa un email de respuesta automática con información de tu servicio</li>
         </ol>
 
-        <p>Sin alias dedicado, tendrías que dar la dirección fea del trigger o configurar reglas complicadas en tu email principal.</p>
+        <p>Sin una dirección dedicada, tendrías que dar la dirección fea del trigger o configurar reglas complicadas en tu email principal.</p>
 
         <h3>Clasificación automática con IA</h3>
 
@@ -205,7 +205,7 @@
         <p>Muchos servicios de infraestructura (UptimeRobot, Grafana, AWS) envían alertas por email. Crea <code>alertas@tudominio.com</code>:</p>
 
         <ol>
-          <li>La alerta llega al alias</li>
+          <li>La alerta llega a la dirección</li>
           <li>Se reenvía a n8n</li>
           <li>n8n analiza la severidad (el asunto suele indicar "CRITICAL", "WARNING", etc.)</li>
           <li>Si es crítica: envía mensaje a Slack, SMS por Twilio, y crea incidente en PagerDuty</li>
@@ -219,17 +219,17 @@
         <ul>
           <li><strong>Filtrar por remitente</strong>: solo reenviar emails de dominios específicos</li>
           <li><strong>Filtrar por asunto</strong>: solo procesar emails que contengan ciertas palabras clave</li>
-          <li><strong>Múltiples destinos</strong>: un alias puede reenviar a tu herramienta de automatización <em>y</em> a tu bandeja personal al mismo tiempo</li>
+          <li><strong>Múltiples destinos</strong>: una dirección puede reenviar a tu herramienta de automatización <em>y</em> a tu bandeja personal al mismo tiempo</li>
         </ul>
 
         <h2>Tips para automatizar sin dolor</h2>
 
         <ul>
-          <li><strong>Un alias por workflow</strong>: no mezcles propósitos. Si tienes un workflow para leads y otro para facturas, usa aliases separados. Así puedes desactivar uno sin afectar al otro.</li>
-          <li><strong>Nombra descriptivamente</strong>: <code>leads-zapier@</code> o <code>facturas-make@</code> te dicen exactamente qué hace cada alias y a dónde va.</li>
-          <li><strong>Prueba antes de publicar</strong>: envía emails de prueba al alias y verifica que el workflow se active correctamente antes de darlo como dirección de contacto.</li>
-          <li><strong>Monitorea en la Bandeja</strong>: la <a href="/blog/bandeja-compartida-vs-helpdesk">Bandeja de MailMask</a> te muestra todos los emails que pasan por tus aliases, así puedes verificar que nada se pierda.</li>
-          <li><strong>Documenta tus flows</strong>: mantén una lista de qué alias conecta con qué herramienta y qué acción ejecuta. Tu yo del futuro te lo agradecerá.</li>
+          <li><strong>Una dirección por workflow</strong>: no mezcles propósitos. Si tienes un workflow para leads y otro para facturas, usa direcciones separadas. Así puedes desactivar una sin afectar a la otra.</li>
+          <li><strong>Nombra descriptivamente</strong>: <code>leads-zapier@</code> o <code>facturas-make@</code> te dicen exactamente qué hace cada dirección y a dónde va.</li>
+          <li><strong>Prueba antes de publicar</strong>: envía emails de prueba a la dirección y verifica que el workflow se active correctamente antes de darlo como dirección de contacto.</li>
+          <li><strong>Monitorea en la Bandeja</strong>: la <a href="/blog/bandeja-compartida-vs-helpdesk">Bandeja de MailMask</a> te muestra todos los emails que pasan por tus direcciones, así puedes verificar que nada se pierda.</li>
+          <li><strong>Documenta tus flows</strong>: mantén una lista de qué dirección conecta con qué herramienta y qué acción ejecuta. Tu yo del futuro te lo agradecerá.</li>
         </ul>
 
         <h2>¿Qué herramienta elegir?</h2>
@@ -240,19 +240,19 @@
 
         <p><strong>n8n</strong> es la opción para equipos técnicos. Es open source, puedes hostearlo tú mismo, y tiene la mayor flexibilidad para integraciones custom con código. Si ya tienes infraestructura propia, n8n se integra naturalmente.</p>
 
-        <p>Las tres funcionan perfectamente con aliases de MailMask. La diferencia está en tu nivel técnico y la complejidad de lo que quieras automatizar.</p>
+        <p>Las tres funcionan perfectamente con las direcciones de MailMask. La diferencia está en tu nivel técnico y la complejidad de lo que quieras automatizar.</p>
 
         <h2>Empieza con un workflow simple</h2>
 
-        <p>No intentes automatizar todo de golpe. Elige el proceso manual que más tiempo te consume — captura de leads, clasificación de soporte, procesamiento de facturas — y crea un alias + workflow para eso. Una vez que veas el resultado, naturalmente vas a querer automatizar más.</p>
+        <p>No intentes automatizar todo de golpe. Elige el proceso manual que más tiempo te consume — captura de leads, clasificación de soporte, procesamiento de facturas — y crea una dirección + workflow para eso. Una vez que veas el resultado, naturalmente vas a querer automatizar más.</p>
 
-        <p><a href="/register">Crea tu cuenta en MailMask</a>, configura tu primer alias de automatización y conecta tu herramienta favorita. En 15 minutos puedes tener tu primer workflow funcionando.</p>
+        <p><a href="/register">Crea tu cuenta en MailMask</a>, configura tu primera dirección de automatización y conecta tu herramienta favorita. En 15 minutos puedes tener tu primer workflow funcionando.</p>
       </div>
     </article>
 
     <section class="blog-cta">
-      <h2>Aliases ilimitados para tus automatizaciones</h2>
-      <p>Conecta MailMask con n8n, Make o Zapier. Aliases profesionales gratis para empezar · $99 por dominio activado.</p>
+      <h2>Direcciones ilimitadas para tus automatizaciones</h2>
+      <p>Conecta MailMask con n8n, Make o Zapier. Direcciones profesionales gratis para empezar · $99 por dominio activado.</p>
       <a href="/register" class="cta-btn">Crear cuenta gratis</a>
     </section>
 
