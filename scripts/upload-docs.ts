@@ -81,7 +81,7 @@ lo único que se paga es "activar" un dominio. Todos los precios están en pesos
 Cuenta gratis ($0, sin tarjeta):
 - 1 dominio por cuenta (el más antiguo sin activar; un segundo dominio sin activar queda
   bloqueado: guarda el correo en la Bandeja pero no lo reenvía).
-- 5 máscaras (alias) que reenvían al buzón que elijas.
+- 5 direcciones (máscaras; antes "alias") que reenvían al buzón que elijas.
 - Reenvío hasta 1,000 correos al mes.
 - Bandeja para una persona: leer y responder desde tu dominio. Muestra los últimos 7 días y
   guarda 30 por si activas; después se borra.
@@ -223,7 +223,7 @@ Configuración con llave para Cursor y otros (mcp.json):
 
 Son 95 herramientas que cubren lo mismo que el panel (cada una es un método del SDK, con las mismas reglas y límites). Al conectarse, el cliente recibe además una guía con el orden para conectar un dominio, qué significa gratis/activado/bloqueado y cómo funcionan los pagos.
 - Dominios: list_domains, get_domain, create_domain (devuelve los registros DNS: MX, TXT de verificación, CNAME de DKIM, SPF), domain_dns_setup (los registros exactos para pegar en el registrador, cuáles ya se ven en el DNS público y en qué panel van: Hostinger, GoDaddy, Cloudflare, Namecheap, Route 53), verify_domain, domain_health, delete_domain.
-- Máscaras y buzones: list_aliases, create_alias (con mailbox: true crea también el buzón IMAP y devuelve la contraseña una sola vez), update_alias, delete_alias, create_mailbox, delete_mailbox, reset_mailbox_password (genera una contraseña nueva para el buzón y la devuelve una sola vez), apple_profile_link (liga al perfil que configura el buzón en iPhone, iPad o Mac), mailbox_export_link (liga para descargar el buzón en .mbox).
+- Direcciones (máscaras) y buzones: list_aliases, create_alias (con mailbox: true crea también el buzón IMAP y devuelve la contraseña una sola vez), update_alias, delete_alias, create_mailbox, delete_mailbox, reset_mailbox_password (genera una contraseña nueva para el buzón y la devuelve una sola vez), apple_profile_link (liga al perfil que configura el buzón en iPhone, iPad o Mac), mailbox_export_link (liga para descargar el buzón en .mbox).
 - Activación y cobro: activation_link (liga de MercadoPago para activar un dominio a $99 MXN/mes, o sumarle +50 GB o +100 envíos/día), list_addons, billing_status.
 - Comprar y renovar dominios: search_domains, domain_prices, register_domain (devuelve la liga de pago), list_registrations, renewal_status, renewal_link.
 - Transferencias: transfer_check (requisitos y precio, no cobra), transfer_start (devuelve la liga al formulario seguro de la app donde se pega el código EPP y se paga; el código EPP NUNCA se da en el chat), transfer_status, transfer_dns, update_transfer_dns, approve_transfer_dns, resend_transfer_email, transfer_out (el código EPP llega por correo al dueño).
@@ -354,7 +354,7 @@ Nota: el SDK usa mm.send.bulkSend() y mm.send.bulkStatus() para estas operacione
     content: `MailMask permite invitar miembros (agentes) a un dominio con diferentes roles y permisos. Esto facilita la colaboración en equipo para gestionar emails.
 
 Roles disponibles:
-- owner: acceso completo — gestionar dominio, aliases, reglas, miembros, bandeja, envío
+- owner: acceso completo — gestionar dominio, direcciones, reglas, miembros, bandeja, envío
 - admin: lectura, escritura y gestión de miembros (no puede eliminar dominio ni transferir ownership)
 - agent: solo lectura — puede ver bandeja y responder conversaciones asignadas
 

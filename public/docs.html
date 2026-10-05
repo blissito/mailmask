@@ -185,7 +185,7 @@
         <a href="#instalacion">Instalaci&oacute;n</a>
         <a href="#autenticacion">Autenticaci&oacute;n</a>
         <a href="#dominios">Dominios</a>
-        <a href="#aliases">Aliases</a>
+        <a href="#aliases">Direcciones</a>
         <a href="#buzones" class="pl-4">Buzones IMAP</a>
         <a href="#dns">DNS</a>
         <a href="#reglas">Reglas</a>
@@ -208,7 +208,7 @@
     <main class="prose-section px-6 md:px-12 py-10">
 
       <h1 class="text-3xl font-bold mb-2">SDK de MailMask</h1>
-      <p class="text-fg-muted mb-8">Skills para tu agente, cliente oficial TypeScript/JavaScript, API REST, SMTP y servidor MCP. Crea aliases, gestiona dominios, env&iacute;a emails y m&aacute;s &mdash; desde tu c&oacute;digo o pidi&eacute;ndoselo a tu agente.</p>
+      <p class="text-fg-muted mb-8">Skills para tu agente, cliente oficial TypeScript/JavaScript, API REST, SMTP y servidor MCP. Crea direcciones, gestiona dominios, env&iacute;a emails y m&aacute;s &mdash; desde tu c&oacute;digo o pidi&eacute;ndoselo a tu agente.</p>
 
       <p class="text-sm text-fg-subtle mb-10">
         <code class="text-accent-text">npm</code>:
@@ -297,50 +297,52 @@ dnsRecords.spf;          <span class="cm">// { type: "TXT", name, value: "v=spf1
 setup.records;       <span class="cm">// [{ type, name: "@", fqdn, value, level: "requerido" | "recomendado" | "opcional" }]</span>
 setup.registrarHint; <span class="cm">// { provider, label, note } &mdash; en qu&eacute; panel se pegan (Hostinger, GoDaddy, Cloudflare&hellip;)</span></code></pre>
 
-      <!-- Aliases -->
-      <h2 id="aliases" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Aliases</h2>
-      <p class="text-fg-muted mb-4">Crea y administra aliases (m&aacute;scaras) de email. Cada alias reenv&iacute;a correo a uno o m&uacute;ltiples destinos, guarda el correo en un buz&oacute;n IMAP propio, o las dos cosas. El dominio gratis permite 5 aliases; el activado, ilimitados. <code class="text-fg">*</code> como alias es el catch-all.</p>
-      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Listar aliases</span>
-<span class="kw">const</span> aliases = <span class="kw">await</span> mm.aliases.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
+      <!-- Direcciones (antes "aliases"; el id se conserva porque hay enlaces externos) -->
+      <span id="direcciones"></span>
+      <h2 id="aliases" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Direcciones</h2>
+      <p class="text-fg-muted mb-4">Crea y administra las direcciones de tu dominio (antes las llam&aacute;bamos <em>alias</em>; tambi&eacute;n son tus m&aacute;scaras). Cada direcci&oacute;n reenv&iacute;a correo a uno o m&uacute;ltiples destinos, guarda el correo en un buz&oacute;n IMAP propio, o las dos cosas. El dominio gratis permite 5 direcciones; el activado, ilimitadas. <code class="text-fg">*</code> como direcci&oacute;n es el catch-all.</p>
+      <p class="text-fg-muted mb-4 text-sm">En el SDK el recurso es <code class="text-fg">mm.addresses</code> (<code class="text-fg">mm.aliases</code> sigue funcionando, es el mismo). En la API REST la ruta es <code class="text-fg">/api/domains/:id/addresses</code>, y <code class="text-fg">/api/domains/:id/alias</code> sigue respondiendo igual. El campo del cuerpo sigue llam&aacute;ndose <code class="text-fg">alias</code> (lo que va antes de la @).</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Listar direcciones</span>
+<span class="kw">const</span> direcciones = <span class="kw">await</span> mm.addresses.<span class="fn">list</span>(<span class="str">"domain-id"</span>);
 
-<span class="cm">// Crear alias</span>
-<span class="kw">const</span> alias = <span class="kw">await</span> mm.aliases.<span class="fn">create</span>(<span class="str">"domain-id"</span>, {
+<span class="cm">// Crear una direcci&oacute;n</span>
+<span class="kw">const</span> hello = <span class="kw">await</span> mm.addresses.<span class="fn">create</span>(<span class="str">"domain-id"</span>, {
   alias: <span class="str">"hello"</span>,
   destinations: [<span class="str">"me@gmail.com"</span>]
 });
 
-<span class="cm">// Crear alias con m&uacute;ltiples destinos</span>
-<span class="kw">const</span> alias = <span class="kw">await</span> mm.aliases.<span class="fn">create</span>(<span class="str">"domain-id"</span>, {
+<span class="cm">// Direcci&oacute;n con m&uacute;ltiples destinos</span>
+<span class="kw">const</span> team = <span class="kw">await</span> mm.addresses.<span class="fn">create</span>(<span class="str">"domain-id"</span>, {
   alias: <span class="str">"team"</span>,
   destinations: [<span class="str">"alice@company.com"</span>, <span class="str">"bob@company.com"</span>]
 });
 
-<span class="cm">// Actualizar alias</span>
-<span class="kw">await</span> mm.aliases.<span class="fn">update</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>, { enabled: <span class="kw">false</span> });
+<span class="cm">// Actualizar una direcci&oacute;n</span>
+<span class="kw">await</span> mm.addresses.<span class="fn">update</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>, { enabled: <span class="kw">false</span> });
 
-<span class="cm">// Eliminar alias</span>
-<span class="kw">await</span> mm.aliases.<span class="fn">delete</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);</code></pre>
+<span class="cm">// Eliminar una direcci&oacute;n</span>
+<span class="kw">await</span> mm.addresses.<span class="fn">delete</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);</code></pre>
 
       <h3 id="buzones" class="text-lg font-semibold text-fg mt-8 mb-2">Buzones IMAP</h3>
-      <p class="text-fg-muted mb-4">En un <strong class="text-fg">dominio activado</strong>, un alias puede tener un buz&oacute;n real para leer y enviar desde Apple Mail, Outlook o Thunderbird (IMAP 993 y SMTP 465 con TLS). Buzones ilimitados con 10 GB compartidos por dominio, ampliables en bloques de +50 GB. <strong class="text-fg">La contrase&ntilde;a se devuelve una sola vez y MailMask no la guarda</strong>; si se pierde, se regenera desde el panel. Un alias con buz&oacute;n puede ir sin destinos de reenv&iacute;o.</p>
-      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Alias con buz&oacute;n (y sin reenv&iacute;o)</span>
-<span class="kw">const</span> ventas = <span class="kw">await</span> mm.aliases.<span class="fn">create</span>(<span class="str">"domain-id"</span>, { alias: <span class="str">"ventas"</span>, mailbox: <span class="kw">true</span> });
+      <p class="text-fg-muted mb-4">En un <strong class="text-fg">dominio activado</strong>, una direcci&oacute;n puede tener un buz&oacute;n real para leer y enviar desde Apple Mail, Outlook o Thunderbird (IMAP 993 y SMTP 465 con TLS). Buzones ilimitados con 10 GB compartidos por dominio, ampliables en bloques de +50 GB. <strong class="text-fg">La contrase&ntilde;a se devuelve una sola vez y MailMask no la guarda</strong>; si se pierde, se regenera desde el panel. Una direcci&oacute;n con buz&oacute;n puede ir sin destinos de reenv&iacute;o.</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Direcci&oacute;n con buz&oacute;n (y sin reenv&iacute;o)</span>
+<span class="kw">const</span> ventas = <span class="kw">await</span> mm.addresses.<span class="fn">create</span>(<span class="str">"domain-id"</span>, { alias: <span class="str">"ventas"</span>, mailbox: <span class="kw">true</span> });
 ventas.buzon;      <span class="cm">// { email, password, quotaBytes, imap: { host, port: 993 }, smtp: { host, port: 465 } }</span>
-ventas.errorBuzon; <span class="cm">// texto si el alias se cre&oacute; pero el buz&oacute;n no</span>
+ventas.errorBuzon; <span class="cm">// texto si la direcci&oacute;n se cre&oacute; pero el buz&oacute;n no</span>
 
-<span class="cm">// Buz&oacute;n para un alias que ya existe</span>
-<span class="kw">const</span> buzon = <span class="kw">await</span> mm.aliases.<span class="fn">createMailbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
+<span class="cm">// Buz&oacute;n para una direcci&oacute;n que ya existe</span>
+<span class="kw">const</span> buzon = <span class="kw">await</span> mm.addresses.<span class="fn">createMailbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
 
-<span class="cm">// Borrar el buz&oacute;n Y SU CORREO (el alias conserva sus destinos)</span>
+<span class="cm">// Borrar el buz&oacute;n Y SU CORREO (la direcci&oacute;n conserva sus destinos)</span>
 <span class="cm">// Contrase&ntilde;a nueva (se devuelve una sola vez)</span>
-<span class="kw">const</span> { password } = <span class="kw">await</span> mm.aliases.<span class="fn">resetMailboxPassword</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
-<span class="kw">await</span> mm.aliases.<span class="fn">deleteMailbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
+<span class="kw">const</span> { password } = <span class="kw">await</span> mm.addresses.<span class="fn">resetMailboxPassword</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
+<span class="kw">await</span> mm.addresses.<span class="fn">deleteMailbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
 
 <span class="cm">// Perfil de Apple Mail (plist, texto) para iPhone, iPad y Mac</span>
-<span class="kw">const</span> plist = <span class="kw">await</span> mm.aliases.<span class="fn">appleProfile</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
+<span class="kw">const</span> plist = <span class="kw">await</span> mm.addresses.<span class="fn">appleProfile</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);
 
 <span class="cm">// Exportar todo el buz&oacute;n en .mbox: devuelve el Response en streaming (puede pesar GB)</span>
-<span class="kw">const</span> res = <span class="kw">await</span> mm.aliases.<span class="fn">exportMbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);</code></pre>
+<span class="kw">const</span> res = <span class="kw">await</span> mm.addresses.<span class="fn">exportMbox</span>(<span class="str">"domain-id"</span>, <span class="str">"hello"</span>);</code></pre>
 
       <!-- DNS -->
       <h2 id="dns" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">DNS</h2>
@@ -408,7 +410,7 @@ console.<span class="fn">log</span>(d.delegated, d.observed);</code></pre>
 
       <!-- Envio -->
       <h2 id="envio" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Env&iacute;o de emails</h2>
-      <p class="text-fg-muted mb-4">Env&iacute;a emails individuales o masivos desde cualquier alias activo de tu dominio. El cuerpo puede ir como <code class="text-accent-text">html</code>, <code class="text-accent-text">body</code> (texto plano) o <code class="text-accent-text">markdown</code>; <code class="text-accent-text">replyTo</code> es opcional.</p>
+      <p class="text-fg-muted mb-4">Env&iacute;a emails individuales o masivos desde cualquier direcci&oacute;n activa de tu dominio. El cuerpo puede ir como <code class="text-accent-text">html</code>, <code class="text-accent-text">body</code> (texto plano) o <code class="text-accent-text">markdown</code>; <code class="text-accent-text">replyTo</code> es opcional.</p>
       <p class="text-fg-muted mb-4"><strong class="text-fg">La firma del dominio &mdash;y su logo&mdash; s&oacute;lo se a&ntilde;ade cuando mandas <code class="text-accent-text">markdown</code>.</strong> Con <code class="text-accent-text">html</code> o <code class="text-accent-text">body</code> el correo sale tal cual lo escribiste, sin firma: as&iacute; un correo transaccional que ya trae su propio pie no termina con dos firmas.</p>
       <ul class="text-fg-muted mb-4 list-disc pl-6 space-y-1 text-sm">
         <li>El dominio gratis no inicia correo nuevo: responde <code class="text-fg">403</code> hasta que se activa ($99/mes, 50 env&iacute;os al d&iacute;a y bloques de +100).</li>
@@ -486,7 +488,7 @@ console.<span class="fn">log</span>(status.sent, status.failed, status.skippedSu
       <!-- Webhooks -->
       <h2 id="webhooks" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">Webhooks</h2>
       <p class="text-fg-muted mb-4">Recibe un <code class="text-fg">POST</code> en tu servidor cada vez que pasa algo en el dominio. Disponible en <strong class="text-fg">dominio activado</strong>. La URL debe ser <code class="text-fg">https</code> y p&uacute;blica; m&aacute;ximo 10 webhooks por dominio.</p>
-      <ul class="text-fg-muted mb-4 list-disc pl-6 space-y-1 text-sm"><li><code class="text-fg">email.received</code>: lleg&oacute; correo a un alias. <code class="text-fg-subtle">data: { from, to, subject, alias, forwardedTo[], messageId }</code></li><li><code class="text-fg">email.sent</code>: saliste por <code class="text-fg">send</code> o <code class="text-fg">bulkSend</code>. <code class="text-fg-subtle">data: { to, cc?, subject, from, messageId, bulkJobId? }</code></li><li><code class="text-fg">email.delivered</code>: el servidor del destinatario acept&oacute; el correo. <code class="text-fg-subtle">data: { recipient, messageId, subject, smtpResponse, processingTimeMillis }</code></li><li><code class="text-fg">email.bounced</code>: rebote permanente; el destinatario entr&oacute; a la lista de supresi&oacute;n. <code class="text-fg-subtle">data: { recipient, reason, messageId, subject }</code></li><li><code class="text-fg">email.complained</code>: el destinatario marc&oacute; spam. Mismo <code class="text-fg">data</code> que el rebote.</li></ul>
+      <ul class="text-fg-muted mb-4 list-disc pl-6 space-y-1 text-sm"><li><code class="text-fg">email.received</code>: lleg&oacute; correo a una direcci&oacute;n. <code class="text-fg-subtle">data: { from, to, subject, alias, forwardedTo[], messageId }</code></li><li><code class="text-fg">email.sent</code>: saliste por <code class="text-fg">send</code> o <code class="text-fg">bulkSend</code>. <code class="text-fg-subtle">data: { to, cc?, subject, from, messageId, bulkJobId? }</code></li><li><code class="text-fg">email.delivered</code>: el servidor del destinatario acept&oacute; el correo. <code class="text-fg-subtle">data: { recipient, messageId, subject, smtpResponse, processingTimeMillis }</code></li><li><code class="text-fg">email.bounced</code>: rebote permanente; el destinatario entr&oacute; a la lista de supresi&oacute;n. <code class="text-fg-subtle">data: { recipient, reason, messageId, subject }</code></li><li><code class="text-fg">email.complained</code>: el destinatario marc&oacute; spam. Mismo <code class="text-fg">data</code> que el rebote.</li></ul>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="cm">// Crear. El secret se muestra una sola vez: gu&aacute;rdalo.</span>
 <span class="kw">const</span> wh = <span class="kw">await</span> mm.webhooks.<span class="fn">create</span>(<span class="str">"domain-id"</span>, {
   url: <span class="str">"https://miapp.com/webhooks/mailmask"</span>,
@@ -697,7 +699,7 @@ claude mcp add --transport http mailmask https://www.mailmask.studio/mcp \
       <p class="text-fg-muted mb-2">Son 95 herramientas, que cubren lo mismo que el panel; cada una es un m&eacute;todo del SDK, con las mismas reglas y l&iacute;mites. Al conectarse, el cliente recibe adem&aacute;s una gu&iacute;a (<code>instructions</code>) con el orden para conectar un dominio, qu&eacute; significa gratis, activado y bloqueado, y c&oacute;mo funcionan los pagos.</p>
       <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-4">
         <li><strong>Dominios</strong>: <code>list_domains</code>, <code>get_domain</code>, <code>create_domain</code> (devuelve los registros DNS: MX, TXT, DKIM, SPF), <code>domain_dns_setup</code> (los registros exactos para pegar en tu registrador, cu&aacute;les ya se ven y en qu&eacute; panel van), <code>verify_domain</code>, <code>domain_health</code>, <code>delete_domain</code>.</li>
-        <li><strong>M&aacute;scaras y buzones</strong>: <code>list_aliases</code>, <code>create_alias</code> (con <code>mailbox: true</code> crea tambi&eacute;n el buz&oacute;n IMAP), <code>update_alias</code>, <code>delete_alias</code>, <code>create_mailbox</code>, <code>delete_mailbox</code>, <code>reset_mailbox_password</code> (contrase&ntilde;a nueva, devuelta una sola vez), <code>apple_profile_link</code> (liga al perfil de Apple Mail), <code>mailbox_export_link</code> (liga para descargar el <code>.mbox</code>).</li>
+        <li><strong>Direcciones (m&aacute;scaras) y buzones</strong>: <code>list_aliases</code>, <code>create_alias</code> (con <code>mailbox: true</code> crea tambi&eacute;n el buz&oacute;n IMAP), <code>update_alias</code>, <code>delete_alias</code>, <code>create_mailbox</code>, <code>delete_mailbox</code>, <code>reset_mailbox_password</code> (contrase&ntilde;a nueva, devuelta una sola vez), <code>apple_profile_link</code> (liga al perfil de Apple Mail), <code>mailbox_export_link</code> (liga para descargar el <code>.mbox</code>).</li>
         <li><strong>DNS</strong>: <code>list_dns_records</code>, <code>create_dns_zone</code>, <code>dns_delegation_status</code>, <code>set_dns_record</code>, <code>delete_dns_record</code>, <code>import_dns_records</code>, <code>point_domain_to</code> (apunta el dominio a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render o Fly sin saber qu&eacute; registros hacen falta).</li>
         <li><strong>Activaci&oacute;n y cobro</strong>: <code>activation_link</code> (liga de MercadoPago para activar el dominio, mensual o anual, o sumarle un bloque), <code>list_addons</code>, <code>billing_status</code>.</li>
         <li><strong>Comprar y renovar dominios</strong>: <code>search_domains</code>, <code>domain_prices</code>, <code>register_domain</code>, <code>list_registrations</code>, <code>renewal_status</code>, <code>renewal_link</code>.</li>

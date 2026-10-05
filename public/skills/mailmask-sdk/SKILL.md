@@ -1,11 +1,11 @@
 ---
 name: mailmask-sdk
-description: Use the official MailMask JavaScript/TypeScript SDK (@easybits.cloud/mailmask on npm) to create masks (aliases), send email from a domain, manage rules, webhooks, suppressions, SMTP credentials, DNS, team members, signatures, payment links, domain purchases and transfers, and to verify webhook signatures in a receiver. Use when writing code that talks to mailmask.studio, when a project imports @easybits.cloud/mailmask, or when the user needs to send or receive email through their own domain from an app.
+description: Use the official MailMask JavaScript/TypeScript SDK (@easybits.cloud/mailmask on npm) to create addresses (masks, formerly aliases), send email from a domain, manage rules, webhooks, suppressions, SMTP credentials, DNS, team members, signatures, payment links, domain purchases and transfers, and to verify webhook signatures in a receiver. Use when writing code that talks to mailmask.studio, when a project imports @easybits.cloud/mailmask, or when the user needs to send or receive email through their own domain from an app.
 license: MIT
 compatibility: Node 18+, Deno, Bun or Workers (uses fetch and WebCrypto only). Network access to https://www.mailmask.studio.
 metadata:
   author: mailmask
-  version: "1.2"
+  version: "1.3"
 ---
 
 # MailMask SDK
@@ -30,7 +30,7 @@ All take a `domainId` (from `mm.domains.list()`) except `domains` and `apiKeys`.
 | Resource | Methods |
 |---|---|
 | `mm.domains` | `list()`, `get(id)`, `create(domain)` → DNS records to set, `dnsSetup(id, { live? })` → records to paste + `registrarHint`, `verify(id)`, `health(id)`, `delete(id)` |
-| `mm.aliases` | `list(d)`, `create(d, { alias, destinations?, mailbox? })`, `update(d, alias, { enabled?, destinations? })`, `delete(d, alias)`, `createMailbox(d, alias)`, `deleteMailbox(d, alias)`, `resetMailboxPassword(d, alias)`, `appleProfile(d, alias)` → plist text, `exportMbox(d, alias)` → streaming `Response` |
+| `mm.addresses` (0.4.5+; `mm.aliases` is the same object and keeps working) | `list(d)`, `create(d, { alias, destinations?, mailbox? })`, `update(d, alias, { enabled?, destinations? })`, `delete(d, alias)`, `createMailbox(d, alias)`, `deleteMailbox(d, alias)`, `resetMailboxPassword(d, alias)`, `appleProfile(d, alias)` → plist text, `exportMbox(d, alias)` → streaming `Response` |
 | `mm.send` | `send(d, input, { idempotencyKey? })`, `bulkSend(d, { from, recipients, subject, html })`, `bulkStatus(d, jobId)` |
 | `mm.attachments` | `upload(d, { filename, contentType, data })` → key to pass in `send({ attachments: [key] })` |
 | `mm.rules` | `list`, `create(d, { field, match, value, action, target?, priority? })`, `update`, `delete` |
@@ -92,7 +92,7 @@ an activated domain and a public https URL (max 10 per domain).
 - Read the domain list once and cache the id; do not create domains from code paths that run
   more than once (a `409` means it exists).
 - Treat `MailMaskError.message` as user-facing copy; do not swallow it.
-- `from` must be a mask that exists and is enabled; create it first with `mm.aliases.create`.
+- `from` must be a mask that exists and is enabled; create it first with `mm.addresses.create` (`mm.aliases.create` on SDK < 0.4.5).
 - Never hardcode the key; never commit `.env`.
 - Full reference with every field: https://www.mailmask.studio/docs (see the `mailmask-docs`
   skill). For an agent that should manage the account interactively use `mailmask-mcp`.

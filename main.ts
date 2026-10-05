@@ -1265,7 +1265,7 @@ const app = new Elysia({ adapter: node() })
       info: {
         title: "MailMask API",
         version: "1.0.0",
-        description: "API de MailMask: máscaras (alias) con reenvío, buzones IMAP, envío autenticado, reglas y webhooks sobre tu dominio. Autenticación: `Authorization: Bearer mk_…` con una API key creada en https://www.mailmask.studio/app (sección API Keys); 60 peticiones por minuto por llave. SDK: `@easybits.cloud/mailmask` en npm. Agentes de IA: servidor MCP en https://www.mailmask.studio/mcp con la misma llave. Guía: https://www.mailmask.studio/docs · resumen para modelos: https://www.mailmask.studio/llms.txt",
+        description: "API de MailMask: direcciones (máscaras; antes alias, en `/addresses` o `/alias`) con reenvío, buzones IMAP, envío autenticado, reglas y webhooks sobre tu dominio. Autenticación: `Authorization: Bearer mk_…` con una API key creada en https://www.mailmask.studio/app (sección API Keys); 60 peticiones por minuto por llave. SDK: `@easybits.cloud/mailmask` en npm. Agentes de IA: servidor MCP en https://www.mailmask.studio/mcp con la misma llave. Guía: https://www.mailmask.studio/docs · resumen para modelos: https://www.mailmask.studio/llms.txt",
       },
       components: {
         securitySchemes: {

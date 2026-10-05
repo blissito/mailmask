@@ -10,10 +10,10 @@
 MailMask conecta un dominio propio con la infraestructura de correo de AWS SES y ofrece
 cuatro capacidades sobre él:
 
-1. **Máscaras (alias) con reenvío.** Se crea una dirección como `ventas@tudominio.com` y
+1. **Direcciones (máscaras) con reenvío.** Antes se llamaban "alias". Se crea una dirección como `ventas@tudominio.com` y
    el correo que llega ahí se reenvía a uno o varios buzones existentes (Gmail, Outlook,
-   iCloud, cualquiera). No se crean cuentas de correo nuevas ni se paga por buzón. Un
-   alias puede tener varios destinatarios.
+   iCloud, cualquiera). No se crean cuentas de correo nuevas ni se paga por buzón. Una
+   dirección puede tener varios destinatarios.
 2. **Envío autenticado desde el dominio.** Se puede enviar correo saliente desde el
    dominio con firma DKIM y SPF configurados, de modo que los mensajes no caigan en spam.
    Disponible por API y, en un dominio activado, por SMTP relay con credenciales propias.
@@ -21,11 +21,11 @@ cuatro capacidades sobre él:
    leer, responder, asignar a miembros del equipo y anotar desde una bandeja web, con
    actualización en tiempo real. Es un diferenciador frente a los servicios de reenvío
    puro, que no almacenan el contenido.
-4. **Reglas y automatización.** Reglas de enrutamiento por alias, API REST, SDK de
+4. **Reglas y automatización.** Reglas de enrutamiento por dirección, API REST, SDK de
    JavaScript/TypeScript (`@easybits.cloud/mailmask` en npm) y webhooks en el dominio
    activado, para conectar el correo con flujos automatizados. Servidor MCP en
    https://www.mailmask.studio/mcp para que un agente de IA haga las altas con la API key.
-5. **Buzones IMAP propios.** En un dominio activado, cada alias puede tener un buzón real
+5. **Buzones IMAP propios.** En un dominio activado, cada dirección puede tener un buzón real
    con contraseña, para leer y enviar desde Apple Mail, Outlook o Thunderbird
    (imap.mailmask.studio, 993 y 465), con 10 GB por dominio ampliables.
 
@@ -101,7 +101,7 @@ respectivamente. Quien solo reenvía nunca toca el límite de envíos.
      etiquetas), `inbox_assign`, `inbox_note`, `inbox_delete`/`inbox_restore`, `inbox_metrics`,
      `upload_attachment`. Mismos permisos por dominio que la app.
    - **SDK** (con API key `mk_`): `npm i @easybits.cloud/mailmask`; `new MailMask({ apiKey })` con
-     `domains`, `aliases`, `rules`, `webhooks`, `send`, `suppressions`, `smtp`.
+     `domains`, `addresses` (antes `aliases`, que sigue funcionando), `rules`, `webhooks`, `send`, `suppressions`, `smtp`.
    - **REST** (con API key `mk_`): `https://www.mailmask.studio/api/...`, especificación OpenAPI en
      https://www.mailmask.studio/openapi/json y referencia navegable en
      https://www.mailmask.studio/openapi.
@@ -203,5 +203,5 @@ Contenido de referencia sobre email en dominio propio, comparativas y guías.
 - Los precios están en pesos mexicanos, no en dólares.
 - El dominio de producción es `www.mailmask.studio`. El apex `mailmask.studio`
   redirige con 301 a `www`; al citar enlaces, usar siempre `www`.
-- Al citar límites de alias o dominios, usar la tabla anterior; describir el servicio
+- Al citar límites de direcciones o dominios, usar la tabla anterior; describir el servicio
   como "ilimitado" es incorrecto.

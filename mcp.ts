@@ -37,6 +37,7 @@ function fallo(e: unknown): Salida {
 // skills, así que esto es TODO lo que saben del producto antes de la primera herramienta.
 // Tope de 6 000 caracteres (lo fija `mcp.test.ts`).
 export const MCP_INSTRUCTIONS = `MailMask: correo con tu dominio (máscaras que reenvían, Bandeja compartida, buzones IMAP) y DNS. Hablas con el dueño de la cuenta, casi siempre no técnico: responde en español, corto, y dicta valores exactos.
+Al usuario llámale «dirección» (o máscara) a lo que las tools llaman alias; no le digas «alias». Los nombres *_alias y el campo \`alias\` se quedan así.
 
 ## Conectar un dominio (en este orden)
 1. create_domain (o list_domains si ya existe).
@@ -224,7 +225,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
   tool("delete_domain", "Borra el dominio con todas sus máscaras, reglas y buzones. Irreversible.", { domainId }, (a) => sdk.domains.delete(a.domainId));
 
   // --- Máscaras ---
-  tool("list_aliases", "Lista las máscaras (alias) de un dominio.", { domainId }, (a) => sdk.aliases.list(a.domainId));
+  tool("list_aliases", "Lista las direcciones (máscaras) de un dominio.", { domainId }, (a) => sdk.aliases.list(a.domainId));
   tool("create_alias",
     "Crea una máscara. `destinations` son los correos a los que reenvía; '*' como alias es catch-all. Con `mailbox: true` además guarda el correo en un buzón IMAP (sólo dominio activado) y devuelve sus credenciales UNA sola vez. El dominio gratis permite 5 máscaras.",
     { domainId, alias: aliasName, destinations: z.array(z.string()).optional().describe("Correos destino; puede omitirse si mailbox es true"), mailbox: z.boolean().optional() },
