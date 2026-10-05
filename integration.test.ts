@@ -1488,6 +1488,46 @@ describe("Webhook", () => {
     }
   });
 
+  it("el primer cobro tras la autorización no regala otro periodo ni duplica la orden", async () => {
+    // kandey.com.mx (5-oct-2026): autorizar dio 370 días y el primer cobro sumó otros 370,
+    // con dos cargos de $1,588 en el libro por un solo pago.
+    const email = `webhook-addon-first-${suffix}@example.com`;
+    createUser(email, await hashPassword("testpass123"));
+    const addon = createAddon(email, "storage50");
+    const mpId = `mp-addon-first-${crypto.randomUUID()}`;
+    const { updateAddon, listOrdersForSubject } = await import("./db.ts");
+    updateAddon(addon.id, { mpPreapprovalId: mpId });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, _init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("authorized_payments/")) {
+        return new Response(JSON.stringify({ id: 777, preapproval_id: mpId, status: "processed", transaction_amount: 99, payment: { id: 888, status: "approved" } }));
+      }
+      if (url.includes("api.mercadopago.com/preapproval/")) {
+        return new Response(JSON.stringify({ payer_email: email, external_reference: `addon:${addon.id}`, status: "authorized", auto_recurring: { transaction_amount: 99, frequency: 1, currency_id: "MXN" } }));
+      }
+      return originalFetch(input, _init);
+    };
+
+    try {
+      const auth = await postWebhook({ type: "subscription_preapproval", data: { id: mpId } }, `auth-${mpId}`);
+      await auth.body?.cancel();
+      const afterAuth = getAddonById(addon.id)!.currentPeriodEnd;
+
+      const payId = `pay-first-${crypto.randomUUID()}`;
+      const pay = await postWebhook({ type: "subscription_authorized_payment", data: { id: payId } }, payId);
+      assert.equal(pay.status, 200);
+      await pay.body?.cancel();
+
+      assert.equal(getAddonById(addon.id)!.currentPeriodEnd, afterAuth, "el primer cobro no debe extender el periodo");
+      const charges = listOrdersForSubject("addon", addon.id).filter((o) => o.kind === "charge");
+      assert.equal(charges.length, 1, "un solo pago = una sola orden");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("addon with future start_date activates until start+35 without recording a charge", async () => {
     const email = `webhook-addon-deferred-${suffix}@example.com`;
     createUser(email, await hashPassword("testpass123"));

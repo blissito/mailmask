@@ -180,6 +180,8 @@ import {
   addLog,
   isLegacyPlan,
   getMonthlyForwards,
+  listOrdersForSubject,
+  getOrderByEventKey,
 } from "./db.js";
 import { emitEvent, listWebhooks, getWebhook, createWebhook, updateWebhook, deleteWebhook, enqueuePing, listDeliveries, WEBHOOK_EVENTS, MAX_WEBHOOKS_PER_DOMAIN } from "./webhooks.js";
 import type { AddonKind, WhoisContacto } from "./db.js";
@@ -3416,7 +3418,10 @@ const app = new Elysia({ adapter: node() })
             // La clave es el id del add-on y no el del evento: MercadoPago puede
             // reenviar `authorized` para el mismo preapproval indefinidamente, y solo
             // el primero es un cobro.
-            const order = deferred ? null : recordOrder({
+            // Si el primer cobro llegó antes que la autorización, ya registró su orden.
+            const alreadyCharged = listOrdersForSubject("addon", addon.id)
+              .some((o) => o.kind === "charge" && o.mpAuthorizedPaymentId);
+            const order = deferred || alreadyCharged ? null : recordOrder({
               userEmail: addon.userEmail,
               kind: "charge",
               subject: "addon",
@@ -3871,6 +3876,18 @@ const app = new Elysia({ adapter: node() })
         // Renovación mensual de un add-on. Sin esta rama el add-on expiraría aunque el
         // cliente siguiera pagando.
         if (renewingAddon) {
+          // El primer cobro NO es una renovación: la autorización ya dio el primer periodo
+          // (y, si no era diferida, registró la orden y mandó el recibo). Contarlo aquí otra
+          // vez regalaba un ciclo y duplicaba la orden: kandey.com.mx (5-oct-2026) quedó
+          // activado hasta 2028 con dos cargos de $1,588 en el libro por un solo pago.
+          const firstCharge = !listOrdersForSubject("addon", renewingAddon.id)
+            .some((o) => o.kind === "charge" && o.mpAuthorizedPaymentId);
+          if (firstCharge && getOrderByEventKey(`addon-activate:${renewingAddon.id}`)) {
+            log("info", "billing", "Primer cobro del add-on: ya contado en la autorización", { addonId: renewingAddon.id, apId: ap.id });
+            await markWebhookProcessed(eventKey);
+            return new Response("OK", { status: 200 });
+          }
+
           const prev = renewingAddon.currentPeriodEnd ? new Date(renewingAddon.currentPeriodEnd) : new Date();
           const base = prev > new Date() ? prev : new Date();
           base.setDate(base.getDate() + (ap.type === "yearly" || (ap.transaction_amount ?? 0) * 100 >= DOMAIN_ANNUAL_PRICE ? 370 : 35));
