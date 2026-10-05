@@ -1,0 +1,49 @@
+# CI de la Software Factory de Ghosty. Lo exige la protección de la rama principal.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck --if-present
+      - run: npm run lint --if-present
+      # data/ está en .gitignore y better-sqlite3 no crea el directorio solo (ver test-setup.mjs)
+      - run: mkdir -p data
+      - run: npm test --if-present
+      - run: npm run build --if-present
+  security:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Requiere 'Dependency graph' activado en Settings → Code security del repo;
+      # mientras no se active, dependency-review-action falla con un error de configuración,
+      # no por una dependencia riesgosa. continue-on-error hasta que se active.
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        continue-on-error: true
+        with:
+          fail-on-severity: high
