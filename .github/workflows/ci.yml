@@ -28,6 +28,28 @@ jobs:
       - run: mkdir -p data
       - run: npm test --if-present
       - run: npm run build --if-present
+  verify-cli:
+    # cli/ es su propio paquete (depende de @easybits.cloud/mailmask vía npm), no un workspace del
+    # root: necesita su propio install. Antes de este job, el `npm test` del root ya se topaba con
+    # cli/test/*.test.ts por el discovery recursivo de node:test y tronaba con ERR_MODULE_NOT_FOUND.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cli/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
   security:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
