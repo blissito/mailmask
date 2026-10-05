@@ -10,7 +10,29 @@
 // Los dos hablan el mismo SSE: `data: {type:"chunk"|"tool"|"done"|"error"}` más `: hb`.
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { sqlite } from "./pg.js";
-import { getDomain, getUser, getAgentByEmail, derechosDeDominio } from "./db.js";
+import { getDomain, getUser, getAgentByEmail, derechosDeDominio, listUserDomains } from "./db.js";
+
+// --- Quién puede usar el asistente ---
+
+const emailList = (v: string | undefined): string[] =>
+  (v ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+
+export function isAdminEmail(email: string): boolean {
+  return emailList(process.env.ADMIN_EMAILS).includes(email.toLowerCase());
+}
+
+// Único guardián del asistente: lo usan `/api/auth/me` (mostrar el dock) y las rutas
+// `/api/asistente*` que gastan (turno, que acuña el `mt_`, y subida de adjuntos).
+// Admins y ASSISTANT_EMAILS siempre. Con ASSISTANT_PUBLIC=1, además toda cuenta dueña
+// de al menos un dominio activado (pagado, manual o de cortesía): cada turno gasta la
+// llave de Claude de la casa, así que una cuenta gratis no lo recibe.
+export function canUseAssistant(email: string): boolean {
+  if (isAdminEmail(email) || emailList(process.env.ASSISTANT_EMAILS).includes(email.toLowerCase())) return true;
+  if (process.env.ASSISTANT_PUBLIC !== "1") return false;
+  const owner = getUser(email);
+  if (!owner) return false;
+  return listUserDomains(owner.email).some((d) => derechosDeDominio(d, owner).activado);
+}
 
 // --- Configuración ---
 

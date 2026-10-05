@@ -129,7 +129,11 @@ turno, 120 req/min por usuario. Un `mt_` no sirve como cookie ni una cookie como
 
 **Env:** `GHOSTY_PARTNER_KEY`, `GHOSTY_PARTNER_SECRET`, `GHOSTY_AGENT_ID` (obligatorio en
 `fleet`), `GHOSTY_RUNTIME` (`fleet` por defecto), `ASSISTANT_EMAILS` (probadores, por comas) y
-`ASSISTANT_PUBLIC=1` para abrirlo a todos; mientras no, sólo lo ven los admins y esa lista.
+`ASSISTANT_PUBLIC=1` para abrirlo además a toda cuenta **dueña de al menos un dominio activado**
+(pagado, manual o cortesía; las gratis no, porque cada turno gasta la llave de Claude de la casa);
+sin él, sólo los admins y esa lista. Un solo guardián, `canUseAssistant()` en `assistant.ts`:
+lo usan `/api/auth/me` (`assistant`, muestra el dock), `/api/asistente/stream` (acuña el `mt_`)
+y `/api/asistente/upload`.
 
 **Ghosty, configurado por CLI** (no hay nada en el repo que lo cree): space `mailmask`, agente
 **Mask** `cmuq2rfma0008gewlanomot6g`; `ghosty mcp set` con `ghosty/mcp.json` (el header lleva el

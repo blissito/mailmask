@@ -215,6 +215,8 @@ import {
   userKey,
   ASSISTANT_BASE_PROMPT,
   type AssistantAttachment,
+  canUseAssistant,
+  isAdminEmail,
 } from "./assistant.js";
 import { checkRateLimit } from "./rate-limit.js";
 import {
@@ -570,16 +572,8 @@ async function rateLimitGuard(
 
 // --- Admin check ---
 
-// Mientras el asistente se prueba, sólo lo ven los admins y ASSISTANT_EMAILS; ASSISTANT_PUBLIC=1 lo abre a todos.
-function assistantEnabledFor(email: string): boolean {
-  if (process.env.ASSISTANT_PUBLIC === "1" || isAdmin(email)) return true;
-  // Probadores: correos separados por coma en ASSISTANT_EMAILS.
-  return (process.env.ASSISTANT_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).includes(email.toLowerCase());
-}
-
 function isAdmin(email: string): boolean {
-  const admins = (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim().toLowerCase());
-  return admins.includes(email.toLowerCase());
+  return isAdminEmail(email);
 }
 
 // --- SNS signature verification ---
@@ -1873,7 +1867,7 @@ const app = new Elysia({ adapter: node() })
       JSON.stringify({
         ...profileOf(user), // email, displayName, avatarUrl
         isAdmin: isAdmin(user.email),
-        assistant: assistantEnabledFor(user.email),
+        assistant: canUseAssistant(user.email),
         domainsCount: domains.length,
         forwards,
         subscription: {
@@ -8013,7 +8007,7 @@ const app = new Elysia({ adapter: node() })
   .post("/api/asistente/stream", async ({ request, body }) => {
     const auth = await getAuthUser(request);
     if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
-    if (!assistantEnabledFor(auth.email)) return jsonErr("El asistente todavía no está disponible para tu cuenta.", 403);
+    if (!canUseAssistant(auth.email)) return jsonErr("El asistente todavía no está disponible para tu cuenta.", 403);
     const rl = checkRateLimit(`assistant:${auth.email}`, 20, 60_000);
     if (!rl.allowed) return jsonErr("Demasiados mensajes seguidos; espera un minuto.", 429);
 
@@ -8112,6 +8106,7 @@ const app = new Elysia({ adapter: node() })
   .post("/api/asistente/upload", async ({ request }) => {
     const auth = await getAuthUser(request);
     if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    if (!canUseAssistant(auth.email)) return jsonErr("El asistente todavía no está disponible para tu cuenta.", 403);
     const rl = checkRateLimit(`assistant-upload:${auth.email}`, 20, 60_000);
     if (!rl.allowed) return jsonErr("Demasiadas subidas; espera un minuto.", 429);
 

@@ -370,6 +370,55 @@ describe("Asistente: Ghosty, turn token y confirmaciones", () => {
     assert.equal(conKey.status, 200);
   });
 
+  // --- Quién lo usa ---
+
+  it("canUseAssistant: con ASSISTANT_PUBLIC sólo cuentas con dominio activado (o lista/admin); sin él sólo lista/admin", async () => {
+    const saved = { pub: process.env.ASSISTANT_PUBLIC, list: process.env.ASSISTANT_EMAILS, admins: process.env.ADMIN_EMAILS };
+    const free = `asis-free-${suffix}@example.com`;
+    const paid = `asis-paid-${suffix}@example.com`;
+    const tester = `asis-tester-${suffix}@example.com`;
+    const admin = `asis-admin-${suffix}@example.com`;
+    for (const e of [free, paid, tester, admin]) dbmod.createUser(e, await authmod.hashPassword("password123"));
+    dbmod.createDomain(free, `asis-free-${suffix}.com`, ["d1"], "vt");
+    const paidDomain = dbmod.createDomain(paid, `asis-paid-${suffix}.com`, ["d1"], "vt");
+    const addon = dbmod.createAddon(paid, "domain", paidDomain.id);
+    dbmod.updateAddon(addon.id, { status: "active", currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString() });
+
+    const asUser = async (e: string) => {
+      const csrf = authmod.generateCsrfToken();
+      const cookie = `token=${await authmod.signJwt({ email: e })}`;
+      const me = await (await req("/api/auth/me", { headers: { cookie } })).json();
+      const stream = await postJson("/api/asistente/stream", { text: "hola" }, { cookie: `${cookie}; csrf_token=${csrf}`, "x-csrf-token": csrf });
+      if (stream.status === 200) await stream.text();
+      const fd = new FormData();
+      fd.append("file", new File(["hola"], "a.txt", { type: "text/plain" }));
+      const upload = await req("/api/asistente/upload", { method: "POST", headers: { cookie: `${cookie}; csrf_token=${csrf}`, "x-csrf-token": csrf }, body: fd });
+      return { me: me.assistant, stream: stream.status, upload: upload.status };
+    };
+
+    try {
+      sseFrames = [`data: ${JSON.stringify({ type: "done", value: "ok" })}\n\n`];
+      process.env.ASSISTANT_EMAILS = tester;
+      process.env.ADMIN_EMAILS = admin;
+
+      process.env.ASSISTANT_PUBLIC = "1";
+      assert.deepEqual(await asUser(free), { me: false, stream: 403, upload: 403 }, "gratis sin dominio activado: nada");
+      assert.deepEqual(await asUser(paid), { me: true, stream: 200, upload: 200 }, "dominio activado: sí");
+      assert.equal(asis.canUseAssistant(tester), true, "lista, aunque sea gratis");
+      assert.equal(asis.canUseAssistant(admin), true, "admin, aunque sea gratis");
+      assert.equal(asis.canUseAssistant(`nadie-${suffix}@example.com`), false, "cuenta inexistente");
+
+      delete process.env.ASSISTANT_PUBLIC;
+      assert.deepEqual(await asUser(paid), { me: false, stream: 403, upload: 403 }, "sin ASSISTANT_PUBLIC el dominio activado no basta");
+      assert.deepEqual(await asUser(tester), { me: true, stream: 200, upload: 200 });
+      assert.equal(asis.canUseAssistant(admin), true);
+    } finally {
+      for (const [k, v] of [["ASSISTANT_PUBLIC", saved.pub], ["ASSISTANT_EMAILS", saved.list], ["ADMIN_EMAILS", saved.admins]] as const) {
+        if (v === undefined) delete process.env[k]; else process.env[k] = v;
+      }
+    }
+  });
+
   // --- Salud ---
 
   it("un dominio sin activar es aviso, no error", async () => {
