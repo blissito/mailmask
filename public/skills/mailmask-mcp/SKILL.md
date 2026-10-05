@@ -5,7 +5,7 @@ license: MIT
 compatibility: An MCP client with Streamable HTTP transport (OAuth-capable, or with custom headers for an API key), or curl for the raw JSON-RPC.
 metadata:
   author: mailmask
-  version: "1.4"
+  version: "1.5"
 ---
 
 # MailMask over MCP
@@ -150,6 +150,8 @@ paid; confirm afterwards with `list_addons`, `list_registrations` or `domain_hea
 - Never send email the user did not ask for. Before `inbox_reply`, `inbox_send` or `send_email`,
   show the user the recipient and text and wait for their OK, unless they gave standing
   instructions for that mask.
+- Talk to the user about **direcciones** (or máscaras), never "alias": the `*_alias` tool names
+  and the `alias` field keep the old name for compatibility.
 - A per-agent mailbox beats handing over a personal Gmail: create a mask such as
   `agent@theirdomain.com`, then work it with `inbox_list` (status `unread`) → `inbox_read` →
   `inbox_reply` → `inbox_mark` closed.

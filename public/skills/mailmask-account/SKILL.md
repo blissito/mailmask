@@ -5,7 +5,7 @@ license: MIT
 compatibility: Needs curl or any HTTP client and network access to https://www.mailmask.studio. If the agent has MCP, prefer the mailmask-mcp skill (same capabilities, typed tools).
 metadata:
   author: mailmask
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Run a MailMask account for its owner
@@ -14,6 +14,10 @@ MailMask puts email on a domain the user already owns: masks like `hola@sudomini
 forward to any inbox, optional IMAP mailboxes, outbound sending signed with DKIM, rules,
 webhooks and a shared inbox (Bandeja). One API key controls everything except billing and the
 Bandeja UI, which stay in the browser on purpose.
+
+Vocabulary: the product calls a mask a **dirección** (address) or **máscara**; never say "alias"
+to the user. The API keeps the old name: `/api/domains/:id/alias` (and its synonym
+`/addresses`) and the `alias` field (the part before the @).
 
 ## Setup (once)
 
