@@ -631,6 +631,63 @@ export function domainTransferOut(d: { domain: string; confirmUrl: string }): Em
   };
 }
 
+export function domainUnlockConfirm(d: { domain: string; confirmUrl: string }): Email {
+  return {
+    subject: cleanSubject(`Confirma que quieres quitarle la protección a ${d.domain}`),
+    html: layout({
+      preheader: `Un clic para quitar el candado de transferencia de ${d.domain}.`,
+      heading: "¿Quitamos la protección?",
+      body: p(`Pediste quitar el candado de transferencia de ${d.domain}. Sin él, quien tenga el código de autorización puede llevarse el dominio a otro registrador.`)
+        + calloutBox("Si no fuiste tú, ignora este correo: el dominio sigue protegido. Y cambia tu contraseña, porque alguien entró a tu cuenta.", "warn")
+        + p("Al confirmar, el dominio queda sin protección 7 días y después se vuelve a proteger solo."),
+      cta: { label: "Quitar la protección", url: d.confirmUrl },
+      footerNote: "El enlace vence en 30 minutos y sirve una sola vez.",
+    }),
+    text: textBlock([
+      `Pediste quitar el candado de transferencia de ${d.domain}.`,
+      "Si no fuiste tú, ignora este correo: el dominio sigue protegido.",
+      `Confirma aquí (vence en 30 minutos): ${d.confirmUrl}`,
+    ], true),
+  };
+}
+
+export function domainUnlocked(d: { domain: string; relockAt: string; relockUrl: string }): Email {
+  return {
+    subject: cleanSubject(`${d.domain} quedó sin protección contra transferencia`),
+    html: layout({
+      preheader: `Se vuelve a proteger solo el ${shortDate(d.relockAt)}.`,
+      heading: "Tu dominio quedó sin protección",
+      body: p(`Quitamos el candado de transferencia de ${d.domain}. Ahora puede moverse a otro registrador con su código de autorización.`)
+        + detailTable([["Dominio", d.domain], ["Se vuelve a proteger", shortDate(d.relockAt)]])
+        + calloutBox("Si no fuiste tú, protégelo de nuevo con el botón. No hace falta iniciar sesión.", "danger"),
+      cta: { label: "Volver a protegerlo", url: d.relockUrl },
+      footerNote: "Este enlace sólo puede volver a poner el candado; nunca lo quita.",
+    }),
+    text: textBlock([
+      `Quitamos el candado de transferencia de ${d.domain}.`,
+      `Se vuelve a proteger solo el ${shortDate(d.relockAt)}.`,
+      `Si no fuiste tú, vuelve a protegerlo (sin iniciar sesión): ${d.relockUrl}`,
+    ], true),
+  };
+}
+
+export function domainRelocked(d: { domain: string }): Email {
+  return {
+    subject: cleanSubject(`${d.domain} vuelve a estar protegido`),
+    html: layout({
+      preheader: `Pusimos de nuevo el candado de transferencia.`,
+      heading: "Volvimos a proteger tu dominio",
+      body: p(`${d.domain} tiene otra vez el candado de transferencia: nadie puede llevárselo a otro registrador.`)
+        + p("Si todavía quieres moverlo, quita la protección desde el panel; te llegará un correo para confirmarlo."),
+      cta: { label: "Ver mi dominio", url: `${baseUrl()}/app` },
+    }),
+    text: textBlock([
+      `${d.domain} tiene otra vez el candado de transferencia.`,
+      `Ver tu dominio: ${baseUrl()}/app`,
+    ], true),
+  };
+}
+
 export function guestWelcome(d: {
   plan: string;
   setPasswordUrl: string;

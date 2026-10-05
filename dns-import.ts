@@ -23,6 +23,8 @@ const NOMBRES = [
   "autodiscover", "autoconfig", "_dmarc", "_domainkey", "default._domainkey",
   "google._domainkey", "k1._domainkey", "k2._domainkey", "s1._domainkey", "s2._domainkey",
   "selector1._domainkey", "selector2._domainkey", "mandrill._domainkey", "zoho._domainkey",
+  // Hostinger firma con tres selectores; el inventario de kandey.com.mx (oct-2026) los perdía.
+  "hostingermail-a._domainkey", "hostingermail-b._domainkey", "hostingermail-c._domainkey",
   "_acme-challenge", "_github-pages-challenge",
 ];
 

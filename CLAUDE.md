@@ -44,7 +44,7 @@ comprueba "no es 404" ya vale: eso solo habría atrapado 6 de los 10 bugs.
 `WebStandardStreamableHTTPServerTransport`, `enableJsonResponse`), autenticado sólo con
 `Authorization: Bearer mk_…` (la API key normal) o `Bearer mt_…` (turn token del asistente,
 ver "Asistente Mask"); sin ellas 401, y `/mcp` está exento de CSRF porque nunca acepta cookie.
-95 herramientas desde el 4-oct-2026, con paridad con el panel (cobro por liga, compra/transferencia/renovación de
+96 herramientas desde el 5-oct-2026 (`lock_domain_transfer`), con paridad con el panel (cobro por liga, compra/transferencia/renovación de
 dominios, equipo, firma y logo, respuestas guardadas, `domain_dns_setup`, perfil, pedidos, referidos y la **Bandeja**: `inbox_*`) y `MCP_INSTRUCTIONS`
 (≤6000 caracteres, lo fija `mcp.test.ts`): es todo lo que un agente partner sabe del producto. **Cada herramienta es el SDK real** (`sdk/src`, que sí viaja
 en la imagen) hablando con la app en proceso vía `app.fetch` — el mismo truco de
@@ -338,6 +338,28 @@ verdad, nunca antes: si la transferencia se cae, el dominio se pierde.
 cliente (no hace falta cuenta de AWS suya, son sólo datos) y en transfer-in deberían ser los
 suyos: el dominio ya era de él.
 
+### Candado de transferencia (`transfer-lock.ts`, 5-oct-2026)
+
+Patrón de Cloudflare/Porkbun y lección de los secuestros de Squarespace (2024): **protegido por
+defecto, quitarlo cuesta un paso fuera del panel, vuelve solo y el titular se entera siempre.**
+Pestaña "Registro" del dominio en `/app`; columnas `transfer_lock` y `transfer_unlocked_until`
+(migración 0027), espejo de `clientTransferProhibited` que actualiza el cron diario.
+
+- **Poner** (`POST /api/domains/registrations/:regId/transfer-lock {locked:true}`) es un clic con
+  cualquier credencial del dueño, también `mk_`/`mo_`/`mt_` (SDK `registrations.lock`, MCP
+  `lock_domain_transfer`). La dirección segura no lleva fricción.
+- **Quitar** (`{locked:false}`) **no quita nada**: manda un correo con enlace de 30 min y un uso
+  (`/app?transfer-lock=`), y tanto pedirlo como confirmarlo exigen `via === "session"`. Un agente
+  no se quita el candado, igual que no fabrica llaves; por eso no está en el SDK ni en el MCP.
+  Antes de los 60 días de ICANN (`transferEligibleAt`) da 409: quitarlo no serviría de nada.
+- Confirmado, queda **7 días** sin candado y avisa al dueño **y al contacto WHOIS** con un enlace
+  sin sesión "no fui yo" (`/api/domains/transfer-lock/relock`, exento de CSRF: sólo sabe poner el
+  candado). El GET sólo pinta un botón; el POST lo hace — los escáneres de correo abren enlaces.
+- El cron lo vuelve a poner al vencer (no si AWS reporta `pendingTransfer`: lo tumbaría) y
+  **alerta** si aparece quitado sin `transfer_unlocked_until`: alguien lo quitó por fuera.
+- El transfer-out confirmado pasa por el mismo `unlockTransfer`: antes uno abandonado dejaba el
+  dominio abierto para siempre. El código EPP sigue saliendo sólo por el flujo de transfer-out.
+
 ### ⏳ EN ESPERA — primera transferencia real: kandey.com.mx (24-sep-2026)
 
 **Estado:** mandada a AWS el 24-sep a las 22:47 (operación
@@ -347,6 +369,18 @@ solo, hasta 10 días. Cliente: `fresnnyypublicidad@gmail.com` (WHOIS `rfc.rossy@
 Pago **manual** (`mpPaymentId: manual:bliss-2026-09-24`), fuera de MercadoPago, pero **la clienta
 no ha pagado**: paga cuando se complete la transferencia. AWS ya nos cobró $29 USD el 24-sep; si
 falla, pedir el reembolso a AWS con la operación.
+
+**5-oct-2026: AWS la completó (paso 14/14)**, pero la fila quedó en `transfer_cancelled` por el
+bug de "cancelar" al día 10 (ya corregido). Estado: dominio en nuestra cuenta de AWS, vence
+3-oct-2027, candado puesto; NS y MX **siguen en Hostinger**. Activado por cortesía hasta el
+5-nov (add-on `cancelled` con fecha, se apaga solo). Zona Route 53 `Z06501399WP47IQBW1R7`
+creada y copiada **sin delegar** (13 registros, incluidos los DKIM `hostingermail-a/b/c`), sin
+`configureDnsRecords`: el botón `/dns/zone` habría puesto nuestro MX delante del de Hostinger.
+Cobro: pago único de MP $1,588 (activación anual $999 + dominio $589), `external_reference`
+`manual:kandey-anual-2026`, porque la clienta paga sin sesión y una suscripción la exige. El
+webhook no lo procesa: al entrar, extender el add-on a 370 días, registrar la orden a mano y
+limpiar `mp_preapproval_id`/`next_charge_at` de la fila (preapproval cancelado). Antes de mover
+NS: IP del apex según el hPanel (la CDN rota), revivir la fila a `registering`.
 
 **Fue un dolor de muelas para la clienta.** Ella sola no lo hubiera logrado; hicieron
 falta bliss en WhatsApp y una sesión entera arreglando en producción. Lo que se topó, en

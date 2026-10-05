@@ -101,6 +101,7 @@ const EXACT: Record<string, string> = {
   approve_transfer_dns: "Aprobando el DNS de la transferencia",
   resend_transfer_email: "Reenviando el correo de la transferencia",
   transfer_out: "Preparando la salida del dominio",
+  lock_domain_transfer: "Protegiendo el dominio",
   renewal_status: "Revisando la renovación",
   // Equipo y Bandeja.
   list_members: "Consultando el equipo",

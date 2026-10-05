@@ -67,6 +67,12 @@ export async function syncDomainExpirations(): Promise<void> {
         nextChargeAt: expiresAt ? new Date(Date.parse(expiresAt) - 60 * DIA).toISOString() : null,
       });
 
+      // Candado de transferencia: guarda el estado, lo vuelve a poner si venció su plazo
+      // y alerta si alguien lo quitó por fuera de la app (`transfer-lock.ts`).
+      const { reconcileTransferLock } = await import("./transfer-lock.js");
+      await reconcileTransferLock(reg, detalle).catch((err) =>
+        log("error", "cron", "No se pudo revisar el candado de transferencia", { domain: reg.domainName, error: String(err) }));
+
       // Este es el estado que pierde dominios, y nada de nuestro código lo produce: si
       // aparece, alguien lo apagó a mano en la consola de AWS.
       if (!detalle.autoRenew) {

@@ -169,6 +169,7 @@ import {
   getDomainRegistrationByPreapprovalId,
   getDomainRegistrationByDomainName,
   publicDomainRegistration,
+  transferEligibleAt,
   listCannedResponses,
   createCannedResponse,
   deleteCannedResponse,
@@ -275,6 +276,7 @@ import {
   domainRenewalUpcoming,
   domainChargeFailed,
   domainTransferOut,
+  domainUnlockConfirm,
   guestWelcome,
   migrationDone,
   SUPPORT_EMAIL,
@@ -1202,6 +1204,14 @@ function jsonErr(error: string, status: number): Response {
   return new Response(JSON.stringify({ error }), { status, headers: { "content-type": "application/json" } });
 }
 
+// Página mínima del enlace "volver a proteger" del correo: quien la abre puede no tener sesión.
+function relockPage(title: string, text: string, actionHtml: string, status = 200): Response {
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — MailMask</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#faf6ef;color:#1c1917;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;padding:16px}main{max-width:420px;background:#fff;border:1px solid #e7e0d4;border-radius:12px;padding:28px}h1{font-size:20px;margin:0 0 12px}p{line-height:1.5;color:#57534e}button{background:#16a34a;color:#fff;border:0;border-radius:8px;padding:12px 18px;font-size:15px;font-weight:600;cursor:pointer}@media (prefers-color-scheme:dark){body{background:#0f0f10;color:#f5f5f4}main{background:#18181b;border-color:#27272a}p{color:#a8a29e}}</style></head>
+<body><main><h1>${title}</h1><p>${text}</p>${actionHtml}</main></body></html>`;
+  return new Response(html, { status, headers: { "content-type": "text/html; charset=utf-8" } });
+}
+
 // Un archivo subido como multipart (`file`) o, en JSON, `{fromUrl, filename?}` con un adjunto
 // que el mismo usuario subió al chat del asistente: así un agente por MCP adjunta sin bytes.
 // Devuelve un File para que las rutas validen tipo y tamaño igual en los dos caminos.
@@ -1349,6 +1359,9 @@ const app = new Elysia({ adapter: node() })
     if (url.pathname.startsWith("/oauth/")) return;
     // El relay de la caja de Stalwart firma con HMAC y nunca manda cookie.
     if (url.pathname === "/api/internal/outbound") return;
+    // El enlace "no fui yo" del correo llega sin sesión: lo autoriza su token de un solo uso
+    // y sólo puede PONER el candado, nunca quitarlo.
+    if (url.pathname === "/api/domains/transfer-lock/relock") return;
     // Skip CSRF for Bearer token auth (inherently CSRF-safe)
     const authHeader = request.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) return;
@@ -6941,7 +6954,20 @@ const app = new Elysia({ adapter: node() })
 
     // La proyección pública quita `awsCostCents`: es lo que nos cuesta a nosotros el
     // dominio en AWS, y salía tal cual en la respuesta al cliente.
-    const registrations = getDomainRegistrationsByUser(auth.email).map(publicDomainRegistration);
+    const rows = getDomainRegistrationsByUser(auth.email);
+    // El candado sólo se espeja en el cron diario; un dominio que todavía no pasa por ahí
+    // se lee una vez de AWS para que el panel no lo pinte como desconocido.
+    for (const r of rows) {
+      if (r.status !== "registered" || r.transferLock !== null) continue;
+      try {
+        const { getDomainDetail } = await import("./route53.js");
+        r.transferLock = (await getDomainDetail(r.domainName)).transferLock;
+        updateDomainRegistration(r.id, { transferLock: r.transferLock });
+      } catch (err) {
+        log("warn", "route53", "No se pudo leer el candado de transferencia", { domain: r.domainName, error: String(err) });
+      }
+    }
+    const registrations = rows.map(publicDomainRegistration);
     return new Response(JSON.stringify(registrations), { headers: { "content-type": "application/json" } });
   }, {
     detail: { tags: ["Domain Registration"], summary: "List domain registrations for current user", security: [{ cookieAuth: [] }] },
@@ -7306,8 +7332,11 @@ const app = new Elysia({ adapter: node() })
     if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Registro no encontrado", 404);
 
     try {
-      const { disableDomainTransferLock, retrieveDomainAuthCode } = await import("./route53.js");
-      await disableDomainTransferLock(reg.domainName);
+      const { retrieveDomainAuthCode } = await import("./route53.js");
+      // Con fecha de regreso: un transfer-out abandonado dejaba el dominio sin candado para
+      // siempre. Si la salida no se completa en 7 días, el cron lo vuelve a proteger.
+      const { unlockTransfer } = await import("./transfer-lock.js");
+      await unlockTransfer(reg);
       const authCode = await retrieveDomainAuthCode(reg.domainName);
 
       // El AutoRenew sigue encendido hasta que el dominio salga de verdad: si se apaga
@@ -7330,6 +7359,113 @@ const app = new Elysia({ adapter: node() })
   }, {
     body: t.Object({ token: t.String() }),
     detail: { tags: ["Domain Registration"], summary: "Confirm transfer-out and receive the EPP auth code", security: [{ cookieAuth: [] }] },
+  })
+
+  // --- Candado de transferencia (`transfer-lock.ts`) ---
+  //
+  // Ponerlo es un clic desde cualquier lado (incluso un agente). Quitarlo nunca es directo:
+  // manda un correo con un enlace de 30 minutos, y sólo con la sesión del panel. Un agente
+  // con una llave no se quita el candado, igual que no fabrica llaves.
+
+  .post("/api/domains/registrations/:regId/transfer-lock", async ({ request, params, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    const reg = getDomainRegistration(params.regId);
+    if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Registro no encontrado", 404);
+    if (reg.status !== "registered") return jsonErr("Este dominio todavía no está registrado a tu nombre.", 409);
+
+    const locked = (body as { locked?: unknown }).locked;
+    if (locked === true) {
+      try {
+        const { lockTransfer } = await import("./transfer-lock.js");
+        const transferLock = await lockTransfer(reg);
+        return Response.json({ ok: true, transferLock, transferUnlockedUntil: null });
+      } catch (err) {
+        log("error", "route53", "No se pudo poner el candado de transferencia", { domain: reg.domainName, error: String(err) });
+        return jsonErr("No pudimos proteger el dominio. Intenta de nuevo en un momento.", 502);
+      }
+    }
+    if (locked !== false) return jsonErr("Manda locked: true o false.", 400);
+
+    if (auth.via !== "session") {
+      return jsonErr("Quitar la protección sólo se puede desde el panel, con tu sesión.", 403);
+    }
+    const eligibleAt = transferEligibleAt(reg);
+    if (eligibleAt > new Date().toISOString()) {
+      return Response.json(
+        { error: `Por la regla de 60 días de ICANN, ${reg.domainName} no puede cambiar de registrador hasta el ${eligibleAt.slice(0, 10)}.`, transferEligibleAt: eligibleAt },
+        { status: 409 },
+      );
+    }
+    const limited = await rateLimitGuard(`transfer-unlock:${auth.email}`, 3, 300_000);
+    if (limited) return limited;
+
+    const { createUnlockToken } = await import("./transfer-lock.js");
+    const token = await createUnlockToken(reg.id);
+    try {
+      await sendTemplate(auth.email, domainUnlockConfirm({
+        domain: reg.domainName,
+        confirmUrl: `${getMainDomainUrl()}/app?transfer-lock=${token}`,
+      }));
+    } catch (err) {
+      log("error", "route53", "No se pudo mandar la confirmación para quitar el candado", { domain: reg.domainName, error: String(err) });
+      return jsonErr("No pudimos mandarte el correo de confirmación. Escríbenos.", 500);
+    }
+    return Response.json({ ok: true, aviso: "Te mandamos un correo para confirmar. La protección sigue puesta hasta entonces." });
+  }, {
+    body: t.Object({ locked: t.Boolean() }),
+    detail: { tags: ["Domain Registration"], summary: "Lock the domain against transfers, or request (by email) to unlock it", security: [{ cookieAuth: [] }] },
+  })
+
+  .post("/api/domains/transfer-lock/confirm", async ({ request, body }) => {
+    const auth = await getAuthUser(request);
+    if (!auth) return jsonErr("No autenticado", 401);
+    if (auth.via !== "session") return jsonErr("Quitar la protección sólo se puede desde el panel, con tu sesión.", 403);
+    const limited = await rateLimitGuard(getIp(request), 5, 300_000);
+    if (limited) return limited;
+
+    const { consumeToken, unlockTransfer } = await import("./transfer-lock.js");
+    const value = consumeToken(String((body as { token?: string }).token ?? ""), "transfer-unlock");
+    if (!value) return jsonErr("El enlace de confirmación venció o ya se usó. Pídelo otra vez.", 400);
+    const reg = getDomainRegistration(value.regId);
+    if (!reg || reg.ownerEmail !== auth.email) return jsonErr("Registro no encontrado", 404);
+    if (reg.status !== "registered") return jsonErr("Este dominio ya no está registrado a tu nombre.", 409);
+
+    try {
+      const until = await unlockTransfer(reg);
+      return Response.json({ ok: true, domain: reg.domainName, transferLock: false, transferUnlockedUntil: until });
+    } catch (err) {
+      log("error", "route53", "No se pudo quitar el candado de transferencia", { domain: reg.domainName, error: String(err) });
+      return jsonErr("No pudimos quitar la protección. Escríbenos y lo hacemos a mano.", 502);
+    }
+  }, {
+    body: t.Object({ token: t.String() }),
+    detail: { tags: ["Domain Registration"], summary: "Confirm (from the email link) removing the transfer lock for 7 days", security: [{ cookieAuth: [] }] },
+  })
+
+  // "Si no fuiste tú": el enlace del correo vuelve a poner el candado sin sesión. El GET sólo
+  // pinta un botón porque los escáneres de correo abren los enlaces solos; el POST lo hace.
+  .get("/api/domains/transfer-lock/relock", ({ query }) => {
+    const token = String(query.token ?? "").replace(/[^a-zA-Z0-9-]/g, "");
+    return relockPage(
+      "¿Volvemos a proteger tu dominio?",
+      "Con el candado puesto nadie puede llevarse tu dominio a otro registrador.",
+      `<form method="post" action="/api/domains/transfer-lock/relock"><input type="hidden" name="token" value="${token}"><button type="submit">Proteger mi dominio</button></form>`,
+    );
+  })
+  .post("/api/domains/transfer-lock/relock", async ({ request, body }) => {
+    const limited = await rateLimitGuard(getIp(request), 10, 300_000);
+    if (limited) return limited;
+    try {
+      const { relockByToken } = await import("./transfer-lock.js");
+      const domain = await relockByToken(String((body as { token?: string } | null)?.token ?? ""));
+      if (!domain) return relockPage("El enlace ya no sirve", "Venció o ya se usó. Si tu dominio sigue sin protección, entra al panel y ponla desde ahí.", "", 400);
+      const { escHtml } = await import("./emails.js");
+      return relockPage("Listo: tu dominio está protegido", `${escHtml(domain)} tiene otra vez el candado de transferencia. Si no fuiste tú quien lo quitó, cambia tu contraseña.`, "");
+    } catch (err) {
+      log("error", "route53", "Relock por enlace falló", { error: String(err) });
+      return relockPage("No pudimos protegerlo", "Escríbenos a soporte y lo hacemos a mano en este momento.", "", 502);
+    }
   })
 
   // --- Renovación anual del dominio ---

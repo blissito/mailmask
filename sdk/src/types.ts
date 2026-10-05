@@ -507,6 +507,12 @@ export interface DomainRegistration {
   nextChargeAt: string | null;
   dnsImportStatus: string;
   transferAuthCodeHint: string | null;
+  /** Candado de transferencia (`clientTransferProhibited`); null si aún no se ha leído de AWS. */
+  transferLock: boolean | null;
+  /** Mientras está quitado: cuándo se vuelve a poner solo. */
+  transferUnlockedUntil: string | null;
+  /** Desde cuándo puede cambiar de registrador (regla de 60 días de ICANN). */
+  transferEligibleAt: string;
   lastError: string | null;
   createdAt: string;
   [k: string]: unknown;

@@ -284,6 +284,13 @@ class RegistrationsResource {
   }
   /** Deja de cobrar la renovación anual. El dominio sigue vigente hasta su vencimiento. */
   cancelRenewal(regId: string) { return this.req<{ ok: boolean; aviso: string }>(`/api/domains/registrations/${regId}/renewal/cancel`, { method: "POST" }); }
+  /**
+   * Pone el candado de transferencia. Quitarlo no está en el SDK a propósito: sólo se hace
+   * desde el panel, con la sesión del dueño y confirmando por correo.
+   */
+  lock(regId: string) {
+    return this.req<{ ok: boolean; transferLock: boolean; transferUnlockedUntil: null }>(`/api/domains/registrations/${regId}/transfer-lock`, { method: "POST", body: JSON.stringify({ locked: true }) });
+  }
 }
 
 class TransfersResource {

@@ -2421,12 +2421,27 @@ export interface DomainRegistration {
   dnsSnapshotAt: string | null;
   dnsImportStatus: DnsImportStatus;
   whoisContact: WhoisContacto | null;
+  transferLock: boolean | null;
+  transferUnlockedUntil: string | null;
 }
 
 /** Lo que puede ver el cliente. `awsCostCents` es nuestro costo interno y salía en la API. */
 export function publicDomainRegistration(r: DomainRegistration) {
   const { awsCostCents: _costo, lastError, ...resto } = r;
-  return { ...resto, lastError: lastError ? "El registro falló; escríbenos y lo revisamos." : null };
+  return {
+    ...resto,
+    lastError: lastError ? "El registro falló; escríbenos y lo revisamos." : null,
+    transferEligibleAt: transferEligibleAt(r),
+  };
+}
+
+/**
+ * Regla de ICANN: un dominio no puede cambiar de registrador en los 60 días siguientes a
+ * su registro o a su última transferencia. Antes de esa fecha quitar el candado no sirve
+ * de nada y sólo deja el dominio expuesto.
+ */
+export function transferEligibleAt(r: Pick<DomainRegistration, "registeredAt" | "createdAt">): string {
+  return new Date(Date.parse(r.registeredAt ?? r.createdAt) + 60 * 864e5).toISOString();
 }
 
 export function createDomainRegistration(data: {
@@ -2490,7 +2505,7 @@ type CamposRegistro =
   | "lastSyncedAt" | "awsAutoRenew" | "warnedAt" | "dunningStartedAt"
   | "transferAuthCodeHint" | "transferRequestedAt" | "transferApprovedAt"
   | "previousRegistrar" | "dnsSnapshot" | "dnsSnapshotAt" | "dnsImportStatus"
-  | "whoisContact";
+  | "whoisContact" | "transferLock" | "transferUnlockedUntil";
 
 /** `autoRenew` estaba en la tabla desde el principio y esta función no dejaba escribirlo. */
 export function updateDomainRegistration(

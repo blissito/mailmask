@@ -228,7 +228,7 @@ describe("MCP: agentes contra la app", () => {
     const nombres = (await rpc("tools/list")).json.result.tools.map((t: { name: string }) => t.name);
     for (const n of ["domain_dns_setup", "activation_link", "billing_status", "list_addons", "search_domains", "domain_prices", "register_domain",
       "list_registrations", "transfer_check", "transfer_start", "transfer_status", "transfer_dns", "update_transfer_dns", "approve_transfer_dns",
-      "resend_transfer_email", "transfer_out", "renewal_status", "renewal_link", "list_members", "invite_member", "remove_member", "cancel_invite",
+      "resend_transfer_email", "transfer_out", "lock_domain_transfer", "renewal_status", "renewal_link", "list_members", "invite_member", "remove_member", "cancel_invite",
       "get_signature", "set_signature", "list_canned_replies", "create_canned_reply", "delete_canned_reply", "apple_profile_link", "mailbox_export_link"]) {
       assert.ok(nombres.includes(n), n);
     }
@@ -237,6 +237,7 @@ describe("MCP: agentes contra la app", () => {
     assert.ok((await buscar("hostinger")).includes("domain_dns_setup"));
     assert.ok((await buscar("firma")).includes("set_signature"));
     assert.ok((await buscar("invitar")).includes("invite_member"));
+    assert.ok((await buscar("candado")).includes("lock_domain_transfer"));
   });
 
   it("transfer_start no recibe el EPP: devuelve la liga al formulario de la app", async () => {

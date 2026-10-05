@@ -61,7 +61,7 @@ Todo cobro es una liga de MercadoPago que el USUARIO abre y paga (activation_lin
 transfer_check (requisitos, precio, DNS actual) → transfer_start devuelve formUrl, un formulario de la app donde el usuario pega el código EPP y sus datos WHOIS, y paga. NUNCA pidas ni aceptes el código EPP (auth code) en el chat: si te lo pegan, dile que no lo comparta y que lo ponga en el formulario. Después, transfer_status. Cuando toque aprobar el DNS: transfer_dns para revisar el inventario con el usuario (lo que falte dejará de funcionar), update_transfer_dns si hay que corregir, y approve_transfer_dns sólo con su visto bueno. Si el registrador anterior no la suelta: resend_transfer_email, y que lo pida en el chat de su registrador. Que no pida otro EPP: invalida el que se mandó.
 
 ## Llevarse un dominio
-transfer_out manda el código EPP por correo al dueño, nunca al chat.
+transfer_out manda el código EPP por correo al dueño, nunca al chat. lock_domain_transfer pone el candado de transferencia; quitarlo sólo se puede en el panel, con confirmación por correo.
 
 ## Acciones delicadas
 Borrar dominio, máscara, buzón o registro DNS, sacar a un miembro, transferir fuera o cancelar un add-on o una renovación (cancel_addon, cancel_renewal) son irreversibles: confírmalo con el usuario antes. Algunas responden que necesitan confirmación: el usuario la aprueba en la app; no reintentes ni busques otra vía.
@@ -134,6 +134,7 @@ const KEYWORDS: Record<string, string> = {
   approve_transfer_dns: "aprobar inventario transferencia",
   resend_transfer_email: "correo aprobación registrador reenviar transferencia",
   transfer_out: "llevarme sacar otro registrador epp",
+  lock_domain_transfer: "candado bloqueo proteger robo secuestro transferencia",
   renewal_status: "renovación vencimiento expira",
   renewal_link: "renovar renovación pagar anual",
   list_members: "equipo miembros agentes personas usuarios",
@@ -421,11 +422,14 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
   tool("transfer_out",
     "Inicia la salida de un dominio comprado en MailMask hacia otro registrador. Manda un correo al dueño para confirmar; el código EPP llega ahí, nunca en esta respuesta. Confirma con el usuario antes.",
     { registrationId }, (a) => sdk.registrations.transferOut(a.registrationId));
+  tool("lock_domain_transfer",
+    "Pone el candado de transferencia de un dominio comprado en MailMask: nadie puede llevárselo a otro registrador. Quitarlo no se puede desde aquí; el usuario lo hace en el panel y lo confirma por correo.",
+    { registrationId }, (a) => sdk.registrations.lock(a.registrationId));
   tool("renewal_status", "Vencimiento y renovación anual de los dominios comprados en MailMask.",
     { registrationId: registrationId.optional() },
     async (a) => (await sdk.registrations.list())
       .filter((r) => !a.registrationId || r.id === a.registrationId)
-      .map((r) => ({ registrationId: r.id, domain: r.domainName, status: r.status, expiresAt: r.expiresAt, renewalStatus: r.renewalStatus, renewalPriceCents: r.renewalPriceCents, nextChargeAt: r.nextChargeAt })));
+      .map((r) => ({ registrationId: r.id, domain: r.domainName, status: r.status, expiresAt: r.expiresAt, renewalStatus: r.renewalStatus, renewalPriceCents: r.renewalPriceCents, nextChargeAt: r.nextChargeAt, transferLock: r.transferLock, transferUnlockedUntil: r.transferUnlockedUntil })));
   tool("renewal_link", "Liga de MercadoPago para la renovación anual automática de un dominio registrado. El usuario la abre y autoriza el cobro.",
     { registrationId, payerEmail: z.string().optional() },
     async (a) => {

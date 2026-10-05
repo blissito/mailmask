@@ -350,6 +350,11 @@ export const domainRegistrations = sqliteTable("domain_registrations", {
   // Datos del cliente para el WHOIS (0022). En un transfer-in el dominio ya era suyo:
   // ponerlo a nombre de MailMask le quitaría la titularidad.
   whoisContact: text("whois_contact", { mode: "json" }).$type<WhoisContacto>(),
+  // Candado de transferencia (0027). Espejo de `clientTransferProhibited` en AWS; null = aún
+  // no se ha leído. `transferUnlockedUntil` es cuándo se vuelve a poner solo: un candado
+  // quitado sin fecha de regreso es justo lo que se usa para robar dominios.
+  transferLock: integer("transfer_lock", { mode: "boolean" }),
+  transferUnlockedUntil: text("transfer_unlocked_until"),
 }, (table) => [
   index("idx_domain_reg_owner").on(table.ownerEmail),
   index("idx_domain_reg_status").on(table.status),

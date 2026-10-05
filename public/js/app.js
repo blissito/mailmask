@@ -288,6 +288,7 @@ async function checkAuth() {
     showToast("Email verificado exitosamente");
     window.history.replaceState({}, "", "/app");
   }
+  handleTransferLinks();
 }
 
 function renderVerifyBanner() {
@@ -1090,6 +1091,7 @@ async function selectDomain(id) {
   // La pestaña DNS está siempre: desde que hay editor, el dominio comprado con nosotros es
   // justamente el que más tiene que editar. Antes se ocultaba porque "el DNS es automático".
   document.querySelector('.tab-btn[data-tab="dns"]')?.classList.remove("hidden");
+  syncRegistroTab();
 
   switchTab("aliases");
   await loadAliases();
@@ -2896,6 +2898,197 @@ function switchTab(tab) {
   else if (tab === "smtp") loadSmtpCredentials();
   else if (tab === "webhooks") loadWebhooks();
   else if (tab === "apikeys") loadApiKeys();
+  else if (tab === "registro") loadRegistro();
+}
+
+// --- Registro del dominio y candado de transferencia ---
+//
+// Protegido por defecto. Ponerlo es un clic; quitarlo manda un correo de confirmación y se
+// vuelve a poner solo a los 7 días (`transfer-lock.ts`). El código EPP nunca sale aquí.
+
+async function registroDelDominio() {
+  if (!selectedDomain) return null;
+  const res = await fetch("/api/domains/registrations");
+  if (!res.ok) return null;
+  const regs = await res.json().catch(() => []);
+  return regs.find((r) => r.status === "registered" &&
+    (r.domainId === selectedDomain.id || r.domainName === selectedDomain.domain)) || null;
+}
+
+async function syncRegistroTab() {
+  const btn = document.getElementById("tab-btn-registro");
+  if (!btn) return;
+  btn.classList.add("hidden");
+  const reg = await registroDelDominio();
+  if (reg) btn.classList.remove("hidden");
+}
+
+const fechaLarga = (iso) => new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
+
+async function loadRegistro() {
+  const panel = document.getElementById("registro-panel");
+  if (!panel) return;
+  const reg = await registroDelDominio();
+  if (!reg) { panel.innerHTML = `<p class="text-sm text-fg-muted">Este dominio no se registró con MailMask.</p>`; return; }
+
+  const ahora = new Date().toISOString();
+  const enEspera = reg.transferEligibleAt && reg.transferEligibleAt > ahora;
+  const renovacion = {
+    active: "Cobro anual activo",
+    past_due: "Cobro rechazado: revisa tu tarjeta",
+    cancelled: "Cancelada",
+    none: "Sin renovación automática",
+  }[reg.renewalStatus] || reg.renewalStatus;
+
+  let candado;
+  if (reg.transferLock === false) {
+    candado = `
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="text-xs px-2 py-1 rounded-full bg-amber-500/15 text-amber-600 font-semibold">🔓 Sin protección</span>
+        ${reg.transferUnlockedUntil ? `<span class="text-xs text-amber-600">Se vuelve a proteger el ${esc(fechaLarga(reg.transferUnlockedUntil))}</span>` : ""}
+        <button type="button" data-lock="on" class="ml-auto btn-primary text-sm px-4 py-2 rounded-lg">Proteger ahora</button>
+      </div>`;
+  } else if (reg.transferLock === true && enEspera) {
+    candado = `
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="text-xs px-2 py-1 rounded-full bg-mask-500/15 text-accent-text font-semibold">🔒 Protegido</span>
+        <span class="text-xs text-fg-muted">⏳ Por la regla de 60 días de ICANN no puede cambiar de registrador hasta el ${esc(fechaLarga(reg.transferEligibleAt))}</span>
+      </div>`;
+  } else if (reg.transferLock === true) {
+    candado = `
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="text-xs px-2 py-1 rounded-full bg-mask-500/15 text-accent-text font-semibold">🔒 Protegido</span>
+        <span class="text-xs text-fg-muted">Nadie puede llevárselo a otro registrador.</span>
+        <button type="button" data-lock="off" class="ml-auto btn-secondary text-sm px-4 py-2 rounded-lg">Quitar protección</button>
+      </div>`;
+  } else {
+    candado = `<p class="text-xs text-fg-muted">Todavía no leemos el estado de AWS. Vuelve en un momento.</p>`;
+  }
+
+  panel.innerHTML = `
+    <div class="bg-bg-elev border border-line rounded-xl divide-y divide-line">
+      <div class="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+        <div><div class="text-xs text-fg-muted mb-1">Vence</div><div class="text-fg font-semibold">${reg.expiresAt ? esc(fechaLarga(reg.expiresAt)) : "—"}</div></div>
+        <div><div class="text-xs text-fg-muted mb-1">Renovación</div><div class="text-fg">${esc(renovacion)}</div></div>
+      </div>
+      <div class="px-5 py-4">
+        <div class="text-sm font-semibold text-fg mb-3">Protección contra transferencia</div>
+        ${candado}
+        <p class="text-xs text-fg-subtle mt-3 font-mono">${reg.transferLock === true ? "clientTransferProhibited" : reg.transferLock === false ? "ok (sin clientTransferProhibited)" : ""}</p>
+      </div>
+    </div>`;
+
+  panel.querySelector('[data-lock="on"]')?.addEventListener("click", async (e) => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    const r = await fetch(`/api/domains/registrations/${reg.id}/transfer-lock`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ locked: true }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { b.disabled = false; playSound("error"); return showToast(j.error || "No pudimos protegerlo.", true); }
+    playSound("success");
+    showToast("Dominio protegido");
+    loadRegistro();
+  });
+  panel.querySelector('[data-lock="off"]')?.addEventListener("click", () => confirmarQuitarCandado(reg));
+}
+
+function confirmarQuitarCandado(reg) {
+  const dlg = document.createElement("div");
+  dlg.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4";
+  dlg.innerHTML = `
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-md p-5">
+      <h3 class="font-semibold text-fg mb-2">¿Quitar la protección de ${esc(reg.domainName)}?</h3>
+      <p class="text-sm text-fg-muted mb-3">Sin el candado, quien tenga el código de autorización puede llevarse el dominio a otro registrador. Sólo hace falta si te lo vas a llevar.</p>
+      <ul class="text-sm text-fg-muted list-disc pl-5 space-y-1 mb-4">
+        <li>Te mandamos un correo a ${esc(currentUser?.email || "tu cuenta")}; se quita al confirmar ahí.</li>
+        <li>Queda sin protección 7 días y se vuelve a poner sola.</li>
+        <li>El código para trasladarlo se pide aparte y también llega por correo.</li>
+      </ul>
+      <p data-error class="text-sm text-red-500 mb-3 hidden"></p>
+      <div class="flex justify-end gap-2">
+        <button type="button" data-action="close" class="text-sm text-fg-muted hover:text-fg px-3 py-2">Cancelar</button>
+        <button type="button" data-action="send" class="btn-primary text-sm px-4 py-2 rounded-lg">Mandarme el correo</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg);
+  const close = () => dlg.remove();
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) close(); });
+  dlg.querySelector('[data-action="close"]').addEventListener("click", close);
+  dlg.querySelector('[data-action="send"]').addEventListener("click", async (e) => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    const r = await fetch(`/api/domains/registrations/${reg.id}/transfer-lock`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ locked: false }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      b.disabled = false;
+      playSound("error");
+      const el = dlg.querySelector("[data-error]");
+      el.textContent = j.error || "No se pudo mandar el correo.";
+      el.classList.remove("hidden");
+      return;
+    }
+    close();
+    playSound("pop");
+    showToast("Revisa tu correo para confirmar");
+  });
+}
+
+// Enlaces de los correos: `/app?transfer-lock=<token>` quita el candado y
+// `/app?transfer-out=<token>` entrega el código EPP. El clic en el correo es la confirmación.
+async function handleTransferLinks() {
+  const params = new URLSearchParams(window.location.search);
+  const lockToken = params.get("transfer-lock");
+  const outToken = params.get("transfer-out");
+  if (!lockToken && !outToken) return;
+  window.history.replaceState({}, "", "/app");
+
+  if (lockToken) {
+    const r = await fetch("/api/domains/transfer-lock/confirm", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: lockToken }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { playSound("error"); return showToast(j.error || "No se pudo quitar la protección.", true); }
+    playSound("whoosh");
+    showToast(`${j.domain} quedó sin protección hasta el ${fechaLarga(j.transferUnlockedUntil)}`);
+    return;
+  }
+
+  const r = await fetch("/api/domains/transfer-out/confirm", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ token: outToken }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { playSound("error"); return showToast(j.error || "No se pudo preparar la salida.", true); }
+  const dlg = document.createElement("div");
+  dlg.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4";
+  dlg.innerHTML = `
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-md p-5">
+      <h3 class="font-semibold text-fg mb-2">Código de autorización de ${esc(j.domain)}</h3>
+      <p class="text-sm text-fg-muted mb-3">${esc(j.aviso)}</p>
+      <div class="flex gap-2 mb-4">
+        <input readonly value="${esc(j.authCode)}" class="flex-1 bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg font-mono">
+        <button type="button" data-action="copy" class="btn-secondary text-sm px-3 py-2 rounded-lg">Copiar</button>
+      </div>
+      <p class="text-xs text-amber-600 mb-4">Quien tenga este código puede llevarse el dominio. No lo compartas ni lo pegues en un chat.</p>
+      <div class="flex justify-end"><button type="button" data-action="close" class="btn-primary text-sm px-4 py-2 rounded-lg">Listo</button></div>
+    </div>`;
+  document.body.appendChild(dlg);
+  playSound("pop");
+  dlg.querySelector('[data-action="copy"]').addEventListener("click", async () => {
+    await navigator.clipboard?.writeText(j.authCode).catch(() => {});
+    showToast("Código copiado");
+  });
+  dlg.querySelector('[data-action="close"]').addEventListener("click", () => dlg.remove());
 }
 
 // --- Webhooks (sólo lectura + probar/pausar/borrar; se crean con el SDK) ---

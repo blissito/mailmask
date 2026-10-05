@@ -114,6 +114,7 @@
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="members">Miembros</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="smtp">SMTP</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="webhooks">Webhooks</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle hidden" data-tab="registro" id="tab-btn-registro">Registro</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle hidden" data-tab="apikeys" id="tab-btn-apikeys">API Keys</button>
       </div>
 
@@ -235,6 +236,11 @@
           <p class="text-fg-subtle mb-3">Los webhooks vienen con el dominio activado.</p>
           <button type="button" data-action="open-addons" class="text-accent-text hover:text-accent text-sm underline transition-colors">Activar dominio · $99/mes</button>
         </div>
+      </div>
+
+      <!-- Tab: Registro (sólo dominios comprados o transferidos aquí) -->
+      <div id="tab-registro" class="tab-content hidden">
+        <div id="registro-panel"></div>
       </div>
 
       <div id="tab-smtp" class="tab-content hidden">

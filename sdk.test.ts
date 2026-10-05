@@ -95,6 +95,8 @@ describe("SDK ↔ servidor: contrato", () => {
         checkTransferability: async () => ({ transferable: true, motivo: null }),
         resendTransferEmail: async () => undefined,
         disableDomainTransferLock: async () => undefined,
+        enableDomainTransferLock: async () => undefined,
+        getDomainDetail: async () => ({ expirationDate: null, autoRenew: true, nameservers: [], statusList: ["clientTransferProhibited"], transferLock: true }),
         retrieveDomainAuthCode: async () => "EPP-NO-DEBE-SALIR",
         listTldPrice: async () => null,
       },
@@ -727,6 +729,19 @@ describe("SDK ↔ servidor: contrato", () => {
     assert.ok(ren.nextChargeAt);
     // Otra cuenta no la ve.
     await assert.rejects(() => sinEnvios.registrations.transferOut(reg.id), (e: MailMaskError) => e.status === 404);
+  });
+
+  it("registrations: lock pone el candado; quitarlo no existe en el SDK", async () => {
+    const reg = dbmod.createDomainRegistration({ domainName: `candado-${suffix}.com`, ownerEmail: email, tld: ".com", priceCents: 30000, awsCostCents: 1500 });
+    dbmod.updateDomainRegistration(reg.id, { status: "registered", registeredAt: new Date().toISOString(), transferLock: false });
+    const r = await mm.registrations.lock(reg.id);
+    assert.equal(r.transferLock, true);
+    const fila = (await mm.registrations.list()).find((x) => x.id === reg.id)!;
+    assert.equal(fila.transferLock, true);
+    assert.equal(fila.transferUnlockedUntil, null);
+    assert.ok(fila.transferEligibleAt > new Date().toISOString(), "recién registrado: 60 días de ICANN");
+    assert.equal((mm.registrations as unknown as Record<string, unknown>).unlock, undefined);
+    await assert.rejects(() => sinEnvios.registrations.lock(reg.id), (e: MailMaskError) => e.status === 404);
   });
 
   it("transfers: check, inventario DNS (leer, corregir, aprobar) y reenviar el correo", async () => {
