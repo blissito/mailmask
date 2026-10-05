@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { encodeHeader, normalizeAddress } from "./ses.ts";
+import { encodeHeader, normalizeAddress, rewriteFromAndReplyTo } from "./ses.ts";
 
 describe("encodeHeader (RFC 2047)", () => {
   it("deja pasar ASCII sin tocar", () => {
@@ -141,5 +141,32 @@ describe("FROM_HEADER", () => {
     assert.equal(mod.FROM_HEADER, "MailMask <noreply@mailmask.studio>");
     if (anterior === undefined) delete process.env.ALERT_FROM_EMAIL;
     else process.env.ALERT_FROM_EMAIL = anterior;
+  });
+});
+
+describe("rewriteFromAndReplyTo (reenvío)", () => {
+  const cuenta = (s: string) => (s.split(/\r?\n\r?\n/)[0].match(/^Reply-To:/gmi) ?? []).length;
+
+  it("sin Reply-To original, agrega el del remitente", () => {
+    const raw = "From: Ana <ana@x.com>\r\nSubject: hola\r\n\r\ncuerpo";
+    const out = rewriteFromAndReplyTo(raw, "ana@x.com", "reenvio@d.com");
+    assert.equal(cuenta(out), 1);
+    assert.match(out, /^Reply-To: ana@x\.com$/m);
+    assert.match(out, /^From: "ana@x\.com" <reenvio@d\.com>$/m);
+  });
+
+  it("con Reply-To original, conserva ése y no duplica", () => {
+    const raw = "From: Meta <no@meta.com>\r\nReply-To: soporte@meta.com\r\nSubject: x\r\n\r\ncuerpo";
+    const out = rewriteFromAndReplyTo(raw, "no@meta.com", "reenvio@d.com");
+    assert.equal(cuenta(out), 1);
+    assert.match(out, /^Reply-To: soporte@meta\.com$/m);
+  });
+
+  it("con dos Reply-To (mal formado) y uno doblado, deja uno solo", () => {
+    const raw = "Reply-To: \"Uno\"\r\n <uno@a.com>\r\nFrom: b@b.com\r\nReply-To: dos@a.com\r\n\r\nReply-To: en el cuerpo no se toca";
+    const out = rewriteFromAndReplyTo(raw, "b@b.com", "reenvio@d.com");
+    assert.equal(cuenta(out), 1);
+    assert.match(out, /^Reply-To: "Uno" <uno@a\.com>$/m);
+    assert.match(out, /\r\n\r\nReply-To: en el cuerpo no se toca$/);
   });
 });

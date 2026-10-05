@@ -504,6 +504,22 @@ export function stripHeaders(raw: string, names: string[]): string {
   return kept.join("\r\n") + rest;
 }
 
+// Reescribe el From al dominio que reenvía y deja **exactamente un** Reply-To. Si el
+// original ya traía uno, ése manda (el remitente pidió que le contesten ahí); si no, va
+// el remitente original. Antes se agregaba siempre otro y SES rechazaba con
+// "Duplicate header 'Reply-To'" todo correo que ya lo tuviera (denik.me, 24-sep-2026).
+export function rewriteFromAndReplyTo(raw: string, from: string, forwardingAddress: string): string {
+  const sepMatch = raw.match(/\r?\n\r?\n/);
+  const headerBlock = sepMatch?.index != null ? raw.slice(0, sepMatch.index) : raw;
+  const unfolded = headerBlock.replace(/\r?\n[ \t]+/g, " ");
+  const originalReplyTo = unfolded.match(/^Reply-To:[ \t]*(.+)$/mi)?.[1]?.trim();
+  const replyTo = originalReplyTo || from;
+  return stripHeaders(raw, ["Reply-To"]).replace(
+    /^From:\s*.+$/mi,
+    `From: "${from}" <${forwardingAddress}>\r\nReply-To: ${replyTo}`,
+  );
+}
+
 export async function forwardEmail(originalRaw: string, from: string, to: string, aliasDomain: string): Promise<void> {
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
@@ -524,11 +540,7 @@ export async function forwardEmail(originalRaw: string, from: string, to: string
   // Use the alias domain for From so emails show the user's domain, not mailmask.studio
   const forwardingAddress = `reenvio@${aliasDomain}`;
 
-  // Rewrite From header and add Reply-To so replies go to original sender
-  let rewrittenRaw = originalRaw.replace(
-    /^From:\s*.+$/mi,
-    `From: "${from}" <${forwardingAddress}>\r\nReply-To: ${from}`,
-  );
+  let rewrittenRaw = rewriteFromAndReplyTo(originalRaw, from, forwardingAddress);
 
   // Remove/rewrite headers that SES validates against verified identities
   rewrittenRaw = rewrittenRaw.replace(/^Return-Path:\s*.+$/mi, `Return-Path: <${forwardingAddress}>`);
