@@ -540,3 +540,16 @@ programar("0 15 * * *", async () => {
     log("error", "cron", "Aviso de activaciones manuales falló", { error: String(err) });
   }
 });
+
+// Lunes 15:00 UTC (9:00 CDMX) — resumen interno de los reportes DMARC a admin. El
+// `claimOnce` por fecha evita un segundo correo si el proceso se reinicia a esa hora.
+programar("0 15 * * 1", async () => {
+  try {
+    const lunes = new Date().toISOString().slice(0, 10);
+    if (!claimOnce("dmarc-digest", lunes, 14)) return;
+    const { sendDmarcWeeklyDigest } = await import("./dmarc-reports.js");
+    await sendDmarcWeeklyDigest();
+  } catch (err) {
+    log("error", "cron", "Resumen DMARC semanal falló", { error: String(err) });
+  }
+});

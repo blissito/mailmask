@@ -577,6 +577,25 @@ los `NOT_FOUND` de brendago.design de esa ventana. Sin versionado, ese correo no
 
 La firma es **markdown** (`appendSignature` en `email-html.ts`), así que sólo se aplica cuando el cliente manda `markdown` — con `html` o `body` sale sin firma, y está documentado en `docs.html`. El logo va **por URL, no incrustado**: Microsoft 365, Exchange 2019, OWA y Outlook.com muestran las imágenes incrustadas como adjuntos, y con `cid:` cada correo del dominio llevaría icono de clip. Vive en el prefijo permanente `domain-assets/`; **no agregarlo a `sweepOrphanEmailImages`**, que es lo que lo volvería efímero. Su ancho se fuerza a 200 px deduciéndolo de la ruta, porque `md` corre con `html:false` y heredaría los 600 px del cuerpo.
 
+## Reportes DMARC (interno, 5-oct-2026)
+
+`dmarc-reports.ts`. El `rua` de `mailmask.studio` apunta a `DMARC_REPORT_ADDRESS` (default
+`dmarc@mailmask.studio`); `processInbound` lo intercepta por **dirección completa** justo después
+del chequeo de dominio verificado —antes del rate limit y de la Bandeja—, así que no cuenta topes
+ni crea conversación, y el `dmarc@` de un cliente sigue el camino normal. Adjuntos `.zip` (`fflate`)
+o `.gz` (`zlib`), XML con `fast-xml-parser` (`parseTagValue: false`: el `report_id` de Google no
+cabe en un número). Topes: 5 MB por adjunto, 20 MB descomprimido, 10 000 records. Un XML basura
+loguea `warn` y no tumba el resto. Tablas `dmarc_reports` (único `(org_name, report_id)`: un
+reenvío no duplica) y `dmarc_records` (migración 0028). Cron lunes 15:00 UTC → `dmarcWeeklyDigest`
+a `ALERT_EMAIL`: alineado %, fuentes por IP con PTR, lo que falló y el veredicto. Una semana sin
+reportes también avisa: es la señal de que el `rua` se rompió. **Sin UI, SDK ni MCP a propósito**:
+es para decidir nuestra política, no un producto.
+
+**Criterio para pasar a `quarantine`:** dos semanas seguidas ≥ 99 % alineado y ninguna fuente
+nuestra (PTR `*.amazonses.com`) fallando; el correo lo dice. El `rua` se pone con
+`scripts/dmarc-rua.ts` (dry-run por defecto, se niega si la política ya no es `p=none`), **después**
+del deploy: si un reporte llega antes, cae en la Bandeja de mailmask.studio sin daño.
+
 ## Captcha
 
 `POST /api/auth/register` y `/api/auth/forgot-password` verifican **Cloudflare Turnstile** (`turnstile.ts`). Lo que protege no es el widget sino el **canje del token** contra siteverify: un widget cuyo token nadie valida deja el formulario igual de abierto, y Cloudflare lo reporta como "siteverify isn't being called". Por eso: si siteverify no responde se **rechaza**, y sin `TURNSTILE_SECRET` se falla **abierto fuera de producción** (para que la suite corra) y **cerrado en producción**. `turnstile.test.ts` atraviesa las dos rutas reales y falla si el token no se canjeó.

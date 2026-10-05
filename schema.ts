@@ -631,3 +631,33 @@ export const oauthTokens = sqliteTable("oauth_tokens", {
   index("idx_oauth_tokens_family").on(table.familyId),
   index("idx_oauth_tokens_user").on(table.userEmail),
 ]);
+
+// Reportes agregados de DMARC (rua) de nuestros dominios. Sólo uso interno: ver dmarc-reports.ts.
+export const dmarcReports = sqliteTable("dmarc_reports", {
+  id: text("id").primaryKey(),
+  orgName: text("org_name").notNull(),
+  reportId: text("report_id").notNull(),
+  domain: text("domain").notNull(),
+  policy: text("policy"),
+  dateBegin: text("date_begin").notNull(),
+  dateEnd: text("date_end").notNull(),
+  receivedAt: text("received_at").notNull(),
+}, (table) => [
+  uniqueIndex("idx_dmarc_reports_org_report").on(table.orgName, table.reportId),
+  index("idx_dmarc_reports_date_end").on(table.dateEnd),
+]);
+
+export const dmarcRecords = sqliteTable("dmarc_records", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  reportId: text("report_id").notNull().references(() => dmarcReports.id, { onDelete: "cascade" }),
+  sourceIp: text("source_ip").notNull(),
+  count: integer("count").notNull(),
+  disposition: text("disposition"),
+  dkimPass: integer("dkim_pass", { mode: "boolean" }).notNull(),
+  spfPass: integer("spf_pass", { mode: "boolean" }).notNull(),
+  headerFrom: text("header_from"),
+  dkimDomain: text("dkim_domain"),
+  spfDomain: text("spf_domain"),
+}, (table) => [
+  index("idx_dmarc_records_report").on(table.reportId),
+]);

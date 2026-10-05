@@ -8,6 +8,7 @@ import { acotarTexto } from "./regex-guard.js";
 import { notifyBandeja } from "./sse-hub.js";
 import { depositarEnImap, imapHabilitado } from "./imap-store.js";
 import { emitEvent } from "./webhooks.js";
+import { dmarcReportAddress, ingestDmarcReport } from "./dmarc-reports.js";
 
 // --- SNS notification types ---
 
@@ -585,6 +586,19 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
 
     const domain = await getDomainByName(domainName);
     if (!domain || !domain.verified) continue;
+
+    // Reportes DMARC de nuestros propios dominios (uso interno). Dirección completa: el
+    // `dmarc@` de un cliente sigue el camino normal. No entra a la Bandeja ni cuenta topes.
+    if (recipient === dmarcReportAddress()) {
+      if (rawContent) {
+        try {
+          await ingestDmarcReport(rawContent);
+        } catch (err) {
+          log("warn", "dmarc", "Reporte DMARC ilegible", { error: String(err), from, subject });
+        }
+      }
+      continue;
+    }
 
     // Derechos de ESTE dominio. Ya no existe "sin plan": el gratis reenvía con sus
     // topes. Lo único que se frena es el 2.º dominio sin activar (`bloqueado`), y aun

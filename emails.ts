@@ -30,6 +30,7 @@
 // `sendTemplate` por lo mismo — arrastra `pg.ts` y el SDK de AWS, y renderizar un
 // correo no tiene por qué hacer eso.
 import { PLANS, ADDONS, planLabel, addonLabel, LEGACY_ADDONS } from "./plans.js";
+import type { DmarcDigest, DmarcSource } from "./dmarc-reports.js";
 
 export const ALERT_FROM = process.env.ALERT_FROM_EMAIL ?? "noreply@mailmask.studio";
 // `ALERT_FROM_EMAIL` puede venir como dirección pelada o ya con display name
@@ -464,6 +465,68 @@ export function domainRenewalUpcoming(d: {
       "Un dominio vencido deja de recibir correo y recuperarlo cuesta mucho más.",
       `Actívala aquí: ${baseUrl()}/app`,
     ], true),
+  };
+}
+
+// --- Interno: resumen semanal de DMARC (sólo a admin, ver dmarc-reports.ts) ---
+
+function dmarcSourceLabel(s: DmarcSource): string {
+  const host = s.hostname ?? "sin PTR";
+  return s.known ? `${s.sourceIp} · ${host} (${s.known})` : `${s.sourceIp} · ${host}`;
+}
+
+export function dmarcWeeklyDigest(d: DmarcDigest): Email {
+  const range = `${shortDate(d.weekStart)} – ${shortDate(d.weekEnd)}`;
+  const pctText = (v: number | null) => (v === null ? "—" : `${v}%`);
+
+  if (d.reports === 0) {
+    return {
+      subject: cleanSubject("DMARC: no llegó ningún reporte esta semana"),
+      html: layout({
+        preheader: "Ningún reportero mandó datos. Revisa el rua.",
+        heading: "DMARC: semana sin reportes",
+        body: p(`Del ${range} no llegó ningún reporte DMARC.`) + calloutBox(d.verdict, "warn"),
+      }),
+      text: textBlock([`Del ${range} no llegó ningún reporte DMARC.`, d.verdict]),
+    };
+  }
+
+  const summary: [string, string][] = [
+    ["Mensajes reportados", d.total.toLocaleString("es-MX")],
+    ["Alineado DMARC", pctText(d.alignedPct)],
+    ["Semana anterior", pctText(d.previousAlignedPct)],
+    ["Reportes", String(d.reports)],
+    ["Reporteros", d.reporters.join(", ")],
+    ["Dominios", d.domains.join(", ")],
+  ];
+  const top: [string, string][] = d.sources.slice(0, 10)
+    .map((s) => [dmarcSourceLabel(s), `${s.total} · ${pctText(Math.round((s.passed / Math.max(s.total, 1)) * 1000) / 10)}`]);
+  const failing: [string, string][] = d.failing.slice(0, 15)
+    .map((s) => [dmarcSourceLabel(s), `${s.failed} fallaron`]);
+
+  const html = p(`Quién envió correo como nuestros dominios del ${range}, según los reportes DMARC.`)
+    + detailTable(summary)
+    + p("Fuentes principales (mensajes · % alineado):")
+    + detailTable(top)
+    + (failing.length
+      ? p("Lo que falló DMARC:") + detailTable(failing)
+      : p("Nada falló DMARC esta semana."))
+    + calloutBox(d.verdict, d.readyForQuarantine ? "info" : "warn");
+
+  return {
+    subject: cleanSubject(`DMARC semanal: ${pctText(d.alignedPct)} alineado, ${d.failing.length} fuente(s) fallando`),
+    html: layout({
+      preheader: d.verdict,
+      heading: "Resumen DMARC de la semana",
+      body: html,
+    }),
+    text: textBlock([
+      `Reportes DMARC del ${range}.`,
+      textRows(summary),
+      "Fuentes principales (mensajes · % alineado):\n" + textRows(top),
+      failing.length ? "Lo que falló DMARC:\n" + textRows(failing) : "Nada falló DMARC esta semana.",
+      d.verdict,
+    ]),
   };
 }
 
