@@ -157,6 +157,8 @@ Contenido de referencia sobre email en dominio propio, comparativas y guías.
   MailMask desarrolla clasificación automática de emails con IA: cada correo se etiqueta como venta, soporte o facturación y se enruta al equipo correcto.
 - Cómo dejar de escribirle a tus clientes desde tu Gmail personal — https://www.mailmask.studio/blog/dejar-de-escribir-desde-gmail-personal
   Recibes en tu dominio pero escribes desde tu Gmail. Así se rompe el hilo de la conversación y así se arregla, sin cambiar de correo.
+- Reportes DMARC (rua): qué dicen y cómo usarlos — https://www.mailmask.studio/blog/reportes-dmarc-rua
+  Qué trae un reporte DMARC rua, quién lo manda y cómo leerlo para separar tu correo, el de terceros y la suplantación antes de subir a reject.
 - Email para agencias: un dominio por cliente — https://www.mailmask.studio/blog/email-agencia-dominio-por-cliente
   Gestiona el email de cada cliente en su propio dominio sin pagar una cuenta Workspace por cada uno. Configura direcciones y reenvío desde un solo panel.
 - Cómo dar de alta emails a clientes sin darles acceso al hosting — https://www.mailmask.studio/blog/email-clientes-sin-acceso-hosting

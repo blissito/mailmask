@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reportes DMARC (rua): qué dicen y cómo usarlos — MailMask</title>
+    <meta name="description" content="Qué trae un reporte DMARC rua, quién lo manda y cómo leerlo para separar tu correo, el de terceros y la suplantación antes de subir a reject." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/reportes-dmarc-rua" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="Reportes DMARC (rua): qué dicen y cómo los usa un sistema de correo profesional" />
+    <meta property="og:description" content="Gmail, Outlook y Yahoo te mandan cada día un XML con quién envió correo como tu dominio y si pasó SPF y DKIM. Qué trae, cómo se procesa sin riesgos y cómo se usa para subir de p=none a quarantine y reject con datos." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/reportes-dmarc-rua" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="og:image" content="https://www.mailmask.studio/blog/img/dmarc-rua-og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Un buzón rojo con máscara de lucha libre recibe sobres con gráficas de barras y, al lado, una hoja de reporte revisada con lupa" />
+    <meta property="og:image:secure_url" content="https://www.mailmask.studio/blog/img/dmarc-rua-og.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta name="twitter:image" content="https://www.mailmask.studio/blog/img/dmarc-rua-og.jpg" />
+    <meta property="article:published_time" content="2026-10-05" />
+    <meta property="article:modified_time" content="2026-10-05" />
+    <meta property="article:section" content="Ingeniería" />
+    <meta property="article:tag" content="DMARC" />
+    <meta property="article:tag" content="DNS" />
+    <meta property="article:tag" content="entregabilidad" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@HectorBlisS" />
+    <meta name="twitter:creator" content="@HectorBlisS" />
+    <meta name="twitter:title" content="Reportes DMARC (rua): qué dicen y cómo los usa un sistema de correo profesional" />
+    <meta name="twitter:description" content="Qué trae el XML diario de DMARC, cómo se procesa sin riesgos y cómo se usa para pasar de p=none a reject con datos y no a ciegas." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <script src="/js/theme.js"></script>
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Reportes DMARC (rua): qué dicen y cómo los usa un sistema de correo profesional",
+      "description": "Gmail, Outlook y Yahoo te mandan cada día un XML con quién envió correo como tu dominio y si pasó SPF y DKIM. Qué trae, cómo se procesa sin riesgos y cómo se usa para subir de p=none a quarantine y reject con datos.",
+      "datePublished": "2026-10-05",
+      "dateModified": "2026-10-05",
+      "image": "https://www.mailmask.studio/blog/img/dmarc-rua.jpg",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/reportes-dmarc-rua"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Reportes DMARC (rua): qué dicen y cómo los usa un sistema de correo profesional", "item": "https://www.mailmask.studio/blog/reportes-dmarc-rua" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Qué es el rua de DMARC y para qué sirve?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "rua es la etiqueta del registro DMARC que dice a qué dirección deben mandar los receptores sus reportes agregados. Sirve para ver, con datos de Gmail, Outlook, Yahoo y otros, qué servidores enviaron correo con tu dominio en el From y si pasaron SPF y DKIM alineados. Sin esos reportes, cambiar la política de p=none a quarantine o reject es apostar a ciegas."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué trae un reporte agregado de DMARC?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Un XML con tres partes: report_metadata (quién lo manda, un report_id y el rango de fechas), policy_published (la política que el receptor leyó en tu DNS) y una lista de record. Cada record agrupa los mensajes de una IP de origen: cuántos fueron (count), qué hizo el receptor (disposition), si DKIM y SPF pasaron alineados (policy_evaluated), el dominio del From (header_from) y los dominios que realmente firmaron o pasaron SPF (auth_results). No trae asuntos, destinatarios ni contenido."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Quién manda los reportes DMARC y en qué formato llegan?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Los grandes receptores de correo, como Google, Microsoft y Yahoo, mandan uno al día por cada dominio que les envió correo. Llega como un correo normal a la dirección del rua, con el XML comprimido en .zip o .gz como adjunto. Si la dirección está en otro dominio, ese dominio debe autorizarlo con un TXT en <tu-dominio>._report._dmarc.<dominio-destino> que contenga v=DMARC1."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo procesa los reportes DMARC un sistema de correo profesional?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Los recibe en una dirección dedicada, extrae el XML con topes de tamaño antes y después de descomprimir (contra bombas de compresión), descarta duplicados por la pareja reportero + report_id, guarda los conteos por IP de origen, resuelve el DNS inverso de cada IP para saber quién es y manda un resumen semanal con el porcentaje alineado y las fuentes que fallan."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo se distingue en un reporte DMARC el correo propio, el de terceros y la suplantación?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Por la IP de origen, su DNS inverso y los dominios de auth_results. Tu proveedor principal aparece con DKIM alineado en pass. Un tercero legítimo (CRM, facturación, newsletter) suele pasar DKIM o SPF, pero con su propio dominio, así que no alinea. El reenvío rompe SPF y a veces conserva DKIM. La suplantación viene de IPs sin relación contigo y falla todo."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cuándo se puede subir de p=none a quarantine y a reject?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Cuando los reportes lo demuestran: un criterio razonable es dos semanas seguidas con 99 % o más de los mensajes alineados y ninguna fuente legítima fallando. Entonces se pasa a p=quarantine subiendo pct de 25 a 100, y con otras dos semanas limpias a p=reject. Si una fuente legítima empieza a fallar, se baja un escalón y se corrige esa fuente."
+          }
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="site bg-bg text-fg antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4 border-b border-line/70 bg-bg/85 backdrop-blur">
+      <a href="/" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Reportes DMARC (rua): qué dicen y cómo los usa un sistema de correo profesional</h1>
+        <div class="meta">
+          <span>📅 5 Oct 2026</span>
+          <span>⏱ 9 min de lectura</span>
+        </div>
+      </header>
+
+      <figure class="blog-cover">
+        <img src="/blog/img/dmarc-rua-il.jpg" alt="Un buzón rojo con máscara de lucha libre recibe sobres con gráficas de barras y, al lado, una hoja de reporte revisada con lupa" width="1200" height="800" fetchpriority="high" />
+      </figure>
+
+      <div class="blog-content">
+        <p>Casi todos los registros DMARC que se ven en la práctica dicen lo mismo: <code>v=DMARC1; p=none</code>. La política existe, pero no hace nada. Y muchos ni siquiera llevan la parte que la vuelve útil: el <code>rua</code>, la dirección a la que Gmail, Outlook y Yahoo mandan cada día un reporte de <strong>quién está enviando correo con tu dominio</strong>.</p>
+
+        <p>Este artículo es sobre esos reportes: qué traen línea por línea, cómo se procesan sin abrirle la puerta a un archivo malicioso, cómo se separa el correo propio del de terceros y de la suplantación, y cómo se usan para subir la política a <code>quarantine</code> y <code>reject</code> con datos en vez de con fe. Si las siglas son nuevas, empieza por <a href="/blog/que-son-dkim-spf-dmarc">qué son DKIM, SPF y DMARC</a>.</p>
+
+        <h2>¿Qué es el rua de DMARC y para qué sirve?</h2>
+
+        <p><strong>El <code>rua</code> es la etiqueta del registro DMARC que le dice a los receptores a dónde mandar sus reportes agregados.</strong> Cada receptor grande que recibió correo con tu dominio en el <code>From</code> te manda, una vez al día, el resumen de lo que vio: qué IPs enviaron, cuántos mensajes y si pasaron SPF y DKIM alineados.</p>
+
+        <p>Se declara en el mismo TXT de <code>_dmarc</code>:</p>
+
+        <pre><code>_dmarc.ejemplo.com.  TXT  "v=DMARC1; p=none; rua=mailto:dmarc@ejemplo.com"</code></pre>
+
+        <p>Sirve para una sola cosa, pero es la que importa: <strong>saber qué se rompería antes de endurecer la política</strong>. Con <code>p=reject</code> el receptor tira todo lo que no alinea, incluida la factura que manda tu sistema contable con tu dominio si nadie lo configuró bien. Sin reportes, eso lo descubres cuando un cliente dice que no le llegó nada.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 720 360" width="100%" role="img" aria-labelledby="diagFlujoRua" xmlns="http://www.w3.org/2000/svg">
+            <title id="diagFlujoRua">Flujo de un reporte DMARC: tu dominio envía correo; Gmail, Outlook y Yahoo evalúan SPF, DKIM y alineación; cada 24 horas mandan un XML comprimido adjunto a un correo; llega al buzón del rua; un parser lo descomprime con topes y descarta repetidos; se guarda por IP de origen; se identifica cada IP con DNS inverso y se clasifica; sale un resumen semanal.</title>
+            <defs>
+              <marker id="arwRua" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" fill="rgb(var(--mask-500))" />
+              </marker>
+            </defs>
+
+            <!-- Row 1: sending and evaluation -->
+            <rect x="16" y="24" width="200" height="76" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="116" y="48" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Tu dominio envía</text>
+            <text x="116" y="66" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">From: ventas@ejemplo.com</text>
+            <text x="116" y="84" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">tú, tu CRM, tu facturación…</text>
+
+            <line x1="216" y1="62" x2="258" y2="62" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwRua)" />
+            <text x="237" y="52" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">entrega</text>
+
+            <rect x="260" y="24" width="200" height="76" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="360" y="48" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Gmail · Outlook · Yahoo</text>
+            <text x="360" y="66" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">evalúan SPF, DKIM</text>
+            <text x="360" y="84" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">y alineación con el From</text>
+
+            <line x1="460" y1="62" x2="502" y2="62" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwRua)" />
+            <text x="481" y="52" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">c/24 h</text>
+
+            <rect x="504" y="24" width="200" height="76" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="604" y="48" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Reporte agregado</text>
+            <text x="604" y="66" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">XML en .zip o .gz</text>
+            <text x="604" y="84" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">adjunto a un correo</text>
+
+            <line x1="604" y1="100" x2="604" y2="140" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwRua)" />
+            <text x="614" y="124" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">llega al rua=</text>
+
+            <!-- Row 2: ingestion, right to left -->
+            <rect x="504" y="142" width="200" height="76" rx="8" fill="#18181b" stroke="rgb(var(--mask-500))" stroke-width="2" />
+            <text x="604" y="166" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Buzón dedicado</text>
+            <text x="604" y="184" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">dmarc@ejemplo.com</text>
+            <text x="604" y="202" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">nunca tu bandeja personal</text>
+
+            <line x1="504" y1="180" x2="462" y2="180" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwRua)" />
+            <text x="483" y="170" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">extrae</text>
+
+            <rect x="260" y="142" width="200" height="76" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="360" y="166" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Parser</text>
+            <text x="360" y="184" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">descomprime con tope</text>
+            <text x="360" y="202" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">descarta report_id repetido</text>
+
+            <line x1="260" y1="180" x2="218" y2="180" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwRua)" />
+            <text x="239" y="170" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">guarda</text>
+
+            <rect x="16" y="142" width="200" height="76" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="116" y="166" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Base por fuente</text>
+            <text x="116" y="184" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">IP · mensajes · pasa / falla</text>
+            <text x="116" y="202" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">header_from · quién firmó</text>
+
+            <line x1="116" y1="218" x2="116" y2="258" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwRua)" />
+            <text x="126" y="242" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">identifica</text>
+
+            <!-- Row 3: classification and digest -->
+            <rect x="16" y="260" width="320" height="84" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="176" y="284" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">DNS inverso + clasificación</text>
+            <text x="176" y="304" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">propio · tercero legítimo</text>
+            <text x="176" y="322" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">reenvío · suplantación</text>
+
+            <line x1="336" y1="302" x2="378" y2="302" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwRua)" />
+            <text x="357" y="292" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">resume</text>
+
+            <rect x="380" y="260" width="324" height="84" rx="8" fill="#18181b" stroke="#4ade80" />
+            <text x="542" y="284" text-anchor="middle" fill="#86efac" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Resumen semanal</text>
+            <text x="542" y="304" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">% alineado · fuentes que fallan</text>
+            <text x="542" y="322" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">¿ya se puede subir la política?</text>
+          </svg>
+        </figure>
+
+        <h2>¿Qué trae un reporte agregado de DMARC?</h2>
+
+        <p><strong>Un XML con quién lo manda, la política que leyó en tu DNS y una fila por cada IP que envió correo como tu dominio.</strong> No trae asuntos, destinatarios ni contenido: son conteos. Por eso se llama agregado, y por eso los receptores grandes sí lo mandan.</p>
+
+        <p>Este es un reporte realista de un día, recortado a tres filas que muestran los tres casos que importan (las IPs son de documentación):</p>
+
+        <pre><code>&lt;feedback&gt;
+  &lt;report_metadata&gt;
+    &lt;org_name&gt;google.com&lt;/org_name&gt;
+    &lt;email&gt;noreply-dmarc-support@google.com&lt;/email&gt;
+    &lt;report_id&gt;10394882716253948172&lt;/report_id&gt;
+    &lt;date_range&gt;&lt;begin&gt;1790985600&lt;/begin&gt;&lt;end&gt;1791071999&lt;/end&gt;&lt;/date_range&gt;
+  &lt;/report_metadata&gt;
+  &lt;policy_published&gt;
+    &lt;domain&gt;ejemplo.com&lt;/domain&gt;
+    &lt;adkim&gt;r&lt;/adkim&gt;&lt;aspf&gt;r&lt;/aspf&gt;
+    &lt;p&gt;none&lt;/p&gt;&lt;sp&gt;none&lt;/sp&gt;&lt;pct&gt;100&lt;/pct&gt;
+  &lt;/policy_published&gt;
+
+  &lt;!-- 1. Tu proveedor principal: DKIM alineado, todo bien --&gt;
+  &lt;record&gt;
+    &lt;row&gt;
+      &lt;source_ip&gt;198.51.100.23&lt;/source_ip&gt;
+      &lt;count&gt;412&lt;/count&gt;
+      &lt;policy_evaluated&gt;
+        &lt;disposition&gt;none&lt;/disposition&gt;
+        &lt;dkim&gt;pass&lt;/dkim&gt;&lt;spf&gt;fail&lt;/spf&gt;
+      &lt;/policy_evaluated&gt;
+    &lt;/row&gt;
+    &lt;identifiers&gt;&lt;header_from&gt;ejemplo.com&lt;/header_from&gt;&lt;/identifiers&gt;
+    &lt;auth_results&gt;
+      &lt;dkim&gt;&lt;domain&gt;ejemplo.com&lt;/domain&gt;&lt;result&gt;pass&lt;/result&gt;&lt;/dkim&gt;
+      &lt;spf&gt;&lt;domain&gt;amazonses.com&lt;/domain&gt;&lt;result&gt;pass&lt;/result&gt;&lt;/spf&gt;
+    &lt;/auth_results&gt;
+  &lt;/record&gt;
+
+  &lt;!-- 2. Un CRM legítimo que firma con su propio dominio: no alinea --&gt;
+  &lt;record&gt;
+    &lt;row&gt;
+      &lt;source_ip&gt;203.0.113.10&lt;/source_ip&gt;
+      &lt;count&gt;120&lt;/count&gt;
+      &lt;policy_evaluated&gt;
+        &lt;disposition&gt;none&lt;/disposition&gt;
+        &lt;dkim&gt;fail&lt;/dkim&gt;&lt;spf&gt;fail&lt;/spf&gt;
+      &lt;/policy_evaluated&gt;
+    &lt;/row&gt;
+    &lt;identifiers&gt;&lt;header_from&gt;ejemplo.com&lt;/header_from&gt;&lt;/identifiers&gt;
+    &lt;auth_results&gt;
+      &lt;dkim&gt;&lt;domain&gt;crm-proveedor.com&lt;/domain&gt;&lt;result&gt;pass&lt;/result&gt;&lt;/dkim&gt;
+      &lt;spf&gt;&lt;domain&gt;bounce.crm-proveedor.com&lt;/domain&gt;&lt;result&gt;pass&lt;/result&gt;&lt;/spf&gt;
+    &lt;/auth_results&gt;
+  &lt;/record&gt;
+
+  &lt;!-- 3. Alguien haciéndose pasar por ti --&gt;
+  &lt;record&gt;
+    &lt;row&gt;
+      &lt;source_ip&gt;192.0.2.77&lt;/source_ip&gt;
+      &lt;count&gt;38&lt;/count&gt;
+      &lt;policy_evaluated&gt;
+        &lt;disposition&gt;none&lt;/disposition&gt;
+        &lt;dkim&gt;fail&lt;/dkim&gt;&lt;spf&gt;fail&lt;/spf&gt;
+      &lt;/policy_evaluated&gt;
+    &lt;/row&gt;
+    &lt;identifiers&gt;&lt;header_from&gt;ejemplo.com&lt;/header_from&gt;&lt;/identifiers&gt;
+    &lt;auth_results&gt;
+      &lt;spf&gt;&lt;domain&gt;ejemplo.com&lt;/domain&gt;&lt;result&gt;fail&lt;/result&gt;&lt;/spf&gt;
+    &lt;/auth_results&gt;
+  &lt;/record&gt;
+&lt;/feedback&gt;</code></pre>
+
+        <p>Cómo se lee cada bloque:</p>
+
+        <table>
+          <thead>
+            <tr><th>Elemento</th><th>Qué dice</th><th>Para qué sirve</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>report_metadata</code></td><td>Quién manda el reporte, su <code>report_id</code> y el rango de fechas en segundos Unix.</td><td>La pareja <code>org_name</code> + <code>report_id</code> identifica al reporte: es la llave para no contarlo dos veces.</td></tr>
+            <tr><td><code>policy_published</code></td><td>El registro <code>_dmarc</code> tal como lo leyó el receptor: <code>p</code>, <code>sp</code>, <code>pct</code> y el modo de alineación.</td><td>Confirma que el receptor ve lo que crees que publicaste. Un cambio de DNS tarda en aparecer aquí.</td></tr>
+            <tr><td><code>source_ip</code> + <code>count</code></td><td>Desde qué IP salieron y cuántos mensajes fueron.</td><td>Es la unidad de análisis: todo se agrupa por fuente.</td></tr>
+            <tr><td><code>policy_evaluated</code></td><td>Lo que hizo el receptor (<code>disposition</code>: <code>none</code>, <code>quarantine</code>, <code>reject</code>) y si DKIM y SPF pasaron <strong>alineados</strong>.</td><td>Es lo que decide DMARC. Basta con que uno de los dos sea <code>pass</code> para que el mensaje pase.</td></tr>
+            <tr><td><code>header_from</code></td><td>El dominio del <code>From</code> visible.</td><td>Separa tu dominio de sus subdominios, que pueden tener otra política (<code>sp</code>).</td></tr>
+            <tr><td><code>auth_results</code></td><td>Los resultados crudos: qué dominio firmó DKIM y qué dominio pasó SPF, alineen o no.</td><td>Explica el porqué de un fallo: dice <em>quién</em> firmó en vez de ti.</td></tr>
+          </tbody>
+        </table>
+
+        <p>La fila 1 enseña la trampa más común. SPF dice <code>pass</code> en <code>auth_results</code> pero <code>fail</code> en <code>policy_evaluated</code>: pasó para <code>amazonses.com</code>, el dominio del sobre, que no es el tuyo. <strong>Pasar no es alinear.</strong> Como DKIM sí firmó con <code>ejemplo.com</code>, el mensaje pasa DMARC de todos modos.</p>
+
+        <h2>¿Quién manda los reportes DMARC y en qué formato llegan?</h2>
+
+        <p><strong>Los grandes receptores, como Google, Microsoft y Yahoo, mandan uno al día por dominio, como correo normal con el XML comprimido en <code>.zip</code> o <code>.gz</code> adjunto.</strong> Un dominio que envía a muchos proveedores distintos recibe varios cada día; uno chico, dos o tres.</p>
+
+        <p>El adjunto tiene un nombre con forma fija, <code>receptor!dominio!inicio!fin.xml.gz</code>, y el asunto dice <code>Report Domain: ejemplo.com Submitter: google.com</code>. Ninguno de los dos es confiable para procesar: hay reporteros que mandan un <code>.zip</code> declarado como <code>application/octet-stream</code>. Lo que sí es confiable son los primeros bytes del archivo.</p>
+
+        <p>Hay dos tipos de reporte, y conviene no confundirlos:</p>
+
+        <table>
+          <thead>
+            <tr><th></th><th><code>rua</code> (agregado)</th><th><code>ruf</code> (de fallo)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Qué trae</td><td>Conteos por IP: cuántos pasaron y cuántos no.</td><td>Un mensaje individual que falló, a veces con encabezados o partes del contenido.</td></tr>
+            <tr><td>Cada cuándo</td><td>Uno al día por receptor.</td><td>Uno por fallo, casi en tiempo real.</td></tr>
+            <tr><td>Quién lo manda</td><td>Prácticamente todos los receptores grandes.</td><td>Muy pocos: Gmail y Outlook.com no los mandan, por privacidad.</td></tr>
+            <tr><td>Para qué sirve</td><td>Decidir la política con datos.</td><td>Depurar un caso concreto, cuando llega.</td></tr>
+          </tbody>
+        </table>
+
+        <p>La etiqueta <code>fo=1</code> pide reporte de fallo cuando falla <em>cualquiera</em> de los dos mecanismos, en vez de sólo cuando fallan los dos (el valor por defecto, <code>fo=0</code>). Ojo: <code>fo</code> sólo afecta a <code>ruf</code>. Ponerla no cambia en nada los reportes agregados.</p>
+
+        <p>Si el <code>rua</code> apunta a <strong>otro dominio</strong>, por ejemplo un servicio de análisis, el receptor primero verifica que ese dominio acepte tus reportes. Lo hace leyendo un TXT con un nombre construido así:</p>
+
+        <pre><code>; En el DNS de ejemplo.com
+_dmarc.ejemplo.com.                     TXT  "v=DMARC1; p=none; rua=mailto:dmarc@reportes-externos.com; fo=1"
+
+; En el DNS de reportes-externos.com: autoriza recibir los de ejemplo.com
+ejemplo.com._report._dmarc.reportes-externos.com.  TXT  "v=DMARC1"</code></pre>
+
+        <p>Sin ese segundo registro los reportes no salen, y nadie te avisa. Si la dirección del <code>rua</code> está en tu mismo dominio no hace falta.</p>
+
+        <h2>¿Cómo procesa los reportes DMARC un sistema de correo profesional?</h2>
+
+        <p><strong>Como datos no confiables que llegan de internet: con una dirección dedicada, topes de tamaño, deduplicación y agregación por fuente.</strong> Un archivo comprimido que cualquiera puede mandarte es exactamente la forma de una bomba de descompresión, y un reporte puede llegar dos veces.</p>
+
+        <table>
+          <thead>
+            <tr><th>Paso</th><th>Qué se hace</th><th>Por qué</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1. Dirección dedicada</td><td><code>dmarc@</code> separada de tu correo, procesada por código.</td><td>Son correos automáticos diarios; en una bandeja humana se ignoran en una semana.</td></tr>
+            <tr><td>2. Detectar el formato</td><td>Por la firma del archivo: <code>PK</code> es zip, <code>1F 8B</code> es gzip.</td><td>El nombre y el tipo MIME mienten con frecuencia.</td></tr>
+            <tr><td>3. Topes de tamaño</td><td>Un máximo para el adjunto, otro para lo descomprimido y otro de filas por reporte.</td><td>Un zip de kilobytes puede expandirse a gigas. El tope de lo descomprimido se aplica <em>mientras</em> se descomprime, no después.</td></tr>
+            <tr><td>4. Parsear sin sorpresas</td><td>XML sin entidades externas; números como texto.</td><td>Un <code>report_id</code> de 20 dígitos pierde precisión si se lee como número y deja de servir como llave.</td></tr>
+            <tr><td>5. Deduplicar</td><td>Llave única <code>(org_name, report_id)</code>.</td><td>Los reporteros reintentan; contar dos veces infla los números.</td></tr>
+            <tr><td>6. Guardar por fuente</td><td>Una fila por IP con mensajes, pasa y falla.</td><td>Las preguntas siempre son por fuente: ¿quién es esta IP y por qué falla?</td></tr>
+            <tr><td>7. Identificar</td><td>DNS inverso de cada IP, con caché y tiempo límite.</td><td><code>a8-23.smtp-out.amazonses.com</code> dice más que <code>198.51.100.23</code>. Un PTR que no contesta no debe colgar el proceso.</td></tr>
+            <tr><td>8. Resumir</td><td>Un correo semanal con el porcentaje alineado, la semana anterior para comparar y las fuentes que fallan.</td><td>Un dato diario es ruido; la tendencia de dos semanas es lo que permite decidir.</td></tr>
+          </tbody>
+        </table>
+
+        <p>Un error de un solo reporte nunca debe tumbar el resto. Se registra, se sigue con el siguiente adjunto, y el correo de reportes no comparte proceso crítico con el correo de verdad.</p>
+
+        <h2>¿Cómo se distingue el correo propio, el de terceros y la suplantación?</h2>
+
+        <p><strong>Cruzando la IP de origen, su DNS inverso y los dominios de <code>auth_results</code>.</strong> Toda fuente cae en una de cuatro clases, y cada una pide una acción distinta. Confundirlas es la forma más común de romper correo legítimo al endurecer la política.</p>
+
+        <table>
+          <thead>
+            <tr><th>Clase</th><th>Cómo se ve en el reporte</th><th>Qué hacer</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Tu envío principal</strong></td><td>DNS inverso de tu proveedor; DKIM <code>pass</code> con tu dominio.</td><td>Nada. Es la línea base del porcentaje alineado.</td></tr>
+            <tr><td><strong>Tercero legítimo</strong> (CRM, facturación, newsletter)</td><td>DNS inverso del proveedor; DKIM o SPF en <code>pass</code> pero con <em>su</em> dominio, así que no alinea.</td><td>Configurar en ese proveedor DKIM con tu dominio (o un Return-Path propio). Sin eso, <code>reject</code> le tira el correo.</td></tr>
+            <tr><td><strong>Reenvío</strong></td><td>IP de un servidor de correo conocido (una universidad, un buzón que reenvía a Gmail); SPF falla, DKIM a veces sobrevive.</td><td>No se arregla desde tu lado. Por eso DKIM es el que importa: sobrevive al reenvío, SPF no.</td></tr>
+            <tr><td><strong>Suplantación</strong></td><td>IPs sin relación contigo, sin DNS inverso o de redes residenciales; falla todo.</td><td>Nada que corregir: es justo lo que <code>quarantine</code> y <code>reject</code> van a detener.</td></tr>
+          </tbody>
+        </table>
+
+        <p>El primer reporte de un dominio con algunos años suele dar sorpresas en la segunda fila: el formulario de la web que manda avisos con tu dominio, la plataforma de facturación electrónica, el sistema de citas. Encontrarlos es el punto de todo el ejercicio, y es mucho mejor encontrarlos en un reporte que en una queja.</p>
+
+        <h2>¿Cuándo se puede subir de p=none a quarantine y a reject?</h2>
+
+        <p><strong>Cuando los reportes lo demuestran, no cuando pasa cierto tiempo.</strong> Un criterio razonable: dos semanas seguidas con 99 % o más de los mensajes alineados y ninguna fuente legítima fallando. Dos semanas, porque hay envíos que sólo salen una vez por semana o a fin de mes.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 -6 720 298" width="100%" role="img" aria-labelledby="diagEscalera" xmlns="http://www.w3.org/2000/svg">
+            <title id="diagEscalera">Escalera de la política DMARC: de p=none, que sólo observa, se pasa a p=quarantine con pct de 25 a 100 cuando hay dos semanas seguidas con 99 % o más alineado y ninguna fuente legítima fallando; de quarantine se pasa a p=reject después de dos semanas con pct=100 sin correo legítimo en spam. Si una fuente legítima empieza a fallar, se regresa un escalón y se corrige.</title>
+            <defs>
+              <marker id="arwEsc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" fill="rgb(var(--mask-500))" />
+              </marker>
+              <marker id="arwEscRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" fill="#f87171" />
+              </marker>
+            </defs>
+
+            <!-- Step 1 -->
+            <rect x="16" y="208" width="170" height="76" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="101" y="234" text-anchor="middle" fill="#e4e4e7" font-family="ui-monospace, monospace" font-size="14" font-weight="600">p=none</text>
+            <text x="101" y="254" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">sólo observa</text>
+            <text x="101" y="270" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">llegan reportes</text>
+
+            <line x1="186" y1="246" x2="214" y2="246" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwEsc)" />
+
+            <!-- Gate 1 -->
+            <rect x="216" y="208" width="210" height="76" rx="8" fill="none" stroke="#fbbf24" stroke-dasharray="5 4" />
+            <text x="321" y="230" text-anchor="middle" fill="#fbbf24" font-family="system-ui, sans-serif" font-size="10" letter-spacing="1.5">PUERTA</text>
+            <text x="321" y="250" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="11">2 semanas ≥ 99 % alineado</text>
+            <text x="321" y="268" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="11">0 fuentes legítimas fallando</text>
+
+            <line x1="321" y1="208" x2="321" y2="182" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwEsc)" />
+
+            <!-- Step 2 -->
+            <rect x="236" y="104" width="170" height="76" rx="8" fill="#18181b" stroke="rgb(var(--mask-500))" stroke-width="2" />
+            <text x="321" y="130" text-anchor="middle" fill="#e4e4e7" font-family="ui-monospace, monospace" font-size="14" font-weight="600">p=quarantine</text>
+            <text x="321" y="150" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">pct=25 → 50 → 100</text>
+            <text x="321" y="166" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">lo que falla va a spam</text>
+
+            <line x1="406" y1="142" x2="434" y2="142" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwEsc)" />
+
+            <!-- Gate 2 -->
+            <rect x="436" y="104" width="210" height="76" rx="8" fill="none" stroke="#fbbf24" stroke-dasharray="5 4" />
+            <text x="541" y="126" text-anchor="middle" fill="#fbbf24" font-family="system-ui, sans-serif" font-size="10" letter-spacing="1.5">PUERTA</text>
+            <text x="541" y="146" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="11">2 semanas con pct=100</text>
+            <text x="541" y="164" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="11">sin correo legítimo en spam</text>
+
+            <line x1="541" y1="104" x2="541" y2="78" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwEsc)" />
+
+            <!-- Step 3 -->
+            <rect x="456" y="0" width="170" height="76" rx="8" fill="#18181b" stroke="#4ade80" stroke-width="2" />
+            <text x="541" y="26" text-anchor="middle" fill="#86efac" font-family="ui-monospace, monospace" font-size="14" font-weight="600">p=reject</text>
+            <text x="541" y="46" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">lo que falla se rechaza</text>
+            <text x="541" y="62" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">en la conexión SMTP</text>
+
+            <!-- Fallback -->
+            <rect x="456" y="208" width="248" height="76" rx="8" fill="#18181b" stroke="#f87171" />
+            <text x="580" y="232" text-anchor="middle" fill="#fca5a5" font-family="system-ui, sans-serif" font-size="12" font-weight="600">Si una fuente legítima falla</text>
+            <text x="580" y="252" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">baja un escalón y corrige</text>
+            <text x="580" y="268" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">su DKIM antes de volver a subir</text>
+            <line x1="456" y1="246" x2="428" y2="246" stroke="#f87171" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arwEscRed)" />
+          </svg>
+        </figure>
+
+        <p>La etiqueta <code>pct</code> es lo que hace el paso intermedio seguro: <code>pct=25</code> aplica <code>quarantine</code> a una cuarta parte de lo que falla y trata el resto como <code>none</code>. Los registros de cada escalón se ven así:</p>
+
+        <pre><code>; Semana 0: observar
+_dmarc.ejemplo.com.  TXT  "v=DMARC1; p=none; rua=mailto:dmarc@ejemplo.com"
+
+; Puerta 1 cumplida: cuarentena gradual
+_dmarc.ejemplo.com.  TXT  "v=DMARC1; p=quarantine; pct=25; rua=mailto:dmarc@ejemplo.com"
+_dmarc.ejemplo.com.  TXT  "v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@ejemplo.com"
+
+; Puerta 2 cumplida: rechazo
+_dmarc.ejemplo.com.  TXT  "v=DMARC1; p=reject; rua=mailto:dmarc@ejemplo.com"</code></pre>
+
+        <p>Dos detalles. El <code>rua</code> <strong>se queda</strong> en <code>reject</code>: es justo cuando un tercero nuevo que nadie configuró empezaría a perder correo en silencio. Y la revisión del estándar conocida como DMARCbis reemplaza <code>pct</code> por una bandera de prueba <code>t=y</code>; conviene revisar qué aceptan tus receptores cuando actualices el registro.</p>
+
+        <h2>Qué hace MailMask con esto</h2>
+
+        <p>Cuando conectas un dominio, MailMask te da los registros DNS que hacen falta, y el de DMARC viene incluido: <code>v=DMARC1; p=none; rua=mailto:dmarc@tudominio</code>. El correo que sale de MailMask va firmado con DKIM de tu propio dominio, que es lo que alinea. La dirección <code>dmarc@</code> la creas como cualquier otra, para que los reportes no se mezclen con tu correo. Y si tu DNS vive en MailMask, la API y el MCP tienen una plantilla <code>dmarc</code> que escribe el registro por ti.</p>
+
+        <p>Si te interesa lo que pasa del otro lado, sigue con <a href="/blog/evitar-emails-caigan-en-spam">cómo evitar que tus correos caigan en spam</a> o con <a href="/blog/dominio-verificado-que-rebota-anatomia-ses">la anatomía de un dominio en Amazon SES</a>.</p>
+
+        <h2>Resumen rápido</h2>
+
+        <ul>
+          <li><strong>El <code>rua</code> te manda cada día</strong>, desde cada receptor grande, quién envió correo como tu dominio y si alineó.</li>
+          <li><strong>Pasar no es alinear</strong>: SPF puede dar <code>pass</code> para el dominio de tu proveedor y aun así fallar DMARC. Lo que decide es <code>policy_evaluated</code>.</li>
+          <li><strong>Procésalos como datos hostiles</strong>: dirección dedicada, firma del archivo, topes al descomprimir y llave única <code>(org_name, report_id)</code>.</li>
+          <li><strong>Clasifica cada fuente</strong> en propia, tercero legítimo, reenvío o suplantación. Sólo la segunda pide trabajo de tu lado.</li>
+          <li><strong>Sube la política con una puerta</strong>: dos semanas ≥ 99 % alineado y cero fuentes legítimas fallando, <code>pct</code> gradual y el <code>rua</code> siempre puesto.</li>
+        </ul>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Tu dominio, con DMARC desde el primer día</h2>
+      <p>Conecta tu dominio y recibe los registros de SPF, DKIM y DMARC listos para pegar. Gratis para empezar · $99 por dominio activado.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-line py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-fg-muted text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-fg-subtle text-sm flex gap-4">
+          <a href="/terms" class="hover:text-fg transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-fg transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-fg transition-colors">Blog</a>
+          <a href="/login" class="hover:text-fg transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-fg-subtle text-xs mt-4">
+        © 2026 by fixter.org
+      </p>
+    </footer>
+  </body>
+</html>
