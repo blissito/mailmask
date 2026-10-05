@@ -195,6 +195,15 @@ describe("SDK ↔ servidor: contrato", () => {
     assert.ok(!(await mm.aliases.list(domainId)).some((a) => a.alias === "temporal"));
   });
 
+  it("addresses es el nombre nuevo de aliases: mismo recurso, mismas rutas", async () => {
+    assert.equal(mm.addresses, mm.aliases);
+    await mm.addresses.create(domainId, { alias: "direccion", destinations: ["x@example.com"] });
+    assert.ok((await mm.addresses.list(domainId)).some((a) => a.alias === "direccion"));
+    await mm.addresses.update(domainId, "direccion", { enabled: false });
+    await mm.addresses.delete(domainId, "direccion");
+    assert.ok(!(await mm.addresses.list(domainId)).some((a) => a.alias === "direccion"));
+  });
+
   it("send con `from` sale del alias pedido, no de noreply", async () => {
     enviados.length = 0;
     const res = await mm.send.send(domainId, {

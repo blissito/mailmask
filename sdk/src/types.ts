@@ -52,6 +52,15 @@ export interface DomainVerification {
   error?: string;
 }
 
+/** Nombre público de `Alias` desde la 0.4.5. */
+export type Address = Alias;
+/** Nombre público de `AliasCreated` desde la 0.4.5. */
+export type AddressCreated = AliasCreated;
+/** Nombre público de `CreateAliasInput` desde la 0.4.5. */
+export type CreateAddressInput = CreateAliasInput;
+/** Nombre público de `UpdateAliasInput` desde la 0.4.5. */
+export type UpdateAddressInput = UpdateAliasInput;
+
 export interface Alias {
   alias: string;
   domainId: string;

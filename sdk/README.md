@@ -1,6 +1,6 @@
 # @easybits.cloud/mailmask
 
-Official TypeScript/JavaScript SDK for the [MailMask](https://mailmask.studio) email alias and forwarding API.
+Official TypeScript/JavaScript SDK for the [MailMask](https://mailmask.studio) email address, mailbox and forwarding API.
 
 ## Install
 
@@ -19,29 +19,30 @@ const mm = new MailMask({ apiKey: "mk_..." });
 const domains = await mm.domains.list();
 const domainId = domains[0].id;
 
-// Create an alias — emails to hello@yourdomain.com forward to your inbox
-const alias = await mm.aliases.create(domainId, {
+// Create an address — emails to hello@yourdomain.com forward to your inbox
+const address = await mm.addresses.create(domainId, {
   alias: "hello",
   destinations: ["you@example.com"],
 });
 
 // Send an email (routed through MailMask for high deliverability)
 await mm.send.send(domainId, {
-  from: "hello",              // must be an active alias; defaults to `noreply`
+  from: "hello",              // must be an active address; defaults to `noreply`
   fromName: "Acme",           // optional display name: Acme <hello@yourdomain.com>
   to: "client@example.com",
   subject: "Welcome!",
   html: "<p>Thanks for signing up.</p>", // or `body` (plain text) / `markdown`
 });
 
-// List aliases for a domain
-const aliases = await mm.aliases.list(domainId);
+// List addresses for a domain
+const addresses = await mm.addresses.list(domainId);
 
 // Add a domain — returns the DNS records to configure (MX, TXT, DKIM, SPF)
 const { domain, dnsRecords } = await mm.domains.create("yourdomain.com");
 
-// An alias with an IMAP mailbox (activated domain): password is returned once
-const inbox = await mm.aliases.create(domainId, { alias: "sales", mailbox: true });
+// An address with an IMAP mailbox (activated domain): password is returned once
+const inbox = await mm.addresses.create(domainId, { alias: "sales", mailbox: true });
+// `mm.aliases` still works: it is the same resource under its old name.
 console.log(inbox.buzon?.password, inbox.buzon?.imap);
 ```
 
@@ -86,7 +87,7 @@ Full API reference and examples: https://mailmask.studio/docs
 
 ## Links
 
-- [MailMask](https://mailmask.studio) — Email alias & forwarding service
+- [MailMask](https://mailmask.studio) — Email addresses, mailboxes & forwarding on your domain
 - [EasyBits](https://easybits.cloud) — Cloud platform
 - [Fixter](https://fixter.org) — Development team
 

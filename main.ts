@@ -532,6 +532,19 @@ function getIp(request: Request): string {
   return request.headers.get(TRUSTED_IP_HEADER)?.trim() || "unknown";
 }
 
+// Reentra `/api/domains/:id/addresses[/…]` como `/api/domains/:id/alias[/…]`. El cuerpo
+// se lee completo (son JSON chicos) para no depender de `duplex` al reenviar un stream.
+async function forwardAddresses(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  url.pathname = url.pathname.replace(/^(\/api\/domains\/[^/]+\/)addresses(?=\/|$)/, "$1alias");
+  const hasBody = request.method !== "GET" && request.method !== "HEAD";
+  return app.fetch(new Request(url, {
+    method: request.method,
+    headers: request.headers,
+    body: hasBody ? await request.arrayBuffer() : undefined,
+  }));
+}
+
 async function rateLimitGuard(
   ip: string,
   limit: number,
@@ -2383,8 +2396,8 @@ const app = new Elysia({ adapter: node() })
     // 5. Aliases
     const aliases = listAliases(domain.id).filter(a => a.enabled);
     checks.aliases = aliases.length > 0
-      ? { ok: true, detail: `${aliases.length} alias${aliases.length === 1 ? "" : "es"} activo${aliases.length === 1 ? "" : "s"}` }
-      : { ok: false, detail: "No hay aliases activos — los emails no se reenviarán" };
+      ? { ok: true, detail: `${aliases.length} ${aliases.length === 1 ? "dirección activa" : "direcciones activas"}` }
+      : { ok: false, detail: "No hay direcciones activas — los correos no se reenviarán" };
 
     // 6. Plan
     const ownerUser = getUser(domain.ownerEmail);
@@ -2417,7 +2430,7 @@ const app = new Elysia({ adapter: node() })
     } else if (!checks.spf.ok || !checks.dkim.ok) {
       summary = "Tu dominio puede tener problemas de entregabilidad — revisa SPF y DKIM";
     } else if (!checks.aliases.ok) {
-      summary = "No hay aliases activos — los emails recibidos no se reenviarán";
+      summary = "No hay direcciones activas — los correos recibidos no se reenviarán";
     } else {
       summary = "Hay problemas con la configuración de tu dominio";
     }
@@ -2636,6 +2649,13 @@ const app = new Elysia({ adapter: node() })
     return res;
   }, { detail: { tags: ["MCP"], summary: "Servidor MCP (Streamable HTTP)" } })
 
+  // `/addresses` es sinónimo de `/alias` (5-oct-2026: de cara al público ya no se dice
+  // "alias" sino "dirección"). Reescribe la ruta y reentra por `app.fetch`, el mismo truco
+  // de `/mcp`: los handlers de `/alias` son la única implementación, y CSRF, permisos,
+  // topes y confirmaciones corren igual. `/alias` no se retira: es contrato del SDK y del MCP.
+  .all("/api/domains/:id/addresses", ({ request }) => forwardAddresses(request), { detail: { hide: true } })
+  .all("/api/domains/:id/addresses/*", ({ request }) => forwardAddresses(request), { detail: { hide: true } })
+
   .get("/api/domains/:id/alias", async ({ request, params }) => {
     const user = await getAuthUser(request);
     if (!user)
@@ -2711,7 +2731,7 @@ const app = new Elysia({ adapter: node() })
     // Validate alias format (alphanumeric, dots, hyphens, or * for catch-all)
     if (alias !== "*" && !/^[a-zA-Z0-9._-]+$/.test(alias)) {
       return new Response(
-        JSON.stringify({ error: "Formato de alias inválido" }),
+        JSON.stringify({ error: "Formato de dirección inválido" }),
         { status: 400 },
       );
     }
@@ -2730,7 +2750,7 @@ const app = new Elysia({ adapter: node() })
 
     const existing = await getAlias(domain.id, alias);
     if (existing) {
-      return new Response(JSON.stringify({ error: "Este alias ya existe" }), {
+      return new Response(JSON.stringify({ error: "Esta dirección ya existe" }), {
         status: 409,
       });
     }
@@ -2822,7 +2842,7 @@ const app = new Elysia({ adapter: node() })
 
     const updated = await updateAlias(domain.id, params.alias, updates);
     if (!updated)
-      return new Response(JSON.stringify({ error: "Alias no encontrado" }), {
+      return new Response(JSON.stringify({ error: "Dirección no encontrada" }), {
         status: 404,
       });
 
@@ -2862,7 +2882,7 @@ const app = new Elysia({ adapter: node() })
         intent: "delete_alias",
         domainId: domain.id,
         summary: {
-          title: `Borrar la máscara ${previo.alias}@${domain.domain}`,
+          title: `Borrar la dirección ${previo.alias}@${domain.domain}`,
           lines: [
             previo.destinations.length ? `Reenvía a: ${previo.destinations.join(", ")}` : "Sin destinos de reenvío",
             ...(previo.mailboxEnabled ? ["Tiene buzón IMAP"] : []),
@@ -2888,7 +2908,7 @@ const app = new Elysia({ adapter: node() })
 
     const deleted = await deleteAlias(domain.id, params.alias);
     if (!deleted)
-      return new Response(JSON.stringify({ error: "Alias no encontrado" }), {
+      return new Response(JSON.stringify({ error: "Dirección no encontrada" }), {
         status: 404,
       });
 
@@ -4379,7 +4399,7 @@ const app = new Elysia({ adapter: node() })
       const sendAliases = await listAliases(domain.id);
       const hit = sendAliases.find((a) => a.alias.toLowerCase() === candidate && a.enabled && a.alias !== "*");
       if (!hit) {
-        return new Response(JSON.stringify({ error: "El remitente debe ser un alias activo de tu dominio" }), { status: 400 });
+        return new Response(JSON.stringify({ error: "El remitente debe ser una dirección activa de tu dominio" }), { status: 400 });
       }
       fromLocalPart = hit.alias;
     }
@@ -4639,7 +4659,7 @@ const app = new Elysia({ adapter: node() })
       const bulkAliases = await listAliases(domain.id);
       const hit = bulkAliases.find((a) => a.alias.toLowerCase() === candidate && a.enabled && a.alias !== "*");
       if (!hit) {
-        return new Response(JSON.stringify({ error: "El remitente debe ser un alias activo de tu dominio" }), { status: 400 });
+        return new Response(JSON.stringify({ error: "El remitente debe ser una dirección activa de tu dominio" }), { status: 400 });
       }
       bulkFromLocal = hit.alias;
     }
@@ -4981,7 +5001,7 @@ const app = new Elysia({ adapter: node() })
     const local = String(fromAlias).split("@")[0].toLowerCase();
     const match = aliases.find((a) => a.alias.toLowerCase() === local && a.enabled && a.alias !== "*");
     if (!match) {
-      return new Response(JSON.stringify({ error: "El remitente debe ser un alias activo de tu dominio" }), { status: 400 });
+      return new Response(JSON.stringify({ error: "El remitente debe ser una dirección activa de tu dominio" }), { status: 400 });
     }
 
     const recipient = normalizeAddress(String(to));
@@ -5851,7 +5871,7 @@ const app = new Elysia({ adapter: node() })
     const { domain } = gate;
 
     if (!alias || !/^[a-z0-9._%+-]+$/.test(alias)) {
-      return new Response(JSON.stringify({ error: "alias requerido (sólo la parte antes de la arroba)" }), { status: 400 });
+      return new Response(JSON.stringify({ error: "alias requerido: la dirección, sólo la parte antes de la arroba" }), { status: 400 });
     }
     // Sin buzón no hay nada que configurar: el perfil se instalaría y el cliente de
     // correo fallaría al autenticarse, que es una forma peor de decir "no lo tienes".

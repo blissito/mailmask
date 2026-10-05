@@ -46,6 +46,9 @@ export class MailMask {
   private apiKey: string;
 
   domains: DomainsResource;
+  /** Las direcciones del dominio (máscaras), con reenvío, buzón o ambos. */
+  addresses: AliasesResource;
+  /** @deprecated Usa `addresses`; es el mismo recurso y no se va a retirar. */
   aliases: AliasesResource;
   rules: RulesResource;
   logs: LogsResource;
@@ -75,7 +78,9 @@ export class MailMask {
     const req = <T>(path: string, opts?: RequestInit) => request<T>(this.baseUrl, this.apiKey, path, opts, doFetch);
 
     this.domains = new DomainsResource(req);
-    this.aliases = new AliasesResource(req, (path) => requestRaw(this.baseUrl, this.apiKey, path, doFetch));
+    this.addresses = new AliasesResource(req, (path) => requestRaw(this.baseUrl, this.apiKey, path, doFetch));
+    // Mismo objeto y mismas rutas `/alias`: así funciona también contra servidores viejos.
+    this.aliases = this.addresses;
     this.rules = new RulesResource(req);
     this.logs = new LogsResource(req);
     this.send = new SendResource(req);

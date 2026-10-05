@@ -600,6 +600,54 @@ describe("Alias update", () => {
   });
 });
 
+// `/addresses` es sinónimo de `/alias`: misma implementación, mismos guardias.
+describe("Addresses (sinónimo de /alias)", () => {
+  it("CRUD por /addresses ve lo mismo que /alias y respeta CSRF", async () => {
+    const email = `addr-${suffix}@example.com`;
+    createUser(email, await hashPassword("testpassword1"));
+    updateUserSubscription(email, {
+      plan: "developer",
+      status: "active",
+      currentPeriodEnd: new Date(Date.now() + 365 * 86400000).toISOString(),
+    });
+    const domain = createDomain(email, `addr-${suffix}.test`, ["dkim1"], "verify1");
+    const cookie = `token=${await signJwt({ email })}`;
+    const csrf = generateCsrfToken();
+    const base = `/api/domains/${domain.id}`;
+
+    const sinCsrf = await jsonPost(`${base}/addresses`, { alias: "hola", destinations: ["d@example.com"] }, cookie);
+    assert.equal(sinCsrf.status, 403);
+    await sinCsrf.body?.cancel();
+
+    const creado = await jsonPost(`${base}/addresses`, { alias: "hola", destinations: ["d@example.com"] }, cookie, csrf);
+    assert.equal(creado.status, 201, await creado.clone().text());
+    await creado.body?.cancel();
+
+    const viaAlias = await (await jsonGet(`${base}/alias`, cookie)).json();
+    const viaAddresses = await (await jsonGet(`${base}/addresses`, cookie)).json();
+    assert.deepEqual(viaAddresses, viaAlias);
+    assert.ok(viaAddresses.some((a: { alias: string }) => a.alias === "hola"));
+
+    const editado = await jsonPut(`${base}/addresses/hola`, { enabled: false }, cookie, csrf);
+    assert.equal(editado.status, 200);
+    assert.equal((await editado.json()).enabled, false);
+
+    const borrado = await req(`${base}/addresses/hola`, {
+      method: "DELETE",
+      headers: { cookie: `${cookie}; csrf_token=${csrf}`, "x-csrf-token": csrf, "fly-client-ip": nextIp() },
+    });
+    assert.equal(borrado.status, 200);
+    await borrado.body?.cancel();
+    assert.ok(!(await (await jsonGet(`${base}/alias`, cookie)).json()).some((a: { alias: string }) => a.alias === "hola"));
+
+    // Otro dueño no ve nada por el sinónimo.
+    const ajeno = `token=${await signJwt({ email: `otro-${suffix}@example.com` })}`;
+    const res = await jsonGet(`${base}/addresses`, ajeno);
+    assert.notEqual(res.status, 200);
+    await res.body?.cancel();
+  });
+});
+
 // --- Webhook HTTP handler tests ---
 
 const MP_SECRET = process.env.MP_WEBHOOK_SECRET ?? "test-webhook-secret";
@@ -1557,7 +1605,7 @@ describe("Bandeja: redactar", () => {
   it("rechaza un remitente que no es alias del dominio", async () => {
     const res = await compose({ fromAlias: "inventado" });
     assert.equal(res.status, 400);
-    assert.match((await res.json()).error, /alias activo/i);
+    assert.match((await res.json()).error, /dirección activa/i);
   });
 
   it("rechaza un alias deshabilitado", async () => {
