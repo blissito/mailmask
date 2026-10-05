@@ -230,7 +230,15 @@ export async function iniciarTransferencia(reg: DomainRegistration): Promise<voi
 
 /** Recordatorios de aprobación: AWS caduca la solicitud sola a los ~5 días en muchos TLDs. */
 const HITOS_RECORDATORIO = [2, 5, 8];
-const DIAS_HASTA_CANCELAR = 10;
+/**
+ * A los 10 días se escala al equipo, pero NO se cancela: AWS no tiene API para cancelar un
+ * transfer-in, así que una "cancelación" nuestra sólo vive en la base. kandey.com.mx (oct-2026)
+ * la marcamos cancelada al día 10, AWS la completó al 11 y el dominio quedó en nuestra cuenta,
+ * renovándose, sin aprovisionar y con la clienta avisada de que había fallado.
+ * Los únicos finales son los de AWS: SUCCESSFUL, FAILED o ERROR.
+ */
+const DAYS_UNTIL_ESCALATION = 10;
+const LEGACY_CANCEL_ERROR = "Sin aprobación del registrador";
 
 /**
  * Pagadas y sin mandar a AWS. Pasa cuando el auth code caducó (7 días) o no se pudo
@@ -261,11 +269,30 @@ export async function sondearTransferencias(): Promise<void> {
     ...getDomainRegistrationsByStatus("transfer_submitted"),
     ...getDomainRegistrationsByStatus("transfer_awaiting_approval"),
   ];
-  if (!enCurso.length) return;
+  // Las que cancelamos en local antes de este arreglo siguen vivas en AWS y pueden completarse.
+  const canceladasEnLocal = getDomainRegistrationsByStatus("transfer_cancelled").filter(
+    (r) => r.route53OperationId && r.lastError === LEGACY_CANCEL_ERROR && r.warnedAt !== "completed-after-cancel",
+  );
+  if (!enCurso.length && !canceladasEnLocal.length) return;
 
   const { getOperationStatus, getDomainDetail } = await import("./route53.js");
   const { sendTemplate, domainTransferPending, domainTransferDnsReview, domainTransferFailed } = await import("./emails.js");
   const { sendAlert } = await import("./ses.js");
+
+  // Sólo avisa: al cliente ya se le dijo que falló (y quizá se le reembolsó), así que revivir
+  // la fila y moverle los nameservers es decisión de una persona.
+  for (const reg of canceladasEnLocal) {
+    try {
+      if (await getOperationStatus(reg.route53OperationId!) !== "SUCCESSFUL") continue;
+      await sendAlert(
+        `transferencia-completada-tras-cancelar:${reg.domainName}`,
+        `La transferencia de ${reg.domainName} (${reg.ownerEmail}) se completó en AWS aunque la habíamos marcado cancelada. El dominio ya está en nuestra cuenta y renovándose; la fila sigue en transfer_cancelled. Revívela (status registering) tras revisar su DNS y avísale al cliente.`,
+      ).catch(() => {});
+      updateDomainRegistration(reg.id, { warnedAt: "completed-after-cancel" });
+    } catch (err) {
+      log("error", "route53", "Sondeo de transferencia cancelada falló", { domain: reg.domainName, error: String(err) });
+    }
+  }
 
   for (const reg of enCurso) {
     if (!reg.route53OperationId) continue;
@@ -315,13 +342,14 @@ export async function sondearTransferencias(): Promise<void> {
         ? Math.floor((Date.now() - Date.parse(reg.transferRequestedAt)) / 864e5)
         : 0;
 
-      if (esperando >= DIAS_HASTA_CANCELAR) {
-        updateDomainRegistration(reg.id, { status: "transfer_cancelled", lastError: "Sin aprobación del registrador" });
-        await sendTemplate(reg.ownerEmail, domainTransferFailed({
-          domain: reg.domainName,
-          reason: "No se aprobó a tiempo en tu registrador actual",
-        })).catch(() => {});
-        await sendAlert("transferencia-cancelada", `${reg.domainName} (${reg.ownerEmail}) llevaba ${esperando} días sin aprobación. Hay que reembolsarle.`);
+      if (esperando >= DAYS_UNTIL_ESCALATION) {
+        if (reg.warnedAt !== "escalated") {
+          await sendAlert(
+            `transferencia-atorada:${reg.domainName}`,
+            `${reg.domainName} (${reg.ownerEmail}) lleva ${esperando} días esperando al registrador y AWS sigue en curso. No se cancela sola ni la cancelamos: hablar con el cliente o con su registrador.`,
+          ).catch(() => {});
+          updateDomainRegistration(reg.id, { warnedAt: "escalated" });
+        }
       } else if (HITOS_RECORDATORIO.includes(esperando) && reg.warnedAt !== String(esperando)) {
         await sendTemplate(reg.ownerEmail, domainTransferPending({ domain: reg.domainName, daysWaiting: esperando })).catch(() => {});
         updateDomainRegistration(reg.id, { warnedAt: String(esperando) });

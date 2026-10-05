@@ -248,9 +248,13 @@ Dos cosas no obvias, y las dos existen para no tumbarle la web al cliente:
    `updateNameservers`.
 
 El transfer-in de AWS incluye +1 año, así que se cobra el precio de renovación. El sondeo va
-cada 10 minutos; recordatorios a los 2, 5 y 8 días y cancelación a los 10 (AWS caduca la
-solicitud sola a los ~5 en muchos TLDs). Un fallo alerta con "hay que reembolsarle": el
-reembolso es manual.
+cada 10 minutos; recordatorios a los 2, 5 y 8 días y a los 10 **una alerta al equipo, nunca
+una cancelación**: AWS no tiene API para cancelar un transfer-in, así que cancelar sólo en la
+base es mentir. Pasó con kandey.com.mx: la marcamos cancelada al día 10, a la clienta le llegó
+"no se pudo transferir" y AWS la completó al 11 (5-oct-2026), dejando el dominio en nuestra
+cuenta, renovándose y sin aprovisionar. Los únicos finales son los de AWS (`SUCCESSFUL`,
+`FAILED`, `ERROR`); una fila `transfer_cancelled` de antes que AWS complete sólo alerta, no se
+revive sola. Un fallo alerta con "hay que reembolsarle": el reembolso es manual.
 
 **Qué TLD se aceptan.** El alta de un dominio nuevo se limita a `TLD_PRICES`, una parrilla
 curada de 12 con precios pensados a mano. **La transferencia no**: ahí el dominio ya es del

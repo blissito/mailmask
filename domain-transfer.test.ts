@@ -201,7 +201,7 @@ describe("transferencia de dominios", () => {
     assert.ok(alertas.some((m) => m.includes(reg.domainName) && /se completó/.test(m)), "no avisó al equipo");
   });
 
-  it("recuerda la aprobación y cancela a los 10 días", async () => {
+  it("recuerda la aprobación y a los 10 días escala al equipo sin cancelar", async () => {
     const hace6 = new Date(Date.now() - 6 * 864e5).toISOString();
     const reg = crear({ status: "transfer_submitted", route53OperationId: `op-${suffix}`, transferRequestedAt: hace6 });
 
@@ -212,11 +212,30 @@ describe("transferencia de dominios", () => {
     correos.length = 0;
     await prov.sondearTransferencias();
 
-    const fresco = dbmod.getDomainRegistration(reg.id);
-    assert.equal(fresco.status, "transfer_cancelled");
-    assert.ok(correos.some((c) => /No se pudo transferir/.test(c.subject)));
-    // Ya se le cobró: alguien tiene que reembolsarle.
-    assert.ok(alertas.some((a) => /reembolsar/.test(a)));
+    // AWS no puede cancelar un transfer-in: kandey.com.mx se completó al día 11.
+    assert.equal(dbmod.getDomainRegistration(reg.id).status, "transfer_awaiting_approval");
+    assert.ok(!correos.some((c) => /No se pudo transferir/.test(c.subject)), "le dijo al cliente que falló");
+    assert.equal(alertas.filter((a) => a.includes(reg.domainName) && /sigue en curso/.test(a)).length, 1);
+
+    await prov.sondearTransferencias();
+    assert.equal(alertas.filter((a) => a.includes(reg.domainName) && /sigue en curso/.test(a)).length, 1, "repitió la alerta");
+
+    // Y si AWS termina después, entra al aprovisionamiento como cualquier otra.
+    estadoOperacion = "SUCCESSFUL";
+    await prov.sondearTransferencias();
+    assert.equal(dbmod.getDomainRegistration(reg.id).status, "registering");
+  });
+
+  it("una fila cancelada en local que AWS completa sólo alerta, sin revivirla", async () => {
+    const reg = crear({ status: "transfer_cancelled", route53OperationId: `op-${suffix}`, transferRequestedAt: new Date(Date.now() - 11 * 864e5).toISOString() });
+    dbmod.updateDomainRegistration(reg.id, { lastError: "Sin aprobación del registrador" });
+    estadoOperacion = "SUCCESSFUL";
+
+    await prov.sondearTransferencias();
+    await prov.sondearTransferencias();
+
+    assert.equal(dbmod.getDomainRegistration(reg.id).status, "transfer_cancelled");
+    assert.equal(alertas.filter((a) => a.includes(reg.domainName) && /habíamos marcado cancelada/.test(a)).length, 1);
   });
 
   it("si AWS rechaza la operación, se avisa y se marca para reembolso", async () => {
