@@ -7,7 +7,7 @@
 export const SUGGESTIONS: { icon: string; text: string }[] = [
   { icon: "🧭", text: "Configura mi dominio paso a paso" },
   { icon: "🩺", text: "¿Por qué mi dominio dice Atención?" },
-  { icon: "🎭", text: "Crea un alias hola@ que reenvíe a mi Gmail" },
+  { icon: "🎭", text: "Crea una dirección hola@ que reenvíe a mi Gmail" },
   { icon: "▲", text: "Apunta mi dominio a Vercel" },
   { icon: "📦", text: "Transfiere mi dominio a MailMask" },
 ]

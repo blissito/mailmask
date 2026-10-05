@@ -108,7 +108,7 @@ function renderPlanCard() {
     const cortesia = (d.addons ?? []).some(a => a.kind === "domain" && a.isCourtesy);
     const detalle = r.activado
       ? [cortesia ? "cortesía" : null, extras.length ? `${extras.length} bloque${extras.length === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ")
-      : r.bloqueado ? "guarda, no reenvía" : `${r.aliases} máscaras · 7 días de Bandeja`;
+      : r.bloqueado ? "guarda, no reenvía" : `${r.aliases} direcciones · 7 días de Bandeja`;
     return `
       <div class="meter">
         <div class="l"><span>${esc(d.domain)}</span><span class="num">${esc(estado)}</span></div>
@@ -525,7 +525,7 @@ function renderStats() {
           <div class="text-3xl font-light text-fg mt-1">${u.domains.current}${u.domains.limit == null ? "" : `<span class="text-lg text-fg-subtle">/${u.domains.limit}</span>`}</div>
         </div>
         <div>
-          <span class="text-[11px] uppercase tracking-widest text-fg-subtle font-semibold">Alias</span>
+          <span class="text-[11px] uppercase tracking-widest text-fg-subtle font-semibold">Direcciones</span>
           <div class="text-3xl font-light text-fg mt-1">${totalAliases}</div>
         </div>
         <div>
@@ -1049,7 +1049,7 @@ function renderDomains() {
     const estado = estadoDominio(d.id);
     const chip = estado === "activado" ? `<span class="tag">Activado</span>` : estado === "bloqueado" ? `<span class="tag !bg-amber-500/15 !text-amber-600">Sin activar</span>` : `<span class="tag">Gratis</span>`;
     const detalle = verified
-      ? `${n != null ? `<em>${n} alias</em> · ` : ""}${estado === "bloqueado" ? "guarda, no reenvía" : "verificado"}`
+      ? `${n != null ? `<em>${n} ${n === 1 ? "dirección" : "direcciones"}</em> · ` : ""}${estado === "bloqueado" ? "guarda, no reenvía" : "verificado"}`
       : `<em>Falta configurar DNS</em>`;
     return `
     <div class="dom" data-action="select-domain" data-domain-id="${esc(d.id)}">
@@ -1158,7 +1158,7 @@ function renderActivacion() {
     el.innerHTML = `
       <div class="flex flex-wrap items-center gap-3 bg-bg-elev border border-line rounded-xl px-4 py-3">
         <span class="text-sm text-fg font-semibold">Dominio gratis</span>
-        <span class="text-xs text-fg-muted">${r.aliases} máscaras · la Bandeja muestra 7 días · sin correo nuevo ni equipo</span>
+        <span class="text-xs text-fg-muted">${r.aliases} direcciones · la Bandeja muestra 7 días · sin correo nuevo ni equipo</span>
         <span class="ml-auto flex flex-wrap gap-2">${pedir}${btn("Activar · $99/mes")}</span>
       </div>`;
   }
@@ -1179,7 +1179,7 @@ function goBack() {
 
 async function deleteDomain() {
   if (!selectedDomain) return;
-  if (!confirm(`¿Eliminar dominio ${selectedDomain.domain}? Se borrarán todos los alias y reglas.`)) return;
+  if (!confirm(`¿Eliminar dominio ${selectedDomain.domain}? Se borrarán todas las direcciones y reglas.`)) return;
   const res = await fetch(`/api/domains/${selectedDomain.id}`, { method: "DELETE" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -1774,7 +1774,7 @@ async function toggleAlias(alias, enabled) {
 }
 
 async function removeAlias(alias) {
-  if (!confirm(`¿Eliminar alias ${alias}@${selectedDomain.domain}?`)) return;
+  if (!confirm(`¿Eliminar la dirección ${alias}@${selectedDomain.domain}?`)) return;
   await fetch(`/api/domains/${selectedDomain.id}/alias/${alias}`, { method: "DELETE" });
   await loadAliases();
   await refreshUsage();
@@ -2132,7 +2132,7 @@ function renderHealthPanel() {
   const summaryText = { ok: "text-accent-text", warning: "text-amber-600", error: "text-red-500" };
 
   const checkOrder = ["verified", "mx", "spf", "dkim", "aliases", "plan"];
-  const checkLabels = { verified: "Verificación", mx: "MX (recepción)", spf: "SPF", dkim: "DKIM", aliases: "Aliases", plan: "Plan" };
+  const checkLabels = { verified: "Verificación", mx: "MX (recepción)", spf: "SPF", dkim: "DKIM", aliases: "Direcciones", plan: "Plan" };
 
   panel.innerHTML = `
     <div class="mb-6 border ${summaryBg[health.status]} rounded-xl p-5">
@@ -3318,7 +3318,7 @@ function setupEventListeners() {
       }
     } else {
       const data = await res.json();
-      errEl.textContent = data.error || "Error al crear alias";
+      errEl.textContent = data.error || "Error al crear la dirección";
       errEl.classList.remove("hidden");
     }
   });
@@ -3360,7 +3360,7 @@ function setupEventListeners() {
       await loadAliases();
     } else {
       const data = await res.json();
-      errEl.textContent = data.error || "Error al editar alias";
+      errEl.textContent = data.error || "Error al editar la dirección";
       errEl.classList.remove("hidden");
     }
   });

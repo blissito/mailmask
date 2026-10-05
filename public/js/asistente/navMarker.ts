@@ -31,7 +31,7 @@
  * que el agente puede mandar. El panel de salud vive dentro de `dns`.
  */
 export const TABS: Record<string, string> = {
-  aliases: "Ver alias",
+  aliases: "Ver direcciones",
   rules: "Ver reglas",
   logs: "Ver logs",
   dns: "Ver DNS",

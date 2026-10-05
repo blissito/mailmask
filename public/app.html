@@ -107,7 +107,7 @@
 
       <!-- Tabs: en móvil se deslizan a lo ancho -->
       <div class="flex gap-1 border-b border-line mb-6 overflow-x-auto whitespace-nowrap -mx-4 px-4 sm:mx-0 sm:px-0">
-        <button class="tab-btn active-tab px-4 py-2 text-sm font-semibold" data-tab="aliases">Alias</button>
+        <button class="tab-btn active-tab px-4 py-2 text-sm font-semibold" data-tab="aliases">Direcciones</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="rules">Reglas</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="logs">Logs</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="dns">DNS</button>
@@ -120,12 +120,12 @@
       <!-- Tab: Aliases -->
       <div id="tab-aliases" class="tab-content">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="font-semibold">Alias</h3>
-          <button id="btn-add-alias" class="text-sm bg-bg-inset hover:bg-line px-3 py-1.5 rounded-lg transition-colors">+ Agregar alias</button>
+          <h3 class="font-semibold">Direcciones</h3>
+          <button id="btn-add-alias" class="text-sm bg-bg-inset hover:bg-line px-3 py-1.5 rounded-lg transition-colors">+ Nueva dirección</button>
         </div>
         <div id="aliases-list" class="space-y-2"></div>
         <div id="aliases-empty" class="hidden text-center py-8 text-fg-subtle">
-          No hay alias. Crea uno para empezar a recibir email.
+          No hay direcciones. Crea una para empezar a recibir correo.
         </div>
       </div>
 
@@ -137,7 +137,7 @@
         </div>
         <div id="rules-list" class="space-y-2"></div>
         <div id="rules-empty" class="hidden text-center py-8 text-fg-subtle">
-          No hay reglas. Los emails se procesan solo por alias.
+          No hay reglas. Los correos se procesan sólo por dirección.
         </div>
       </div>
 
@@ -429,10 +429,10 @@
   <!-- Modal: Add alias -->
   <div id="modal-add-alias" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
     <div class="bg-bg-elev border border-line rounded-xl w-full max-w-md p-6">
-      <h3 class="text-lg font-bold mb-4">Agregar alias</h3>
+      <h3 class="text-lg font-bold mb-4">Nueva dirección</h3>
       <form id="form-add-alias">
         <div class="mb-4">
-          <label class="block text-sm text-fg-muted mb-1">Alias (parte local)</label>
+          <label class="block text-sm text-fg-muted mb-1">Dirección (lo que va antes de la @)</label>
           <div class="flex items-center gap-2">
             <input type="text" name="alias" required placeholder="ventas"
               class="lowercase flex-1 bg-bg-inset border border-line rounded-lg px-4 py-3 text-fg placeholder-fg-subtle focus:border-red-500 focus:outline-none">
@@ -460,7 +460,7 @@
         <div id="add-alias-error" class="text-red-500 text-sm mt-2 hidden"></div>
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" class="btn-cancel-modal px-4 py-2 text-fg-muted hover:text-fg transition-colors" data-modal="modal-add-alias">Cancelar</button>
-          <button type="submit" class="bg-accent hover:bg-accent/90 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear alias</button>
+          <button type="submit" class="bg-accent hover:bg-accent/90 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Crear dirección</button>
         </div>
       </form>
     </div>
@@ -482,7 +482,7 @@
 
   <div id="modal-edit-alias" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center px-4 z-50">
     <div class="bg-bg-elev border border-line rounded-xl w-full max-w-md p-6">
-      <h3 class="text-lg font-bold mb-4">Editar alias <span id="edit-alias-name" class="font-mono text-accent-text"></span></h3>
+      <h3 class="text-lg font-bold mb-4">Editar dirección <span id="edit-alias-name" class="font-mono text-accent-text"></span></h3>
       <form id="form-edit-alias">
         <input type="hidden" name="alias" />
         <div>

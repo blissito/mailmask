@@ -287,7 +287,7 @@ describe("Asistente: Ghosty, turn token y confirmaciones", () => {
     assert.equal(r.status, 200);
     const result = r.json.result;
     assert.ok(!result.isError, "no es error para el modelo");
-    assert.match(result.content[0].text, new RegExp(`Necesita confirmación del usuario: .*«Borrar la máscara ventas@${domainName.replace(/\./g, "\\.")}»\\. No reintentes`));
+    assert.match(result.content[0].text, new RegExp(`Necesita confirmación del usuario: .*«Borrar la dirección ventas@${domainName.replace(/\./g, "\\.")}»\\. No reintentes`));
     assert.ok(dbmod.getAlias(domainId, "ventas"), "todavía no se borró");
 
     // Reintentar lo mismo reusa la tarjeta.
@@ -296,7 +296,7 @@ describe("Asistente: Ghosty, turn token y confirmaciones", () => {
     const mias = lista.actions.filter((a: { tool: string }) => a.tool === "delete_alias");
     assert.equal(mias.length, 1);
     const action = mias[0];
-    assert.equal(action.summary.title, `Borrar la máscara ventas@${domainName}`);
+    assert.equal(action.summary.title, `Borrar la dirección ventas@${domainName}`);
     assert.equal(action.summary.destructive, true);
     assert.ok(action.summary.lines.some((l: string) => l.includes("dueno@example.com")), "el resumen sale de la base");
 

@@ -14,7 +14,7 @@ describe("resolveNavTarget", () => {
 
   it("acepta una pestaña conocida", () => {
     assert.equal(resolveNavTarget("dominio/abc123/dns")?.label, "Ver DNS")
-    assert.equal(resolveNavTarget("dominio/abc123/aliases")?.label, "Ver alias")
+    assert.equal(resolveNavTarget("dominio/abc123/aliases")?.label, "Ver direcciones")
   })
 
   describe("rechaza lo que no es un destino de /app", () => {

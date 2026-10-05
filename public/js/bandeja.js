@@ -279,7 +279,7 @@ function updateComposeButton() {
     btn.title = "Activa el dominio ($99/mes) para escribir correos nuevos";
   } else if (domainAliases.length === 0) {
     btn.disabled = true;
-    btn.title = "Crea un alias en este dominio para poder escribir";
+    btn.title = "Crea una dirección en este dominio para poder escribir";
   } else {
     btn.disabled = false;
     btn.title = "Redactar (C)";
@@ -293,7 +293,7 @@ function openComposeModal() {
     return;
   }
   if (domainAliases.length === 0) {
-    toast("Necesitas un alias activo en este dominio.");
+    toast("Necesitas una dirección activa en este dominio.");
     return;
   }
   const domain = domains.find(d => d.id === selectedDomainId);
@@ -422,7 +422,7 @@ async function loadConversations(opts = {}) {
 function populateAliasFilter(aliases) {
   const sel = document.getElementById("alias-filter");
   const prev = sel.value;
-  sel.innerHTML = '<option value="">Alias: todos</option>' +
+  sel.innerHTML = '<option value="">Dirección: todas</option>' +
     aliases.map(a => `<option value="${esc(a)}">${esc(a.split("@")[0])}</option>`).join("");
   if (prev && aliases.includes(prev)) sel.value = prev;
 }
@@ -2178,7 +2178,7 @@ async function cargarMetricas() {
         <thead><tr><th>Persona</th><th>Conversaciones</th><th>Respuestas</th></tr></thead>
         <tbody>${m.porAgente.map(a => `<tr><td>${esc(a.agente)}</td><td>${a.conversaciones}</td><td>${a.respuestas}</td></tr>`).join("")}</tbody>
        </table>
-       <p class="mesa-metric-note">Se cuenta por conversación asignada: al responder, el remitente es el alias del dominio, no la persona.</p>`;
+       <p class="mesa-metric-note">Se cuenta por conversación asignada: al responder, el remitente es la dirección del dominio, no la persona.</p>`;
 }
 
 // --- SSE for real-time updates ---
