@@ -627,7 +627,7 @@ export interface AccountExport {
 /** Respuesta de `domains.uploadImage()`. */
 export interface UploadedEmailImage {
   ok: boolean;
-  /** URL pública y permanente mientras el correo que la incrusta no se borre. */
+  /** Efímera: se borra tras enviarse (o la barre el aseo diario si nunca se usó). */
   url: string;
 }
 
