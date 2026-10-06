@@ -2,65 +2,212 @@
 <html lang="es-MX">
 <head>
   <meta charset="UTF-8">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Documentación — Skills para agentes, SDK, API REST, SMTP y MCP | MailMask</title>
-  <meta name="description" content="Documentación de MailMask: skills para tu agente (npx skills add), SDK de JavaScript/TypeScript, API REST para máscaras y dominios, credenciales SMTP y servidor MCP. Con ejemplos de código.">
-  <link rel="canonical" href="https://www.mailmask.studio/docs">
+  <title>Documentación de MailMask: SDK, CLI, API REST y MCP</title>
+  <meta name="description" content="Documentación de MailMask: skills para agentes, SDK de JavaScript, CLI, API REST, SMTP y servidor MCP, con ejemplos para crear direcciones, buzones y dominios.">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  <link rel="canonical" href="https://www.mailmask.studio/docs">
+  <link rel="alternate" hreflang="es-MX" href="https://www.mailmask.studio/docs">
+  <link rel="alternate" hreflang="x-default" href="https://www.mailmask.studio/docs">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="MailMask">
   <meta property="og:locale" content="es_MX">
   <meta property="og:url" content="https://www.mailmask.studio/docs">
-  <meta property="og:title" content="Documentación — SDK, API REST, SMTP y MCP | MailMask">
-  <meta property="og:description" content="Documentación de MailMask: skills para tu agente (npx skills add), SDK de JavaScript/TypeScript, API REST para máscaras y dominios, credenciales SMTP y servidor MCP. Con ejemplos de código.">
-  <meta property="og:image" content="https://www.mailmask.studio/img/og-image.png">
+  <meta property="og:title" content="Documentación de MailMask: SDK, CLI, API REST y MCP">
+  <meta property="og:description" content="Documentación de MailMask: skills para agentes, SDK de JavaScript, CLI, API REST, SMTP y servidor MCP, con ejemplos para crear direcciones, buzones y dominios.">
+  <meta property="og:image" content="https://www.mailmask.studio/img/og-docs.jpg">
+  <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="MailMask — email profesional en tu dominio">
+  <meta property="og:image:alt" content="Documentación de MailMask: terminal con el comando mailmask aliases create">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Documentación — SDK, API REST, SMTP y MCP | MailMask">
-  <meta name="twitter:description" content="Documentación de MailMask: skills para tu agente (npx skills add), SDK de JavaScript/TypeScript, API REST para máscaras y dominios, credenciales SMTP y servidor MCP. Con ejemplos de código.">
-  <meta name="twitter:image" content="https://www.mailmask.studio/img/og-image.png">
+  <meta name="twitter:title" content="Documentación de MailMask: SDK, CLI, API REST y MCP">
+  <meta name="twitter:description" content="Documentación de MailMask: skills para agentes, SDK de JavaScript, CLI, API REST, SMTP y servidor MCP, con ejemplos para crear direcciones, buzones y dominios.">
+  <meta name="twitter:image" content="https://www.mailmask.studio/img/og-docs.jpg">
+  <meta name="twitter:image:alt" content="Documentación de MailMask: terminal con el comando mailmask aliases create">
+  <meta name="twitter:site" content="@HectorBlisS">
+  <meta name="twitter:creator" content="@HectorBlisS">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "TechArticle",
-    "headline": "Documentación de MailMask — SDK, API REST, SMTP y MCP",
-    "description": "Documentación técnica de MailMask: SDK de JavaScript/TypeScript, API REST para crear máscaras y dominios, credenciales SMTP para envío autenticado y servidor MCP.",
-    "inLanguage": "es-MX",
-    "author": { "@type": "Organization", "name": "MailMask" },
-    "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
-    "mainEntityOfPage": "https://www.mailmask.studio/docs",
-    "about": [
-      { "@type": "Thing", "name": "Email forwarding" },
-      { "@type": "Thing", "name": "API REST" },
-      { "@type": "Thing", "name": "SMTP" },
-      { "@type": "Thing", "name": "Model Context Protocol" }
-    ]
-  }
-  </script>
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "MailMask SDK",
-    "applicationCategory": "DeveloperApplication",
-    "operatingSystem": "Node.js",
-    "description": "Cliente de JavaScript/TypeScript para la API de MailMask: crear y gestionar máscaras de correo, dominios y reglas de reenvío.",
-    "softwareHelp": "https://www.mailmask.studio/docs",
-    "downloadUrl": "https://www.npmjs.com/package/@easybits.cloud/mailmask",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "MXN" },
-    "publisher": { "@type": "Organization", "name": "MailMask" }
-  }
-  </script>
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
-      { "@type": "ListItem", "position": 2, "name": "Documentación", "item": "https://www.mailmask.studio/docs" }
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://www.mailmask.studio/#org",
+        "name": "MailMask",
+        "url": "https://www.mailmask.studio/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://www.mailmask.studio/img/logo.png"
+        }
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://www.mailmask.studio/#website",
+        "url": "https://www.mailmask.studio/",
+        "name": "MailMask",
+        "inLanguage": "es-MX",
+        "publisher": {
+          "@id": "https://www.mailmask.studio/#org"
+        }
+      },
+      {
+        "@type": "TechArticle",
+        "@id": "https://www.mailmask.studio/docs#article",
+        "headline": "Documentación de MailMask",
+        "description": "Documentación de MailMask: skills para agentes, SDK de JavaScript, CLI, API REST, SMTP y servidor MCP, con ejemplos para crear direcciones, buzones y dominios.",
+        "inLanguage": "es-MX",
+        "datePublished": "2026-03-04",
+        "dateModified": "2026-10-06",
+        "author": {
+          "@id": "https://www.mailmask.studio/#org"
+        },
+        "publisher": {
+          "@id": "https://www.mailmask.studio/#org"
+        },
+        "isPartOf": {
+          "@id": "https://www.mailmask.studio/#website"
+        },
+        "mainEntityOfPage": "https://www.mailmask.studio/docs",
+        "image": "https://www.mailmask.studio/img/og-docs.jpg",
+        "about": [
+          {
+            "@type": "Thing",
+            "name": "Email forwarding"
+          },
+          {
+            "@type": "Thing",
+            "name": "API REST"
+          },
+          {
+            "@type": "Thing",
+            "name": "SMTP"
+          },
+          {
+            "@type": "Thing",
+            "name": "Model Context Protocol"
+          }
+        ],
+        "hasPart": [
+          {
+            "@type": "WebPageElement",
+            "name": "Skills para tu agente",
+            "url": "https://www.mailmask.studio/docs#skills"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Instalación del SDK",
+            "url": "https://www.mailmask.studio/docs#instalacion"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Dominios",
+            "url": "https://www.mailmask.studio/docs#dominios"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Direcciones",
+            "url": "https://www.mailmask.studio/docs#aliases"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Buzones IMAP",
+            "url": "https://www.mailmask.studio/docs#buzones"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "DNS",
+            "url": "https://www.mailmask.studio/docs#dns"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Reglas",
+            "url": "https://www.mailmask.studio/docs#reglas"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Envío de emails",
+            "url": "https://www.mailmask.studio/docs#envio"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Webhooks",
+            "url": "https://www.mailmask.studio/docs#webhooks"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Credenciales SMTP",
+            "url": "https://www.mailmask.studio/docs#smtp"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "API Keys",
+            "url": "https://www.mailmask.studio/docs#api-keys"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Cobro, compra de dominios y equipo",
+            "url": "https://www.mailmask.studio/docs#cuenta"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Manejo de errores",
+            "url": "https://www.mailmask.studio/docs#errores"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "CLI",
+            "url": "https://www.mailmask.studio/docs#cli"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "MCP Server",
+            "url": "https://www.mailmask.studio/docs#mcp"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Referencia API",
+            "url": "https://www.mailmask.studio/docs#referencia"
+          }
+        ]
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://www.mailmask.studio/docs#sdk",
+        "name": "MailMask SDK",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Node.js",
+        "description": "Cliente de JavaScript/TypeScript para la API de MailMask: crear y gestionar direcciones, buzones, dominios y reglas de reenvío.",
+        "softwareHelp": "https://www.mailmask.studio/docs",
+        "downloadUrl": "https://www.npmjs.com/package/@easybits.cloud/mailmask",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "MXN"
+        },
+        "publisher": {
+          "@id": "https://www.mailmask.studio/#org"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "@id": "https://www.mailmask.studio/docs#breadcrumb",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Inicio",
+            "item": "https://www.mailmask.studio/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Documentación",
+            "item": "https://www.mailmask.studio/docs"
+          }
+        ]
+      }
     ]
   }
   </script>
@@ -126,11 +273,6 @@
       pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
     }
   </style>
-    <meta name="twitter:image:alt" content="MailMask — email profesional en tu dominio" />
-    <meta property="og:image:secure_url" content="https://www.mailmask.studio/img/og-image.png" />
-    <meta property="og:image:type" content="image/png" />
-    <meta name="twitter:site" content="@HectorBlisS" />
-    <meta name="twitter:creator" content="@HectorBlisS" />
 </head>
 <body class="site bg-bg text-fg antialiased min-h-screen">
 
@@ -207,7 +349,8 @@
     <!-- Content -->
     <main class="prose-section px-6 md:px-12 py-10">
 
-      <h1 class="text-3xl font-bold mb-2">SDK de MailMask</h1>
+      <h1 class="text-3xl font-bold mb-2">Documentaci&oacute;n de MailMask</h1>
+      <p class="text-sm text-fg-subtle mb-2">Actualizado: <time datetime="2026-10-06">6 de octubre de 2026</time></p>
       <p class="text-fg-muted mb-8">Skills para tu agente, cliente oficial TypeScript/JavaScript, API REST, SMTP y servidor MCP. Crea direcciones, gestiona dominios, env&iacute;a emails y m&aacute;s &mdash; desde tu c&oacute;digo o pidi&eacute;ndoselo a tu agente.</p>
 
       <p class="text-sm text-fg-subtle mb-10">
