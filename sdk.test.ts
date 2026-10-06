@@ -55,6 +55,8 @@ describe("SDK ↔ servidor: contrato", () => {
         putEmailFileToS3: async (key: string, body: Uint8Array, contentType: string) => { archivos.set(key, { body, contentType }); },
         getEmailFileFromS3: async (key: string) => archivos.get(key) ?? null,
         deleteEmailFileFromS3: async (key: string) => { archivos.delete(key); },
+        // Imagen incrustada en un correo saliente (`domains.uploadImage`).
+        putEmailImageToS3: async (key: string, body: Uint8Array, contentType: string) => { archivos.set(`img:${key}`, { body, contentType }); },
         checkDomainStatus: async () => ({ ...ses }),
         // domains.create pide a SES la identidad y la regla de recepción.
         verifyDomain: async () => ({ verificationToken: "tok", dkimTokens: ["d1", "d2", "d3"] }),
@@ -802,6 +804,35 @@ describe("SDK ↔ servidor: contrato", () => {
     assert.match(puesta.avatarUrl ?? "", /^\/api\/avatar\/.+\.png$/);
     await assert.rejects(() => mm.account.setAvatarFromUrl("https://ejemplo.com/foto.png"), (e: MailMaskError) => e.status === 400);
     assert.equal((await mm.account.removeAvatar()).avatarUrl, null);
+  });
+
+  it("account.me(): identidad y uso por dominio, con llave mk_ (no cookie)", async () => {
+    const me = await mm.account.me();
+    assert.equal(me.email, email);
+    assert.equal(typeof me.isAdmin, "boolean");
+    assert.ok(me.domainsCount >= 1);
+    assert.ok(me.porDominio.some((d) => d.id === domainId && d.domain === dominio));
+    assert.equal(typeof me.usage.domains.current, "number");
+  });
+
+  it("account.export(): alias, reglas y logs de todos los dominios, como JSON", async () => {
+    await mm.aliases.create(domainId, { alias: "export-test", destinations: ["e@example.com"] });
+    const data = await mm.account.export();
+    assert.equal(data.email, email);
+    const dom = data.domains.find((d) => d.domainId === domainId);
+    assert.ok(dom, "el dominio del usuario debe venir en el export");
+    assert.ok(dom!.aliases.some((a) => a.alias === "export-test"));
+  });
+
+  it("domains.uploadImage(): sube la imagen y da la url para incrustarla en un correo", async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const img = await mm.domains.uploadImage(domainId, new Blob([png], { type: "image/png" }));
+    assert.equal(img.ok, true);
+    assert.match(img.url, /\/api\/img\//);
+    await assert.rejects(
+      () => mm.domains.uploadImage(domainId, new Blob([new Uint8Array([1])], { type: "application/octet-stream" })),
+      (e: MailMaskError) => e.status === 415,
+    );
   });
 
   it("inbox: listar, leer, redactar, responder, marcar, asignar, anotar, borrar, restaurar y métricas", async () => {
