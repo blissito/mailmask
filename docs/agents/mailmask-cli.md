@@ -166,3 +166,12 @@ El SDK ya marca esto en `DnsRRSetAnotado.managed` (tipo exportado desde
 `sdk/src/types.ts`) — es la fuente de verdad. Cualquier comando `dns upsert` o
 `dns delete` que se agregue debe leer ese campo antes de mutar y rehusarse si es
 `true`, sin excepción de flag.
+
+## Los comandos se documentan en tres lugares
+
+Todo cambio de comandos actualiza `cli/README.md`, `public/docs.html#cli` y
+`public/llms.txt`; `docs-cli.test.ts` (en la raíz) lo vigila: lee los subcomandos de
+`cli/src` y falla si `docs.html#cli` no los lista o `llms.txt` no nombra los de primer
+nivel. Al publicar en npm, cambiar la instalación en los tres y poner
+`CLI_PUBLICADO_EN_NPM = true` en `llms.test.ts`. Mientras el paquete dé 404, ningún
+documento público dice `npm i mailmask-cli`.

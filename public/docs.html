@@ -624,7 +624,7 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
 
       <!-- CLI -->
       <h2 id="cli" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">CLI</h2>
-      <p class="text-fg-muted mb-2">CLI de terminal sobre este mismo SDK: un subcomando por recurso, sin modelo declarativo encima. En construcci&oacute;n (PR en revisi&oacute;n) &mdash; este primer corte trae <code class="text-fg">login</code>, <code class="text-fg">logout</code>, <code class="text-fg">whoami</code>, <code class="text-fg">domains</code> y <code class="text-fg">dns</code>; env&iacute;o de correo y un modo pensado para agentes llegan despu&eacute;s en PRs propios.</p>
+      <p class="text-fg-muted mb-2">CLI de terminal sobre este mismo SDK: un subcomando por recurso, sin modelo declarativo encima. Cubre la sesi&oacute;n (<code class="text-fg">login</code>, <code class="text-fg">logout</code>, <code class="text-fg">whoami</code>), <code class="text-fg">domains</code>, <code class="text-fg">dns</code> y <code class="text-fg">aliases</code>, con los buzones IMAP, el perfil de Apple Mail y la exportaci&oacute;n en mbox. El env&iacute;o de correo desde la terminal todav&iacute;a no est&aacute;.</p>
       <p class="text-fg-subtle text-xs mb-4">Nombre del paquete y del binario (hoy <code>mailmask-cli</code> / <code>mailmask</code>) son provisionales, pendientes de confirmaci&oacute;n antes de publicarse a npm.</p>
       <p class="text-fg-muted text-sm mb-6">&iquest;Quien va a operar tu cuenta es un agente de c&oacute;digo? Probablemente le convenga m&aacute;s instalarle las <a href="#skills" class="text-accent-text hover:underline">skills oficiales</a> (<code>npx skills add https://www.mailmask.studio</code>) que esta CLI: ya saben qu&eacute; puede hacer cada plan y qu&eacute; secretos salen una sola vez. Esta CLI es para cuando la persona teclea los comandos ella misma.</p>
 
@@ -635,7 +635,7 @@ npm install
 npm run build
 node dist/index.js --help</code></pre>
 
-      <p class="text-sm font-bold mb-1">Comandos</p>
+      <p class="text-sm font-bold mb-1">Sesi&oacute;n</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask login [--api-key mk_...] [--base-url https://...]
 mailmask whoami [--json]
 mailmask logout</code></pre>
@@ -644,34 +644,53 @@ mailmask logout</code></pre>
       <p class="text-sm font-bold mb-1">Dominios</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask domains list [--json]
 mailmask domains get &lt;dominio&gt; [--json]
-mailmask domains create &lt;dominio&gt; [--preset vercel|netlify|...] [--target ...] [--subdomain ...]
+mailmask domains create &lt;dominio&gt; [--preset vercel|netlify|github-pages|cloudflare-pages|render|fly|redirect-a-www|dmarc] [--target ...] [--subdomain ...]
 mailmask domains verify &lt;dominio&gt;
 mailmask domains health &lt;dominio&gt;
-mailmask domains delete &lt;dominio&gt;</code></pre>
-      <p class="text-fg-muted text-sm mb-4">En todos, <code>&lt;dominio&gt;</code> acepta el nombre (<code>acme.com</code>) o el id &mdash; se resuelve contra <code>domains list</code>. <code>create --preset</code> registra el dominio y de una vez le aplica un preset de DNS.</p>
+mailmask domains delete &lt;dominio&gt; [--yes] [--json]</code></pre>
+      <p class="text-fg-muted text-sm mb-4">En todos los comandos con dominio, <code>&lt;dominio&gt;</code> acepta el nombre (<code>acme.com</code>) o el id &mdash; se resuelve contra <code>domains list</code>. <code>create --preset</code> registra el dominio y de una vez le aplica un preset de DNS.</p>
 
       <p class="text-sm font-bold mb-1">DNS</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask dns list &lt;dominio&gt; [--json]
 mailmask dns upsert &lt;dominio&gt; &lt;nombre&gt; &lt;tipo&gt; &lt;valor...&gt; [--ttl 300]
-mailmask dns delete &lt;dominio&gt; &lt;nombre&gt; &lt;tipo&gt;
+mailmask dns delete &lt;dominio&gt; &lt;nombre&gt; &lt;tipo&gt; [--yes] [--json]
 mailmask dns preset &lt;dominio&gt; &lt;preset&gt; [--target ...] [--subdomain ...]
 mailmask dns create-zone &lt;dominio&gt;
 mailmask dns delegation &lt;dominio&gt;</code></pre>
       <p class="text-fg-muted text-sm mb-4"><code>dns preset</code> es la misma operaci&oacute;n que <code>domains create --preset</code>, para cuando el dominio ya existe: apunta la ra&iacute;z (y <code>www</code>, salvo que fijes <code>--subdomain</code>) a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render, Fly, un redirect a <code>www</code> o DMARC &mdash; sin escribir el registro a mano. <code>dns upsert</code> <strong class="text-fg">reemplaza</strong> el conjunto completo de valores de ese (nombre, tipo); los registros con <code>managed: true</code> (MX, verificaci&oacute;n, DKIM, SPF) los protege el servidor y no se pueden tocar desde aqu&iacute;.</p>
+
+      <p class="text-sm font-bold mb-1">Direcciones y buzones</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask aliases list &lt;dominio&gt; [--json]
+mailmask aliases create &lt;dominio&gt; &lt;alias&gt; [destino...] [--mailbox] [--json]
+mailmask aliases update &lt;dominio&gt; &lt;alias&gt; [destino...] [--enable | --disable] [--json]
+mailmask aliases delete &lt;dominio&gt; &lt;alias&gt; [--yes] [--json]
+mailmask aliases mailbox create &lt;dominio&gt; &lt;alias&gt; [--json]
+mailmask aliases mailbox delete &lt;dominio&gt; &lt;alias&gt; [--yes] [--json]
+mailmask aliases mailbox reset-password &lt;dominio&gt; &lt;alias&gt; [--yes] [--json]
+mailmask aliases apple-profile &lt;dominio&gt; &lt;alias&gt; -o perfil.mobileconfig
+mailmask aliases export &lt;dominio&gt; &lt;alias&gt; [-o buzon.mbox]</code></pre>
+      <p class="text-fg-muted text-sm mb-4"><code>aliases create</code> acepta uno o m&aacute;s destinos como argumentos sueltos (<code>aliases create acme.com soporte ana@acme.com luis@acme.com</code>); con <code>--mailbox</code> tambi&eacute;n se permite sin ning&uacute;n destino, porque el correo se queda en el buz&oacute;n IMAP. <code>aliases update</code> cambia destinos y/o el estado con <code>--enable</code> o <code>--disable</code> (no se combinan). El buz&oacute;n IMAP vive bajo <code>aliases mailbox</code> y requiere el dominio activado.</p>
+      <p class="text-fg-muted text-sm mb-4"><strong class="text-fg">La contrase&ntilde;a del buz&oacute;n sale enmascarada</strong> (<code>ab&bull;&bull;&bull;&bull;&bull;&bull;yz</code>) y no se vuelve a mostrar completa: para verla entera, <code>mailbox reset-password</code> con <code>--json</code> genera una nueva y la devuelve completa una sola vez; la anterior deja de servir. <code>apple-profile</code> escribe el perfil <code>.mobileconfig</code> de Apple Mail en la ruta de <code>-o</code>; <code>export</code> baja el buz&oacute;n en mbox a un archivo con <code>-o</code> o por la salida est&aacute;ndar, para encadenarlo con otro comando.</p>
+
+      <p class="text-sm font-bold mb-1">Para scripts y agentes: <code>--json</code> y <code>--yes</code></p>
+      <p class="text-fg-muted text-sm mb-4">Con <code>--json</code> los comandos imprimen JSON, y un error sale por stderr como <code>{"error": "...", "status": 404}</code> (sin <code>status</code> si no vino de la API), para parsearlo sin adivinar el formato. Lo que borra o resetea &mdash; <code>domains delete</code>, <code>dns delete</code>, <code>aliases delete</code>, <code>aliases mailbox delete</code> y <code>aliases mailbox reset-password</code> &mdash; pregunta <code>[y/N]</code> en una terminal; fuera de una (CI, un agente) exige <code>--yes</code> y, sin &eacute;l, sale con c&oacute;digo <code>1</code> sin tocar la red.</p>
 
       <p class="text-sm font-bold mb-1">Variable de entorno</p>
       <p class="text-fg-muted text-sm mb-4"><code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">MAILMASK_API_KEY</code> tiene prioridad sobre la sesi&oacute;n guardada &mdash; es la v&iacute;a recomendada para CI o para un agente de c&oacute;digo.</p>
 
       <p class="text-sm font-bold mb-1">D&oacute;nde se guarda la sesi&oacute;n</p>
       <p class="text-fg-muted text-sm mb-4">En el keychain del sistema operativo (Keychain en macOS, Secret Service/<code>secret-tool</code> en Linux). Si no hay keychain disponible &mdash;Windows, o un Linux sin Secret Service&mdash; cae a <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">~/.config/mailmask/credentials.json</code> con permisos <code>600</code>. <code>mailmask logout</code> la borra de donde haya quedado.</p>
+      <p class="text-fg-muted text-sm mb-4">En el keychain del sistema operativo (Keychain en macOS, Secret Service/<code>secret-tool</code> en Linux). Si no hay keychain disponible &mdash;Windows, o un Linux sin Secret Service&mdash; cae a <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">~/.config/mailmask/credentials.json</code> con permisos <code>600</code>. <code>mailmask logout</code> la borra de donde haya quedado.</p>
 
       <p class="text-sm font-bold mb-1">C&oacute;digos de salida</p>
       <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-4">
         <li><code>0</code> &mdash; &eacute;xito.</li>
-        <li><code>1</code> &mdash; error gen&eacute;rico.</li>
-        <li><code>2</code> &mdash; no hay API key activa, o MailMask la rechaz&oacute;.</li>
+        <li><code>1</code> &mdash; error gen&eacute;rico (tambi&eacute;n, un comando destructivo sin <code>--yes</code> fuera de una terminal).</li>
+        <li><code>2</code> &mdash; no hay API key activa, o MailMask la rechaz&oacute; (401/403).</li>
+        <li><code>3</code> &mdash; conflicto (409), p.&nbsp;ej. el dominio ya existe.</li>
+        <li><code>4</code> &mdash; no encontrado (404).</li>
+        <li><code>5</code> &mdash; transitorio: 429, 5xx de MailMask o error de red. Vale la pena reintentar.</li>
       </ul>
-      <p class="text-fg-muted text-sm mb-4">El resto de la taxonom&iacute;a de c&oacute;digos y el contrato <code>--json</code>/<code>--yes</code> para el resto de comandos llegan en un PR aparte.</p>
 
       <!-- MCP -->
       <h2 id="mcp" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">MCP Server</h2>
