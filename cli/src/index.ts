@@ -4,6 +4,7 @@ import logout from "./commands/logout.js";
 import whoami from "./commands/whoami.js";
 import domains from "./commands/domains.js";
 import dns from "./commands/dns.js";
+import aliases from "./commands/aliases.js";
 
 const main = defineCommand({
   meta: {
@@ -11,7 +12,7 @@ const main = defineCommand({
     version: "0.1.0",
     description: "CLI oficial de MailMask — dominios, alias, DNS, reglas, envío y más desde la terminal.",
   },
-  subCommands: { login, logout, whoami, domains, dns },
+  subCommands: { login, logout, whoami, domains, dns, aliases },
 });
 
 runMain(main);
