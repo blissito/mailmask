@@ -4,7 +4,49 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeEach, test } from "node:test";
+import { afterEach, beforeEach, describe, it, mock, test } from "node:test";
+import { MailMaskError } from "@easybits.cloud/mailmask";
+import { fakeClient, trapExit, ExitSignal } from "./test-helpers.js";
+
+let currentClient: ReturnType<typeof fakeClient>["client"];
+
+trapExit();
+// Mismo motivo que en dns.test.ts/domains.test.ts: el mock tiene que estar en
+// pie ANTES del import dinámico de whoami.ts, no dentro de un `before()`.
+mock.module("../src/client.js", {
+  namedExports: {
+    requireClient: async () => ({
+      client: currentClient,
+      auth: { apiKey: "mk_test", baseUrl: undefined, source: "env" as const },
+    }),
+    buildClient: () => currentClient,
+  },
+});
+
+const { default: whoamiCmd } = await import("../src/commands/whoami.js");
+const whoami = whoamiCmd as Record<string, any>;
+
+function captureStderr(): { text: () => string } {
+  let text = "";
+  mock.method(process.stderr, "write", (chunk: string) => {
+    text += chunk;
+    return true;
+  });
+  return { text: () => text };
+}
+
+describe("whoami --json: errores respetan el contrato --json", () => {
+  it("con 401, sale con código 2 e imprime {error, status} a stderr", async () => {
+    const { client } = fakeClient({ apiKeys: { list: () => { throw new MailMaskError(401, "llave inválida"); } } });
+    currentClient = client;
+    const out = captureStderr();
+    await assert.rejects(
+      () => whoami.run({ args: { json: true } }),
+      (err: unknown) => err instanceof ExitSignal && err.code === 2,
+    );
+    assert.deepEqual(JSON.parse(out.text()), { error: "llave inválida", status: 401 });
+  });
+});
 
 // Corre el binario de verdad (no la función run() aislada): lo que importa aquí
 // es el contrato de salida del proceso completo — exit code, stderr, sin stack

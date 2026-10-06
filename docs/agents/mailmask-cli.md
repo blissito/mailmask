@@ -32,10 +32,38 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   sola llamada. `whoami` debe migrar a `account.me()` — queda pendiente para su
   propio ticket, para no mezclar el cambio de ruta con el de la respuesta en
   pantalla.
-- **Exit codes** (ticket 1, mínimo viable): `0` éxito, `1` error genérico, `2` sin
-  API key activa o rechazada por MailMask. La taxonomía completa (conflicto,
-  transitorio, etc.) y el contrato `--json`/`--yes` para el resto de comandos son
-  del ticket de confirmaciones — no los inventes antes de tiempo en comandos nuevos.
+- **Exit codes — taxonomía completa (ticket de confirmaciones):** `0` éxito, `1`
+  error genérico, `2` sin API key activa o rechazada por MailMask (401/403), `3`
+  conflicto (409), `4` no encontrado (404), `5` transitorio (429 o 5xx de
+  MailMask, **o un error de red sin `status`**: `fetch` (undici) nunca lanza
+  `MailMaskError` ante un corte de red o DNS caído — lanza un `TypeError("fetch
+  failed")` con la causa real en `.cause` (p. ej. `ECONNREFUSED`). `failFromError`
+  en `cli/src/output.ts` reconoce ese patrón (`isNetworkError()`, por código de
+  `.cause`/`.code` o por el mensaje `fetch failed`) y lo manda también a `5`, no
+  a `1` — es justo el caso donde vale la pena que un script reintente. Cualquier
+  otro error que no sea `MailMaskError` ni de red es `1`. Cualquier comando
+  nuevo que llame a `failFromError(err)` hereda esto solo: no hace falta (ni se
+  debe) mapear códigos a mano en el comando.
+- **Confirmación de lo destructivo — `confirmOrExit()` en `cli/src/output.ts`:**
+  lo que borra, revoca, envía a terceros o resetea una contraseña pasa por aquí
+  ANTES de tocar el SDK. En una terminal (`process.stdin.isTTY`) pregunta
+  `[y/N]`; fuera de una terminal no hay a quién preguntarle, así que exige
+  `--yes` (`yesArg` en `cli/src/args.ts`) — sin él sale con `1` sin llamar al
+  SDK, nunca asume un "sí" silencioso. Hoy lo usan `domains delete` y
+  `dns delete`; un comando nuevo que mute algo irreversible (`revoke`, `send`,
+  reset de contraseña) debe llamarlo primero, antes de resolver el dominio o
+  listar nada — si `confirmOrExit` corriera después de `resolveDomainId`, el
+  "no llama al SDK" de la regla ya sería falso, porque `resolveDomainId` ya
+  habría pegado a `domains.list()`.
+- **`--json` en errores:** con `--json`, un error no imprime `"✖ ..."` sino
+  `{"error": "...", "status": 404}` a stderr (sin `status` si no vino de la
+  API) — mismo contrato que la salida en éxito, para que un script o un agente
+  lo parseen sin adivinar el formato. Todo comando que acepta `--json` debe
+  pasar `{ json: args.json }` a `failFromError`, `confirmOrExit` y
+  `resolveDomainId` (que ahora acepta ese tercer argumento opcional) — pasarlo
+  a uno y no a los otros deja un comando que mezcla texto y JSON en el mismo
+  flag. `domains health` siempre pasa `{ json: true }` porque su salida nunca
+  tiene forma de texto.
 - **Secretos:** nunca se imprimen completos más de una vez. `maskSecret()` en
   `cli/src/output.ts` muestra sólo cabeza y cola; úsala para cualquier API key,
   contraseña de buzón, secreto de webhook o credencial SMTP que un comando nuevo

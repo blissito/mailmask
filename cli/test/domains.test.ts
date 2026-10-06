@@ -62,12 +62,12 @@ describe("domains create: llamada al SDK y errores", () => {
     assert.equal(calls.length, 0);
   });
 
-  it("si domains.create falla, sale con el exit code de error", async () => {
+  it("si domains.create falla, sale con el exit code de error (409 → conflicto, 3)", async () => {
     const { client } = fakeClient({ domains: { create: () => { throw new MailMaskError(409, "el dominio ya existe"); } } });
     currentClient = client;
     await assert.rejects(
       () => create.run({ args: { domain: "acme.com" } }),
-      (err: unknown) => err instanceof ExitSignal && err.code === 1,
+      (err: unknown) => err instanceof ExitSignal && err.code === 3,
     );
   });
 });
@@ -76,17 +76,27 @@ describe("domains delete: llamada al SDK y errores", () => {
   it("llama domains.delete con el id resuelto", async () => {
     const { client, calls } = fakeClient({ domains: { delete: () => ({ ok: true }) } });
     currentClient = client;
-    await del.run({ args: { domain: "dom_1" } });
+    await del.run({ args: { domain: "dom_1", yes: true } });
     const call = calls.find((c) => c.method === "domains.delete");
     assert.deepEqual(call!.args, ["dom_1"]);
   });
 
-  it("si domains.delete falla, sale con el exit code de error", async () => {
+  it("si domains.delete falla, sale con el exit code de error (401 → auth, 2)", async () => {
     const { client } = fakeClient({ domains: { delete: () => { throw new MailMaskError(401, "llave inválida"); } } });
     currentClient = client;
     await assert.rejects(
-      () => del.run({ args: { domain: "dom_1" } }),
+      () => del.run({ args: { domain: "dom_1", yes: true } }),
       (err: unknown) => err instanceof ExitSignal && err.code === 2,
     );
+  });
+
+  it("sin --yes y sin TTY sale con 1 y no llama al SDK (calls vacío)", async () => {
+    const { client, calls } = fakeClient({ domains: { delete: () => ({ ok: true }) } });
+    currentClient = client;
+    await assert.rejects(
+      () => del.run({ args: { domain: "dom_1" } }),
+      (err: unknown) => err instanceof ExitSignal && err.code === 1,
+    );
+    assert.equal(calls.length, 0);
   });
 });

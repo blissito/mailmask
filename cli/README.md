@@ -25,15 +25,19 @@ mailmask domains get <dominio> [--json]
 mailmask domains create <dominio> [--preset vercel|netlify|github-pages|cloudflare-pages|render|fly|redirect-a-www|dmarc] [--target ...] [--subdomain ...]
 mailmask domains verify <dominio>
 mailmask domains health <dominio>
-mailmask domains delete <dominio>
+mailmask domains delete <dominio> [--yes] [--json]
 
 mailmask dns list <dominio> [--json]
 mailmask dns upsert <dominio> <nombre> <tipo> <valor...> [--ttl 300]
-mailmask dns delete <dominio> <nombre> <tipo>
+mailmask dns delete <dominio> <nombre> <tipo> [--yes] [--json]
 mailmask dns preset <dominio> <preset> [--target ...] [--subdomain ...]
 mailmask dns create-zone <dominio>
 mailmask dns delegation <dominio>
 ```
+
+`domains delete` y `dns delete` son destructivos: en una terminal preguntan
+antes de borrar, y fuera de una terminal (CI, un agente) exigen `--yes` — sin
+él salen con código `1` sin tocar la red.
 
 Sin `--api-key`, `login` abre el navegador para autorizar el dispositivo
 (device-code, como `gh auth login`) — no hace falta copiar y pegar nada. Con
@@ -59,9 +63,21 @@ permisos `600`. `mailmask logout` borra la sesión de donde haya quedado.
 - `0` — éxito
 - `1` — error genérico
 - `2` — no hay API key activa, o MailMask la rechazó
+- `3` — conflicto (409 de MailMask; p. ej. el dominio ya existe)
+- `4` — no encontrado (404 de MailMask)
+- `5` — error transitorio (429 o 5xx de MailMask, o de red) — vale la pena reintentar
 
-El resto de la taxonomía de códigos y el contrato `--json`/`--yes` para el
-resto de comandos llegan en un ticket aparte.
+Con `--json`, un error no imprime "✖ ..." sino `{"error": "...", "status": 404}`
+a stderr (sin `status` si no vino de la API), para que un script lo parsee sin
+adivinar el formato.
+
+## Confirmación de lo destructivo
+
+`domains delete` y `dns delete` (y lo que se agregue después que borre, revoque
+o envíe a terceros) piden confirmación antes de mutar. En una terminal
+preguntan `[y/N]`; fuera de una terminal (CI, un agente, un script) no hay a
+quién preguntarle, así que exigen `--yes` — sin él salen con código `1` sin
+llamar al SDK, nunca asumen un "sí" silencioso.
 
 ## Desarrollo
 

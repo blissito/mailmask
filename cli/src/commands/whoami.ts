@@ -20,7 +20,7 @@ export default defineCommand({
     try {
       [keys, domains] = await Promise.all([client.apiKeys.list(), client.domains.list()]);
     } catch (err) {
-      failFromError(err);
+      failFromError(err, { json: args.json });
     }
 
     const activeKey = keys.find((k) => auth.apiKey.startsWith(k.keyPrefix));
