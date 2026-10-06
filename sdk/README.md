@@ -61,6 +61,13 @@ await mm.send.send(domainId, {
   inReplyTo: "<abc@mail.example.com>", references: "<abc@mail.example.com>",
 }, { idempotencyKey: `invoice-42` });
 
+// Account: identity + usage, and a full JSON export
+const me = await mm.account.me();
+const backup = await mm.account.export();
+
+// Upload an image to embed in an outgoing email (returns a public url)
+const { url } = await mm.domains.uploadImage(domainId, imageBlob);
+
 // Suppression list (hard bounces / complaints)
 await mm.suppressions.list(domainId);
 await mm.suppressions.remove(domainId, "fixed@example.com");
