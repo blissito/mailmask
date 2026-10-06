@@ -7,3 +7,4 @@ export const PRESETS: DnsPreset[] = [
 
 export const jsonArg = { json: { type: "boolean" as const, description: "Salida en JSON para scripts/agentes" } };
 export const domainArg = { domain: { type: "positional" as const, description: "Dominio (acme.com) o su id" } };
+export const yesArg = { yes: { type: "boolean" as const, description: "Confirma sin preguntar (obligatorio fuera de una terminal)" } };

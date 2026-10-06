@@ -41,7 +41,7 @@ describe("dns upsert/delete: convención managed (falla cerrado)", () => {
     const { client, calls } = fakeClient({ dns: { list: () => ({ zone: { status: "active" }, records: [managedRecord] }) } });
     currentClient = client;
     await assert.rejects(
-      () => del.run({ args: { domain: "dom_1", name: "@", type: "MX" } }),
+      () => del.run({ args: { domain: "dom_1", name: "@", type: "MX", yes: true } }),
       ExitSignal,
     );
     assert.equal(calls.some((c) => c.method === "dns.delete"), false);
@@ -61,10 +61,20 @@ describe("dns upsert/delete: convención managed (falla cerrado)", () => {
     const { client, calls } = fakeClient({ dns: { list: () => { throw new Error("red caída"); } } });
     currentClient = client;
     await assert.rejects(
-      () => del.run({ args: { domain: "dom_1", name: "app", type: "A" } }),
+      () => del.run({ args: { domain: "dom_1", name: "app", type: "A", yes: true } }),
       ExitSignal,
     );
     assert.equal(calls.some((c) => c.method === "dns.delete"), false);
+  });
+
+  it("delete sin --yes y sin TTY sale con 1 y no llama al SDK (ni siquiera dns.list)", async () => {
+    const { client, calls } = fakeClient({ dns: { list: () => ({ zone: { status: "active" }, records: [] }) } });
+    currentClient = client;
+    await assert.rejects(
+      () => del.run({ args: { domain: "dom_1", name: "app", type: "A" } }),
+      (err: unknown) => err instanceof ExitSignal && err.code === 1,
+    );
+    assert.equal(calls.length, 0);
   });
 
   it("refuseIfManaged deja pasar un (nombre, tipo) que no es managed", async () => {
@@ -90,7 +100,7 @@ describe("dns upsert/delete/preset/create-zone: llamada al SDK y errores", () =>
     assert.deepEqual(call!.args, ["dom_1", { name: "app", type: "A", values: ["1.2.3.4"], ttl: 600 }]);
   });
 
-  it("upsert propaga el error del SDK como exit code de error", async () => {
+  it("upsert propaga el error del SDK como exit code de error (500 → transitorio, 5)", async () => {
     const { client } = fakeClient({
       dns: {
         list: () => ({ zone: { status: "active" }, records: [] }),
@@ -100,7 +110,7 @@ describe("dns upsert/delete/preset/create-zone: llamada al SDK y errores", () =>
     currentClient = client;
     await assert.rejects(
       () => upsert.run({ args: { domain: "dom_1", name: "app", type: "A", _: ["dom_1", "app", "A", "1.2.3.4"] } }),
-      (err: unknown) => err instanceof ExitSignal && err.code === 1,
+      (err: unknown) => err instanceof ExitSignal && err.code === 5,
     );
   });
 
@@ -112,13 +122,13 @@ describe("dns upsert/delete/preset/create-zone: llamada al SDK y errores", () =>
       },
     });
     currentClient = client;
-    await del.run({ args: { domain: "dom_1", name: "app", type: "A" } });
+    await del.run({ args: { domain: "dom_1", name: "app", type: "A", yes: true } });
     const call = calls.find((c) => c.method === "dns.delete");
     assert.ok(call, "debió llamar dns.delete");
     assert.deepEqual(call!.args, ["dom_1", "app", "A"]);
   });
 
-  it("delete propaga el error del SDK como exit code de error", async () => {
+  it("delete propaga el error del SDK como exit code de error (404 → no encontrado, 4)", async () => {
     const { client } = fakeClient({
       dns: {
         list: () => ({ zone: { status: "active" }, records: [] }),
@@ -127,8 +137,8 @@ describe("dns upsert/delete/preset/create-zone: llamada al SDK y errores", () =>
     });
     currentClient = client;
     await assert.rejects(
-      () => del.run({ args: { domain: "dom_1", name: "app", type: "A" } }),
-      (err: unknown) => err instanceof ExitSignal && err.code === 1,
+      () => del.run({ args: { domain: "dom_1", name: "app", type: "A", yes: true } }),
+      (err: unknown) => err instanceof ExitSignal && err.code === 4,
     );
   });
 
@@ -152,14 +162,14 @@ describe("dns upsert/delete/preset/create-zone: llamada al SDK y errores", () =>
     assert.equal(calls.length, 0);
   });
 
-  it("create-zone llama dns.createZone y propaga su error como exit code de error", async () => {
+  it("create-zone llama dns.createZone y propaga su error como exit code de error (409 → conflicto, 3)", async () => {
     const { client } = fakeClient({
       dns: { createZone: () => { throw new MailMaskError(409, "la zona ya existe"); } },
     });
     currentClient = client;
     await assert.rejects(
       () => createZone.run({ args: { domain: "dom_1" } }),
-      (err: unknown) => err instanceof ExitSignal && err.code === 1,
+      (err: unknown) => err instanceof ExitSignal && err.code === 3,
     );
   });
 });

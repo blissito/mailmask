@@ -7,12 +7,12 @@ import { failFromError } from "./output.js";
  * `domains.list()` por nombre O id; si no aparece en la lista, se deja pasar
  * tal cual para que la API responda su propio 404 en vez de inventar uno aquí.
  */
-export async function resolveDomainId(client: MailMask, domainOrId: string): Promise<string> {
+export async function resolveDomainId(client: MailMask, domainOrId: string, opts: { json?: boolean } = {}): Promise<string> {
   let domains: Awaited<ReturnType<MailMask["domains"]["list"]>>;
   try {
     domains = await client.domains.list();
   } catch (err) {
-    failFromError(err);
+    failFromError(err, opts);
   }
   const match = domains.find((d) => d.domain === domainOrId || d.id === domainOrId);
   return match ? match.id : domainOrId;

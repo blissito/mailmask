@@ -1,9 +1,9 @@
 import { defineCommand } from "citty";
 import type { DnsPreset } from "@easybits.cloud/mailmask";
 import { requireClient } from "../client.js";
-import { failFromError, printJson } from "../output.js";
+import { confirmOrExit, failFromError, printJson } from "../output.js";
 import { resolveDomainId } from "../resolve.js";
-import { PRESETS, jsonArg, domainArg } from "../args.js";
+import { PRESETS, jsonArg, domainArg, yesArg } from "../args.js";
 
 const list = defineCommand({
   meta: { name: "list", description: "Lista los dominios de la cuenta" },
@@ -14,7 +14,7 @@ const list = defineCommand({
     try {
       domains = await client.domains.list();
     } catch (err) {
-      failFromError(err);
+      failFromError(err, { json: args.json });
     }
     if (args.json) return printJson(domains);
     if (domains.length === 0) {
@@ -33,7 +33,7 @@ const get = defineCommand({
   args: { ...domainArg, ...jsonArg },
   async run({ args }) {
     const { client } = await requireClient();
-    const id = await resolveDomainId(client, args.domain);
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
     try {
       const domain = await client.domains.get(id);
       if (args.json) return printJson(domain);
@@ -43,7 +43,7 @@ const get = defineCommand({
       process.stdout.write(`  Registrado vía MailMask: ${domain.registeredViaMailmask ? "sí" : "no"}\n`);
       process.stdout.write(`  Creado: ${domain.createdAt}\n`);
     } catch (err) {
-      failFromError(err);
+      failFromError(err, { json: args.json });
     }
   },
 });
@@ -67,7 +67,7 @@ const create = defineCommand({
     try {
       created = await client.domains.create(args.domain);
     } catch (err) {
-      failFromError(err);
+      failFromError(err, { json: args.json });
     }
 
     let presetResult: Awaited<ReturnType<typeof client.dns.preset>> | null = null;
@@ -75,7 +75,7 @@ const create = defineCommand({
       try {
         presetResult = await client.dns.preset(created.domain.id, args.preset as DnsPreset, args.target, args.subdomain);
       } catch (err) {
-        failFromError(err);
+        failFromError(err, { json: args.json });
       }
     }
 
@@ -99,14 +99,15 @@ const create = defineCommand({
 
 const del = defineCommand({
   meta: { name: "delete", description: "Borra un dominio de la cuenta" },
-  args: { ...domainArg, ...jsonArg },
+  args: { ...domainArg, ...jsonArg, ...yesArg },
   async run({ args }) {
     const { client } = await requireClient();
-    const id = await resolveDomainId(client, args.domain);
+    await confirmOrExit(`¿Borrar el dominio "${args.domain}"? Es irreversible.`, { yes: args.yes, json: args.json });
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
     try {
       await client.domains.delete(id);
     } catch (err) {
-      failFromError(err);
+      failFromError(err, { json: args.json });
     }
     if (args.json) return printJson({ ok: true });
     process.stdout.write(`✓ Dominio borrado: ${args.domain}\n`);
@@ -118,7 +119,7 @@ const verify = defineCommand({
   args: { ...domainArg, ...jsonArg },
   async run({ args }) {
     const { client } = await requireClient();
-    const id = await resolveDomainId(client, args.domain);
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
     try {
       const result = await client.domains.verify(id);
       if (args.json) return printJson(result);
@@ -128,7 +129,7 @@ const verify = defineCommand({
       if (result.stale) process.stdout.write("  (no se pudo consultar a SES; esto es el último estado conocido)\n");
       if (result.error) process.stdout.write(`  Error: ${result.error}\n`);
     } catch (err) {
-      failFromError(err);
+      failFromError(err, { json: args.json });
     }
   },
 });
@@ -138,12 +139,12 @@ const health = defineCommand({
   args: domainArg,
   async run({ args }) {
     const { client } = await requireClient();
-    const id = await resolveDomainId(client, args.domain);
+    const id = await resolveDomainId(client, args.domain, { json: true });
     try {
       const result = await client.domains.health(id);
       printJson(result);
     } catch (err) {
-      failFromError(err);
+      failFromError(err, { json: true });
     }
   },
 });

@@ -1,9 +1,9 @@
 import { defineCommand } from "citty";
 import type { DnsPreset, DnsRecordType, MailMask } from "@easybits.cloud/mailmask";
 import { requireClient } from "../client.js";
-import { failFromError, printJson } from "../output.js";
+import { confirmOrExit, failFromError, printJson } from "../output.js";
 import { resolveDomainId } from "../resolve.js";
-import { PRESETS, jsonArg, domainArg } from "../args.js";
+import { PRESETS, jsonArg, domainArg, yesArg } from "../args.js";
 
 const RECORD_TYPES: DnsRecordType[] = ["A", "AAAA", "CNAME", "TXT", "MX", "NS", "CAA", "SRV"];
 
@@ -27,21 +27,28 @@ export async function refuseIfManaged(
   domainId: string,
   name: string,
   type: DnsRecordType,
+  opts: { json?: boolean } = {},
 ): Promise<void> {
   let current: Awaited<ReturnType<typeof client.dns.list>>;
   try {
     current = await client.dns.list(domainId);
   } catch (err) {
-    process.stderr.write(
-      `✖ No se pudo confirmar si ${type} ${name} está protegido por MailMask; no se arriesga la mutación. (${err instanceof Error ? err.message : String(err)})\n`,
-    );
+    const reason = `No se pudo confirmar si ${type} ${name} está protegido por MailMask; no se arriesga la mutación. (${err instanceof Error ? err.message : String(err)})`;
+    if (opts.json) {
+      process.stderr.write(`${JSON.stringify({ error: reason })}\n`);
+      process.exit(1);
+    }
+    process.stderr.write(`✖ ${reason}\n`);
     process.exit(1);
   }
   const match = current.records?.find((r) => r.name === name && r.type === type);
   if (match?.managed) {
-    process.stderr.write(
-      `✖ ${type} ${name} lo administra MailMask${match.managedReason ? ` (${match.managedReason})` : ""} — no se puede tocar desde el CLI.\n`,
-    );
+    const reason = `${type} ${name} lo administra MailMask${match.managedReason ? ` (${match.managedReason})` : ""} — no se puede tocar desde el CLI.`;
+    if (opts.json) {
+      process.stderr.write(`${JSON.stringify({ error: reason })}\n`);
+      process.exit(1);
+    }
+    process.stderr.write(`✖ ${reason}\n`);
     process.exit(1);
   }
 }
@@ -51,7 +58,7 @@ const list = defineCommand({
   args: { ...domainArg, ...jsonArg },
   async run({ args }) {
     const { client } = await requireClient();
-    const id = await resolveDomainId(client, args.domain);
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
     try {
       const result = await client.dns.list(id);
       if (args.json) return printJson(result);
@@ -65,7 +72,7 @@ const list = defineCommand({
         process.stdout.write(`${r.type.padEnd(5)} ${r.name}  →  ${r.values.join(", ")}  (ttl ${r.ttl})${flags}\n`);
       }
     } catch (err) {
-      failFromError(err);
+      failFromError(err, { json: args.json });
     }
   },
 });
@@ -90,8 +97,8 @@ const upsert = defineCommand({
       process.exit(1);
     }
     const { client } = await requireClient();
-    const id = await resolveDomainId(client, args.domain);
-    await refuseIfManaged(client, id, args.name, args.type);
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
+    await refuseIfManaged(client, id, args.name, args.type, { json: args.json });
     try {
       const result = await client.dns.upsert(id, {
         name: args.name,
@@ -102,7 +109,7 @@ const upsert = defineCommand({
       if (args.json) return printJson(result);
       process.stdout.write(`✓ ${args.type} ${args.name} → ${values.join(", ")} (propagación: ${result.propagacion})\n`);
     } catch (err) {
-      failFromError(err);
+      failFromError(err, { json: args.json });
     }
   },
 });
@@ -113,19 +120,21 @@ const del = defineCommand({
     domain: { type: "positional", description: "Dominio (acme.com) o su id" },
     name: { type: "positional", description: "Nombre del registro" },
     type: { type: "positional", description: `Tipo: ${RECORD_TYPES.join(", ")}` },
+    ...yesArg,
     json: { type: "boolean", description: "Salida en JSON para scripts/agentes" },
   },
   async run({ args }) {
     checkRecordType(args.type);
     const { client } = await requireClient();
-    const id = await resolveDomainId(client, args.domain);
-    await refuseIfManaged(client, id, args.name, args.type);
+    await confirmOrExit(`¿Borrar el registro ${args.type} ${args.name}? Es irreversible.`, { yes: args.yes, json: args.json });
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
+    await refuseIfManaged(client, id, args.name, args.type, { json: args.json });
     try {
       const result = await client.dns.delete(id, args.name, args.type);
       if (args.json) return printJson(result);
       process.stdout.write(`✓ Borrado: ${args.type} ${args.name}\n`);
     } catch (err) {
-      failFromError(err);
+      failFromError(err, { json: args.json });
     }
   },
 });
@@ -145,13 +154,13 @@ const preset = defineCommand({
       process.exit(1);
     }
     const { client } = await requireClient();
-    const id = await resolveDomainId(client, args.domain);
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
     try {
       const result = await client.dns.preset(id, args.preset as DnsPreset, args.target, args.subdomain);
       if (args.json) return printJson(result);
       process.stdout.write(`✓ Preset "${args.preset}" aplicado (propagación: ${result.propagacion}).\n`);
     } catch (err) {
-      failFromError(err);
+      failFromError(err, { json: args.json });
     }
   },
 });
@@ -161,7 +170,7 @@ const createZone = defineCommand({
   args: { ...domainArg, ...jsonArg },
   async run({ args }) {
     const { client } = await requireClient();
-    const id = await resolveDomainId(client, args.domain);
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
     try {
       const result = await client.dns.createZone(id);
       if (args.json) return printJson(result);
@@ -170,7 +179,7 @@ const createZone = defineCommand({
       for (const ns of result.nameservers) process.stdout.write(`    ${ns}\n`);
       process.stdout.write(`  Importados: ${result.imported.length} registro(s). ${result.importWarning}\n`);
     } catch (err) {
-      failFromError(err);
+      failFromError(err, { json: args.json });
     }
   },
 });
@@ -180,7 +189,7 @@ const delegation = defineCommand({
   args: { ...domainArg, ...jsonArg },
   async run({ args }) {
     const { client } = await requireClient();
-    const id = await resolveDomainId(client, args.domain);
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
     try {
       const result = await client.dns.delegation(id);
       if (args.json) return printJson(result);
@@ -188,7 +197,7 @@ const delegation = defineCommand({
       process.stdout.write(`  Observados: ${result.observed.join(", ") || "(ninguno)"}\n`);
       process.stdout.write(`  Esperados:  ${result.expected.join(", ")}\n`);
     } catch (err) {
-      failFromError(err);
+      failFromError(err, { json: args.json });
     }
   },
 });
