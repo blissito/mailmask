@@ -8,7 +8,7 @@
 ## Qué hace exactamente
 
 MailMask conecta un dominio propio con la infraestructura de correo de AWS SES y ofrece
-cuatro capacidades sobre él:
+cinco capacidades sobre él:
 
 1. **Direcciones (máscaras) con reenvío.** Antes se llamaban "alias". Se crea una dirección como `ventas@tudominio.com` y
    el correo que llega ahí se reenvía a uno o varios buzones existentes (Gmail, Outlook,
@@ -34,9 +34,10 @@ cuatro capacidades sobre él:
 - No es un servicio de correo desechable ni de campañas. Sí ofrece buzones IMAP reales en
   el dominio activado (ver arriba); el POP3 no está disponible.
 - No es un servicio de campañas ni de email marketing masivo.
-- No es un registrador de dominios hoy. El registro integrado vía Route 53 está en el
-  backlog; por ahora el dominio se trae de un registrador externo y se configuran los
-  registros DNS (MX, TXT de verificación y CNAMEs de DKIM).
+- No obliga a comprar el dominio aquí. Se puede comprar en MailMask (un año, con una liga de
+  MercadoPago que abre y paga una persona; se registra y se configura solo al pagar, con
+  renovación anual y transferencia de entrada y salida) o traer uno de un registrador externo
+  y publicar los registros DNS (MX, TXT de verificación y CNAMEs de DKIM).
 - No ofrece direcciones desechables anónimas al estilo de los servicios de privacidad:
   está orientado a correo profesional sobre un dominio propio.
 
@@ -105,6 +106,15 @@ respectivamente. Quien solo reenvía nunca toca el límite de envíos.
    - **REST** (con API key `mk_`): `https://www.mailmask.studio/api/...`, especificación OpenAPI en
      https://www.mailmask.studio/openapi/json y referencia navegable en
      https://www.mailmask.studio/openapi.
+   - **CLI** (`mailmask`, terminal): aún no publicado en npm; se instala desde el repo
+     (`cli/`: `npm install && npm run build`, luego `node dist/index.js --help`). Se autentica
+     con `MAILMASK_API_KEY` (lo recomendado para un agente) o con `mailmask login`. Comandos:
+     `login`/`logout`/`whoami`, `domains`, `dns` y `aliases` (con buzones IMAP en
+     `aliases mailbox`, más `aliases apple-profile` y `aliases export`). `--json` para
+     máquinas (los errores salen como JSON por stderr); lo destructivo pide `--yes` fuera de una
+     terminal y sin él sale con 1. Exit codes: 0 éxito, 1 genérico, 2 sin llave o rechazada,
+     3 conflicto, 4 no encontrado, 5 transitorio (reintentar). Referencia:
+     https://www.mailmask.studio/docs#cli.
    - **Skills** (formato Agent Skills): `npx skills add https://www.mailmask.studio` o
      `npx skills add blissito/mailmask-skills`. Cinco: `mailmask-account`, `mailmask-mcp`,
      `mailmask-sdk`, `mailmask-dns`, `mailmask-docs`. Índice en
@@ -135,7 +145,7 @@ dominio por API o SMTP.
 
 - Inicio: https://www.mailmask.studio/
 - Precios: https://www.mailmask.studio/pricing
-- Documentación (SDK, API REST, SMTP, MCP): https://www.mailmask.studio/docs
+- Documentación (Skills, SDK, CLI, API REST, SMTP y MCP): https://www.mailmask.studio/docs
 - Blog: https://www.mailmask.studio/blog
 - Términos: https://www.mailmask.studio/terms
 - Privacidad: https://www.mailmask.studio/privacy

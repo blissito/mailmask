@@ -2,65 +2,206 @@
 <html lang="es-MX">
 <head>
   <meta charset="UTF-8">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Documentación — Skills para agentes, SDK, API REST, SMTP y MCP | MailMask</title>
-  <meta name="description" content="Documentación de MailMask: skills para tu agente (npx skills add), SDK de JavaScript/TypeScript, API REST para máscaras y dominios, credenciales SMTP y servidor MCP. Con ejemplos de código.">
-  <link rel="canonical" href="https://www.mailmask.studio/docs">
+  <title>Documentación de MailMask: SDK, CLI, API REST y MCP</title>
+  <meta name="description" content="Documentación de MailMask: skills para agentes, SDK de JavaScript, CLI, API REST, SMTP y servidor MCP, con ejemplos para crear direcciones, buzones y dominios.">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  <link rel="canonical" href="https://www.mailmask.studio/docs">
+  <link rel="alternate" hreflang="es-MX" href="https://www.mailmask.studio/docs">
+  <link rel="alternate" hreflang="x-default" href="https://www.mailmask.studio/docs">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="MailMask">
   <meta property="og:locale" content="es_MX">
   <meta property="og:url" content="https://www.mailmask.studio/docs">
-  <meta property="og:title" content="Documentación — SDK, API REST, SMTP y MCP | MailMask">
-  <meta property="og:description" content="Documentación de MailMask: skills para tu agente (npx skills add), SDK de JavaScript/TypeScript, API REST para máscaras y dominios, credenciales SMTP y servidor MCP. Con ejemplos de código.">
-  <meta property="og:image" content="https://www.mailmask.studio/img/og-image.png">
+  <meta property="og:title" content="Documentación de MailMask: SDK, CLI, API REST y MCP">
+  <meta property="og:description" content="Documentación de MailMask: skills para agentes, SDK de JavaScript, CLI, API REST, SMTP y servidor MCP, con ejemplos para crear direcciones, buzones y dominios.">
+  <meta property="og:image" content="https://www.mailmask.studio/img/og-docs.jpg">
+  <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="MailMask — email profesional en tu dominio">
+  <meta property="og:image:alt" content="Documentación de MailMask: terminal con el comando mailmask aliases create">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Documentación — SDK, API REST, SMTP y MCP | MailMask">
-  <meta name="twitter:description" content="Documentación de MailMask: skills para tu agente (npx skills add), SDK de JavaScript/TypeScript, API REST para máscaras y dominios, credenciales SMTP y servidor MCP. Con ejemplos de código.">
-  <meta name="twitter:image" content="https://www.mailmask.studio/img/og-image.png">
+  <meta name="twitter:title" content="Documentación de MailMask: SDK, CLI, API REST y MCP">
+  <meta name="twitter:description" content="Documentación de MailMask: skills para agentes, SDK de JavaScript, CLI, API REST, SMTP y servidor MCP, con ejemplos para crear direcciones, buzones y dominios.">
+  <meta name="twitter:image" content="https://www.mailmask.studio/img/og-docs.jpg">
+  <meta name="twitter:image:alt" content="Documentación de MailMask: terminal con el comando mailmask aliases create">
+  <meta name="twitter:site" content="@HectorBlisS">
+  <meta name="twitter:creator" content="@HectorBlisS">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "TechArticle",
-    "headline": "Documentación de MailMask — SDK, API REST, SMTP y MCP",
-    "description": "Documentación técnica de MailMask: SDK de JavaScript/TypeScript, API REST para crear máscaras y dominios, credenciales SMTP para envío autenticado y servidor MCP.",
-    "inLanguage": "es-MX",
-    "author": { "@type": "Organization", "name": "MailMask" },
-    "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
-    "mainEntityOfPage": "https://www.mailmask.studio/docs",
-    "about": [
-      { "@type": "Thing", "name": "Email forwarding" },
-      { "@type": "Thing", "name": "API REST" },
-      { "@type": "Thing", "name": "SMTP" },
-      { "@type": "Thing", "name": "Model Context Protocol" }
-    ]
-  }
-  </script>
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "MailMask SDK",
-    "applicationCategory": "DeveloperApplication",
-    "operatingSystem": "Node.js",
-    "description": "Cliente de JavaScript/TypeScript para la API de MailMask: crear y gestionar máscaras de correo, dominios y reglas de reenvío.",
-    "softwareHelp": "https://www.mailmask.studio/docs",
-    "downloadUrl": "https://www.npmjs.com/package/@easybits.cloud/mailmask",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "MXN" },
-    "publisher": { "@type": "Organization", "name": "MailMask" }
-  }
-  </script>
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    "itemListElement": [
-      { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
-      { "@type": "ListItem", "position": 2, "name": "Documentación", "item": "https://www.mailmask.studio/docs" }
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://www.mailmask.studio/#org",
+        "name": "MailMask",
+        "url": "https://www.mailmask.studio/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://www.mailmask.studio/img/logo.png"
+        }
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://www.mailmask.studio/#website",
+        "url": "https://www.mailmask.studio/",
+        "name": "MailMask",
+        "inLanguage": "es-MX",
+        "publisher": {
+          "@id": "https://www.mailmask.studio/#org"
+        }
+      },
+      {
+        "@type": "TechArticle",
+        "@id": "https://www.mailmask.studio/docs#article",
+        "headline": "Documentación de MailMask",
+        "description": "Documentación de MailMask: skills para agentes, SDK de JavaScript, CLI, API REST, SMTP y servidor MCP, con ejemplos para crear direcciones, buzones y dominios.",
+        "inLanguage": "es-MX",
+        "datePublished": "2026-03-04",
+        "dateModified": "2026-10-06",
+        "author": {
+          "@id": "https://www.mailmask.studio/#org"
+        },
+        "publisher": {
+          "@id": "https://www.mailmask.studio/#org"
+        },
+        "isPartOf": {
+          "@id": "https://www.mailmask.studio/#website"
+        },
+        "mainEntityOfPage": "https://www.mailmask.studio/docs",
+        "image": "https://www.mailmask.studio/img/og-docs.jpg",
+        "about": [
+          {
+            "@type": "Thing",
+            "name": "Email forwarding"
+          },
+          {
+            "@type": "Thing",
+            "name": "API REST"
+          },
+          {
+            "@type": "Thing",
+            "name": "SMTP"
+          },
+          {
+            "@type": "Thing",
+            "name": "Model Context Protocol"
+          }
+        ],
+        "hasPart": [
+          {
+            "@type": "WebPageElement",
+            "name": "Skills para tu agente",
+            "url": "https://www.mailmask.studio/docs#skills"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Instalación del SDK",
+            "url": "https://www.mailmask.studio/docs#instalacion"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Dominios",
+            "url": "https://www.mailmask.studio/docs#dominios"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Direcciones",
+            "url": "https://www.mailmask.studio/docs#aliases"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Buzones IMAP",
+            "url": "https://www.mailmask.studio/docs#buzones"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "DNS",
+            "url": "https://www.mailmask.studio/docs#dns"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Reglas",
+            "url": "https://www.mailmask.studio/docs#reglas"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Envío de emails",
+            "url": "https://www.mailmask.studio/docs#envio"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Webhooks",
+            "url": "https://www.mailmask.studio/docs#webhooks"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Credenciales SMTP",
+            "url": "https://www.mailmask.studio/docs#smtp"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "API Keys",
+            "url": "https://www.mailmask.studio/docs#api-keys"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Cobro, compra de dominios y equipo",
+            "url": "https://www.mailmask.studio/docs#cuenta"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Manejo de errores",
+            "url": "https://www.mailmask.studio/docs#errores"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "CLI",
+            "url": "https://www.mailmask.studio/docs#cli"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "MCP Server",
+            "url": "https://www.mailmask.studio/docs#mcp"
+          },
+          {
+            "@type": "WebPageElement",
+            "name": "Referencia API",
+            "url": "https://www.mailmask.studio/docs#referencia"
+          }
+        ]
+      },
+      {
+        "@type": "SoftwareSourceCode",
+        "@id": "https://www.mailmask.studio/docs#sdk",
+        "name": "MailMask SDK",
+        "description": "Cliente de JavaScript/TypeScript para la API de MailMask: crear y gestionar direcciones, buzones, dominios y reglas de reenvío.",
+        "programmingLanguage": "TypeScript",
+        "runtimePlatform": "Node.js",
+        "url": "https://www.npmjs.com/package/@easybits.cloud/mailmask",
+        "publisher": {
+          "@id": "https://www.mailmask.studio/#org"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "@id": "https://www.mailmask.studio/docs#breadcrumb",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Inicio",
+            "item": "https://www.mailmask.studio/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Documentación",
+            "item": "https://www.mailmask.studio/docs"
+          }
+        ]
+      }
     ]
   }
   </script>
@@ -126,11 +267,6 @@
       pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
     }
   </style>
-    <meta name="twitter:image:alt" content="MailMask — email profesional en tu dominio" />
-    <meta property="og:image:secure_url" content="https://www.mailmask.studio/img/og-image.png" />
-    <meta property="og:image:type" content="image/png" />
-    <meta name="twitter:site" content="@HectorBlisS" />
-    <meta name="twitter:creator" content="@HectorBlisS" />
 </head>
 <body class="site bg-bg text-fg antialiased min-h-screen">
 
@@ -207,7 +343,8 @@
     <!-- Content -->
     <main class="prose-section px-6 md:px-12 py-10">
 
-      <h1 class="text-3xl font-bold mb-2">SDK de MailMask</h1>
+      <h1 class="text-3xl font-bold mb-2">Documentaci&oacute;n de MailMask</h1>
+      <p class="text-sm text-fg-subtle mb-2">Actualizado: <time datetime="2026-10-06">6 de octubre de 2026</time></p>
       <p class="text-fg-muted mb-8">Skills para tu agente, cliente oficial TypeScript/JavaScript, API REST, SMTP y servidor MCP. Crea direcciones, gestiona dominios, env&iacute;a emails y m&aacute;s &mdash; desde tu c&oacute;digo o pidi&eacute;ndoselo a tu agente.</p>
 
       <p class="text-sm text-fg-subtle mb-10">
@@ -624,7 +761,7 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
 
       <!-- CLI -->
       <h2 id="cli" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">CLI</h2>
-      <p class="text-fg-muted mb-2">CLI de terminal sobre este mismo SDK: un subcomando por recurso, sin modelo declarativo encima. En construcci&oacute;n (PR en revisi&oacute;n) &mdash; este primer corte trae <code class="text-fg">login</code>, <code class="text-fg">logout</code>, <code class="text-fg">whoami</code>, <code class="text-fg">domains</code> y <code class="text-fg">dns</code>; env&iacute;o de correo y un modo pensado para agentes llegan despu&eacute;s en PRs propios.</p>
+      <p class="text-fg-muted mb-2">CLI de terminal sobre este mismo SDK: un subcomando por recurso, sin modelo declarativo encima. Cubre la sesi&oacute;n (<code class="text-fg">login</code>, <code class="text-fg">logout</code>, <code class="text-fg">whoami</code>), <code class="text-fg">domains</code>, <code class="text-fg">dns</code> y <code class="text-fg">aliases</code>, con los buzones IMAP, el perfil de Apple Mail y la exportaci&oacute;n en mbox. El env&iacute;o de correo desde la terminal todav&iacute;a no est&aacute;.</p>
       <p class="text-fg-subtle text-xs mb-4">Nombre del paquete y del binario (hoy <code>mailmask-cli</code> / <code>mailmask</code>) son provisionales, pendientes de confirmaci&oacute;n antes de publicarse a npm.</p>
       <p class="text-fg-muted text-sm mb-6">&iquest;Quien va a operar tu cuenta es un agente de c&oacute;digo? Probablemente le convenga m&aacute;s instalarle las <a href="#skills" class="text-accent-text hover:underline">skills oficiales</a> (<code>npx skills add https://www.mailmask.studio</code>) que esta CLI: ya saben qu&eacute; puede hacer cada plan y qu&eacute; secretos salen una sola vez. Esta CLI es para cuando la persona teclea los comandos ella misma.</p>
 
@@ -635,7 +772,7 @@ npm install
 npm run build
 node dist/index.js --help</code></pre>
 
-      <p class="text-sm font-bold mb-1">Comandos</p>
+      <p class="text-sm font-bold mb-1">Sesi&oacute;n</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask login [--api-key mk_...] [--base-url https://...]
 mailmask whoami [--json]
 mailmask logout</code></pre>
@@ -644,20 +781,36 @@ mailmask logout</code></pre>
       <p class="text-sm font-bold mb-1">Dominios</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask domains list [--json]
 mailmask domains get &lt;dominio&gt; [--json]
-mailmask domains create &lt;dominio&gt; [--preset vercel|netlify|...] [--target ...] [--subdomain ...]
+mailmask domains create &lt;dominio&gt; [--preset vercel|netlify|github-pages|cloudflare-pages|render|fly|redirect-a-www|dmarc] [--target ...] [--subdomain ...]
 mailmask domains verify &lt;dominio&gt;
 mailmask domains health &lt;dominio&gt;
-mailmask domains delete &lt;dominio&gt;</code></pre>
-      <p class="text-fg-muted text-sm mb-4">En todos, <code>&lt;dominio&gt;</code> acepta el nombre (<code>acme.com</code>) o el id &mdash; se resuelve contra <code>domains list</code>. <code>create --preset</code> registra el dominio y de una vez le aplica un preset de DNS.</p>
+mailmask domains delete &lt;dominio&gt; [--yes] [--json]</code></pre>
+      <p class="text-fg-muted text-sm mb-4">En todos los comandos con dominio, <code>&lt;dominio&gt;</code> acepta el nombre (<code>acme.com</code>) o el id &mdash; se resuelve contra <code>domains list</code>. <code>create --preset</code> registra el dominio y de una vez le aplica un preset de DNS.</p>
 
       <p class="text-sm font-bold mb-1">DNS</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask dns list &lt;dominio&gt; [--json]
 mailmask dns upsert &lt;dominio&gt; &lt;nombre&gt; &lt;tipo&gt; &lt;valor...&gt; [--ttl 300]
-mailmask dns delete &lt;dominio&gt; &lt;nombre&gt; &lt;tipo&gt;
+mailmask dns delete &lt;dominio&gt; &lt;nombre&gt; &lt;tipo&gt; [--yes] [--json]
 mailmask dns preset &lt;dominio&gt; &lt;preset&gt; [--target ...] [--subdomain ...]
 mailmask dns create-zone &lt;dominio&gt;
 mailmask dns delegation &lt;dominio&gt;</code></pre>
       <p class="text-fg-muted text-sm mb-4"><code>dns preset</code> es la misma operaci&oacute;n que <code>domains create --preset</code>, para cuando el dominio ya existe: apunta la ra&iacute;z (y <code>www</code>, salvo que fijes <code>--subdomain</code>) a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render, Fly, un redirect a <code>www</code> o DMARC &mdash; sin escribir el registro a mano. <code>dns upsert</code> <strong class="text-fg">reemplaza</strong> el conjunto completo de valores de ese (nombre, tipo); los registros con <code>managed: true</code> (MX, verificaci&oacute;n, DKIM, SPF) los protege el servidor y no se pueden tocar desde aqu&iacute;.</p>
+
+      <p class="text-sm font-bold mb-1">Direcciones y buzones</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask aliases list &lt;dominio&gt; [--json]
+mailmask aliases create &lt;dominio&gt; &lt;alias&gt; [destino...] [--mailbox] [--json]
+mailmask aliases update &lt;dominio&gt; &lt;alias&gt; [destino...] [--enable | --disable] [--json]
+mailmask aliases delete &lt;dominio&gt; &lt;alias&gt; [--yes] [--json]
+mailmask aliases mailbox create &lt;dominio&gt; &lt;alias&gt; [--json]
+mailmask aliases mailbox delete &lt;dominio&gt; &lt;alias&gt; [--yes] [--json]
+mailmask aliases mailbox reset-password &lt;dominio&gt; &lt;alias&gt; [--yes] [--json]
+mailmask aliases apple-profile &lt;dominio&gt; &lt;alias&gt; -o perfil.mobileconfig
+mailmask aliases export &lt;dominio&gt; &lt;alias&gt; [-o buzon.mbox]</code></pre>
+      <p class="text-fg-muted text-sm mb-4"><code>aliases create</code> acepta uno o m&aacute;s destinos como argumentos sueltos (<code>aliases create acme.com soporte ana@acme.com luis@acme.com</code>); con <code>--mailbox</code> tambi&eacute;n se permite sin ning&uacute;n destino, porque el correo se queda en el buz&oacute;n IMAP. <code>aliases update</code> cambia destinos y/o el estado con <code>--enable</code> o <code>--disable</code> (no se combinan). El buz&oacute;n IMAP vive bajo <code>aliases mailbox</code> y requiere el dominio activado.</p>
+      <p class="text-fg-muted text-sm mb-4"><strong class="text-fg">La contrase&ntilde;a del buz&oacute;n sale enmascarada</strong> (<code>ab&bull;&bull;&bull;&bull;&bull;&bull;yz</code>) y no se vuelve a mostrar completa: para verla entera, <code>mailbox reset-password</code> con <code>--json</code> genera una nueva y la devuelve completa una sola vez; la anterior deja de servir. <code>apple-profile</code> escribe el perfil <code>.mobileconfig</code> de Apple Mail en la ruta de <code>-o</code>; <code>export</code> baja el buz&oacute;n en mbox a un archivo con <code>-o</code> o por la salida est&aacute;ndar, para encadenarlo con otro comando.</p>
+
+      <p class="text-sm font-bold mb-1">Para scripts y agentes: <code>--json</code> y <code>--yes</code></p>
+      <p class="text-fg-muted text-sm mb-4">Con <code>--json</code> los comandos imprimen JSON, y un error sale por stderr como <code>{"error": "...", "status": 404}</code> (sin <code>status</code> si no vino de la API), para parsearlo sin adivinar el formato. Lo que borra o resetea &mdash; <code>domains delete</code>, <code>dns delete</code>, <code>aliases delete</code>, <code>aliases mailbox delete</code> y <code>aliases mailbox reset-password</code> &mdash; pregunta <code>[y/N]</code> en una terminal; fuera de una (CI, un agente) exige <code>--yes</code> y, sin &eacute;l, sale con c&oacute;digo <code>1</code> sin tocar la red.</p>
 
       <p class="text-sm font-bold mb-1">Variable de entorno</p>
       <p class="text-fg-muted text-sm mb-4"><code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">MAILMASK_API_KEY</code> tiene prioridad sobre la sesi&oacute;n guardada &mdash; es la v&iacute;a recomendada para CI o para un agente de c&oacute;digo.</p>
@@ -668,10 +821,12 @@ mailmask dns delegation &lt;dominio&gt;</code></pre>
       <p class="text-sm font-bold mb-1">C&oacute;digos de salida</p>
       <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-4">
         <li><code>0</code> &mdash; &eacute;xito.</li>
-        <li><code>1</code> &mdash; error gen&eacute;rico.</li>
-        <li><code>2</code> &mdash; no hay API key activa, o MailMask la rechaz&oacute;.</li>
+        <li><code>1</code> &mdash; error gen&eacute;rico (tambi&eacute;n, un comando destructivo sin <code>--yes</code> fuera de una terminal).</li>
+        <li><code>2</code> &mdash; no hay API key activa, o MailMask la rechaz&oacute; (401/403).</li>
+        <li><code>3</code> &mdash; conflicto (409), p.&nbsp;ej. el dominio ya existe.</li>
+        <li><code>4</code> &mdash; no encontrado (404).</li>
+        <li><code>5</code> &mdash; transitorio: 429, 5xx de MailMask o error de red. Vale la pena reintentar.</li>
       </ul>
-      <p class="text-fg-muted text-sm mb-4">El resto de la taxonom&iacute;a de c&oacute;digos y el contrato <code>--json</code>/<code>--yes</code> para el resto de comandos llegan en un PR aparte.</p>
 
       <!-- MCP -->
       <h2 id="mcp" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">MCP Server</h2>
