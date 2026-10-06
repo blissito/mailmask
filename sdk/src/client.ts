@@ -8,8 +8,8 @@ import type {
   DnsChangeResult, DnsPreset, DnsSetup,
   BillingStatus, AddonsResponse, CheckoutLink, DomainSearchResult, TldPrice, DomainRegistrationCreated,
   DomainRegistration, TransferCheck, TransferDnsInventory, RenewalLink, DomainMember, DomainInvite, CannedReply,
-  AccountProfile, InboxPage, InboxListOptions, InboxConversation, InboxConversationDetail, InboxComposeInput,
-  InboxReplyInput, InboxUpdateInput, InboxNote, OrdersPage, ReferralStats,
+  AccountProfile, AccountMe, AccountExport, InboxPage, InboxListOptions, InboxConversation, InboxConversationDetail, InboxComposeInput,
+  InboxReplyInput, InboxUpdateInput, InboxNote, OrdersPage, ReferralStats, UploadedEmailImage,
 } from "./types.js";
 
 class MailMaskError extends Error {
@@ -120,6 +120,12 @@ class DomainsResource {
     return this.req<{ ok: boolean; logoUrl: string }>(`/api/domains/${id}/logo`, { method: "POST", body: JSON.stringify({ fromUrl: url }) });
   }
   removeLogo(id: string) { return this.req<{ ok: boolean }>(`/api/domains/${id}/logo`, { method: "DELETE" }); }
+  /** Imagen para incrustar en un correo saliente (PNG, JPG, GIF o WebP; máx. 2 MB). Efímera: se borra tras enviarse o por el barrido diario. */
+  uploadImage(id: string, file: Blob, filename = "imagen") {
+    const form = new FormData();
+    form.append("file", file, filename);
+    return this.req<UploadedEmailImage>(`/api/domains/${id}/images`, { method: "POST", body: form });
+  }
 }
 
 class DnsResource {
@@ -321,6 +327,14 @@ class CannedResource {
 
 class AccountResource {
   constructor(private req: Req) {}
+  /**
+   * Identidad y uso de la cuenta: dominios, derechos por dominio, add-ons y cuotas.
+   * Sustituto de `whoami` mientras no exista un endpoint de identidad más chico — ver
+   * `docs/agents/mailmask-cli.md`.
+   */
+  me() { return this.req<AccountMe>("/api/auth/me"); }
+  /** Todo tu dato (alias, reglas y logs de cada dominio) como JSON exportable. */
+  export() { return this.req<AccountExport>("/api/export"); }
   getProfile() { return this.req<AccountProfile>("/api/profile"); }
   /** Nombre visible (máx. 60 caracteres). Cadena vacía lo borra. */
   updateProfile(input: { displayName: string | null }) {

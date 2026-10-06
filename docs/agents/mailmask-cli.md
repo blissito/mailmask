@@ -24,10 +24,14 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   `cli-auth.ts` (en memoria, TTL de 5 min: no necesita tabla ni migración).
   `MAILMASK_NO_KEYCHAIN` fuerza el fallback de archivo — es cómo `test/config.test.ts`
   prueba ese camino sin depender de si la máquina que corre la prueba tiene keychain real.
-- **No existe un endpoint `/me`.** `whoami` arma la identidad combinando
+- **`whoami` todavía arma la identidad a mano, pero ya no hace falta.** Combina
   `apiKeys.list()` (para nombrar la llave activa por su `keyPrefix`) con
-  `domains.list()` (conteo de dominios visibles). Si MailMask agrega un endpoint de
-  identidad real, `whoami` debería migrar a usarlo en vez de esta combinación.
+  `domains.list()` (conteo de dominios visibles) porque, al escribir `whoami`, no
+  había un endpoint de identidad en el SDK. Desde el ticket B del sprint 4 sí lo
+  hay: `account.me()` (`GET /api/auth/me`) devuelve email, dominios y uso en una
+  sola llamada. `whoami` debe migrar a `account.me()` — queda pendiente para su
+  propio ticket, para no mezclar el cambio de ruta con el de la respuesta en
+  pantalla.
 - **Exit codes** (ticket 1, mínimo viable): `0` éxito, `1` error genérico, `2` sin
   API key activa o rechazada por MailMask. La taxonomía completa (conflicto,
   transitorio, etc.) y el contrato `--json`/`--yes` para el resto de comandos son
