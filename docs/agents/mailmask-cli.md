@@ -109,8 +109,14 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   `confirmOrExit` ANTES de `resolveDomainId` — mismo contrato de A que
   `domains delete`/`dns delete`. La contraseña del buzón (de `createMailbox` o
   `resetMailboxPassword`) se imprime con `maskSecret()` en modo texto —
-  nunca completa salvo con `--json`, que es la única vía para copiarla; cada
-  password sólo sale así una vez, nunca se vuelve a mostrar. `apple-profile` y
+  nunca completa salvo con `--json`. El aviso de cómo recuperarla completa
+  NO es el mismo en los tres comandos: en `reset-password` sí vale "corre el
+  mismo comando con --json" (no muta nada más, repetirlo es seguro), pero en
+  `create --mailbox` y `mailbox create` repetir el comando da 409 (la máscara
+  o el buzón ya existen) — ahí el aviso (`afterSecretCreate()`) manda a
+  `aliases mailbox reset-password <dominio> <alias> --yes --json`, que sí
+  genera una contraseña nueva. Cada password sólo sale completa una vez, por
+  el comando que corresponda; nunca se vuelve a mostrar la misma. `apple-profile` y
   `export` llaman a `client.aliases.appleProfile()`/`exportMbox()` (ninguno de
   los dos pasa por el `req<T>` genérico: son texto/streaming, no JSON) y
   escriben a la ruta de `-o`/`--output`; `export` sin `-o` cae a stdout para

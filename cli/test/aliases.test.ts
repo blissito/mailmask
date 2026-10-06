@@ -25,6 +25,18 @@ const { default: aliases } = await import("../src/commands/aliases.js");
 const { list, create, update, delete: del, mailbox, "apple-profile": appleProfile, export: exportMailbox } = aliases.subCommands as Record<string, any>;
 const { create: mailboxCreate, delete: mailboxDelete, "reset-password": resetPassword } = mailbox.subCommands as Record<string, any>;
 
+// Mismo patrón que `captureStderr` en whoami.test.ts, pero sobre stdout: el
+// aviso de "cómo copiar la contraseña completa" vive ahí, no en un valor de
+// retorno, así que hay que leerlo de lo que el comando imprimió de verdad.
+function captureStdout(): { text: () => string; restore: () => void } {
+  let text = "";
+  const fn = mock.method(process.stdout, "write", (chunk: string) => {
+    text += chunk;
+    return true;
+  });
+  return { text: () => text, restore: () => fn.mock.restore() };
+}
+
 describe("aliases list: llamada al SDK", () => {
   it("llama aliases.list con el id resuelto", async () => {
     const { client, calls } = fakeClient({ aliases: { list: () => [] } });
@@ -59,6 +71,27 @@ describe("aliases create: llamada al SDK y errores", () => {
     await create.run({ args: { domain: "dom_1", alias: "hola", mailbox: true, _: ["dom_1", "hola"] } });
     const call = calls.find((c) => c.method === "aliases.create");
     assert.deepEqual(call!.args, ["dom_1", { alias: "hola", destinations: [], mailbox: true }]);
+  });
+
+  it("--mailbox en texto: nunca imprime la contraseña completa y manda a reset-password --json para copiarla", async () => {
+    const { client } = fakeClient({
+      aliases: {
+        create: () => ({
+          alias: "hola", domainId: "dom_1", destinations: [], enabled: true, forwardCount: 0, createdAt: "now",
+          buzon: { email: "hola@acme.com", password: "s3cr3t-password-123", quotaBytes: 0, imap: { host: "imap", port: 993, security: "ssl" }, smtp: { host: "smtp", port: 587, security: "starttls" } },
+        }),
+      },
+    });
+    currentClient = client;
+    const out = captureStdout();
+    try {
+      await create.run({ args: { domain: "dom_1", alias: "hola", mailbox: true, _: ["dom_1", "hola"] } });
+    } finally {
+      out.restore();
+    }
+    const text = out.text();
+    assert.doesNotMatch(text, /s3cr3t-password-123/, "la contraseña completa nunca debe salir en modo texto");
+    assert.match(text, /mailbox reset-password dom_1 hola --yes --json/, "debe apuntar a reset-password, no a repetir create (409)");
   });
 
   it("sin destinos y sin --mailbox sale con error SIN llamar al SDK", async () => {
@@ -142,6 +175,22 @@ describe("aliases mailbox create/delete/reset-password", () => {
     await mailboxCreate.run({ args: { domain: "dom_1", alias: "hola" } });
     const call = calls.find((c) => c.method === "aliases.createMailbox");
     assert.deepEqual(call!.args, ["dom_1", "hola"]);
+  });
+
+  it("mailbox create en texto: nunca imprime la contraseña completa y manda a reset-password --json para copiarla", async () => {
+    const { client } = fakeClient({
+      aliases: { createMailbox: () => ({ email: "hola@acme.com", password: "s3cr3t-password-123", quotaBytes: 0, imap: { host: "imap", port: 993, security: "ssl" }, smtp: { host: "smtp", port: 587, security: "starttls" } }) },
+    });
+    currentClient = client;
+    const out = captureStdout();
+    try {
+      await mailboxCreate.run({ args: { domain: "dom_1", alias: "hola" } });
+    } finally {
+      out.restore();
+    }
+    const text = out.text();
+    assert.doesNotMatch(text, /s3cr3t-password-123/, "la contraseña completa nunca debe salir en modo texto");
+    assert.match(text, /mailbox reset-password dom_1 hola --yes --json/, "debe apuntar a reset-password, no a repetir create (409)");
   });
 
   it("mailbox delete sin --yes y sin TTY sale con 1 y no llama al SDK", async () => {

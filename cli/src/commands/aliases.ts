@@ -12,7 +12,14 @@ const aliasArgs = {
   alias: { type: "positional" as const, description: "Parte local de la máscara, p. ej. hola (usa * para catch-all)" },
 };
 
-const AFTER_SECRET = "  Corre el mismo comando con --json para obtenerla completa ahora; no se vuelve a mostrar.\n";
+// Repetir el comando que creó la contraseña (create / mailbox create) no sirve: la
+// máscara o el buzón ya existen y el SDK responde 409. Ahí el único camino para
+// copiarla completa es reset-password --json (genera una nueva, invalida ésta).
+// reset-password sí puede repetirse — por eso tiene su propio aviso más corto.
+function afterSecretCreate(domain: string, alias: string): string {
+  return `  Para copiarla completa, corre "mailmask aliases mailbox reset-password ${domain} ${alias} --yes --json" (genera una contraseña nueva; ésta ya no se puede recuperar).\n`;
+}
+const AFTER_SECRET_RESET = "  Corre el mismo comando con --json para obtenerla completa ahora; no se vuelve a mostrar.\n";
 
 const list = defineCommand({
   meta: { name: "list", description: "Lista las máscaras (alias) de un dominio" },
@@ -42,7 +49,7 @@ const create = defineCommand({
   args: {
     ...aliasArgs,
     mailbox: { type: "boolean", description: "Crea también un buzón IMAP (requiere dominio activado)" },
-    json: { type: "boolean", description: "Salida en JSON para scripts/agentes" },
+    ...jsonArg,
   },
   async run({ args }) {
     // domain y alias ya consumieron los 2 primeros positionals; el resto son destinos.
@@ -62,7 +69,7 @@ const create = defineCommand({
       if (created.buzon) {
         process.stdout.write(`  Buzón: ${created.buzon.email}\n`);
         process.stdout.write(`  Contraseña: ${maskSecret(created.buzon.password)}\n`);
-        process.stdout.write(AFTER_SECRET);
+        process.stdout.write(afterSecretCreate(args.domain, args.alias));
       } else if (created.errorBuzon) {
         process.stdout.write(`  ⚠ No se pudo crear el buzón: ${created.errorBuzon}\n`);
       }
@@ -78,7 +85,7 @@ const update = defineCommand({
     ...aliasArgs,
     enable: { type: "boolean", description: "Activa la máscara" },
     disable: { type: "boolean", description: "Desactiva la máscara" },
-    json: { type: "boolean", description: "Salida en JSON para scripts/agentes" },
+    ...jsonArg,
   },
   async run({ args }) {
     if (args.enable && args.disable) {
@@ -134,7 +141,7 @@ const mailboxCreate = defineCommand({
       if (args.json) return printJson(mailbox);
       process.stdout.write(`✓ Buzón creado: ${mailbox.email}\n`);
       process.stdout.write(`  Contraseña: ${maskSecret(mailbox.password)}\n`);
-      process.stdout.write(AFTER_SECRET);
+      process.stdout.write(afterSecretCreate(args.domain, args.alias));
       process.stdout.write(`  IMAP: ${mailbox.imap.host}:${mailbox.imap.port} (${mailbox.imap.security})\n`);
       process.stdout.write(`  SMTP: ${mailbox.smtp.host}:${mailbox.smtp.port} (${mailbox.smtp.security})\n`);
     } catch (err) {
@@ -171,7 +178,7 @@ const resetPassword = defineCommand({
       const result = await client.aliases.resetMailboxPassword(id, args.alias);
       if (args.json) return printJson(result);
       process.stdout.write(`✓ Contraseña reiniciada: ${maskSecret(result.password)}\n`);
-      process.stdout.write(AFTER_SECRET);
+      process.stdout.write(AFTER_SECRET_RESET);
     } catch (err) {
       failFromError(err, { json: args.json });
     }

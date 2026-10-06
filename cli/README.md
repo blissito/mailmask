@@ -76,8 +76,13 @@ El buzón IMAP vive bajo `aliases mailbox`: `create` lo crea para una máscara
 existente (requiere el dominio activado), `delete` lo borra junto con todo su
 correo, y `reset-password` genera una contraseña nueva e invalida la
 anterior. La contraseña sólo se devuelve en el momento de crear el buzón o de
-reiniciarla — en texto sale enmascarada (`sk_a...3f2`, ver `maskSecret()`);
-para copiarla completa corre el mismo comando con `--json`.
+reiniciarla — en texto sale enmascarada (`sk_a...3f2`, ver `maskSecret()`).
+Para copiarla completa: en `reset-password` corre el mismo comando con
+`--json` (no muta nada más, repetirlo es seguro). En `aliases create --mailbox`
+y `aliases mailbox create` repetir el comando NO sirve — la máscara o el
+buzón ya existen y el SDK responde 409 —, así que ahí hay que seguir con
+`aliases mailbox reset-password <dominio> <alias> --yes --json`, que genera
+una contraseña nueva (la de la creación ya no se puede recuperar).
 
 `aliases apple-profile -o perfil.mobileconfig` escribe el perfil de
 configuración de Apple Mail para el buzón de una máscara, listo para
