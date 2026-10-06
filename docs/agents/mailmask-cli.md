@@ -2,9 +2,9 @@
 
 **Qué:** CLI en TypeScript sobre `@easybits.cloud/mailmask` (`sdk/`), un subcomando
 por recurso del SDK — sin modelo declarativo encima. Esta primera entrega (ticket 1
-del sprint) trae `login`, `logout`, `whoami`, `domains` y `dns`. Envío de
-correo y un modo pensado para agentes llegan después en PRs propios sobre esta
-misma base.
+del sprint) trae `login`, `logout`, `whoami`, `domains` y `dns`. El ticket C del
+sprint 4 agregó `aliases` (máscaras y buzones IMAP). Envío de correo y un modo
+pensado para agentes llegan después en PRs propios sobre esta misma base.
 
 **Por qué:** la CLI no inventa nada encima del SDK — cada comando es 1:1 con un
 método ya documentado, para que no haya dos formas de aprenderse la API.
@@ -95,8 +95,34 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   nombre (`acme.com`) o el id — `cli/src/resolve.ts` lo busca en
   `domains.list()`; si no aparece, se deja pasar tal cual para que la API
   responda su propio 404 en vez de inventar uno aquí. `cli/src/commands/dns.ts`
-  ya la reusa; los comandos de recursos futuros que cuelgan de un dominio
-  (`aliases`, `rules`, ...) deben hacer lo mismo, no reimplementar la búsqueda.
+  y `cli/src/commands/aliases.ts` ya la reusan; los comandos de recursos
+  futuros que cuelgan de un dominio (`rules`, ...) deben hacer lo mismo, no
+  reimplementar la búsqueda.
+- **`cli/src/commands/aliases.ts` (ticket C, sprint 4):** `list|create|update|delete`
+  son 1:1 con `client.aliases.*`; `destinations` en `create`/`update` sale de
+  `args._.slice(2)` (mismo truco que `dns upsert` para el "rest" que citty no
+  tiene, pero con 2 positionals consumidos — `<dominio> <alias>` — en vez de 3).
+  `create --mailbox` se permite sin ningún destino (el correo se queda en el
+  buzón IMAP); sin `--mailbox` y sin destinos, sale con error antes de tocar
+  el SDK. `mailbox create|delete|reset-password` cuelgan de un `subCommands`
+  propio (`aliases mailbox ...`) y `delete`/`reset-password` pasan por
+  `confirmOrExit` ANTES de `resolveDomainId` — mismo contrato de A que
+  `domains delete`/`dns delete`. La contraseña del buzón (de `createMailbox` o
+  `resetMailboxPassword`) se imprime con `maskSecret()` en modo texto —
+  nunca completa salvo con `--json`. El aviso de cómo recuperarla completa
+  NO es el mismo en los tres comandos: en `reset-password` sí vale "corre el
+  mismo comando con --json" (no muta nada más, repetirlo es seguro), pero en
+  `create --mailbox` y `mailbox create` repetir el comando da 409 (la máscara
+  o el buzón ya existen) — ahí el aviso (`afterSecretCreate()`) manda a
+  `aliases mailbox reset-password <dominio> <alias> --yes --json`, que sí
+  genera una contraseña nueva. Cada password sólo sale completa una vez, por
+  el comando que corresponda; nunca se vuelve a mostrar la misma. `apple-profile` y
+  `export` llaman a `client.aliases.appleProfile()`/`exportMbox()` (ninguno de
+  los dos pasa por el `req<T>` genérico: son texto/streaming, no JSON) y
+  escriben a la ruta de `-o`/`--output`; `export` sin `-o` cae a stdout para
+  encadenarse con otro comando. `cli/test/test-helpers.ts` ganó `aliases?: Impl`
+  en `fakeClient()` — cualquier comando nuevo que use `client.aliases.*` en un
+  test ya no necesita tocar el helper.
 - **`domains create --preset` / `dns preset`:** ambos llaman a
   `client.dns.preset()` del SDK (los mismos ocho presets que `point_domain_to`
   del MCP, ver `public/skills/mailmask-dns/SKILL.md`). La validación del nombre
