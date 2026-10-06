@@ -31,11 +31,15 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
 - **Exit codes — taxonomía completa (ticket de confirmaciones):** `0` éxito, `1`
   error genérico, `2` sin API key activa o rechazada por MailMask (401/403), `3`
   conflicto (409), `4` no encontrado (404), `5` transitorio (429 o 5xx de
-  MailMask, o un error de red sin `status`) — vale la pena reintentar. La mapea
-  `exitCodeForStatus()` en `cli/src/output.ts`, a partir de `MailMaskError.status`;
-  un error que no es `MailMaskError` (red, lo que sea) siempre es `1`. Cualquier
-  comando nuevo que llame a `failFromError(err)` hereda esto solo: no hace falta
-  (ni se debe) mapear códigos a mano en el comando.
+  MailMask, **o un error de red sin `status`**: `fetch` (undici) nunca lanza
+  `MailMaskError` ante un corte de red o DNS caído — lanza un `TypeError("fetch
+  failed")` con la causa real en `.cause` (p. ej. `ECONNREFUSED`). `failFromError`
+  en `cli/src/output.ts` reconoce ese patrón (`isNetworkError()`, por código de
+  `.cause`/`.code` o por el mensaje `fetch failed`) y lo manda también a `5`, no
+  a `1` — es justo el caso donde vale la pena que un script reintente. Cualquier
+  otro error que no sea `MailMaskError` ni de red es `1`. Cualquier comando
+  nuevo que llame a `failFromError(err)` hereda esto solo: no hace falta (ni se
+  debe) mapear códigos a mano en el comando.
 - **Confirmación de lo destructivo — `confirmOrExit()` en `cli/src/output.ts`:**
   lo que borra, revoca, envía a terceros o resetea una contraseña pasa por aquí
   ANTES de tocar el SDK. En una terminal (`process.stdin.isTTY`) pregunta

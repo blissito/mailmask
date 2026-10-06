@@ -13,6 +13,20 @@ function exitCodeForStatus(status: number): number {
   return EXIT.ERROR;
 }
 
+const NETWORK_ERROR_CODES = ["ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "ECONNRESET", "EAI_AGAIN"];
+
+/** El fetch de Node (undici) nunca lanza `MailMaskError`: ante un problema de red lanza un
+ * `TypeError("fetch failed")` con la causa real en `.cause` (p. ej. ECONNREFUSED). Sin esto,
+ * cualquier corte de red o DNS caído salía como 1 (genérico) en vez del 5 (transitorio) que
+ * promete la taxonomía — y es justo el caso en el que vale la pena que un script reintente. */
+function isNetworkError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const cause = (err as { cause?: unknown }).cause;
+  const code = (err as { code?: unknown }).code ?? (cause as { code?: unknown } | undefined)?.code;
+  if (typeof code === "string" && NETWORK_ERROR_CODES.includes(code)) return true;
+  return err instanceof TypeError && /fetch failed/i.test(err.message);
+}
+
 export function printJson(data: unknown): void {
   process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
 }
@@ -45,8 +59,9 @@ export function failFromError(err: unknown, opts: { json?: boolean } = {}): neve
     fail(`MailMask respondió ${err.status}: ${err.message}`, code);
   }
   const message = err instanceof Error ? err.message : String(err);
-  if (opts.json) failJson(message, undefined, EXIT.ERROR);
-  fail(message, EXIT.ERROR);
+  const code = isNetworkError(err) ? EXIT.TRANSIENT : EXIT.ERROR;
+  if (opts.json) failJson(message, undefined, code);
+  fail(message, code);
 }
 
 export const NO_AUTH_MESSAGE =

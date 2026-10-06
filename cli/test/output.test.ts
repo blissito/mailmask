@@ -42,6 +42,14 @@ describe("failFromError: taxonomía de exit codes", () => {
   it("error sin status conocido → genérico (1)", () => {
     assert.throws(() => failFromError(new Error("lo que sea")), (err: unknown) => err instanceof ExitSignal && err.code === EXIT.ERROR);
   });
+  it("error de RED (fetch failed, sin status) → transitorio 5", () => {
+    assert.throws(() => failFromError(new TypeError("fetch failed")), (e: unknown) => e instanceof ExitSignal && e.code === EXIT.TRANSIENT);
+  });
+  it("error de red por código de causa (ECONNREFUSED) → transitorio 5", () => {
+    const err = new TypeError("fetch failed");
+    (err as unknown as { cause: unknown }).cause = Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" });
+    assert.throws(() => failFromError(err), (e: unknown) => e instanceof ExitSignal && e.code === EXIT.TRANSIENT);
+  });
 });
 
 describe("failFromError: --json imprime {error, status} a stderr", () => {
