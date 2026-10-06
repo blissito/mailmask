@@ -570,6 +570,67 @@ export interface AccountProfile {
   avatarUrl: string | null;
 }
 
+/** Derechos y uso de UN dominio, dentro de `AccountMe.porDominio`. */
+export interface AccountMeDomainUsage {
+  id: string;
+  domain: string;
+  /** Límites del dominio (sends, aliases, dominios, etc.), por plan y add-ons. */
+  derechos: Record<string, unknown>;
+  addons: Addon[];
+  uso: {
+    aliases: { current: number; limit: number };
+    rules: { current: number; limit: number };
+    sends: { current: number; limit: number };
+    forwards: { current: number; limit: number };
+    mailboxBytes: { current: number; limit: number };
+  };
+}
+
+/** Respuesta de `account.me()`: identidad de la cuenta y su uso, por dominio y total. */
+export interface AccountMe extends AccountProfile {
+  isAdmin: boolean;
+  assistant: boolean;
+  domainsCount: number;
+  emailVerified: boolean;
+  forwards: { current: number; limit: number };
+  subscription: { plan: string; status: string; currentPeriodEnd: string | null; planLabel: string; [k: string]: unknown };
+  porDominio: AccountMeDomainUsage[];
+  addons: Addon[];
+  planPriceCents: number | null;
+  addonCatalog: Record<string, { price: number; label: string }>;
+  addonsForSale: string[];
+  lastOrder: Order | null;
+  usage: {
+    domains: { current: number; limit: number | null };
+    aliasesPerDomain: unknown[];
+    rulesPerDomain: unknown[];
+    sendsPerDomain: unknown[];
+  };
+  referralSlug?: string | null;
+  referralStats: ReferralStats;
+}
+
+/** Respuesta de `account.export()`: todo el dato del usuario, listo para descargar. */
+export interface AccountExport {
+  email: string;
+  exportedAt: string;
+  domains: {
+    domain: string;
+    domainId: string;
+    verified: boolean;
+    aliases: Alias[];
+    rules: Rule[];
+    logs: EmailLog[];
+  }[];
+}
+
+/** Respuesta de `domains.uploadImage()`. */
+export interface UploadedEmailImage {
+  ok: boolean;
+  /** URL pública y permanente mientras el correo que la incrusta no se borre. */
+  url: string;
+}
+
 // --- Bandeja (inbox) ---
 
 export type InboxStatus = "open" | "snoozed" | "closed";
