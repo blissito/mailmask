@@ -159,7 +159,7 @@
         </svg>
         <span class="font-bold text-lg">MailMask</span>
       </a>
-      <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-accent/10 text-accent-text border border-accent/20">SDK v0.4.0</span>
+      <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-accent/10 text-accent-text border border-accent/20">SDK v0.4.7</span>
     </div>
     <div class="flex items-center gap-4">
       <a href="/openapi" class="nav-api-ref text-sm text-fg-subtle hover:text-fg transition-colors">HTTP API Reference</a>
@@ -458,6 +458,13 @@ console.<span class="fn">log</span>(status.sent, status.failed, status.skippedSu
   references: <span class="str">"&lt;abc123@mail.example.com&gt;"</span>,
   attachments: [pdf],
 });</code></pre>
+      <h3 class="text-lg font-semibold text-fg mt-8 mb-2">Im&aacute;genes dentro del correo</h3>
+      <p class="text-fg-muted mb-4">Para incrustar una imagen en el HTML de un correo, s&uacute;bela al dominio (PNG, JPG, GIF o WebP; m&aacute;x. 2 MB) y usa la URL p&uacute;blica que regresa. Es ef&iacute;mera: se borra tras enviarse el correo, o en el barrido diario si nunca se us&oacute;. Desde la 0.4.7.</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="kw">const</span> { url } = <span class="kw">await</span> mm.domains.<span class="fn">uploadImage</span>(<span class="str">"domain-id"</span>, imagen); <span class="cm">// Blob</span>
+<span class="kw">await</span> mm.send.<span class="fn">send</span>(<span class="str">"domain-id"</span>, {
+  from: <span class="str">"hola"</span>, to: <span class="str">"cliente@example.com"</span>, subject: <span class="str">"Nuestro cat&aacute;logo"</span>,
+  html: <span class="str">`&lt;img src="${url}" alt="Cat&aacute;logo"&gt;`</span>,
+});</code></pre>
       <h3 class="text-lg font-semibold text-fg mt-8 mb-2">Idempotencia</h3>
       <p class="text-fg-muted mb-4">Si tu proceso reintenta, pasa una clave de idempotencia (m&aacute;x. 128 caracteres). Durante 24 horas, la misma clave devuelve la respuesta original sin volver a enviar ni consumir cuota. La respuesta repetida lleva el header <code class="text-fg">Idempotent-Replayed: true</code>.</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code><span class="kw">await</span> mm.send.<span class="fn">send</span>(<span class="str">"domain-id"</span>, { to, subject, html }, {
@@ -590,7 +597,12 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
 <span class="kw">const</span> perfil = <span class="kw">await</span> mm.account.<span class="fn">getProfile</span>(); <span class="cm">// { email, displayName, avatarUrl }</span>
 <span class="kw">await</span> mm.account.<span class="fn">updateProfile</span>({ displayName: <span class="str">"Ana Ruiz"</span> });
 <span class="kw">await</span> mm.account.<span class="fn">setAvatar</span>(archivo); <span class="cm">// PNG, JPG o WebP, m&aacute;x. 2 MB</span>
-<span class="kw">await</span> mm.account.<span class="fn">removeAvatar</span>();</code></pre>
+<span class="kw">await</span> mm.account.<span class="fn">removeAvatar</span>();
+
+<span class="cm">// Identidad, plan y uso (por dominio y total) &mdash; desde la 0.4.7</span>
+<span class="kw">const</span> yo = <span class="kw">await</span> mm.account.<span class="fn">me</span>(); <span class="cm">// { email, subscription, porDominio, usage, ... }</span>
+<span class="cm">// Todo tu dato como JSON: direcciones, reglas y logs de cada dominio</span>
+<span class="kw">const</span> respaldo = <span class="kw">await</span> mm.account.<span class="fn">export</span>(); <span class="cm">// { email, exportedAt, domains: [...] }</span></code></pre>
       <h3 id="activacion-anual" class="text-lg font-semibold text-fg mt-8 mb-2">Activaci&oacute;n anual</h3>
       <p class="text-fg-muted mb-4">La activaci&oacute;n del dominio tambi&eacute;n se paga por a&ntilde;o: <strong class="text-fg">$999 MXN cada 12 meses</strong> en vez de $99 al mes. Por HTTP se pide con <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">period: "annual"</code> en <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">POST /api/addons/checkout</code> (por omisi&oacute;n <code class="text-fg">"monthly"</code>). S&oacute;lo aplica a <code class="text-fg">kind: "domain"</code>: los bloques de espacio y env&iacute;os son mensuales y responden 400 si se piden anuales. El m&eacute;todo <code class="text-fg">billing.checkout()</code> del SDK todav&iacute;a no expone <code class="text-fg">period</code>.</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>POST /api/addons/checkout

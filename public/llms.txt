@@ -101,7 +101,7 @@ respectivamente. Quien solo reenvía nunca toca el límite de envíos.
      etiquetas), `inbox_assign`, `inbox_note`, `inbox_delete`/`inbox_restore`, `inbox_metrics`,
      `upload_attachment`. Mismos permisos por dominio que la app.
    - **SDK** (con API key `mk_`): `npm i @easybits.cloud/mailmask`; `new MailMask({ apiKey })` con
-     `domains`, `addresses` (antes `aliases`, que sigue funcionando), `rules`, `webhooks`, `send`, `suppressions`, `smtp`.
+     `domains` (incluye `uploadImage` para incrustar imágenes en un correo), `addresses` (antes `aliases`, que sigue funcionando), `rules`, `webhooks`, `send`, `suppressions`, `smtp` y `account` (`me()` = identidad y uso, `export()` = todo tu dato en JSON).
    - **REST** (con API key `mk_`): `https://www.mailmask.studio/api/...`, especificación OpenAPI en
      https://www.mailmask.studio/openapi/json y referencia navegable en
      https://www.mailmask.studio/openapi.
