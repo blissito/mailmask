@@ -21,3 +21,7 @@ la landing, pricing y el blog cuando se les haga su pase.
   iguales — córrelo en un clon con historia, o edita a mano sólo el `<lastmod>` que cambió.
 - **Trampa:** `github_push_files` sube texto; un binario (la imagen OG) va con
   `contentBase64` o `fromUrl`, nunca como `content`.
+
+## Trampa: no uses `SoftwareApplication` sin ratings
+
+Google exige `aggregateRating` o `review` en `SoftwareApplication` y el Rich Results Test marca el nodo como inválido si faltan; no se inventan ratings. El SDK va como `SoftwareSourceCode` (sin rich result que validar) y `docs-seo.test.ts` falla si reaparece `SoftwareApplication`.

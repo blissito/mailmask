@@ -80,10 +80,10 @@ test("og-docs.jpg existe, mide lo que dicen las metas y pesa menos de 200 KB", (
   assert.ok(existsSync(new URL("./scripts/og-docs.html", import.meta.url)), "falta la plantilla scripts/og-docs.html");
 });
 
-test("JSON-LD: un @graph con Organization, WebSite, TechArticle, SoftwareApplication y BreadcrumbList", () => {
+test("JSON-LD: un @graph con Organization, WebSite, TechArticle, SoftwareSourceCode (SDK) y BreadcrumbList", () => {
   const nodos = grafo();
   const tipos = nodos.map((n) => n["@type"]).sort();
-  assert.deepEqual(tipos, ["BreadcrumbList", "Organization", "SoftwareApplication", "TechArticle", "WebSite"]);
+  assert.deepEqual(tipos, ["BreadcrumbList", "Organization", "SoftwareSourceCode", "TechArticle", "WebSite"]);
   const ids = new Set(nodos.map((n) => n["@id"]));
   assert.ok(ids.has(`${HOST}/#org`) && ids.has(`${HOST}/#website`));
   // Toda referencia {"@id"} apunta a un nodo del grafo.
@@ -91,7 +91,7 @@ test("JSON-LD: un @graph con Organization, WebSite, TechArticle, SoftwareApplica
 });
 
 test("JSON-LD: la CLI no aparece como software descargable mientras no esté en npm", () => {
-  const apps = grafo().filter((n) => n["@type"] === "SoftwareApplication");
+  const apps = grafo().filter((n) => n["@type"] === "SoftwareSourceCode");
   for (const a of apps) assert.doesNotMatch(JSON.stringify(a), /mailmask-cli|"name":"MailMask CLI"/i);
   assert.doesNotMatch(JSON.stringify(grafo()), /mailmask-cli/);
 });
@@ -113,4 +113,8 @@ test("las anclas de hasPart existen en la página", () => {
     const id = p.url.split("#")[1];
     assert.ok(html.includes(`id="${id}"`), `no existe id="${id}"`);
   }
+});
+
+test("el JSON-LD no declara SoftwareApplication sin aggregateRating/review (Google lo marca inválido y no inventamos ratings)", () => {
+  assert.doesNotMatch(JSON.stringify(grafo()), /SoftwareApplication|MobileApplication|WebApplication/);
 });

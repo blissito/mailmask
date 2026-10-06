@@ -89,3 +89,11 @@ test("llms.txt menciona cada comando de primer nivel de la CLI y los buzones", (
     assert.ok(llms.includes(palabra), `llms.txt no menciona ${palabra}`);
   }
 });
+
+test("docs.html#cli no repite párrafos", () => {
+  const html = leer("./public/docs.html");
+  const ini = html.indexOf('<h2 id="cli"');
+  const parrafos = [...html.slice(ini, html.indexOf("<h2 ", ini + 10)).matchAll(/<p [^>]*>(.*?)<\/p>/gs)].map((m) => m[1].trim());
+  const repetidos = parrafos.filter((p, i) => parrafos.indexOf(p) !== i);
+  assert.deepEqual(repetidos, []);
+});

@@ -173,19 +173,13 @@
         ]
       },
       {
-        "@type": "SoftwareApplication",
+        "@type": "SoftwareSourceCode",
         "@id": "https://www.mailmask.studio/docs#sdk",
         "name": "MailMask SDK",
-        "applicationCategory": "DeveloperApplication",
-        "operatingSystem": "Node.js",
         "description": "Cliente de JavaScript/TypeScript para la API de MailMask: crear y gestionar direcciones, buzones, dominios y reglas de reenvío.",
-        "softwareHelp": "https://www.mailmask.studio/docs",
-        "downloadUrl": "https://www.npmjs.com/package/@easybits.cloud/mailmask",
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "MXN"
-        },
+        "programmingLanguage": "TypeScript",
+        "runtimePlatform": "Node.js",
+        "url": "https://www.npmjs.com/package/@easybits.cloud/mailmask",
         "publisher": {
           "@id": "https://www.mailmask.studio/#org"
         }
@@ -822,7 +816,6 @@ mailmask aliases export &lt;dominio&gt; &lt;alias&gt; [-o buzon.mbox]</code></pr
       <p class="text-fg-muted text-sm mb-4"><code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">MAILMASK_API_KEY</code> tiene prioridad sobre la sesi&oacute;n guardada &mdash; es la v&iacute;a recomendada para CI o para un agente de c&oacute;digo.</p>
 
       <p class="text-sm font-bold mb-1">D&oacute;nde se guarda la sesi&oacute;n</p>
-      <p class="text-fg-muted text-sm mb-4">En el keychain del sistema operativo (Keychain en macOS, Secret Service/<code>secret-tool</code> en Linux). Si no hay keychain disponible &mdash;Windows, o un Linux sin Secret Service&mdash; cae a <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">~/.config/mailmask/credentials.json</code> con permisos <code>600</code>. <code>mailmask logout</code> la borra de donde haya quedado.</p>
       <p class="text-fg-muted text-sm mb-4">En el keychain del sistema operativo (Keychain en macOS, Secret Service/<code>secret-tool</code> en Linux). Si no hay keychain disponible &mdash;Windows, o un Linux sin Secret Service&mdash; cae a <code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">~/.config/mailmask/credentials.json</code> con permisos <code>600</code>. <code>mailmask logout</code> la borra de donde haya quedado.</p>
 
       <p class="text-sm font-bold mb-1">C&oacute;digos de salida</p>
