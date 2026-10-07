@@ -28,6 +28,16 @@ jobs:
       - run: mkdir -p data
       - run: npm test --if-present
       - run: npm run build --if-present
+      # Los bundles del chat se suben compilados (el Dockerfile no los construye). Si el código o
+      # las deps cambiaron y nadie recompiló, avisa sin bloquear: dependabot no puede empujar
+      # bundles a su rama. Ver docs/agents/ci-y-bundles.md.
+      - name: Bundles del chat al día
+        continue-on-error: true
+        run: |
+          if ! git diff --exit-code --stat public/js/docs-chat.js public/js/asistente.js; then
+            echo "::warning title=Bundles del chat desactualizados::corre 'npm run build:chat' y sube el resultado (public/js/docs-chat.js y asistente.js)"
+            exit 1
+          fi
   verify-cli:
     # cli/ es su propio paquete (depende de @easybits.cloud/mailmask vía npm), no un workspace del
     # root: necesita su propio install. Antes de este job, el `npm test` del root ya se topaba con

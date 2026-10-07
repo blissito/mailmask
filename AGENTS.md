@@ -44,6 +44,7 @@ pon al día la ficha en el mismo PR y agrega aquí su renglón.
 <!-- - [Tema](docs/agents/tema.md) — de qué trata, en una línea -->
 - [CLI de MailMask](docs/agents/mailmask-cli.md) — convenciones de `cli/`: framework de comandos, auth, exit codes y la regla dura de no tocar DNS `managed`.
 - [SEO de páginas públicas](docs/agents/seo-paginas-publicas.md) — metas en un bloque, `@graph`, `dateModified` visible, imagen OG propia y `llms.txt` sin contradecir `/docs`.
+- [CI y bundles del chat](docs/agents/ci-y-bundles.md) — qué corre el CI, por qué los bundles del chat se suben compilados y qué hacer tras un bump de formmy/react/streamdown.
 
 ## Pull requests
 - Rama nueva desde `main`; el PR explica qué cambia y cómo se probó.

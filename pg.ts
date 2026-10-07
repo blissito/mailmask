@@ -8,7 +8,7 @@ import * as schema from "./schema.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = process.env.DATABASE_PATH ?? "./data/mailmask.db";
-const sqlite = new Database(dbPath);
+const sqlite: InstanceType<typeof Database> = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
 
