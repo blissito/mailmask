@@ -22,6 +22,14 @@ import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table
 import { Node, mergeAttributes } from "@tiptap/core";
 import githubAlerts from "markdown-it-github-alerts";
 
+// tiptap-markdown no declara su storage en el tipo `Storage` de tiptap 3: sin esto
+// `editor.storage.markdown` no compila (lo destapó el typecheck del front, pedido #17).
+declare module "@tiptap/core" {
+  interface Storage {
+    markdown: { getMarkdown(): string };
+  }
+}
+
 const CALLOUT_KINDS = ["note", "tip", "important", "warning", "caution"] as const;
 type CalloutKind = (typeof CALLOUT_KINDS)[number];
 

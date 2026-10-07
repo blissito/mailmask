@@ -1,0 +1,17 @@
+{
+  "//": "Tipos del front que esbuild compila sin revisar: chat de /docs, asistente y composer. Ver docs/agents/ci-y-bundles.md.",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["public/js/**/*.ts", "public/js/**/*.tsx"]
+}
