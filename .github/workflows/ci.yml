@@ -34,7 +34,10 @@ jobs:
       - name: Bundles del front al día
         continue-on-error: true
         run: |
-          if ! git diff --exit-code --stat public/js/docs-chat.js public/js/asistente.js public/js/composer.js; then
+          # status --porcelain y no diff: diff ignora un bundle borrado del índice y regenerado
+          files="public/js/docs-chat.js public/js/asistente.js public/js/composer.js"
+          if [ -n "$(git status --porcelain -- $files)" ]; then
+            git status --short -- $files
             echo "::warning title=Bundles del front desactualizados::corre 'npm run build' y sube el resultado (public/js/docs-chat.js, asistente.js y composer.js)"
             exit 1
           fi
