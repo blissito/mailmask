@@ -1,0 +1,4 @@
+# Fixtures de prueba falsos (no son secretos) del commit a1d97e9 de este PR.
+a1d97e909b6e4442e42de7801ef5e1931cce5760:cli/test/smtp.test.ts:generic-api-key:22
+a1d97e909b6e4442e42de7801ef5e1931cce5760:cli/test/api-keys.test.ts:generic-api-key:24
+a1d97e909b6e4442e42de7801ef5e1931cce5760:cli/test/api-keys.test.ts:generic-api-key:27

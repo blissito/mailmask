@@ -43,6 +43,21 @@ mailmask aliases mailbox delete <dominio> <alias> [--yes] [--json]
 mailmask aliases mailbox reset-password <dominio> <alias> [--yes] [--json]
 mailmask aliases apple-profile <dominio> <alias> -o perfil.mobileconfig
 mailmask aliases export <dominio> <alias> [-o buzon.mbox]
+
+mailmask webhooks list <dominio> [--json]
+mailmask webhooks create <dominio> <url> --events email.received,email.bounced [--json]
+mailmask webhooks update <dominio> <id> [--url ...] [--events ...] [--enable | --disable] [--json]
+mailmask webhooks delete <dominio> <id> [--yes] [--json]
+mailmask webhooks test <dominio> <id> [--json]
+mailmask webhooks deliveries <dominio> <id> [--json]
+
+mailmask smtp list <dominio> [--json]
+mailmask smtp create <dominio> <etiqueta> [--json]
+mailmask smtp revoke <dominio> <id> [--yes] [--json]
+
+mailmask api-keys list [--json]
+mailmask api-keys create <nombre> [--json]
+mailmask api-keys revoke <id> [--yes] [--json]
 ```
 
 `domains delete` y `dns delete` son destructivos: en una terminal preguntan
@@ -55,7 +70,7 @@ Sin `--api-key`, `login` abre el navegador para autorizar el dispositivo
 `MAILMASK_API_KEY` por variable de entorno, que tiene prioridad sobre lo
 guardado y es la vía recomendada para CI o para un agente de código.
 
-En los comandos de `domains`, `dns` y `aliases`, `<dominio>` acepta el nombre
+En los comandos de `domains`, `dns`, `aliases`, `webhooks` y `smtp`, `<dominio>` acepta el nombre
 (`acme.com`) o el id — se resuelve contra `domains list` (`cli/src/resolve.ts`).
 `domains create --preset` registra el dominio y de una vez aplica un preset de
 DNS; `dns preset` hace lo mismo sobre uno que ya existe — es la misma llamada
@@ -128,3 +143,22 @@ npm run typecheck
 npm test
 npm run build   # genera dist/index.js con el shebang
 ```
+
+### Webhooks, SMTP y API keys
+
+Los tres recursos devuelven un secreto que no se puede volver a consultar, así
+que sólo `create` lo imprime completo (el secreto de firma del webhook, la
+contraseña SMTP, la API key) y avisa que no se vuelve a mostrar. `list`,
+`update`, `test`, `deliveries` y `revoke`/`delete` nunca lo muestran. Para
+tener otra, revoca y crea una nueva; el SDK no rota el secreto de un webhook
+(borra el webhook y crea otro). `webhooks create` exige `--events` con alguno de
+`email.received`, `email.sent`, `email.delivered`, `email.bounced` y
+`email.complained`; un evento mal escrito sale con `1` sin tocar la red.
+`webhooks` y `smtp` piden el dominio activado.
+
+`webhooks delete`, `smtp revoke` y `api-keys revoke` son destructivos: preguntan
+en una terminal y exigen `--yes` fuera de ella. Si la llave que revocas es la
+que usa esta sesión (la marca `api-keys list`), el comando avisa que la sesión
+quedará sin llave y pide una segunda confirmación (con `--yes`, el aviso va a
+stderr y sigue); al terminar sugiere `mailmask login`, y con `--json` agrega
+`"activeKeyRevoked": true`.

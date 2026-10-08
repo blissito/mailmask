@@ -159,6 +159,27 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   tarde, cuando el comando ya resolvió el import real. Ver `cli/test/dns.test.ts`
   y `cli/test/domains.test.ts`.
 
+- **`webhooks`, `smtp` y `api-keys`:** 1:1 con `client.webhooks.*`, `client.smtp.*` y
+  `client.apiKeys.*`. A diferencia de los buzones, **no hay reset**: el secreto de
+  firma del webhook, la contraseña SMTP y la API key salen completos SÓLO en la
+  salida de `create` (texto y `--json`, sin `maskSecret`) con el aviso de que no se
+  vuelven a mostrar; para otra hay que revocar y crear (el SDK no rota webhooks).
+  `list`/`update`/`test`/`deliveries` nunca los imprimen (`withoutSecret()` quita
+  `secret` aunque la API lo devolviera). `--events` se valida contra
+  `WEBHOOK_EVENTS` (`args.ts`) ANTES de `requireClient`, vía `failUsage()`
+  (`output.ts`: exit 1, con `--json` sale como `{error}`).
+- **Excepción a "confirmar antes de listar": `api-keys revoke`.** Primero pasa por
+  el `confirmOrExit` genérico (contrato intacto: sin TTY y sin `--yes` sale con 1
+  sin llamar a la API). Sólo después hace `apiKeys.list()` para saber si el id es
+  la llave activa (`auth.apiKey.startsWith(keyPrefix)`, como `whoami`); si lo es,
+  pide una SEGUNDA confirmación ("la sesión quedará sin llave"), o con `--yes`
+  escribe el aviso a stderr y sigue. Sugiere `mailmask login`; en `--json` agrega
+  `activeKeyRevoked: true`. Si dos llaves comparten prefijo puede avisar de más,
+  nunca de menos.
+- **Trampa:** `webhooks` y `smtp` exigen dominio activado y la API responde 403, que
+  `failFromError` trata como "corre login" (exit 2). Es engañoso pero cambiarlo toca
+  la taxonomía de exit codes; queda para un issue aparte.
+
 ## Convención dura — no se negocia en ningún comando futuro
 
 **Ningún registro DNS con `managed: true` se toca desde el CLI, ni con `--force`.**
