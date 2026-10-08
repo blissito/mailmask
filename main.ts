@@ -6532,7 +6532,8 @@ const app = new Elysia({ adapter: node() })
       // JSON path does) silently corrupts the file and yields an unrestorable download.
       if (params.key.endsWith(DB_BACKUP_SUFFIX)) {
         const bytes = await getBackupBytesFromS3(params.key);
-        return new Response(bytes, {
+        // Uint8Array<ArrayBufferLike> no entra a BodyInit con los tipos de TS 5.9; Buffer sí
+        return new Response(Buffer.from(bytes), {
           headers: {
             "content-type": "application/gzip",
             "content-disposition": `attachment; filename="${params.key}"`,
