@@ -13,6 +13,7 @@ jobs:
   deploy:
     name: Imagen a GHCR
     runs-on: ubuntu-latest
+    environment: production
     concurrency: deploy-group
     permissions:
       contents: read
