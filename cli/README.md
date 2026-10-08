@@ -47,6 +47,11 @@ mailmask suppressions list <dominio> [--json]
 mailmask suppressions add <dominio> <correo> [--json]
 mailmask suppressions remove <dominio> <correo> [--yes] [--json]
 
+mailmask send email <dominio> --to <correo> --subject <asunto> [--from <alias>] [--from-name <nombre>] [--reply-to <correo>] [--cc <correo>]... [--bcc <correo>]... [--text <texto|@archivo> | --html <html|@archivo> | --markdown <md|@archivo>] [--attach <archivo>]... [--idempotency-key <clave>] [--yes] [--json]
+mailmask send bulk <dominio> <archivo.json> [--yes] [--json]
+mailmask send status <dominio> <jobId> [--json]
+mailmask logs <dominio> [--limit 1-100] [--json]
+
 mailmask inbox list <dominio> [--status open|snoozed|closed|unread|deleted] [--alias <máscara>] [--assigned <usuario>] [--q <texto>] [--limit N] [--cursor <c>] [--json]
 mailmask inbox get <dominio> <conversación> [--before <mensaje>] [--json]
 mailmask inbox reply <dominio> <conversación> --markdown <texto> [--cc <a,b>] [--bcc <a,b>] [--no-quote] [--yes] [--json]
@@ -245,7 +250,27 @@ restauran con `inbox restore`). `inbox attachment` escribe los bytes en `-o` o, 
 stdout; si el adjunto no existe sale con `4` y no deja ningún archivo. `signature set ""`
 borra la firma (máx. 2000 caracteres).
 
-`rules delete`, `suppressions remove`, `inbox reply|compose|delete`, `canned delete`, `domains logo remove`, `webhooks delete`, `smtp revoke` y `api-keys revoke` son destructivos: preguntan
+### Enviar correo y logs
+
+`send email` manda un correo desde un alias activo del dominio. `--from` acepta la
+parte local (`hola`) o la dirección completa (`hola@acme.com`); la completa se recorta
+sólo si es del dominio dado por nombre, y cualquier otra falla sin tocar la red. Sin
+`--from` el correo sale desde `noreply@` y el CLI lo avisa en stderr. `--text`, `--html`
+y `--markdown` aceptan el contenido o `@ruta` para leerlo de un archivo (al menos uno;
+HTML ≤ 100 KB). `--cc`, `--bcc` y `--attach` se repiten (máx. 20 copias; adjuntos ≤ 5 MB
+cada uno). Reintentar con la misma `--idempotency-key` no vuelve a enviar, pero sí vuelve
+a subir los adjuntos (quedan llaves huérfanas en S3 hasta que expiran).
+
+`send bulk` toma un JSON con exactamente `{ "recipients": [...], "subject": "...", "html": "...", "from"?: "..." }`;
+cualquier otra llave (`markdown`, `cc`, `attachments`…) es error. Imprime el `jobId` y
+`send status <dominio> <jobId>` muestra enviados, fallidos y suprimidos de ese total.
+`logs` lista los últimos correos del dominio (por omisión 50).
+
+`send email` y `send bulk` salen a terceros: preguntan en una terminal y fuera de ella
+exigen `--yes`; sin él salen con `1` sin llamar al SDK ni subir adjuntos. Enviar pide el
+dominio activado: un 403 sale con `2` ("corre login").
+
+`rules delete`, `suppressions remove`, `inbox reply|compose|delete`, `canned delete`, `send email|bulk`, `domains logo remove`, `webhooks delete`, `smtp revoke` y `api-keys revoke` son destructivos: preguntan
 en una terminal y exigen `--yes` fuera de ella. Si la llave que revocas es la
 que usa esta sesión (la marca `api-keys list`), el comando avisa que la sesión
 quedará sin llave y pide una segunda confirmación (con `--yes`, el aviso va a
