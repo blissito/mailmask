@@ -1064,7 +1064,7 @@ export function createCourtesyAddon(input: {
 //   activado  = tiene add-on `domain` vigente con su domainId, o su dueño conserva una
 //               suscripción legado vigente (Brenda: mientras MP le cobre lo de antes,
 //               todos sus dominios cuentan como activados — nadie paga más).
-//   esGratis  = no activado y es el dominio MÁS ANTIGUO de su dueño: el único gratis.
+//   esGratis  = no activado y es el dominio más antiguo SIN ACTIVAR de su dueño: el único gratis.
 //   bloqueado = no activado y no es el gratis: el 2.º dominio sin pagar. Su correo se
 //               guarda en la Bandeja pero no se reenvía.
 export interface DerechosDominio {
@@ -1099,11 +1099,17 @@ function suscripcionLegadoVigente(owner: User | null | undefined): boolean {
   return true;
 }
 
-/** El primer dominio que creó la cuenta: ése es el gratis. */
-export function dominioMasAntiguo(ownerEmail: string): string | null {
-  const r = db.select({ id: domains.id }).from(domains)
-    .where(eq(domains.ownerEmail, ownerEmail)).orderBy(asc(domains.createdAt)).limit(1).get();
-  return r?.id ?? null;
+/**
+ * El dominio gratis: el más antiguo de la cuenta que NO tenga su propia activación.
+ * Antes era el más antiguo a secas, así que pagar ese dominio se comía el lugar gratis
+ * y el segundo quedaba bloqueado (palmeralegal.mx, 8-oct-2026): pagar $99 no sumaba
+ * ningún dominio. Si la activación vence, el lugar vuelve al más antiguo.
+ */
+export function freeDomainId(ownerEmail: string): string | null {
+  const rows = db.select({ id: domains.id }).from(domains)
+    .where(eq(domains.ownerEmail, ownerEmail)).orderBy(asc(domains.createdAt)).all();
+  const free = rows.find((r) => !listEffectiveAddonsForDomain(r.id).some((a) => a.kind === "domain"));
+  return free?.id ?? null;
 }
 
 export function derechosDeDominio(domain: { id: string; ownerEmail: string }, owner?: User | null): DerechosDominio {
@@ -1114,7 +1120,7 @@ export function derechosDeDominio(domain: { id: string; ownerEmail: string }, ow
 
   const legadoVigente = suscripcionLegadoVigente(owner);
   const activado = legadoVigente || propios.some((a) => a.kind === "domain");
-  const esGratis = !activado && dominioMasAntiguo(domain.ownerEmail) === domain.id;
+  const esGratis = !activado && freeDomainId(domain.ownerEmail) === domain.id;
   const bloqueado = !activado && !esGratis;
 
   const cuenta = (kind: string) => todos.filter((a) => a.kind === kind).length;
