@@ -761,7 +761,7 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
 
       <!-- CLI -->
       <h2 id="cli" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">CLI</h2>
-      <p class="text-fg-muted mb-2">CLI de terminal sobre este mismo SDK: un subcomando por recurso, sin modelo declarativo encima. Cubre la sesi&oacute;n (<code class="text-fg">login</code>, <code class="text-fg">logout</code>, <code class="text-fg">whoami</code>), <code class="text-fg">domains</code>, <code class="text-fg">dns</code> y <code class="text-fg">aliases</code>, con los buzones IMAP, el perfil de Apple Mail y la exportaci&oacute;n en mbox. El env&iacute;o de correo desde la terminal todav&iacute;a no est&aacute;.</p>
+      <p class="text-fg-muted mb-2">CLI de terminal sobre este mismo SDK: un subcomando por recurso, sin modelo declarativo encima. Cubre la sesi&oacute;n (<code class="text-fg">login</code>, <code class="text-fg">logout</code>, <code class="text-fg">whoami</code>), <code class="text-fg">domains</code>, <code class="text-fg">dns</code>, <code class="text-fg">aliases</code>, <code class="text-fg">webhooks</code>, <code class="text-fg">smtp</code> y <code class="text-fg">api-keys</code>, con los buzones IMAP, el perfil de Apple Mail y la exportaci&oacute;n en mbox. El env&iacute;o de correo desde la terminal todav&iacute;a no est&aacute;.</p>
       <p class="text-fg-subtle text-xs mb-4">Nombre del paquete y del binario (hoy <code>mailmask-cli</code> / <code>mailmask</code>) son provisionales, pendientes de confirmaci&oacute;n antes de publicarse a npm.</p>
       <p class="text-fg-muted text-sm mb-6">&iquest;Quien va a operar tu cuenta es un agente de c&oacute;digo? Probablemente le convenga m&aacute;s instalarle las <a href="#skills" class="text-accent-text hover:underline">skills oficiales</a> (<code>npx skills add https://www.mailmask.studio</code>) que esta CLI: ya saben qu&eacute; puede hacer cada plan y qu&eacute; secretos salen una sola vez. Esta CLI es para cuando la persona teclea los comandos ella misma.</p>
 
@@ -806,11 +806,26 @@ mailmask aliases mailbox delete &lt;dominio&gt; &lt;alias&gt; [--yes] [--json]
 mailmask aliases mailbox reset-password &lt;dominio&gt; &lt;alias&gt; [--yes] [--json]
 mailmask aliases apple-profile &lt;dominio&gt; &lt;alias&gt; -o perfil.mobileconfig
 mailmask aliases export &lt;dominio&gt; &lt;alias&gt; [-o buzon.mbox]</code></pre>
+
+      <p class="text-sm font-bold mb-1">Webhooks, SMTP y API keys</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask webhooks list &lt;dominio&gt; [--json]
+mailmask webhooks create &lt;dominio&gt; &lt;url&gt; --events email.received,email.bounced [--json]
+mailmask webhooks update &lt;dominio&gt; &lt;id&gt; [--url ...] [--events ...] [--enable | --disable] [--json]
+mailmask webhooks delete &lt;dominio&gt; &lt;id&gt; [--yes] [--json]
+mailmask webhooks test &lt;dominio&gt; &lt;id&gt; [--json]
+mailmask webhooks deliveries &lt;dominio&gt; &lt;id&gt; [--json]
+mailmask smtp list &lt;dominio&gt; [--json]
+mailmask smtp create &lt;dominio&gt; &lt;etiqueta&gt; [--json]
+mailmask smtp revoke &lt;dominio&gt; &lt;id&gt; [--yes] [--json]
+mailmask api-keys list [--json]
+mailmask api-keys create &lt;nombre&gt; [--json]
+mailmask api-keys revoke &lt;id&gt; [--yes] [--json]</code></pre>
+      <p class="text-fg-muted text-sm mb-4"><strong class="text-fg">El secreto sale completo s&oacute;lo en <code>create</code></strong> (secreto de firma del webhook, contrase&ntilde;a SMTP, API key) y con el aviso de que no se vuelve a mostrar; ning&uacute;n otro comando lo imprime. Para tener otro, revoca y crea uno nuevo. <code>webhooks create</code> exige <code>--events</code> con <code>email.received</code>, <code>email.sent</code>, <code>email.delivered</code>, <code>email.bounced</code> o <code>email.complained</code>; un evento mal escrito sale con <code>1</code> sin tocar la red. <code>webhooks</code> y <code>smtp</code> piden el dominio activado. Si revocas la llave con la que est&aacute;s conectado, <code>api-keys revoke</code> avisa que la sesi&oacute;n quedar&aacute; sin llave y pide una segunda confirmaci&oacute;n; con <code>--json</code> agrega <code>activeKeyRevoked: true</code>.</p>
       <p class="text-fg-muted text-sm mb-4"><code>aliases create</code> acepta uno o m&aacute;s destinos como argumentos sueltos (<code>aliases create acme.com soporte ana@acme.com luis@acme.com</code>); con <code>--mailbox</code> tambi&eacute;n se permite sin ning&uacute;n destino, porque el correo se queda en el buz&oacute;n IMAP. <code>aliases update</code> cambia destinos y/o el estado con <code>--enable</code> o <code>--disable</code> (no se combinan). El buz&oacute;n IMAP vive bajo <code>aliases mailbox</code> y requiere el dominio activado.</p>
       <p class="text-fg-muted text-sm mb-4"><strong class="text-fg">La contrase&ntilde;a del buz&oacute;n sale enmascarada</strong> (<code>ab&bull;&bull;&bull;&bull;&bull;&bull;yz</code>) y no se vuelve a mostrar completa: para verla entera, <code>mailbox reset-password</code> con <code>--json</code> genera una nueva y la devuelve completa una sola vez; la anterior deja de servir. <code>apple-profile</code> escribe el perfil <code>.mobileconfig</code> de Apple Mail en la ruta de <code>-o</code>; <code>export</code> baja el buz&oacute;n en mbox a un archivo con <code>-o</code> o por la salida est&aacute;ndar, para encadenarlo con otro comando.</p>
 
       <p class="text-sm font-bold mb-1">Para scripts y agentes: <code>--json</code> y <code>--yes</code></p>
-      <p class="text-fg-muted text-sm mb-4">Con <code>--json</code> los comandos imprimen JSON, y un error sale por stderr como <code>{"error": "...", "status": 404}</code> (sin <code>status</code> si no vino de la API), para parsearlo sin adivinar el formato. Lo que borra o resetea &mdash; <code>domains delete</code>, <code>dns delete</code>, <code>aliases delete</code>, <code>aliases mailbox delete</code> y <code>aliases mailbox reset-password</code> &mdash; pregunta <code>[y/N]</code> en una terminal; fuera de una (CI, un agente) exige <code>--yes</code> y, sin &eacute;l, sale con c&oacute;digo <code>1</code> sin tocar la red.</p>
+      <p class="text-fg-muted text-sm mb-4">Con <code>--json</code> los comandos imprimen JSON, y un error sale por stderr como <code>{"error": "...", "status": 404}</code> (sin <code>status</code> si no vino de la API), para parsearlo sin adivinar el formato. Lo que borra o resetea &mdash; <code>domains delete</code>, <code>dns delete</code>, <code>aliases delete</code>, <code>aliases mailbox delete</code> y <code>aliases mailbox reset-password</code>, <code>webhooks delete</code>, <code>smtp revoke</code> y <code>api-keys revoke</code> &mdash; pregunta <code>[y/N]</code> en una terminal; fuera de una (CI, un agente) exige <code>--yes</code> y, sin &eacute;l, sale con c&oacute;digo <code>1</code> sin tocar la red.</p>
 
       <p class="text-sm font-bold mb-1">Variable de entorno</p>
       <p class="text-fg-muted text-sm mb-4"><code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">MAILMASK_API_KEY</code> tiene prioridad sobre la sesi&oacute;n guardada &mdash; es la v&iacute;a recomendada para CI o para un agente de c&oacute;digo.</p>

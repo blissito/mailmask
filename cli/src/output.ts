@@ -49,6 +49,12 @@ function failJson(error: string, status: number | undefined, code: number): neve
   process.exit(code);
 }
 
+/** Error de uso (flags inválidos): exit 1 antes de tocar la red; con `--json` sale como `{error}`. */
+export function failUsage(message: string, opts: { json?: boolean } = {}): never {
+  if (opts.json) failJson(message, undefined, EXIT.ERROR);
+  fail(message, EXIT.ERROR);
+}
+
 export function failFromError(err: unknown, opts: { json?: boolean } = {}): never {
   if (err instanceof MailMaskError) {
     const code = exitCodeForStatus(err.status);
