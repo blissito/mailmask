@@ -128,6 +128,18 @@ describe("Derechos por dominio: activado ($99)", () => {
     assert.equal(derechos(d1.id).activado, true);
     assert.equal(derechos(d2.id).esGratis, true, "pagar $99 suma un dominio, no se come el gratis");
     assert.equal(derechos(d2.id).bloqueado, false);
+
+    // Deja de pagar: el que pagaba se bloquea (empuja a reactivar) y el gratis no se mueve.
+    sqlite.prepare("UPDATE addons SET status = 'cancelled', current_period_end = ? WHERE domain_id = ?").run(PAST, d1.id);
+    assert.equal(derechos(d1.id).bloqueado, true);
+    assert.equal(derechos(d2.id).esGratis, true);
+  });
+
+  it("un checkout abandonado no se come el lugar gratis", () => {
+    const email = cuenta("act");
+    const d = dominio(email);
+    createAddon(email, "domain", d.id); // pending, nunca cobrado
+    assert.equal(derechos(d.id).esGratis, true);
   });
 
   it("+50 GB y +100 envíos se acumulan sobre el dominio activado", () => {

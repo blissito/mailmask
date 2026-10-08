@@ -1064,7 +1064,7 @@ export function createCourtesyAddon(input: {
 //   activado  = tiene add-on `domain` vigente con su domainId, o su dueño conserva una
 //               suscripción legado vigente (Brenda: mientras MP le cobre lo de antes,
 //               todos sus dominios cuentan como activados — nadie paga más).
-//   esGratis  = no activado y es el dominio más antiguo SIN ACTIVAR de su dueño: el único gratis.
+//   esGratis  = no activado y es el dominio más antiguo que NUNCA se activó: el único gratis.
 //   bloqueado = no activado y no es el gratis: el 2.º dominio sin pagar. Su correo se
 //               guarda en la Bandeja pero no se reenvía.
 export interface DerechosDominio {
@@ -1100,16 +1100,24 @@ function suscripcionLegadoVigente(owner: User | null | undefined): boolean {
 }
 
 /**
- * El dominio gratis: el más antiguo de la cuenta que NO tenga su propia activación.
- * Antes era el más antiguo a secas, así que pagar ese dominio se comía el lugar gratis
- * y el segundo quedaba bloqueado (palmeralegal.mx, 8-oct-2026): pagar $99 no sumaba
- * ningún dominio. Si la activación vence, el lugar vuelve al más antiguo.
+ * El dominio gratis: el más antiguo de la cuenta que NUNCA haya estado activado.
+ * - Pagar el gratis no se come el lugar: pasa al siguiente (palmeralegal.mx, 8-oct-2026,
+ *   pagó $99 y su segundo dominio seguía bloqueado).
+ * - Dejar de pagar no lo devuelve: el dominio que se pagaba queda bloqueado (guarda, no
+ *   reenvía) para empujar a reactivarlo, y el gratis sigue donde estaba. Una cuenta que
+ *   pagó todos sus dominios y dejó de pagar se queda sin gratis.
+ * "Estuvo activado" = add-on `domain` vigente o con `currentPeriodEnd` (sólo se fija al
+ * cobrar); un checkout abandonado (pending/expired sin periodo) no cuenta.
  */
 export function freeDomainId(ownerEmail: string): string | null {
+  const everActivated = new Set(
+    listAddons(ownerEmail)
+      .filter((a) => a.kind === "domain" && a.domainId && (a.status === "active" || a.currentPeriodEnd))
+      .map((a) => a.domainId!),
+  );
   const rows = db.select({ id: domains.id }).from(domains)
     .where(eq(domains.ownerEmail, ownerEmail)).orderBy(asc(domains.createdAt)).all();
-  const free = rows.find((r) => !listEffectiveAddonsForDomain(r.id).some((a) => a.kind === "domain"));
-  return free?.id ?? null;
+  return rows.find((r) => !everActivated.has(r.id))?.id ?? null;
 }
 
 export function derechosDeDominio(domain: { id: string; ownerEmail: string }, owner?: User | null): DerechosDominio {
