@@ -10,15 +10,11 @@ npm test          # Run tests (tsx --test)
 ```
 
 ## Deploy
-**Producción vive en sandbox-host desde el 8-oct-2026** (fierro A, caja `app-host` `mailmask-prod`,
-`sb_d425c447-f4c3-4be4-b2a0-6515f5383686`), ya no en Fly. Push a `main` → Actions publica
-`ghcr.io/blissito/mailmask:{sha,main}` → la caja la jala sola en ≤60 s (`app-deploy.timer`: salud en
-`/healthz` y regreso al digest anterior si falla) y el workflow espera a que `/version` dé el SHA.
-Nunca hay deploy desde el árbol local, así que la regla de «worktree limpio» ya la cumple Actions.
-SQLite en `/app/data/mailmask.db` del volumen de la caja (respaldado por `dataPaths` + el respaldo
-diario propio a `mailmask-backups`). Secretos en `/app/secrets.env` de la caja (`FLY_APP_NAME=mailmask`
-se queda a propósito: de él cuelgan las cookies `Secure` y el CORS; `TRUSTED_IP_HEADER=x-real-client-ip`).
-Runbook: `sandbox-host/docs/runbook-fly-migration.md` §7.
+**Siempre desde un worktree limpio de HEAD, nunca desde `/Users/bliss/mailmask` con trabajo sin commit.** `fly deploy` empaqueta el árbol de trabajo tal cual: el 5-sep-2026 un deploy se llevó a producción un `main.ts` que importaba un módulo que estaba en un stash y tumbó el sitio; otro se llevó cambios de precios a medias. Con dos sesiones de Claude en el mismo repo esto pasa.
+```bash
+W=$SCRATCHPAD/deploy-wt; git worktree add --detach "$W" HEAD && (cd "$W" && fly deploy); git worktree remove --force "$W"
+```
+Y nunca `git stash`, `checkout` ni `reset` sobre archivos que otra sesión tiene abiertos; commitea sólo con `git add <tus archivos>`.
 
 ## SDK (`sdk/`)
 When any file inside `sdk/` is modified: bump the version (`npm version patch` in `sdk/`), build, and publish to npm:

@@ -180,6 +180,21 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   `failFromError` trata como "corre login" (exit 2). Es engañoso pero cambiarlo toca
   la taxonomía de exit codes; queda para un issue aparte.
 
+- **`rules`, `suppressions`, `domains dns-setup|logo` y `dns import`:** 1:1 con el SDK.
+  `rules create|update` toman `--field` (to|from|subject), `--match`
+  (contains|equals|regex), `--value`, `--action` (forward|webhook|discard), `--target`,
+  `--priority` (entero) y `--disabled` / `--enable|--disable`; los enums viven en
+  `args.ts` (`RULE_*`) y se validan con `failUsage()` antes de `requireClient`, igual
+  que `--target` obligatorio con forward/webhook. **La regex NO se valida en el CLI:**
+  el 400 de `regex-guard.ts` pasa por `failFromError` tal cual (exit 1). `domains
+  logo set` sólo acepta archivo local (.png/.jpg/.jpeg/.webp, ≤ 500 KB, límite
+  replicado del servidor: si cambia, moverlo en los dos lados); **no tiene `--url`**
+  porque `setLogoFromUrl` sólo admite adjuntos firmados del chat del asistente y el
+  servidor rechaza cualquier otra URL. `dns import` es de **sólo lectura** en el
+  servidor, así que NO lleva `confirmOrExit`; su rate limit (2 cada 5 min) cae solo en
+  exit 5. `rules delete`, `suppressions remove` y `domains logo remove` sí confirman
+  ANTES de `resolveDomainId`.
+
 ## Convención dura — no se negocia en ningún comando futuro
 
 **Ningún registro DNS con `managed: true` se toca desde el CLI, ni con `--force`.**

@@ -112,9 +112,9 @@ respectivamente. Quien solo reenvía nunca toca el límite de envíos.
    - **CLI** (`mailmask`, terminal): aún no publicado en npm; se instala desde el repo
      (`cli/`: `npm install && npm run build`, luego `node dist/index.js --help`). Se autentica
      con `MAILMASK_API_KEY` (lo recomendado para un agente) o con `mailmask login`. Comandos:
-     `login`/`logout`/`whoami`, `domains`, `dns`, `aliases` (con buzones IMAP en
-     `aliases mailbox`, más `aliases apple-profile` y `aliases export`), `webhooks`, `smtp` y
-     `api-keys` (el secreto sale completo sólo en `create`). `--json` para
+     `login`/`logout`/`whoami`, `domains` (con `dns-setup` y `logo`), `dns` (con `import`), `aliases` (con buzones IMAP en
+     `aliases mailbox`, más `aliases apple-profile` y `aliases export`), `webhooks`, `smtp`,
+     `rules`, `suppressions` y `api-keys` (el secreto sale completo sólo en `create`). `--json` para
      máquinas (los errores salen como JSON por stderr); lo destructivo pide `--yes` fuera de una
      terminal y sin él sale con 1. Exit codes: 0 éxito, 1 genérico, 2 sin llave o rechazada,
      3 conflicto, 4 no encontrado, 5 transitorio (reintentar). Referencia:

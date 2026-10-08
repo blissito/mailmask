@@ -1,4 +1,4 @@
-import type { DnsPreset, WebhookEvent } from "@easybits.cloud/mailmask";
+import type { DnsPreset, RuleAction, RuleField, RuleMatch, WebhookEvent } from "@easybits.cloud/mailmask";
 
 /** Compartido entre `domains` (create --preset) y `dns` (preset): un solo lugar para la lista. */
 export const PRESETS: DnsPreset[] = [
@@ -11,3 +11,8 @@ export const yesArg = { yes: { type: "boolean" as const, description: "Confirma 
 
 /** Los 5 eventos de `WebhookEvent` del SDK; `webhooks --events` se valida contra esta lista antes de tocar la red. */
 export const WEBHOOK_EVENTS: WebhookEvent[] = ["email.received", "email.sent", "email.delivered", "email.bounced", "email.complained"];
+
+/** Los valores de `RuleField`, `RuleMatch` y `RuleAction` del SDK; `rules --field/--match/--action` se validan contra ellas antes de tocar la red. */
+export const RULE_FIELDS: RuleField[] = ["to", "from", "subject"];
+export const RULE_MATCHES: RuleMatch[] = ["contains", "equals", "regex"];
+export const RULE_ACTIONS: RuleAction[] = ["forward", "webhook", "discard"];

@@ -202,7 +202,27 @@ const delegation = defineCommand({
   },
 });
 
+const importCmd = defineCommand({
+  meta: { name: "import", description: "Muestra los registros DNS que MailMask encontró en el dominio y los nameservers (sólo lectura: no cambia nada)" },
+  args: { ...domainArg, ...jsonArg },
+  async run({ args }) {
+    const { client } = await requireClient();
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
+    try {
+      const result = await client.dns.import(id);
+      if (args.json) return printJson(result);
+      process.stdout.write(`Encontrados: ${result.found.length} registro(s).\n`);
+      for (const r of result.found) process.stdout.write(`  ${r.type}  ${r.name}  ${r.values.join(" | ")}\n`);
+      process.stdout.write("  Nameservers:\n");
+      for (const ns of result.nameservers) process.stdout.write(`    ${ns}\n`);
+      if (result.warning) process.stdout.write(`  ${result.warning}\n`);
+    } catch (err) {
+      failFromError(err, { json: args.json });
+    }
+  },
+});
+
 export default defineCommand({
   meta: { name: "dns", description: "Administra los registros DNS de un dominio" },
-  subCommands: { list, upsert, delete: del, preset, "create-zone": createZone, delegation },
+  subCommands: { list, upsert, delete: del, preset, "create-zone": createZone, delegation, import: importCmd },
 });

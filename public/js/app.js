@@ -266,9 +266,7 @@ async function checkAuth() {
   // porque explica por qué todos los dominios cuentan como activados.
   const subBadge = currentUser.subscription;
   const finBadge = subBadge?.currentPeriodEnd ? new Date(subBadge.currentPeriodEnd) : null;
-  // `status: "none"` es el relleno que /api/auth/me pone a quien nunca tuvo suscripción:
-  // sin este filtro todas las cuentas mostraban "plan anterior · Sin plan".
-  if (badge && subBadge?.plan && subBadge.status !== "none" && (!finBadge || finBadge >= new Date())) {
+  if (badge && subBadge?.plan && (!finBadge || finBadge >= new Date())) {
     badge.textContent = `plan anterior · ${subBadge.planLabel ?? subBadge.plan}`;
     badge.classList.remove("hidden");
   }
