@@ -769,7 +769,7 @@ describe("Google sign-in", () => {
     }));
     assert.equal(login.status, 200);
     await login.body?.cancel();
-    assert.equal(sqlite.prepare("SELECT count(*) AS c FROM users WHERE email = ?").get(email)!.c, 1);
+    assert.equal((sqlite.prepare("SELECT count(*) AS c FROM users WHERE email = ?").get(email) as { c: number }).c, 1);
   });
 
   it("callback rejects an unverified Google email and a wrong audience", async () => {
