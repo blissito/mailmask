@@ -19,9 +19,9 @@ mock.module("../src/client.js", {
 const { default: smtp } = await import("../src/commands/smtp.js");
 const { list, create, revoke } = smtp.subCommands as Record<string, any>;
 
-const PASSWORD = "p4ssw0rd-COMPLETA-9f8e7d6c5b4a";
-const cred = { id: "cr_1", domainId: "dom_1", label: "app", iamUsername: "AKIAEXAMPLE", createdAt: "now" };
-const created = { id: "cr_1", label: "app", server: "smtp.mailmask.studio", port: 587, encryption: "STARTTLS", username: "AKIAEXAMPLE", password: PASSWORD, createdAt: "now" };
+const PASSWORD = "password-de-prueba";
+const cred = { id: "cr_1", domainId: "dom_1", label: "app", iamUsername: "usuario-de-prueba", createdAt: "now" };
+const created = { id: "cr_1", label: "app", server: "smtp.mailmask.studio", port: 587, encryption: "STARTTLS", username: "usuario-de-prueba", password: PASSWORD, createdAt: "now" };
 
 function captureStdout(): { text: () => string; restore: () => void } {
   let text = "";
@@ -83,7 +83,7 @@ describe("smtp list", () => {
       } finally {
         out.restore();
       }
-      assert.doesNotMatch(out.text(), /p4ssw0rd/);
+      assert.doesNotMatch(out.text(), /password-de-prueba/);
       assert.match(out.text(), /cr_1/);
     }
   });

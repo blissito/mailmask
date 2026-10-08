@@ -20,7 +20,7 @@ mock.module("../src/client.js", {
 const { default: webhooks } = await import("../src/commands/webhooks.js");
 const { list, create, update, delete: del, test, deliveries } = webhooks.subCommands as Record<string, any>;
 
-const SECRET = "whsec_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const SECRET = "secreto-de-prueba";
 const hook = { id: "wh_1", domainId: "dom_1", url: "https://acme.com/hook", events: ["email.received"], enabled: true, createdAt: "now" };
 
 function captureStdout(): { text: () => string; restore: () => void } {
@@ -119,7 +119,7 @@ describe("webhooks: ningún otro comando imprime un secreto", () => {
       } finally {
         out.restore();
       }
-      assert.doesNotMatch(out.text(), /whsec_/);
+      assert.doesNotMatch(out.text(), /secreto-de-prueba/);
       assert.match(out.text(), /wh_1/);
     }
   });
@@ -134,7 +134,7 @@ describe("webhooks: ningún otro comando imprime un secreto", () => {
       } finally {
         out.restore();
       }
-      assert.doesNotMatch(out.text(), /whsec_/);
+      assert.doesNotMatch(out.text(), /secreto-de-prueba/);
     }
     assert.deepEqual(calls.find((c) => c.method === "webhooks.update")!.args, ["dom_1", "wh_1", { enabled: false, events: ["email.sent"] }]);
   });
@@ -155,7 +155,7 @@ describe("webhooks: ningún otro comando imprime un secreto", () => {
         } finally {
           out.restore();
         }
-        assert.doesNotMatch(out.text(), /whsec_/);
+        assert.doesNotMatch(out.text(), /secreto-de-prueba/);
         assert.match(out.text(), /dl_1/);
       }
     }

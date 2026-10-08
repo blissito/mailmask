@@ -5,7 +5,7 @@ import { fakeClient, trapExit, ExitSignal } from "./test-helpers.js";
 
 let currentClient: ReturnType<typeof fakeClient>["client"];
 
-const ACTIVE = "mk_live_ACTIVA1234567890abcdef";
+const ACTIVE = "llave-activa-de-prueba";
 
 trapExit();
 mock.module("../src/client.js", {
@@ -21,10 +21,10 @@ mock.module("../src/client.js", {
 const { default: apiKeys } = await import("../src/commands/api-keys.js");
 const { list, create, revoke } = apiKeys.subCommands as Record<string, any>;
 
-const NEW_KEY = "mk_live_NUEVA-LLAVE-COMPLETA-0123456789";
+const NEW_KEY = "llave-nueva-de-prueba";
 const keys = [
-  { id: "k_active", name: "mi laptop", keyPrefix: "mk_live_ACTIVA", lastUsedAt: "2026-10-01", createdAt: "x" },
-  { id: "k_other", name: "ci", keyPrefix: "mk_live_OTRA123", createdAt: "x" },
+  { id: "k_active", name: "mi laptop", keyPrefix: "llave-activa", lastUsedAt: "2026-10-01", createdAt: "x" },
+  { id: "k_other", name: "ci", keyPrefix: "llave-otra", createdAt: "x" },
 ];
 
 function capture(stream: "stdout" | "stderr"): { text: () => string; restore: () => void } {
@@ -69,7 +69,7 @@ describe("api-keys list", () => {
 
 describe("api-keys create", () => {
   it("imprime la llave completa una vez, con aviso", async () => {
-    const { client, calls } = fakeClient({ apiKeys: { create: () => ({ id: "k_new", name: "bot", keyPrefix: "mk_live_NUEVA", createdAt: "x", key: NEW_KEY }) } });
+    const { client, calls } = fakeClient({ apiKeys: { create: () => ({ id: "k_new", name: "bot", keyPrefix: "llave-nueva", createdAt: "x", key: NEW_KEY }) } });
     currentClient = client;
     const out = capture("stdout");
     try {
