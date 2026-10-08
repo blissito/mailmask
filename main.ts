@@ -1470,6 +1470,12 @@ const app = new Elysia({ adapter: node() })
     headers: { "content-type": "text/plain", "cache-control": "no-store" },
   }))
 
+  // SHA del build (ARG GIT_SHA del Dockerfile): el workflow de deploy espera a que la caja de
+  // sandbox-host lo reporte para dar el rollout por terminado.
+  .get("/version", () => new Response(process.env.GIT_SHA || "dev", {
+    headers: { "content-type": "text/plain", "cache-control": "no-store" },
+  }))
+
   .get("/health", async () => {
     const [queueDepth, deadLetterCount, sesOk] = await Promise.all([
       getQueueDepth(),
