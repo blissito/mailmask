@@ -25,6 +25,9 @@ RUN node_modules/.bin/tsx scripts/skills-pack.mts --write
 # fresh volume attach does not have to mkdir it.
 RUN mkdir -p data
 
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
+
 EXPOSE 8000
 
 CMD ["node_modules/.bin/tsx", "main.ts"]
