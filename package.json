@@ -30,7 +30,7 @@
     "@elysiajs/openapi": "^1.4.16",
     "@formmy.app/chat": "^0.2.0",
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "@streamdown/code": "^1.0.3",
+    "@streamdown/code": "^2.0.0",
     "better-sqlite3": "^11",
     "drizzle-orm": "^0.45",
     "elysia": "^1.4",
