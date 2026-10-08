@@ -12,10 +12,20 @@ export interface MailMaskConfig {
 export interface Domain {
   id: string;
   domain: string;
+  /** Último valor medido. Si `verifiedStatus` es "unknown", no lo afirmes: confírmalo con `domains.health`. */
   verified: boolean;
+  /** Último valor medido. Si `mxStatus` es "unknown", no lo afirmes: confírmalo con `domains.health`. */
   mxConfigured: boolean;
   registeredViaMailmask: boolean;
   createdAt: string;
+  /** Cuándo se midieron `verified` y `mxConfigured` en vivo (health, verify o el servidor). null = nunca. */
+  checkedAt?: string | null;
+  /** "unknown" si la revisión tiene más de 24 h o nunca se hizo. */
+  mxStatus?: "ok" | "missing" | "unknown";
+  /** "unknown" si la revisión tiene más de 24 h o nunca se hizo. */
+  verifiedStatus?: "ok" | "missing" | "unknown";
+  /** Presente cuando algún estado es "unknown": qué hacer para confirmarlo. */
+  statusNote?: string;
   /** Sólo en `domains.list`: reenvíos del mes en curso. */
   monthlyForwards?: number;
   /** Sólo en `domains.list`: tope de reenvíos por hora del plan. */
@@ -47,6 +57,8 @@ export interface DomainVerification {
   domain: string;
   verified: boolean;
   dkimVerified: boolean;
+  /** Si el MX apunta al inbound de SES, medido en la misma llamada; null si el DNS no respondió. */
+  mxConfigured?: boolean | null;
   /** true cuando no se pudo consultar a SES: los campos son el último estado conocido. */
   stale?: boolean;
   error?: string;

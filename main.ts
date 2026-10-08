@@ -4,6 +4,7 @@ import { openapi } from "@elysiajs/openapi";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as dns from "node:dns/promises";
+import { checkInboundMx, domainFlagStatus, refreshDomainFlags, saveDomainFlags } from "./domain-flags.js";
 import { programar, esServidor } from "./scheduler.js";
 import { revisarPatron } from "./regex-guard.js";
 import { buildDnsSetup } from "./dns-setup.js";
@@ -2160,6 +2161,9 @@ const app = new Elysia({ adapter: node() })
       const derechos = derechosDeDominio(d, fullUser);
       return {
         ...d,
+        // Las banderas guardadas valen sólo con fecha: si la revisión pasa de 24 h,
+        // mxStatus/verifiedStatus salen "unknown" (ver domain-flags.ts).
+        ...domainFlagStatus(d),
         monthlyForwards: counts.get(d.id) ?? 0,
         forwardPerHour: derechos.forwardPerHour,
         activado: derechos.activado,
@@ -2171,7 +2175,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["Domains", "SDK"], summary: "List all domains for the authenticated user", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+    detail: { tags: ["Domains", "SDK"], summary: "List all domains for the authenticated user", description: "Inventory. `mxConfigured` and `verified` are the last stored check (`checkedAt`); `mxStatus`/`verifiedStatus` are `unknown` when that check is older than 24 h or never ran. Confirm a domain's status with GET /api/domains/{id}/health.", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
   .post("/api/domains", async ({ request, body }) => {
@@ -2310,7 +2314,7 @@ const app = new Elysia({ adapter: node() })
     }
     const domain = access.domain;
 
-    return new Response(JSON.stringify(domain), {
+    return new Response(JSON.stringify({ ...domain, ...domainFlagStatus(domain) }), {
       headers: { "content-type": "application/json" },
     });
   }, {
@@ -2348,28 +2352,16 @@ const app = new Elysia({ adapter: node() })
         detail: "SES no reconoce este dominio — vuelve a verificarlo y revisa los registros DNS",
       };
     }
-    if (estadoSes.respondio && estadoSes.verified !== domain.verified) {
-      await updateDomain(domain.id, { verified: estadoSes.verified });
-    }
-
     // 2. MX records
-    try {
-      const mxRecords = await dns.resolveMx(d);
-      const sesHost = "inbound-smtp.us-east-1.amazonaws.com";
-      const sesRecord = mxRecords.find(r => r.exchange.toLowerCase() === sesHost);
-      if (!sesRecord) {
-        checks.mx = { ok: false, detail: `MX no apunta a MailMask. Registros actuales: ${mxRecords.map(r => `${r.priority} ${r.exchange}`).join(", ")}` };
-      } else {
-        const higherPriority = mxRecords.filter(r => r.priority < sesRecord.priority && r.exchange.toLowerCase() !== sesHost);
-        if (higherPriority.length > 0) {
-          checks.mx = { ok: false, detail: `MX de SES tiene prioridad ${sesRecord.priority}, pero hay otros con mayor prioridad: ${higherPriority.map(r => `${r.priority} ${r.exchange}`).join(", ")}` };
-        } else {
-          checks.mx = { ok: true, detail: `MX configurado correctamente (prioridad ${sesRecord.priority})` };
-        }
-      }
-    } catch {
-      checks.mx = { ok: false, detail: "No se encontraron registros MX" };
-    }
+    const mx = await checkInboundMx(d);
+    checks.mx = { ok: mx.ok, detail: mx.detail };
+
+    // Lo medido se guarda: `list_domains` lee estas banderas. Antes `mxConfigured`
+    // sólo se escribía al comprar el dominio y la lista mentía (7-oct-2026).
+    saveDomainFlags(domain, {
+      verified: estadoSes.respondio ? estadoSes.verified : null,
+      mxConfigured: mx.resolved ? mx.ok : null,
+    });
 
     // 3. SPF
     try {
@@ -2448,7 +2440,7 @@ const app = new Elysia({ adapter: node() })
       headers: { "content-type": "application/json" },
     });
   }, {
-    detail: { tags: ["Domains", "SDK"], summary: "Check domain health and DNS configuration", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+    detail: { tags: ["Domains", "SDK"], summary: "Check domain health and DNS configuration", description: "Live check (SES, MX, SPF, DKIM, masks, plan): the source of truth for a domain's status. Stores `verified`, `mxConfigured` and `checkedAt`.", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
   // Los registros que el cliente pega en su registrador. `?live=1` además los compara con el
@@ -2489,10 +2481,14 @@ const app = new Elysia({ adapter: node() })
     // Ahora siempre se pregunta, y el resguardo vive donde corresponde: la
     // bandera sólo baja si SES respondió de verdad (`respondio`), no si la
     // consulta falló.
-    const status = await checkDomainStatus(domain.domain);
+    const [status, mx] = await Promise.all([checkDomainStatus(domain.domain), checkInboundMx(domain.domain)]);
 
+    // Se guardan las dos banderas con su fecha, igual que en health (domain-flags.ts).
+    saveDomainFlags(domain, {
+      verified: status.respondio ? status.verified : null,
+      mxConfigured: mx.resolved ? mx.ok : null,
+    });
     if (status.respondio && status.verified !== domain.verified) {
-      await updateDomain(domain.id, { verified: status.verified });
       if (!status.verified) {
         log("warn", "ses", "El dominio dejó de estar verificado en SES", {
           domain: domain.domain,
@@ -2531,6 +2527,7 @@ const app = new Elysia({ adapter: node() })
         domain: domain.domain,
         verified: status.verified,
         dkimVerified: status.dkimVerified,
+        mxConfigured: mx.resolved ? mx.ok : null,
       }),
       {
         headers: { "content-type": "application/json" },
@@ -8421,6 +8418,23 @@ if (esServidor) (async () => {
         log("warn", "startup", "Could not reconcile domain with SES", { domain: d.domain, error: String(err) });
       }
     }
+
+    // Las banderas MX/verificado se recalculan en cada arranque: es la corrida única
+    // que corrigió los `mxConfigured: false` viejos y, de paso, deja `checkedAt` fresco
+    // tras cada deploy. Sólo lee DNS y SES; no escribe nada fuera de la fila.
+    const flagged = { mx: 0, verified: 0, unknown: 0 };
+    for (const d of listAllDomains()) {
+      try {
+        const r = await refreshDomainFlags(d);
+        if (r.mxConfigured) flagged.mx++;
+        if (r.verified) flagged.verified++;
+        if (r.mxConfigured === null || r.verified === null) flagged.unknown++;
+      } catch (err) {
+        flagged.unknown++;
+        log("warn", "startup", "Could not refresh domain flags", { domain: d.domain, error: String(err) });
+      }
+    }
+    log("info", "startup", `Domain flags: ${flagged.mx} con MX, ${flagged.verified} verificados, ${flagged.unknown} sin dato`);
 
     // Las filas escritas antes de que la clave de supresión fuera consistente quedaron
     // con las mayúsculas de SES y ya no matcheaban. Idempotente.

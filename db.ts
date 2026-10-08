@@ -72,6 +72,8 @@ export interface Domain {
   dnsNameservers?: string[] | null;
   dnsDelegatedAt?: string | null;
   dnsCheckedAt?: string | null;
+  /** Cuándo se midieron `verified` y `mxConfigured` en vivo; null = nunca (ver domain-flags.ts). */
+  healthCheckedAt?: string | null;
   /** Firma en markdown que el compositor añade al final de lo que se envía. */
   signature?: string | null;
   /** Llave del logo de la firma en S3; se sirve por URL, no se incrusta. */
@@ -264,6 +266,7 @@ function rowToDomain(r: typeof domains.$inferSelect): Domain {
     dnsNameservers: r.dnsNameservers ?? null,
     dnsDelegatedAt: r.dnsDelegatedAt ?? null,
     dnsCheckedAt: r.dnsCheckedAt ?? null,
+    healthCheckedAt: r.healthCheckedAt ?? null,
     signature: r.signature ?? null,
     signatureLogoKey: r.signatureLogoKey ?? null,
   };
@@ -499,6 +502,7 @@ export function listUserDomains(email: string): Domain[] {
 const CAMPOS_DOMINIO = [
   "verified", "mxConfigured", "signature", "signatureLogoKey", "registeredViaMailmask",
   "hostedZoneId", "dnsZoneStatus", "dnsNameservers", "dnsDelegatedAt", "dnsCheckedAt",
+  "healthCheckedAt",
 ] as const;
 
 export function updateDomain(

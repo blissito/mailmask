@@ -204,6 +204,13 @@
       "when": 1788901000000,
       "tag": "0028_dmarc_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1788901100000,
+      "tag": "0029_domain_health_checked_at",
+      "breakpoints": true
     }
   ]
 }

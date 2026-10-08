@@ -131,7 +131,7 @@ El paquete npm del SDK es @easybits.cloud/mailmask. El dominio del servicio es m
    - TXT record de verificación: proporcionado por MailMask al agregar el dominio
    - CNAMEs de DKIM: 3 registros CNAME para firma DKIM (proporcionados por MailMask)
 3. Verificar el dominio desde el Dashboard o via API (mm.domains.verify("domain-id"))
-4. Consultar estado de salud DNS: mm.domains.health("domain-id")
+4. Consultar estado de salud DNS: mm.domains.health("domain-id"). Es la fuente de verdad del MX y la verificación; mm.domains.list() sólo da la última revisión guardada (checkedAt) y la marca unknown si tiene más de 24 h.
 
 La verificación puede tomar unos minutos mientras se propagan los registros DNS.
 MailMask usa AWS SES para envío y recepción de email.`,
@@ -222,7 +222,7 @@ Configuración con llave para Cursor y otros (mcp.json):
 }
 
 Son 95 herramientas que cubren lo mismo que el panel (cada una es un método del SDK, con las mismas reglas y límites). Al conectarse, el cliente recibe además una guía con el orden para conectar un dominio, qué significa gratis/activado/bloqueado y cómo funcionan los pagos.
-- Dominios: list_domains, get_domain, create_domain (devuelve los registros DNS: MX, TXT de verificación, CNAME de DKIM, SPF), domain_dns_setup (los registros exactos para pegar en el registrador, cuáles ya se ven en el DNS público y en qué panel van: Hostinger, GoDaddy, Cloudflare, Namecheap, Route 53), verify_domain, domain_health, delete_domain.
+- Dominios: list_domains, get_domain, create_domain (devuelve los registros DNS: MX, TXT de verificación, CNAME de DKIM, SPF), domain_dns_setup (los registros exactos para pegar en el registrador, cuáles ya se ven en el DNS público y en qué panel van: Hostinger, GoDaddy, Cloudflare, Namecheap, Route 53), verify_domain, domain_health, delete_domain. El estado de un dominio (MX, verificación) se confirma con domain_health, que revisa en vivo el DNS y SES; list_domains es inventario: sus banderas mxConfigured y verified traen la fecha de la última revisión (checkedAt) y, si tiene más de 24 horas o nunca se hizo, salen como unknown (null en el MCP). Un agente no debe decir que el MX o la verificación fallan sin haber llamado domain_health.
 - Direcciones (máscaras) y buzones: list_aliases, create_alias (con mailbox: true crea también el buzón IMAP y devuelve la contraseña una sola vez), update_alias, delete_alias, create_mailbox, delete_mailbox, reset_mailbox_password (genera una contraseña nueva para el buzón y la devuelve una sola vez), apple_profile_link (liga al perfil que configura el buzón en iPhone, iPad o Mac), mailbox_export_link (liga para descargar el buzón en .mbox).
 - Activación y cobro: activation_link (liga de MercadoPago para activar un dominio a $99 MXN/mes, o sumarle +50 GB o +100 envíos/día), list_addons, billing_status.
 - Comprar y renovar dominios: search_domains, domain_prices, register_domain (devuelve la liga de pago), list_registrations, renewal_status, renewal_link.

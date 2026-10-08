@@ -221,7 +221,36 @@ describe("MCP: agentes contra la app", () => {
     const g: string = init.json.result.instructions;
     assert.ok(g, "sin instructions");
     assert.ok(g.length <= 6000, `instructions mide ${g.length}`);
-    for (const p of ["domain_dns_setup", "verify_domain", "activation_link", "Bloqueado", "EPP", "MercadoPago"]) assert.ok(g.includes(p), p);
+    for (const p of ["domain_dns_setup", "verify_domain", "activation_link", "Bloqueado", "EPP", "MercadoPago", "domain_health"]) assert.ok(g.includes(p), p);
+  });
+
+  it("list_domains no afirma un MX viejo: sin revisión reciente sale null/unknown y apunta a domain_health", async () => {
+    // 7-oct-2026: la lista decía «MX no configurado» de dominios sanos porque la bandera
+    // nunca se había medido. Sin fecha (o con más de 24 h) no se afirma nada.
+    const lista = async () => (await call("list_domains", {}, keyGratis)).json.result.structuredContent.result;
+    const [nunca] = await lista();
+    assert.equal(nunca.mxConfigured, null);
+    assert.equal(nunca.verified, null);
+    assert.equal(nunca.mxStatus, "unknown");
+    assert.equal(nunca.checkedAt, null);
+    assert.match(nunca.statusNote, /domain_health/);
+
+    sqlite.prepare("UPDATE domains SET mx_configured = 1, verified = 1, health_checked_at = ? WHERE id = ?").run(new Date().toISOString(), dominioGratisId);
+    const [fresco] = await lista();
+    assert.equal(fresco.mxConfigured, true);
+    assert.equal(fresco.mxStatus, "ok");
+    assert.equal(fresco.verifiedStatus, "ok");
+    assert.equal(fresco.statusNote, undefined);
+
+    sqlite.prepare("UPDATE domains SET health_checked_at = ? WHERE id = ?").run(new Date(Date.now() - 25 * 3600_000).toISOString(), dominioGratisId);
+    const [viejo] = await lista();
+    assert.equal(viejo.mxConfigured, null);
+    assert.equal(viejo.mxStatus, "unknown");
+
+    // La API REST conserva el booleano (el panel lo pinta) y suma el estado con su fecha.
+    const rest = await (await app.fetch(new Request("http://localhost/api/domains", { headers: { authorization: `Bearer ${keyGratis}` } }))).json();
+    assert.equal(rest[0].mxConfigured, true);
+    assert.equal(rest[0].mxStatus, "unknown");
   });
 
   it("las herramientas nuevas están en el catálogo y search_tools las encuentra en español", async () => {

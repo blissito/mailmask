@@ -48,6 +48,9 @@ Al usuario llámale «dirección» (o máscara) a lo que las tools llaman alias;
 6. Si el plan sale bloqueado: activation_link.
 7. create_alias para que el correo llegue a algún lado: sin máscaras activas no se reenvía nada.
 
+## Estado de un dominio
+El MX y la verificación se confirman con domain_health (revisa en vivo). list_domains es inventario: sus banderas pueden ser viejas (si salen null o "unknown", no sabes). Nunca le digas al usuario que algo falla sin domain_health.
+
 ## Gratis, activado y bloqueado
 - El dominio más antiguo de la cuenta es gratis: reenvía, 5 máscaras, Bandeja de 1 persona, sin envío de correo nuevo.
 - Activado ($99 MXN/mes por dominio): máscaras ilimitadas, equipo, 50 envíos/día, buzones IMAP, reglas, webhooks, SMTP.
@@ -202,6 +205,15 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
   const server = new McpServer({ name: "mailmask", version: MCP_VERSION }, { instructions: MCP_INSTRUCTIONS });
   const catalogo: { name: string; description: string }[] = [];
 
+  // Al agente no se le entrega un `false` viejo: si la revisión pasó de 24 h, las
+  // banderas salen null y `statusNote` le dice que confirme con domain_health.
+  // La API REST conserva los booleanos porque el panel los pinta (7-oct-2026).
+  const staleFlagsAsNull = <D extends { verified: boolean; mxConfigured: boolean; mxStatus?: string; verifiedStatus?: string }>(d: D) => ({
+    ...d,
+    verified: d.verifiedStatus === "unknown" ? null : d.verified,
+    mxConfigured: d.mxStatus === "unknown" ? null : d.mxConfigured,
+  });
+
   const tool = <S extends z.ZodRawShape>(name: string, description: string, shape: S, run: (args: z.infer<z.ZodObject<S>>) => Promise<unknown>) => {
     catalogo.push({ name, description });
     // El genérico de registerTool no infiere bien con un shape genérico; el tipado real
@@ -216,13 +228,15 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
   };
 
   // --- Dominios ---
-  tool("list_domains", "Lista los dominios de la cuenta con su estado de verificación y reenvíos del mes.", {}, () => sdk.domains.list());
-  tool("get_domain", "Detalle de un dominio.", { domainId }, (a) => sdk.domains.get(a.domainId));
+  tool("list_domains",
+    "Inventario de dominios de la cuenta (id, plan, reenvíos del mes) con el último estado guardado de MX y verificación y su fecha (checkedAt). Si mxStatus/verifiedStatus es \"unknown\", el dato es viejo: no afirmes que algo falla; confírmalo con domain_health.",
+    {}, async () => (await sdk.domains.list()).map(staleFlagsAsNull));
+  tool("get_domain", "Detalle de un dominio. El MX y la verificación son lo último guardado; para confirmarlos, domain_health.", { domainId }, async (a) => staleFlagsAsNull(await sdk.domains.get(a.domainId)));
   tool("create_domain",
     "Da de alta un dominio y devuelve los registros DNS que hay que configurar (MX, TXT de verificación, 3 CNAME de DKIM, SPF). El primer dominio de la cuenta es gratis; el segundo en adelante nace bloqueado hasta activarlo ($99 MXN/mes por dominio).",
     { domain: z.string().describe("Dominio, p. ej. tudominio.com") }, (a) => sdk.domains.create(a.domain));
-  tool("verify_domain", "Vuelve a comprobar en SES si el DNS del dominio ya está verificado (identidad y DKIM).", { domainId }, (a) => sdk.domains.verify(a.domainId));
-  tool("domain_health", "Diagnóstico del dominio: MX, DKIM, SPF y recursos de recepción.", { domainId }, (a) => sdk.domains.health(a.domainId));
+  tool("verify_domain", "Vuelve a comprobar en SES si el DNS del dominio ya está verificado (identidad y DKIM) y si el MX apunta a MailMask; guarda el resultado.", { domainId }, (a) => sdk.domains.verify(a.domainId));
+  tool("domain_health", "Revisa EN VIVO el estado del dominio: verificación en SES, MX, SPF, DKIM, máscaras activas y plan. Es la fuente de verdad: úsala antes de decirle al usuario si su MX o su verificación están bien o mal. Guarda lo medido.", { domainId }, (a) => sdk.domains.health(a.domainId));
   tool("delete_domain", "Borra el dominio con todas sus máscaras, reglas y buzones. Irreversible.", { domainId }, (a) => sdk.domains.delete(a.domainId));
 
   // --- Máscaras ---

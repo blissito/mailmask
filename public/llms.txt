@@ -94,6 +94,9 @@ respectivamente. Quien solo reenvía nunca toca el límite de envíos.
      "Authorization: Bearer mk_…"`. 95 herramientas, lo mismo que el panel: `create_domain`
      (devuelve los registros DNS), `create_alias` (con `mailbox: true` crea el buzón IMAP), DNS,
      reglas, webhooks, `send_email`, cobro, dominios, equipo, perfil, referidos y `search_tools`.
+     El estado de un dominio (MX, verificación) se confirma con `domain_health`, que revisa en
+     vivo; `list_domains` es inventario (sus banderas traen `checkedAt` y salen `unknown`/null
+     si la revisión pasa de 24 h).
    - **Un correo propio para tu agente**: en vez de darle tu Gmail, crea una máscara
      (`agente@tudominio.com`) y deja que el agente atienda su Bandeja por MCP: `inbox_list`
      (no leídas, por máscara, búsqueda `q`), `inbox_read` (texto, notas y adjuntos),

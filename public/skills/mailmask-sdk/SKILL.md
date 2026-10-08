@@ -27,6 +27,10 @@ in Spanish, written for the end user) on any non-2xx. 60 requests per minute per
 
 All take a `domainId` (from `mm.domains.list()`) except `domains` and `apiKeys`.
 
+`mm.domains.list()` is an inventory: `mxConfigured` / `verified` are the last stored check
+(`checkedAt`), and `mxStatus` / `verifiedStatus` come back `"unknown"` when that check is older
+than 24 h. To know whether a domain's MX or verification is right, call `mm.domains.health(id)`.
+
 | Resource | Methods |
 |---|---|
 | `mm.domains` | `list()`, `get(id)`, `create(domain)` → DNS records to set, `dnsSetup(id, { live? })` → records to paste + `registrarHint`, `verify(id)`, `health(id)`, `delete(id)`, `uploadImage(id, blob)` → `{ url }` of an image to embed in an outgoing email (PNG/JPG/GIF/WebP, max 2 MB; ephemeral, deleted after sending) (0.4.7+) |

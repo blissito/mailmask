@@ -51,6 +51,8 @@ export const domains = sqliteTable("domains", {
   dnsNameservers: text("dns_nameservers", { mode: "json" }).$type<string[]>(),
   dnsDelegatedAt: text("dns_delegated_at"),
   dnsCheckedAt: text("dns_checked_at"),
+  /** Última vez que health/verify/arranque midieron `verified` y `mxConfigured` en vivo (ver domain-flags.ts). */
+  healthCheckedAt: text("health_checked_at"),
   /** Firma en markdown que se añade al final de lo que se envía desde este dominio. */
   signature: text("signature"),
   // Llave del logo dentro de DOMAIN_ASSET_PREFIX. Se referencia por URL en la

@@ -69,7 +69,8 @@ rules. Names, grouped:
 
 - **Domains**: `list_domains`, `get_domain`, `create_domain` (returns the DNS records to set),
   `domain_dns_setup` (exact records to paste at the registrar, which ones are already live, and
-  `registrarHint` with the panel and menu), `verify_domain`, `domain_health`, `delete_domain`
+  `registrarHint` with the panel and menu), `verify_domain`, `domain_health` (live check of SES,
+  MX, SPF, DKIM, masks and plan: the source of truth for a domain's status), `delete_domain`
   (irreversible).
 - **Masks and mailboxes**: `list_aliases`, `create_alias` (`mailbox: true` also creates the IMAP
   mailbox), `update_alias`, `delete_alias`, `create_mailbox`, `delete_mailbox` (deletes its
@@ -130,7 +131,11 @@ paid; confirm afterwards with `list_addons`, `list_registrations` or `domain_hea
   MailMask's mail records alive. Retry with exactly those values; there is no force flag.
 - Passwords and webhook secrets appear **once** in the tool result. Hand them to the user in
   the same message.
-- Always call `list_domains` first; every other tool takes its `domainId`.
+- Call `list_domains` to get the `domainId` every other tool takes. It is an **inventory**:
+  its `mxConfigured` / `verified` are the last stored check, dated in `checkedAt`; `null` (or
+  `mxStatus` / `verifiedStatus` = `"unknown"`) means nobody checked in the last 24 h.
+- **A domain's status (MX, verification) is confirmed with `domain_health`**, which checks DNS
+  and SES live. Never tell the user their MX or verification is wrong based on `list_domains`.
 - A result with `needsConfirmation: true` is not an error. It only happens with the in-app
   assistant's short-lived turn token (`mt_…`, 5 min) on irreversible actions (`delete_domain`,
   `delete_alias`, `delete_mailbox`, `delete_dns_record`, `remove_member`, `transfer_out`,
