@@ -195,6 +195,33 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   exit 5. `rules delete`, `suppressions remove` y `domains logo remove` sí confirman
   ANTES de `resolveDomainId`.
 
+- **`inbox`, `canned` y `signature` (C15):** 1:1 con `client.inbox|canned|signature`.
+
+  | Subcomando | Método del SDK | Notas |
+  |---|---|---|
+  | `inbox list` | `inbox.list(d, opts)` | `--alias` → `opts.to`; `--status` ∈ open/snoozed/closed/unread/deleted |
+  | `inbox get` | `inbox.get` | siempre texto; `--before` pagina hacia atrás |
+  | `inbox reply` / `compose` | `inbox.reply` / `inbox.compose` | `confirmOrExit`; `--from` → `fromAlias`; `--no-quote` → `quote:false` |
+  | `inbox update` | `inbox.update` | `snoozed` exige `--snooze-until` |
+  | `inbox read` / `assign` / `note` | `markRead` / `assign` / `addNote` | `assign` sin usuario desasigna |
+  | `inbox delete` / `restore` | `inbox.delete(d, ids[])` / `restore` | delete: 1..200 ids, `confirmOrExit`; restore sin confirmar |
+  | `inbox metrics` / `attachment` | `metrics` / `attachment` | `<index>` entero ≥ 0 |
+  | `canned list|create|delete` | `canned.*` | delete con `confirmOrExit` |
+  | `signature get|set` | `signature.get|set` | `""` la borra; > 2000 caracteres → `failUsage` |
+
+  **`inbox get` imprime siempre texto:** `textoDeMensaje()` prefiere `body`, luego
+  `bodyDegraded` (el original ya no está) y, si sólo hay `html`, lo pasa sin etiquetas y
+  con las entidades básicas decodificadas. Con `--json` cada mensaje suma `text`. El
+  servidor marca la conversación leída al abrirla: se documenta, no se evita.
+  **`inbox attachment` nunca crea el archivo si la respuesta no es ok:** el SDK ya lanza
+  `MailMaskError` en 4xx/5xx (404 → exit 4); `res.ok` se revisa igual (cinturón) ANTES de
+  `writeFile`. Sin `-o` va a stdout, como `aliases export`.
+  **Orden en reply/compose/delete:** validación de uso (`failUsage`: ids 1..200, `<index>`,
+  `--status`) → `requireClient` → `confirmOrExit` → `resolveDomainId`. Los ids de `inbox
+  delete` salen de `args._.slice(1)`, no de `rawArgs`. **`--no-quote`:** citty lo convierte en
+  `quote=false`, así que el arg se llama `quote` (con `default: true`); declarar `"no-quote"`
+  nunca recibe nada. `compose` exige dominio activado (403 → exit 2, la trampa de arriba).
+
 ## Convención dura — no se negocia en ningún comando futuro
 
 **Ningún registro DNS con `managed: true` se toca desde el CLI, ni con `--force`.**

@@ -761,7 +761,7 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
 
       <!-- CLI -->
       <h2 id="cli" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">CLI</h2>
-      <p class="text-fg-muted mb-2">CLI de terminal sobre este mismo SDK: un subcomando por recurso, sin modelo declarativo encima. Cubre la sesi&oacute;n (<code class="text-fg">login</code>, <code class="text-fg">logout</code>, <code class="text-fg">whoami</code>), <code class="text-fg">domains</code>, <code class="text-fg">dns</code>, <code class="text-fg">aliases</code>, <code class="text-fg">webhooks</code>, <code class="text-fg">smtp</code>, <code class="text-fg">api-keys</code>, <code class="text-fg">rules</code> y <code class="text-fg">suppressions</code>, con los buzones IMAP, el perfil de Apple Mail y la exportaci&oacute;n en mbox. El env&iacute;o de correo desde la terminal todav&iacute;a no est&aacute;.</p>
+      <p class="text-fg-muted mb-2">CLI de terminal sobre este mismo SDK: un subcomando por recurso, sin modelo declarativo encima. Cubre la sesi&oacute;n (<code class="text-fg">login</code>, <code class="text-fg">logout</code>, <code class="text-fg">whoami</code>), <code class="text-fg">domains</code>, <code class="text-fg">dns</code>, <code class="text-fg">aliases</code>, <code class="text-fg">webhooks</code>, <code class="text-fg">smtp</code>, <code class="text-fg">api-keys</code>, <code class="text-fg">rules</code>, <code class="text-fg">suppressions</code>, <code class="text-fg">inbox</code> (la Bandeja), <code class="text-fg">canned</code> y <code class="text-fg">signature</code>, con los buzones IMAP, el perfil de Apple Mail y la exportaci&oacute;n en mbox. El env&iacute;o de correo desde la terminal todav&iacute;a no est&aacute;.</p>
       <p class="text-fg-subtle text-xs mb-4">Nombre del paquete y del binario (hoy <code>mailmask-cli</code> / <code>mailmask</code>) son provisionales, pendientes de confirmaci&oacute;n antes de publicarse a npm.</p>
       <p class="text-fg-muted text-sm mb-6">&iquest;Quien va a operar tu cuenta es un agente de c&oacute;digo? Probablemente le convenga m&aacute;s instalarle las <a href="#skills" class="text-accent-text hover:underline">skills oficiales</a> (<code>npx skills add https://www.mailmask.studio</code>) que esta CLI: ya saben qu&eacute; puede hacer cada plan y qu&eacute; secretos salen una sola vez. Esta CLI es para cuando la persona teclea los comandos ella misma.</p>
 
@@ -810,6 +810,28 @@ mailmask suppressions add &lt;dominio&gt; &lt;correo&gt; [--json]
 mailmask suppressions remove &lt;dominio&gt; &lt;correo&gt; [--yes] [--json]</code></pre>
       <p class="text-fg-muted text-sm mb-4"><code>forward</code> y <code>webhook</code> exigen <code>--target</code>. Los flags se validan antes de tocar la red; la regex la valida el servidor, y una peligrosa sale con <code>1</code> y el mensaje del servidor.</p>
 
+      <p class="text-sm font-bold mb-1">Bandeja, respuestas guardadas y firma</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask inbox list &lt;dominio&gt; [--status open|snoozed|closed|unread|deleted] [--alias &lt;máscara&gt;] [--assigned &lt;usuario&gt;] [--q &lt;texto&gt;] [--limit N] [--cursor &lt;c&gt;] [--json]
+mailmask inbox get &lt;dominio&gt; &lt;conversación&gt; [--before &lt;mensaje&gt;] [--json]
+mailmask inbox reply &lt;dominio&gt; &lt;conversación&gt; --markdown &lt;texto&gt; [--cc &lt;a,b&gt;] [--bcc &lt;a,b&gt;] [--no-quote] [--yes] [--json]
+mailmask inbox compose &lt;dominio&gt; --from &lt;máscara&gt; --to &lt;correo&gt; --subject &lt;asunto&gt; --markdown &lt;texto&gt; [--cc &lt;a,b&gt;] [--bcc &lt;a,b&gt;] [--yes] [--json]
+mailmask inbox update &lt;dominio&gt; &lt;conversación&gt; [--status open|snoozed|closed] [--snooze-until &lt;ISO&gt;] [--tags &lt;a,b&gt;] [--priority normal|urgent] [--json]
+mailmask inbox read &lt;dominio&gt; &lt;conversación&gt; [--json]
+mailmask inbox assign &lt;dominio&gt; &lt;conversación&gt; [usuario] [--json]
+mailmask inbox note &lt;dominio&gt; &lt;conversación&gt; &lt;texto&gt; [--json]
+mailmask inbox delete &lt;dominio&gt; &lt;conversación...&gt; [--yes] [--json]
+mailmask inbox restore &lt;dominio&gt; &lt;conversación&gt; [--json]
+mailmask inbox metrics &lt;dominio&gt; [--days N] [--json]
+mailmask inbox attachment &lt;dominio&gt; &lt;conversación&gt; &lt;mensaje&gt; &lt;índice&gt; [-o &lt;archivo&gt;]
+
+mailmask canned list &lt;dominio&gt; [--json]
+mailmask canned create &lt;dominio&gt; --title &lt;título&gt; --body &lt;texto&gt; [--json]
+mailmask canned delete &lt;dominio&gt; &lt;id&gt; [--yes] [--json]
+
+mailmask signature get &lt;dominio&gt; [--json]
+mailmask signature set &lt;dominio&gt; &lt;markdown&gt; [--json]</code></pre>
+      <p class="text-fg-muted text-sm mb-4"><code>inbox get</code> siempre imprime texto (un mensaje que s&oacute;lo trae HTML sale sin etiquetas; con <code>--json</code> cada mensaje suma <code>text</code>) y marca la conversaci&oacute;n como le&iacute;da, igual que en la web. <code>inbox reply</code> y <code>inbox compose</code> env&iacute;an correo de verdad: preguntan <code>[y/N]</code> y exigen <code>--yes</code> fuera de una terminal; <code>compose</code> pide el dominio activado y gasta cuota de env&iacute;o. <code>inbox delete</code> acepta de 1 a 200 conversaciones y las manda a la papelera (<code>inbox restore</code> las saca). <code>inbox attachment</code> escribe a <code>-o</code> o a stdout, y si el adjunto no existe sale con <code>4</code> sin crear el archivo. <code>signature set ""</code> borra la firma (m&aacute;x. 2000 caracteres).</p>
+
       <p class="text-sm font-bold mb-1">Direcciones y buzones</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask aliases list &lt;dominio&gt; [--json]
 mailmask aliases create &lt;dominio&gt; &lt;alias&gt; [destino...] [--mailbox] [--json]
@@ -839,7 +861,7 @@ mailmask api-keys revoke &lt;id&gt; [--yes] [--json]</code></pre>
       <p class="text-fg-muted text-sm mb-4"><strong class="text-fg">La contrase&ntilde;a del buz&oacute;n sale enmascarada</strong> (<code>ab&bull;&bull;&bull;&bull;&bull;&bull;yz</code>) y no se vuelve a mostrar completa: para verla entera, <code>mailbox reset-password</code> con <code>--json</code> genera una nueva y la devuelve completa una sola vez; la anterior deja de servir. <code>apple-profile</code> escribe el perfil <code>.mobileconfig</code> de Apple Mail en la ruta de <code>-o</code>; <code>export</code> baja el buz&oacute;n en mbox a un archivo con <code>-o</code> o por la salida est&aacute;ndar, para encadenarlo con otro comando.</p>
 
       <p class="text-sm font-bold mb-1">Para scripts y agentes: <code>--json</code> y <code>--yes</code></p>
-      <p class="text-fg-muted text-sm mb-4">Con <code>--json</code> los comandos imprimen JSON, y un error sale por stderr como <code>{"error": "...", "status": 404}</code> (sin <code>status</code> si no vino de la API), para parsearlo sin adivinar el formato. Lo que borra o resetea &mdash; <code>domains delete</code>, <code>domains logo remove</code>, <code>dns delete</code>, <code>rules delete</code>, <code>suppressions remove</code>, <code>aliases delete</code>, <code>aliases mailbox delete</code> y <code>aliases mailbox reset-password</code>, <code>webhooks delete</code>, <code>smtp revoke</code> y <code>api-keys revoke</code> &mdash; pregunta <code>[y/N]</code> en una terminal; fuera de una (CI, un agente) exige <code>--yes</code> y, sin &eacute;l, sale con c&oacute;digo <code>1</code> sin tocar la red.</p>
+      <p class="text-fg-muted text-sm mb-4">Con <code>--json</code> los comandos imprimen JSON, y un error sale por stderr como <code>{"error": "...", "status": 404}</code> (sin <code>status</code> si no vino de la API), para parsearlo sin adivinar el formato. Lo que borra o resetea &mdash; <code>domains delete</code>, <code>domains logo remove</code>, <code>dns delete</code>, <code>rules delete</code>, <code>suppressions remove</code>, <code>inbox reply</code>, <code>inbox compose</code>, <code>inbox delete</code>, <code>canned delete</code>, <code>aliases delete</code>, <code>aliases mailbox delete</code> y <code>aliases mailbox reset-password</code>, <code>webhooks delete</code>, <code>smtp revoke</code> y <code>api-keys revoke</code> &mdash; pregunta <code>[y/N]</code> en una terminal; fuera de una (CI, un agente) exige <code>--yes</code> y, sin &eacute;l, sale con c&oacute;digo <code>1</code> sin tocar la red.</p>
 
       <p class="text-sm font-bold mb-1">Variable de entorno</p>
       <p class="text-fg-muted text-sm mb-4"><code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">MAILMASK_API_KEY</code> tiene prioridad sobre la sesi&oacute;n guardada &mdash; es la v&iacute;a recomendada para CI o para un agente de c&oacute;digo.</p>

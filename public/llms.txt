@@ -114,7 +114,7 @@ respectivamente. Quien solo reenvía nunca toca el límite de envíos.
      con `MAILMASK_API_KEY` (lo recomendado para un agente) o con `mailmask login`. Comandos:
      `login`/`logout`/`whoami`, `domains` (con `dns-setup` y `logo`), `dns` (con `import`), `aliases` (con buzones IMAP en
      `aliases mailbox`, más `aliases apple-profile` y `aliases export`), `webhooks`, `smtp`,
-     `rules`, `suppressions` y `api-keys` (el secreto sale completo sólo en `create`). `--json` para
+     `rules`, `suppressions`, `inbox` (la Bandeja: list, get, reply, compose, update, assign, note, delete, restore, metrics, attachment), `canned` (respuestas guardadas), `signature` y `api-keys` (el secreto sale completo sólo en `create`). `--json` para
      máquinas (los errores salen como JSON por stderr); lo destructivo pide `--yes` fuera de una
      terminal y sin él sale con 1. Exit codes: 0 éxito, 1 genérico, 2 sin llave o rechazada,
      3 conflicto, 4 no encontrado, 5 transitorio (reintentar). Referencia:
