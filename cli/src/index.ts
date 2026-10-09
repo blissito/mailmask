@@ -10,6 +10,9 @@ import smtp from "./commands/smtp.js";
 import apiKeys from "./commands/api-keys.js";
 import rules from "./commands/rules.js";
 import suppressions from "./commands/suppressions.js";
+import inbox from "./commands/inbox.js";
+import canned from "./commands/canned.js";
+import signature from "./commands/signature.js";
 
 const main = defineCommand({
   meta: {
@@ -17,7 +20,7 @@ const main = defineCommand({
     version: "0.1.0",
     description: "CLI oficial de MailMask — dominios, alias, DNS, reglas, envío y más desde la terminal.",
   },
-  subCommands: { login, logout, whoami, domains, dns, aliases, webhooks, smtp, "api-keys": apiKeys, rules, suppressions },
+  subCommands: { login, logout, whoami, domains, dns, aliases, webhooks, smtp, "api-keys": apiKeys, rules, suppressions, inbox, canned, signature },
 });
 
 runMain(main);
