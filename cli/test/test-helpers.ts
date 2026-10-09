@@ -15,7 +15,7 @@ type Impl = Record<string, (...args: unknown[]) => unknown>;
  * mensaje claro — así una llamada que no se esperaba (p. ej. `dns.upsert`
  * después de que debió abortar por `managed: true`) no pasa inadvertida.
  */
-export function fakeClient(impl: { domains?: Impl; dns?: Impl; apiKeys?: Impl; aliases?: Impl; webhooks?: Impl; smtp?: Impl } = {}): { client: MailMask; calls: RecordedCall[] } {
+export function fakeClient(impl: { domains?: Impl; dns?: Impl; apiKeys?: Impl; aliases?: Impl; webhooks?: Impl; smtp?: Impl; rules?: Impl; suppressions?: Impl } = {}): { client: MailMask; calls: RecordedCall[] } {
   const calls: RecordedCall[] = [];
   // `domains.list` casi todo comando lo llama primero (resolveDomainId): por
   // omisión devuelve [] para que un test que pasa ya el id (p. ej. "dom_1")
@@ -43,6 +43,8 @@ export function fakeClient(impl: { domains?: Impl; dns?: Impl; apiKeys?: Impl; a
     aliases: resource("aliases", impl.aliases),
     webhooks: resource("webhooks", impl.webhooks),
     smtp: resource("smtp", impl.smtp),
+    rules: resource("rules", impl.rules),
+    suppressions: resource("suppressions", impl.suppressions),
   } as unknown as MailMask;
   return { client, calls };
 }
@@ -61,7 +63,49 @@ export class ExitSignal extends Error {
  * sin esto una mutación después de un "exit" simulado seguiría corriendo.
  */
 export function trapExit(): void {
+  silenceOutput();
   mock.method(process, "exit", ((code?: number) => {
     throw new ExitSignal(code ?? 0);
   }) as never);
+}
+
+/**
+ * Captura lo que un comando escribe a stdout/stderr. Sólo toma strings: el runner de node:test
+ * le manda al proceso padre sus eventos por stdout como Buffer serializado, y tragárselos rompe
+ * la corrida de forma intermitente ("Unable to deserialize cloned data"). Lo que no es string
+ * pasa al `write` original.
+ */
+export function captureWrites(stream: NodeJS.WriteStream): { text: () => string; restore: () => void } {
+  const original = stream.write.bind(stream) as (...a: unknown[]) => boolean;
+  let text = "";
+  const fn = mock.method(stream, "write", ((chunk: unknown, ...rest: unknown[]) => {
+    if (typeof chunk !== "string") return original(chunk, ...rest);
+    text += chunk;
+    return true;
+  }) as never);
+  return { text: () => text, restore: () => fn.mock.restore() };
+}
+
+let silenced = false;
+/**
+ * Los comandos imprimen "✓ ..." / "✖ ..." con process.stdout/stderr.write. Con el aislamiento por
+ * proceso de node:test, stdout del hijo es el mismo canal por donde viaja el protocolo del runner;
+ * esas líneas se mezclan con sus Buffers y a veces lo corrompen ("Unable to deserialize cloned
+ * data"). Se descartan los strings (lo que se quiera leer se captura con `captureWrites`) y los
+ * Buffers pasan intactos.
+ */
+function silenceOutput(): void {
+  if (silenced) return;
+  silenced = true;
+  for (const stream of [process.stdout, process.stderr]) {
+    const original = stream.write.bind(stream) as (...a: unknown[]) => boolean;
+    stream.write = ((chunk: unknown, ...rest: unknown[]) => {
+      if (typeof chunk === "string") {
+        const cb = rest.find((r) => typeof r === "function") as (() => void) | undefined;
+        cb?.();
+        return true;
+      }
+      return original(chunk, ...rest);
+    }) as typeof stream.write;
+  }
 }

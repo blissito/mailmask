@@ -26,6 +26,9 @@ mailmask domains create <dominio> [--preset vercel|netlify|github-pages|cloudfla
 mailmask domains verify <dominio>
 mailmask domains health <dominio>
 mailmask domains delete <dominio> [--yes] [--json]
+mailmask domains dns-setup <dominio> [--live] [--json]
+mailmask domains logo set <dominio> <archivo> [--json]
+mailmask domains logo remove <dominio> [--yes] [--json]
 
 mailmask dns list <dominio> [--json]
 mailmask dns upsert <dominio> <nombre> <tipo> <valor...> [--ttl 300]
@@ -33,6 +36,16 @@ mailmask dns delete <dominio> <nombre> <tipo> [--yes] [--json]
 mailmask dns preset <dominio> <preset> [--target ...] [--subdomain ...]
 mailmask dns create-zone <dominio>
 mailmask dns delegation <dominio>
+mailmask dns import <dominio> [--json]
+
+mailmask rules list <dominio> [--json]
+mailmask rules create <dominio> --field to|from|subject --match contains|equals|regex --value <texto> --action forward|webhook|discard [--target <destino>] [--priority N] [--disabled] [--json]
+mailmask rules update <dominio> <reglaId> [--field ...] [--match ...] [--value ...] [--action ...] [--target ...] [--priority N] [--enable | --disable] [--json]
+mailmask rules delete <dominio> <reglaId> [--yes] [--json]
+
+mailmask suppressions list <dominio> [--json]
+mailmask suppressions add <dominio> <correo> [--json]
+mailmask suppressions remove <dominio> <correo> [--yes] [--json]
 
 mailmask aliases list <dominio> [--json]
 mailmask aliases create <dominio> <alias> [destino...] [--mailbox] [--json]
@@ -156,7 +169,17 @@ tener otra, revoca y crea una nueva; el SDK no rota el secreto de un webhook
 `email.complained`; un evento mal escrito sale con `1` sin tocar la red.
 `webhooks` y `smtp` piden el dominio activado.
 
-`webhooks delete`, `smtp revoke` y `api-keys revoke` son destructivos: preguntan
+`rules` y `suppressions` son 1:1 con el SDK. `rules create`/`update` validan los
+flags (`--field`, `--match`, `--action`, `--priority` entero, `--target` con `forward`/`webhook`)
+antes de tocar la red; la regex NO se valida en el CLI: una peligrosa la rechaza el
+servidor con 400 y sale con `1` con su mensaje. `domains dns-setup` muestra los
+registros a pegar en el registrador (`--live` los compara con el DNS público).
+`domains logo set` toma un archivo local (.png, .jpg, .jpeg o .webp, máx. 500 KB); no
+hay `--url` porque el servidor sólo acepta URLs firmadas del chat del asistente.
+`dns import` es de sólo lectura: muestra lo que encontró, los nameservers y el aviso,
+sin cambiar nada (límite: 2 cada 5 min, sale con `5`).
+
+`rules delete`, `suppressions remove`, `domains logo remove`, `webhooks delete`, `smtp revoke` y `api-keys revoke` son destructivos: preguntan
 en una terminal y exigen `--yes` fuera de ella. Si la llave que revocas es la
 que usa esta sesión (la marca `api-keys list`), el comando avisa que la sesión
 quedará sin llave y pide una segunda confirmación (con `--yes`, el aviso va a

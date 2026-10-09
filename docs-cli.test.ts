@@ -51,7 +51,7 @@ function seccionCli(): string {
 
 test("el lector de comandos ve la CLI de main (si no, esta prueba no vigila nada)", () => {
   const { topLevel, rutas } = comandosDelCli();
-  assert.deepEqual(topLevel, ["login", "logout", "whoami", "domains", "dns", "aliases", "webhooks", "smtp", "api-keys"]);
+  assert.deepEqual(topLevel, ["login", "logout", "whoami", "domains", "dns", "aliases", "webhooks", "smtp", "api-keys", "rules", "suppressions"]);
   assert.ok(rutas.includes("aliases mailbox reset-password"), "no expandió aliases mailbox");
   assert.ok(rutas.includes("dns create-zone"));
   assert.ok(rutas.includes("api-keys revoke") && rutas.includes("webhooks deliveries"), "no expandió webhooks/api-keys");

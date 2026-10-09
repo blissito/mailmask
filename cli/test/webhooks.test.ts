@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
 import { MailMaskError } from "@easybits.cloud/mailmask";
-import { fakeClient, trapExit, ExitSignal } from "./test-helpers.js";
+import { fakeClient, trapExit, ExitSignal, captureWrites } from "./test-helpers.js";
 
 let currentClient: ReturnType<typeof fakeClient>["client"];
 
@@ -23,13 +23,8 @@ const { list, create, update, delete: del, test, deliveries } = webhooks.subComm
 const SECRET = "secreto-de-prueba";
 const hook = { id: "wh_1", domainId: "dom_1", url: "https://acme.com/hook", events: ["email.received"], enabled: true, createdAt: "now" };
 
-function captureStdout(): { text: () => string; restore: () => void } {
-  let text = "";
-  const fn = mock.method(process.stdout, "write", (chunk: string) => {
-    text += chunk;
-    return true;
-  });
-  return { text: () => text, restore: () => fn.mock.restore() };
+function captureStdout() {
+  return captureWrites(process.stdout);
 }
 
 describe("webhooks create", () => {

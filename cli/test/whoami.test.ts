@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, it, mock, test } from "node:test";
 import { MailMaskError } from "@easybits.cloud/mailmask";
-import { fakeClient, trapExit, ExitSignal } from "./test-helpers.js";
+import { fakeClient, trapExit, ExitSignal, captureWrites } from "./test-helpers.js";
 
 let currentClient: ReturnType<typeof fakeClient>["client"];
 
@@ -26,13 +26,8 @@ mock.module("../src/client.js", {
 const { default: whoamiCmd } = await import("../src/commands/whoami.js");
 const whoami = whoamiCmd as Record<string, any>;
 
-function captureStderr(): { text: () => string } {
-  let text = "";
-  mock.method(process.stderr, "write", (chunk: string) => {
-    text += chunk;
-    return true;
-  });
-  return { text: () => text };
+function captureStderr() {
+  return captureWrites(process.stderr);
 }
 
 describe("whoami --json: errores respetan el contrato --json", () => {
