@@ -42,7 +42,7 @@ Fichas cortas en `docs/agents/`: decisiones, trampas y glosario que el código n
 Léelas antes de tocar su tema; si tu cambio fija una convención o descubres una trampa, escribe o
 pon al día la ficha en el mismo PR y agrega aquí su renglón.
 <!-- - [Tema](docs/agents/tema.md) — de qué trata, en una línea -->
-- [CLI de MailMask](docs/agents/mailmask-cli.md) — convenciones de `cli/`: framework de comandos, auth, exit codes, la regla dura de no tocar DNS `managed`, `rules`/`suppressions`, `logo` sin `--url`, `dns import` de sólo lectura y, para cobros y dominios registrados, liga impresa y nunca EPP.
+- [CLI de MailMask](docs/agents/mailmask-cli.md) — convenciones de `cli/`: framework de comandos, auth, exit codes, la regla dura de no tocar DNS `managed`, `rules`/`suppressions`, `logo` sin `--url` y `dns import` de sólo lectura e `inbox`/`canned`/`signature` (get siempre en texto; attachment no crea archivo si falla) y, para cobros y dominios registrados, liga impresa y nunca EPP.
 - [SEO de páginas públicas](docs/agents/seo-paginas-publicas.md) — metas en un bloque, `@graph`, `dateModified` visible, imagen OG propia y `llms.txt` sin contradecir `/docs`.
 
 ## Pull requests

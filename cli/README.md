@@ -47,6 +47,26 @@ mailmask suppressions list <dominio> [--json]
 mailmask suppressions add <dominio> <correo> [--json]
 mailmask suppressions remove <dominio> <correo> [--yes] [--json]
 
+mailmask inbox list <dominio> [--status open|snoozed|closed|unread|deleted] [--alias <máscara>] [--assigned <usuario>] [--q <texto>] [--limit N] [--cursor <c>] [--json]
+mailmask inbox get <dominio> <conversación> [--before <mensaje>] [--json]
+mailmask inbox reply <dominio> <conversación> --markdown <texto> [--cc <a,b>] [--bcc <a,b>] [--no-quote] [--yes] [--json]
+mailmask inbox compose <dominio> --from <máscara> --to <correo> --subject <asunto> --markdown <texto> [--cc <a,b>] [--bcc <a,b>] [--yes] [--json]
+mailmask inbox update <dominio> <conversación> [--status open|snoozed|closed] [--snooze-until <ISO>] [--tags <a,b>] [--priority normal|urgent] [--json]
+mailmask inbox read <dominio> <conversación> [--json]
+mailmask inbox assign <dominio> <conversación> [usuario] [--json]
+mailmask inbox note <dominio> <conversación> <texto> [--json]
+mailmask inbox delete <dominio> <conversación...> [--yes] [--json]
+mailmask inbox restore <dominio> <conversación> [--json]
+mailmask inbox metrics <dominio> [--days N] [--json]
+mailmask inbox attachment <dominio> <conversación> <mensaje> <índice> [-o <archivo>]
+
+mailmask canned list <dominio> [--json]
+mailmask canned create <dominio> --title <título> --body <texto> [--json]
+mailmask canned delete <dominio> <id> [--yes] [--json]
+
+mailmask signature get <dominio> [--json]
+mailmask signature set <dominio> <markdown> [--json]
+
 mailmask account profile [--name <texto>] [--json]
 mailmask account avatar set <archivo> [--json]
 mailmask account avatar remove [--yes] [--json]
@@ -214,7 +234,18 @@ hay `--url` porque el servidor sólo acepta URLs firmadas del chat del asistente
 `dns import` es de sólo lectura: muestra lo que encontró, los nameservers y el aviso,
 sin cambiar nada (límite: 2 cada 5 min, sale con `5`).
 
-`rules delete`, `suppressions remove`, `domains logo remove`, `webhooks delete`, `smtp revoke` y `api-keys revoke` son destructivos: preguntan
+La Bandeja (`inbox`), las respuestas guardadas (`canned`) y la firma (`signature`) son
+1:1 con `client.inbox`, `client.canned` y `client.signature`. `inbox get` siempre imprime
+texto (si el mensaje sólo trae HTML, sin etiquetas) y, como en la web, marca la conversación
+como leída; con `--json` cada mensaje trae además `text`. `inbox reply` y `compose` envían
+correo de verdad: piden confirmación y `--yes` fuera de una terminal (`compose` exige el
+dominio activado y gasta cuota de envío). `inbox update --status snoozed` necesita
+`--snooze-until`. `inbox delete` manda de 1 a 200 conversaciones a la papelera (se
+restauran con `inbox restore`). `inbox attachment` escribe los bytes en `-o` o, sin él, a
+stdout; si el adjunto no existe sale con `4` y no deja ningún archivo. `signature set ""`
+borra la firma (máx. 2000 caracteres).
+
+`rules delete`, `suppressions remove`, `inbox reply|compose|delete`, `canned delete`, `domains logo remove`, `webhooks delete`, `smtp revoke` y `api-keys revoke` son destructivos: preguntan
 en una terminal y exigen `--yes` fuera de ella. Si la llave que revocas es la
 que usa esta sesión (la marca `api-keys list`), el comando avisa que la sesión
 quedará sin llave y pide una segunda confirmación (con `--yes`, el aviso va a
