@@ -63,6 +63,7 @@ export class ExitSignal extends Error {
  * sin esto una mutación después de un "exit" simulado seguiría corriendo.
  */
 export function trapExit(): void {
+  silenceOutput();
   mock.method(process, "exit", ((code?: number) => {
     throw new ExitSignal(code ?? 0);
   }) as never);
@@ -83,4 +84,28 @@ export function captureWrites(stream: NodeJS.WriteStream): { text: () => string;
     return true;
   }) as never);
   return { text: () => text, restore: () => fn.mock.restore() };
+}
+
+let silenced = false;
+/**
+ * Los comandos imprimen "✓ ..." / "✖ ..." con process.stdout/stderr.write. Con el aislamiento por
+ * proceso de node:test, stdout del hijo es el mismo canal por donde viaja el protocolo del runner;
+ * esas líneas se mezclan con sus Buffers y a veces lo corrompen ("Unable to deserialize cloned
+ * data"). Se descartan los strings (lo que se quiera leer se captura con `captureWrites`) y los
+ * Buffers pasan intactos.
+ */
+function silenceOutput(): void {
+  if (silenced) return;
+  silenced = true;
+  for (const stream of [process.stdout, process.stderr]) {
+    const original = stream.write.bind(stream) as (...a: unknown[]) => boolean;
+    stream.write = ((chunk: unknown, ...rest: unknown[]) => {
+      if (typeof chunk === "string") {
+        const cb = rest.find((r) => typeof r === "function") as (() => void) | undefined;
+        cb?.();
+        return true;
+      }
+      return original(chunk, ...rest);
+    }) as typeof stream.write;
+  }
 }
