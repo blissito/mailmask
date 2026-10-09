@@ -77,7 +77,14 @@ describe("domains logo", () => {
 describe("domains dns-setup", () => {
   it("pasa live al SDK e imprime tipo, nombre, valor, ok y el registrador", async () => {
     const out: string[] = [];
-    mock.method(process.stdout, "write", ((s: string) => { out.push(String(s)); return true; }) as never);
+    // Sólo se captura texto: el runner de node:test manda sus eventos por stdout como Buffer
+    // serializado; tragárselos rompe la prueba ("Unable to deserialize cloned data").
+    const original = process.stdout.write.bind(process.stdout) as (...a: unknown[]) => boolean;
+    mock.method(process.stdout, "write", ((s: unknown, ...rest: unknown[]) => {
+      if (typeof s !== "string") return original(s, ...rest);
+      out.push(s);
+      return true;
+    }) as never);
     const { client, calls } = fakeClient({
       domains: {
         dnsSetup: () => ({

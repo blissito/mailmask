@@ -85,7 +85,12 @@ describe("rules: regex peligrosa y borrado", () => {
     const { client } = fakeClient({ rules: { create: () => { throw new MailMaskError(400, msg); } } });
     currentClient = client;
     const errs: string[] = [];
-    mock.method(process.stderr, "write", ((s: string) => { errs.push(String(s)); return true; }) as never);
+    const original = process.stderr.write.bind(process.stderr) as (...a: unknown[]) => boolean;
+    mock.method(process.stderr, "write", ((s: unknown, ...rest: unknown[]) => {
+      if (typeof s !== "string") return original(s, ...rest);
+      errs.push(s);
+      return true;
+    }) as never);
     await assert.rejects(
       () => create.run({ args: { domain: "dom_1", field: "subject", match: "regex", value: "(a+)+$", action: "discard", json: true } }),
       (e: unknown) => e instanceof ExitSignal && e.code === 1,
