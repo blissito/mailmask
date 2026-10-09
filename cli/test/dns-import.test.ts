@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
 import { MailMaskError } from "@easybits.cloud/mailmask";
-import { fakeClient, trapExit, ExitSignal } from "./test-helpers.js";
+import { fakeClient, trapExit, ExitSignal, captureWrites } from "./test-helpers.js";
 
 let currentClient: ReturnType<typeof fakeClient>["client"];
 
@@ -23,9 +23,8 @@ const result = {
 };
 
 function capture() {
-  const out: string[] = [];
-  mock.method(process.stdout, "write", ((s: string) => { out.push(String(s)); return true; }) as never);
-  return () => { mock.restoreAll(); trapExit(); return out.join(""); };
+  const cap = captureWrites(process.stdout);
+  return () => { const texto = cap.text(); cap.restore(); return texto; };
 }
 
 describe("dns import", () => {

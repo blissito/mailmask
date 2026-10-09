@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it, mock, test } from "node:test";
 import { MailMaskError } from "@easybits.cloud/mailmask";
 import { EXIT, confirmOrExit, failFromError, maskSecret } from "../src/output.js";
-import { ExitSignal, trapExit } from "./test-helpers.js";
+import { ExitSignal, trapExit, captureWrites } from "./test-helpers.js";
 
 test("maskSecret conserva sólo cabeza y cola de llaves largas", () => {
   assert.equal(maskSecret("mk_abcdefghijklmnop"), "mk_abcd...mnop");
@@ -14,13 +14,8 @@ test("maskSecret oculta por completo una llave corta", () => {
 
 trapExit();
 
-function captureStderr(): { text: () => string } {
-  let text = "";
-  mock.method(process.stderr, "write", (chunk: string) => {
-    text += chunk;
-    return true;
-  });
-  return { text: () => text };
+function captureStderr() {
+  return captureWrites(process.stderr);
 }
 
 describe("failFromError: taxonomía de exit codes", () => {

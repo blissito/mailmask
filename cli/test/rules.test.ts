@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
 import { MailMaskError } from "@easybits.cloud/mailmask";
-import { fakeClient, trapExit, ExitSignal } from "./test-helpers.js";
+import { fakeClient, trapExit, ExitSignal, captureWrites } from "./test-helpers.js";
 
 let currentClient: ReturnType<typeof fakeClient>["client"];
 let requireClientCalls = 0;
@@ -84,15 +84,14 @@ describe("rules: regex peligrosa y borrado", () => {
     const msg = "Regex peligrosa: backtracking exponencial";
     const { client } = fakeClient({ rules: { create: () => { throw new MailMaskError(400, msg); } } });
     currentClient = client;
-    const errs: string[] = [];
-    mock.method(process.stderr, "write", ((s: string) => { errs.push(String(s)); return true; }) as never);
+    const cap = captureWrites(process.stderr);
     await assert.rejects(
       () => create.run({ args: { domain: "dom_1", field: "subject", match: "regex", value: "(a+)+$", action: "discard", json: true } }),
       (e: unknown) => e instanceof ExitSignal && e.code === 1,
     );
-    mock.restoreAll();
-    trapExit();
-    assert.deepEqual(JSON.parse(errs.join("")), { error: msg, status: 400 });
+    const errs = cap.text();
+    cap.restore();
+    assert.deepEqual(JSON.parse(errs), { error: msg, status: 400 });
   });
 
   it("delete sin TTY ni --yes sale con 1 sin llamar a la API (ni domains.list)", async () => {
