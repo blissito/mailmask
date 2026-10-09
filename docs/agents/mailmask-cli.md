@@ -3,8 +3,7 @@
 **Qué:** CLI en TypeScript sobre `@easybits.cloud/mailmask` (`sdk/`), un subcomando
 por recurso del SDK — sin modelo declarativo encima. Esta primera entrega (ticket 1
 del sprint) trae `login`, `logout`, `whoami`, `domains` y `dns`. El ticket C del
-sprint 4 agregó `aliases` (máscaras y buzones IMAP). Envío de correo y un modo
-pensado para agentes llegan después en PRs propios sobre esta misma base.
+sprint 4 agregó `aliases` (máscaras y buzones IMAP). Un modo pensado para agentes llega después en un PR propio sobre esta misma base.
 
 **Por qué:** la CLI no inventa nada encima del SDK — cada comando es 1:1 con un
 método ya documentado, para que no haya dos formas de aprenderse la API.
@@ -194,6 +193,25 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   servidor, así que NO lleva `confirmOrExit`; su rate limit (2 cada 5 min) cae solo en
   exit 5. `rules delete`, `suppressions remove` y `domains logo remove` sí confirman
   ANTES de `resolveDomainId`.
+
+- **`send` y `logs` (C13):** el grupo es `send email|bulk|status` y NO `send <dominio>`
+  porque en citty un grupo con `subCommands` trata el primer positional como
+  subcomando. `--from` es la parte local del alias o la dirección completa: con `@` se
+  recorta sólo si lo que sigue es el dominio dado por nombre (sin mayúsculas); con otro
+  dominio, o con `<dominio>` dado como id, `failUsage` antes de la red. El input lleva
+  `from`, **nunca `fromLocal`** (el bug de la 0.1.4 mandó correos desde el remitente
+  equivocado). Sin `--from` se avisa en stderr que sale desde `noreply@`. `--text` va a
+  `body` del SDK (no existe `text`); `--html`/`--markdown` a los suyos, y cada uno acepta
+  `@ruta`. Orden fijo en `send email`: validar y leer archivos locales → `confirmOrExit`
+  → `resolveDomainId` → `attachments.upload` por archivo → `send.send` con las llaves en
+  `attachments`; así, sin TTY ni `--yes`, no se llama al SDK ni siquiera para subir. La
+  `--idempotency-key` va en `opts`, no en el input. Reintentar con la misma clave y
+  `--attach` vuelve a subir los archivos (el SDK no deduplica) y deja llaves huérfanas en
+  S3 hasta que expiran. `send bulk` acepta el esquema CERRADO de `BulkSendInput`
+  (`recipients`, `subject`, `html`, `from?`): una llave extra (`markdown`, `cc`,
+  `attachments`) es error antes de la red, porque el servidor la ignoraría en silencio.
+  `logs --limit` es un entero 1–100 validado antes de red. Enviar pide dominio activado:
+  el 403 sale como exit 2, la misma trampa de `webhooks`/`smtp`.
 
 ## Convención dura — no se negocia en ningún comando futuro
 
