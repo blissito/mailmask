@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MailMaskError } from "@easybits.cloud/mailmask";
-import { fakeClient, trapExit, ExitSignal } from "./test-helpers.js";
+import { fakeClient, trapExit, ExitSignal, captureWrites } from "./test-helpers.js";
 
 let currentClient: ReturnType<typeof fakeClient>["client"];
 
@@ -28,13 +28,8 @@ const { create: mailboxCreate, delete: mailboxDelete, "reset-password": resetPas
 // Mismo patrón que `captureStderr` en whoami.test.ts, pero sobre stdout: el
 // aviso de "cómo copiar la contraseña completa" vive ahí, no en un valor de
 // retorno, así que hay que leerlo de lo que el comando imprimió de verdad.
-function captureStdout(): { text: () => string; restore: () => void } {
-  let text = "";
-  const fn = mock.method(process.stdout, "write", (chunk: string) => {
-    text += chunk;
-    return true;
-  });
-  return { text: () => text, restore: () => fn.mock.restore() };
+function captureStdout() {
+  return captureWrites(process.stdout);
 }
 
 describe("aliases list: llamada al SDK", () => {

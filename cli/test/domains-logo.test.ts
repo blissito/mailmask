@@ -3,7 +3,7 @@ import { describe, it, mock } from "node:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fakeClient, trapExit, ExitSignal } from "./test-helpers.js";
+import { fakeClient, trapExit, ExitSignal, captureWrites } from "./test-helpers.js";
 
 let currentClient: ReturnType<typeof fakeClient>["client"];
 let requireClientCalls = 0;
@@ -76,15 +76,7 @@ describe("domains logo", () => {
 
 describe("domains dns-setup", () => {
   it("pasa live al SDK e imprime tipo, nombre, valor, ok y el registrador", async () => {
-    const out: string[] = [];
-    // Sólo se captura texto: el runner de node:test manda sus eventos por stdout como Buffer
-    // serializado; tragárselos rompe la prueba ("Unable to deserialize cloned data").
-    const original = process.stdout.write.bind(process.stdout) as (...a: unknown[]) => boolean;
-    mock.method(process.stdout, "write", ((s: unknown, ...rest: unknown[]) => {
-      if (typeof s !== "string") return original(s, ...rest);
-      out.push(s);
-      return true;
-    }) as never);
+    const cap = captureWrites(process.stdout);
     const { client, calls } = fakeClient({
       domains: {
         dnsSetup: () => ({
@@ -96,10 +88,9 @@ describe("domains dns-setup", () => {
     });
     currentClient = client;
     await dnsSetup.run({ args: { domain: "dom_1", live: true } });
-    mock.restoreAll();
-    trapExit();
+    const texto = cap.text();
+    cap.restore();
     assert.deepEqual(calls.find((c) => c.method === "domains.dnsSetup")!.args, ["dom_1", { live: true }]);
-    const texto = out.join("");
     assert.match(texto, /MX\s+@\s+mx\.mailmask\.studio/);
     assert.match(texto, /falta/);
     assert.match(texto, /GoDaddy/);

@@ -67,3 +67,20 @@ export function trapExit(): void {
     throw new ExitSignal(code ?? 0);
   }) as never);
 }
+
+/**
+ * Captura lo que un comando escribe a stdout/stderr. Sólo toma strings: el runner de node:test
+ * le manda al proceso padre sus eventos por stdout como Buffer serializado, y tragárselos rompe
+ * la corrida de forma intermitente ("Unable to deserialize cloned data"). Lo que no es string
+ * pasa al `write` original.
+ */
+export function captureWrites(stream: NodeJS.WriteStream): { text: () => string; restore: () => void } {
+  const original = stream.write.bind(stream) as (...a: unknown[]) => boolean;
+  let text = "";
+  const fn = mock.method(stream, "write", ((chunk: unknown, ...rest: unknown[]) => {
+    if (typeof chunk !== "string") return original(chunk, ...rest);
+    text += chunk;
+    return true;
+  }) as never);
+  return { text: () => text, restore: () => fn.mock.restore() };
+}
