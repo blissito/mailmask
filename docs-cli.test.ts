@@ -31,7 +31,8 @@ export function comandosDelCli(): { topLevel: string[]; rutas: string[] } {
 
   const expandir = (prefijo: string, nombre: string): string[] => {
     const ruta = prefijo ? `${prefijo} ${nombre}` : nombre;
-    const hijos = grupos.get(nombre);
+    // Un subcomando puede llamarse como un grupo de primer nivel (transfers dns / dns): sólo se expande si es el grupo de verdad.
+    const hijos = prefijo && topLevel.includes(nombre) ? undefined : grupos.get(nombre);
     return hijos ? hijos.flatMap((h) => expandir(ruta, h)) : [ruta];
   };
   return { topLevel, rutas: topLevel.flatMap((t) => expandir("", t)) };
@@ -51,10 +52,11 @@ function seccionCli(): string {
 
 test("el lector de comandos ve la CLI de main (si no, esta prueba no vigila nada)", () => {
   const { topLevel, rutas } = comandosDelCli();
-  assert.deepEqual(topLevel, ["login", "logout", "whoami", "domains", "dns", "aliases", "webhooks", "smtp", "api-keys", "rules", "suppressions"]);
+  assert.deepEqual(topLevel, ["login", "logout", "whoami", "domains", "dns", "aliases", "webhooks", "smtp", "api-keys", "rules", "suppressions", "account", "members", "billing", "registrations", "transfers", "referrals"]);
   assert.ok(rutas.includes("aliases mailbox reset-password"), "no expandió aliases mailbox");
   assert.ok(rutas.includes("dns create-zone"));
   assert.ok(rutas.includes("api-keys revoke") && rutas.includes("webhooks deliveries"), "no expandió webhooks/api-keys");
+  assert.ok(rutas.includes("account avatar set") && rutas.includes("transfers dns") && !rutas.some((r) => r.startsWith("transfers dns ")), "no expandió account avatar o confundió transfers dns con el grupo dns");
   assert.ok(rutas.length >= 20, `solo ${rutas.length} rutas`);
 });
 
