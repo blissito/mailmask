@@ -774,6 +774,17 @@ sobre cualquier identidad — la credencial anterior sólo autorizaba `From` de
 `mailmask.studio`. Es seguro porque `mustMatchSender: true` en Stalwart obliga a que el
 remitente sea el usuario autenticado.
 
+### Autodescubrimiento (9-oct-2026)
+
+Stalwart contesta el XML de Outlook y el autoconfig de Thunderbird en `imap.mailmask.studio`,
+pero los clientes lo buscan bajo el dominio del correo: sin registros, Outlook adivinó
+`imap.hostinger` para kandey.com.mx. `mail-autoconfig.ts` agrega **una vez por dominio** el SRV
+`_autodiscover._tcp` → `0 0 443 imap.mailmask.studio` y el CNAME `autoconfig` al crear el primer
+buzón (sólo con zona nuestra y sin pisar lo existente; si no, salen en `dns-setup`). Un CNAME
+`autodiscover.` no sirve: nuestro certificado no cubre el dominio del cliente. Los protocolos
+anunciados salen de `x:SystemSettings.services` (id `singleton`), **no** de los listeners: POP3 se
+quitó de ahí y el listener `pop3s` (995, nunca expuesto) se borró.
+
 ### 🔴 Stalwart se baneó a sí mismo (7-sep-2026)
 
 Todo el tráfico externo entra por el proxy de EasyBits con **una sola IP** (`172.20.0.1`).

@@ -7,6 +7,7 @@
 // Las pistas (`hints`) van en texto con `**negritas**` estilo markdown: el front las convierte
 // a <strong> escapando todo lo demás, y un modelo las lee tal cual.
 import { Resolver } from "node:dns/promises";
+import { IMAP_HOST } from "./apple-profile.js";
 
 export const SES_INBOUND_HOST = "inbound-smtp.us-east-1.amazonaws.com";
 
@@ -14,7 +15,7 @@ export type DnsSetupLevel = "requerido" | "recomendado" | "opcional";
 
 export interface DnsSetupRecord {
   id: string;
-  type: "MX" | "TXT" | "CNAME";
+  type: "MX" | "TXT" | "CNAME" | "SRV";
   /** Como se escribe en casi todos los paneles: relativo al dominio ('@', '_amazonses'). */
   name: string;
   /** Nombre completo, para los paneles que lo piden así. */
@@ -55,6 +56,8 @@ interface DomainLike {
   verificationToken: string;
   dkimTokens: string[];
   hostedZoneId?: string | null;
+  /** Si el dominio tiene al menos un buzón: entonces van los registros de autodescubrimiento. */
+  mailboxes?: boolean;
 }
 
 export function dnsSetupRecords(dom: DomainLike): DnsSetupRecord[] {
@@ -130,6 +133,34 @@ export function dnsSetupRecords(dom: DomainLike): DnsSetupRecord[] {
       ],
     },
   ];
+  if (dom.mailboxes) {
+    records.push(
+      {
+        id: "autodiscover",
+        type: "SRV",
+        name: "_autodiscover._tcp",
+        fqdn: `_autodiscover._tcp.${d}`,
+        value: `0 0 443 ${IMAP_HOST}`,
+        level: "recomendado",
+        purpose: "Outlook: configura los buzones solo, sin escribir el servidor a mano.",
+        benefit: "Sin él, Outlook adivina el servidor y puede proponer el de tu proveedor anterior.",
+        hints: [
+          `Si tu proveedor pide los campos por separado: prioridad **0**, peso **0**, puerto **443**, destino **${IMAP_HOST}**.`,
+          `Si ya usas Microsoft 365 o Exchange en este dominio, **no lo agregues**: le quitarías el autodescubrimiento a esas cuentas.`,
+        ],
+      },
+      {
+        id: "autoconfig",
+        type: "CNAME",
+        name: "autoconfig",
+        fqdn: `autoconfig.${d}`,
+        value: IMAP_HOST,
+        level: "opcional",
+        purpose: "Thunderbird y otros clientes: configuran los buzones solos.",
+        hints: [`Pon solo **autoconfig** como nombre — tu proveedor agrega **.${d}** automáticamente.`],
+      },
+    );
+  }
   // La explicación común de los tres CNAME va en el primero, como siempre la tuvo la tabla.
   const firstDkim = records.find((r) => r.id === "dkim1");
   firstDkim?.hints.unshift(`Los 3 registros CNAME son para **DKIM** — la firma digital que evita que tus emails caigan en spam.`);
