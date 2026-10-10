@@ -761,7 +761,7 @@ console.<span class="fn">log</span>(newKey.key); <span class="cm">// mk_... &mda
 
       <!-- CLI -->
       <h2 id="cli" class="text-2xl font-bold mt-12 mb-4 border-b border-line pb-2">CLI</h2>
-      <p class="text-fg-muted mb-2">CLI de terminal sobre este mismo SDK: un subcomando por recurso, sin modelo declarativo encima. Cubre la sesi&oacute;n (<code class="text-fg">login</code>, <code class="text-fg">logout</code>, <code class="text-fg">whoami</code>), <code class="text-fg">domains</code>, <code class="text-fg">dns</code>, <code class="text-fg">aliases</code>, <code class="text-fg">webhooks</code>, <code class="text-fg">smtp</code>, <code class="text-fg">api-keys</code>, <code class="text-fg">rules</code>, <code class="text-fg">suppressions</code>, <code class="text-fg">inbox</code> (la Bandeja), <code class="text-fg">canned</code> y <code class="text-fg">signature</code>, con los buzones IMAP, el perfil de Apple Mail y la exportaci&oacute;n en mbox. El env&iacute;o de correo desde la terminal todav&iacute;a no est&aacute;.</p>
+      <p class="text-fg-muted mb-2">CLI de terminal sobre este mismo SDK: un subcomando por recurso, sin modelo declarativo encima. Cubre la sesi&oacute;n (<code class="text-fg">login</code>, <code class="text-fg">logout</code>, <code class="text-fg">whoami</code>), <code class="text-fg">domains</code>, <code class="text-fg">dns</code>, <code class="text-fg">aliases</code>, <code class="text-fg">webhooks</code>, <code class="text-fg">smtp</code>, <code class="text-fg">api-keys</code>, <code class="text-fg">rules</code>, <code class="text-fg">suppressions</code>, <code class="text-fg">inbox</code> (la Bandeja), <code class="text-fg">canned</code> y <code class="text-fg">signature</code>, <code class="text-fg">account</code>, <code class="text-fg">members</code>, <code class="text-fg">billing</code>, <code class="text-fg">registrations</code>, <code class="text-fg">transfers</code> y <code class="text-fg">referrals</code>, con los buzones IMAP, el perfil de Apple Mail y la exportaci&oacute;n en mbox. El env&iacute;o de correo desde la terminal todav&iacute;a no est&aacute;.</p>
       <p class="text-fg-subtle text-xs mb-4">Nombre del paquete y del binario (hoy <code>mailmask-cli</code> / <code>mailmask</code>) son provisionales, pendientes de confirmaci&oacute;n antes de publicarse a npm.</p>
       <p class="text-fg-muted text-sm mb-6">&iquest;Quien va a operar tu cuenta es un agente de c&oacute;digo? Probablemente le convenga m&aacute;s instalarle las <a href="#skills" class="text-accent-text hover:underline">skills oficiales</a> (<code>npx skills add https://www.mailmask.studio</code>) que esta CLI: ya saben qu&eacute; puede hacer cada plan y qu&eacute; secretos salen una sola vez. Esta CLI es para cuando la persona teclea los comandos ella misma.</p>
 
@@ -860,8 +860,44 @@ mailmask api-keys revoke &lt;id&gt; [--yes] [--json]</code></pre>
       <p class="text-fg-muted text-sm mb-4"><code>aliases create</code> acepta uno o m&aacute;s destinos como argumentos sueltos (<code>aliases create acme.com soporte ana@acme.com luis@acme.com</code>); con <code>--mailbox</code> tambi&eacute;n se permite sin ning&uacute;n destino, porque el correo se queda en el buz&oacute;n IMAP. <code>aliases update</code> cambia destinos y/o el estado con <code>--enable</code> o <code>--disable</code> (no se combinan). El buz&oacute;n IMAP vive bajo <code>aliases mailbox</code> y requiere el dominio activado.</p>
       <p class="text-fg-muted text-sm mb-4"><strong class="text-fg">La contrase&ntilde;a del buz&oacute;n sale enmascarada</strong> (<code>ab&bull;&bull;&bull;&bull;&bull;&bull;yz</code>) y no se vuelve a mostrar completa: para verla entera, <code>mailbox reset-password</code> con <code>--json</code> genera una nueva y la devuelve completa una sola vez; la anterior deja de servir. <code>apple-profile</code> escribe el perfil <code>.mobileconfig</code> de Apple Mail en la ruta de <code>-o</code>; <code>export</code> baja el buz&oacute;n en mbox a un archivo con <code>-o</code> o por la salida est&aacute;ndar, para encadenarlo con otro comando.</p>
 
+      <p class="text-sm font-bold mb-1">Cuenta, equipo, cobros y dominios registrados</p>
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask account profile [--name &lt;texto&gt;] [--json]
+mailmask account avatar set &lt;archivo&gt; [--json]
+mailmask account avatar remove [--yes] [--json]
+
+mailmask members list &lt;dominio&gt; [--json]
+mailmask members invite &lt;dominio&gt; --email &lt;correo&gt; --name &lt;nombre&gt; [--role admin|agent] [--json]
+mailmask members remove &lt;dominio&gt; &lt;miembroId&gt; [--yes] [--json]
+mailmask members cancel-invite &lt;dominio&gt; &lt;token&gt; [--yes] [--json]
+
+mailmask billing status [--json]
+mailmask billing addons [--json]
+mailmask billing orders [--limit N] [--before &lt;cursor&gt;] [--json]
+mailmask billing checkout &lt;dominio&gt; [--kind domain|storage50|sends100] [--period monthly|annual] [--payer-email &lt;correo&gt;] [--json]
+mailmask billing cancel-addon &lt;addonId&gt; [--yes] [--json]
+
+mailmask registrations search &lt;dominio&gt; [--json]
+mailmask registrations tlds [--json]
+mailmask registrations register &lt;dominio&gt; [--json]
+mailmask registrations list [--json]
+mailmask registrations renewal &lt;dominio|registroId&gt; [--payer-email &lt;correo&gt;] [--json]
+mailmask registrations cancel-renewal &lt;dominio|registroId&gt; [--yes] [--json]
+mailmask registrations transfer-out &lt;dominio|registroId&gt; [--yes] [--json]
+
+mailmask transfers check &lt;dominio&gt; [--json]
+mailmask transfers dns &lt;dominio|registroId&gt; [--json]
+mailmask transfers set-dns &lt;dominio|registroId&gt; --file &lt;registros.json&gt; [--yes] [--json]
+mailmask transfers approve-dns &lt;dominio|registroId&gt; [--yes] [--json]
+mailmask transfers resend-email &lt;dominio|registroId&gt; [--json]
+
+mailmask referrals get [--json]
+mailmask referrals slug &lt;slug&gt; [--json]
+mailmask referrals name &lt;nombre&gt; [--json]</code></pre>
+      <p class="text-fg-muted text-sm mb-4"><strong class="text-fg">El CLI nunca paga, nunca espera el pago y nunca pide, acepta ni muestra un c&oacute;digo EPP.</strong> <code>billing checkout</code>, <code>registrations register</code> y <code>registrations renewal</code> s&oacute;lo imprimen la liga de pago y terminan: la abres t&uacute; y nada cambia hasta que pagas. <code>registrations transfer-out</code> pide el traslado y el c&oacute;digo llega por correo al due&ntilde;o; el comando imprime el aviso, nunca el c&oacute;digo.</p>
+      <p class="text-fg-muted text-sm mb-4"><code>registrations</code> y <code>transfers</code> aceptan el nombre del dominio o el id de su registro (<code>transfers check</code> y <code>registrations search</code>/<code>register</code> reciben el nombre). <code>transfers set-dns</code> <strong class="text-fg">reemplaza el inventario completo</strong> con un arreglo JSON de <code>{ name, type, ttl?, values[] }</code> que se valida antes de tocar la red; luego hay que aprobarlo con <code>transfers approve-dns</code>. <code>account avatar set</code> acepta .png, .jpg, .jpeg o .webp de hasta 2 MB y no tiene <code>--url</code>. <code>account profile --name ""</code> borra el nombre visible (m&aacute;x. 60 caracteres). <code>members invite</code> imprime la liga de invitaci&oacute;n.</p>
+
       <p class="text-sm font-bold mb-1">Para scripts y agentes: <code>--json</code> y <code>--yes</code></p>
-      <p class="text-fg-muted text-sm mb-4">Con <code>--json</code> los comandos imprimen JSON, y un error sale por stderr como <code>{"error": "...", "status": 404}</code> (sin <code>status</code> si no vino de la API), para parsearlo sin adivinar el formato. Lo que borra o resetea &mdash; <code>domains delete</code>, <code>domains logo remove</code>, <code>dns delete</code>, <code>rules delete</code>, <code>suppressions remove</code>, <code>inbox reply</code>, <code>inbox compose</code>, <code>inbox delete</code>, <code>canned delete</code>, <code>aliases delete</code>, <code>aliases mailbox delete</code> y <code>aliases mailbox reset-password</code>, <code>webhooks delete</code>, <code>smtp revoke</code> y <code>api-keys revoke</code> &mdash; pregunta <code>[y/N]</code> en una terminal; fuera de una (CI, un agente) exige <code>--yes</code> y, sin &eacute;l, sale con c&oacute;digo <code>1</code> sin tocar la red.</p>
+      <p class="text-fg-muted text-sm mb-4">Con <code>--json</code> los comandos imprimen JSON, y un error sale por stderr como <code>{"error": "...", "status": 404}</code> (sin <code>status</code> si no vino de la API), para parsearlo sin adivinar el formato. Lo que borra o resetea &mdash; <code>domains delete</code>, <code>domains logo remove</code>, <code>dns delete</code>, <code>rules delete</code>, <code>suppressions remove</code>, <code>inbox reply</code>, <code>inbox compose</code>, <code>inbox delete</code>, <code>canned delete</code>, <code>aliases delete</code>, <code>aliases mailbox delete</code> y <code>aliases mailbox reset-password</code>, <code>webhooks delete</code>, <code>smtp revoke</code> <code>api-keys revoke</code>, <code>members remove</code>, <code>members cancel-invite</code>, <code>billing cancel-addon</code>, <code>registrations cancel-renewal</code>, <code>registrations transfer-out</code>, <code>transfers set-dns</code>, <code>transfers approve-dns</code> y <code>account avatar remove</code> &mdash; pregunta <code>[y/N]</code> en una terminal; fuera de una (CI, un agente) exige <code>--yes</code> y, sin &eacute;l, sale con c&oacute;digo <code>1</code> sin tocar la red.</p>
 
       <p class="text-sm font-bold mb-1">Variable de entorno</p>
       <p class="text-fg-muted text-sm mb-4"><code class="text-accent-text bg-bg-elev px-1.5 py-0.5 rounded text-sm">MAILMASK_API_KEY</code> tiene prioridad sobre la sesi&oacute;n guardada &mdash; es la v&iacute;a recomendada para CI o para un agente de c&oacute;digo.</p>

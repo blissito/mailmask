@@ -221,6 +221,35 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   delete` salen de `args._.slice(1)`, no de `rawArgs`. **`--no-quote`:** citty lo convierte en
   `quote=false`, así que el arg se llama `quote` (con `default: true`); declarar `"no-quote"`
   nunca recibe nada. `compose` exige dominio activado (403 → exit 2, la trampa de arriba).
+## `account`, `members`, `billing`, `registrations`, `transfers` y `referrals`
+
+Dinero y dominios de por medio: el CLI **confirma, no cobra y no expone el EPP**.
+
+- **Cobros = liga impresa.** `billing checkout`, `registrations register` y `registrations renewal`
+  imprimen la liga de MercadoPago (`init_point` / `initPoint`) y terminan con 0 sin esperar el pago,
+  sin hacer polling. Con `--json` imprimen la respuesta del SDK tal cual.
+- **Nunca EPP.** Ningún comando acepta ni imprime un código de autorización. `registrations
+  transfer-out` imprime sólo el `aviso` (el código llega por correo al dueño; en `--json` se
+  proyecta `{ ok, aviso }` aunque la API devolviera más) y `registrations list` quita
+  `transferAuthCodeHint` en texto y en `--json`. `cli/test/cuenta-sin-epp.test.ts` recorre las
+  definiciones de args y falla si alguno se llama `epp|auth-code|authcode`.
+- **`resolveRegistrationId`** (`cli/src/resolve.ts`, gemela de `resolveDomainId`): `registrations`
+  y `transfers` aceptan el nombre del dominio o el id del registro, buscando en
+  `registrations.list()`; si no aparece, lo deja pasar para el 404 de la API. Excepciones: `transfers
+  check` y `registrations search|register` reciben el nombre (aún no hay registro).
+- **Ocho comandos confirman ANTES de `requireClient`/`resolve*`** (sin TTY y sin `--yes`: exit 1 con
+  cero llamadas): `members remove`, `members cancel-invite`, `billing cancel-addon`, `registrations
+  cancel-renewal`, `registrations transfer-out`, `transfers set-dns`, `transfers approve-dns` y
+  `account avatar remove`. `transfers set-dns` valida el archivo ANTES de confirmar y de tocar la red.
+- **`transfers set-dns` reemplaza todo el inventario** (`--file` con un arreglo `{name, type, ttl?, values[]}`);
+  no hay modo de editar un solo registro, por eso confirma y deja el traslado pendiente de `approve-dns`.
+- **Avatar sin `--url`:** `account avatar set <archivo>` valida .png/.jpg/.jpeg/.webp y ≤ 2 MB (límite
+  replicado del servidor, como `domains logo set`) antes de `requireClient`. `setAvatarFromUrl` sólo sirve
+  con adjuntos firmados del asistente. `account profile --name` ≤ 60 caracteres; `--name ""` lo borra.
+- **Fuera de alcance a propósito:** `account me` (lo hará `whoami`), `account export`, y
+  `registrations lock`: poner el candado existe en el SDK pero quitarlo no se expone nunca desde aquí.
+- **Trampa en `docs-cli.test.ts`:** `transfers dns` se llama igual que el grupo `dns`; el lector de
+  rutas sólo expande un nombre como grupo si es de primer nivel, o habría inventado `transfers dns list`.
 
 ## Convención dura — no se negocia en ningún comando futuro
 

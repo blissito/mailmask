@@ -67,6 +67,39 @@ mailmask canned delete <dominio> <id> [--yes] [--json]
 mailmask signature get <dominio> [--json]
 mailmask signature set <dominio> <markdown> [--json]
 
+mailmask account profile [--name <texto>] [--json]
+mailmask account avatar set <archivo> [--json]
+mailmask account avatar remove [--yes] [--json]
+
+mailmask members list <dominio> [--json]
+mailmask members invite <dominio> --email <correo> --name <nombre> [--role admin|agent] [--json]
+mailmask members remove <dominio> <miembroId> [--yes] [--json]
+mailmask members cancel-invite <dominio> <token> [--yes] [--json]
+
+mailmask billing status [--json]
+mailmask billing addons [--json]
+mailmask billing orders [--limit N] [--before <cursor>] [--json]
+mailmask billing checkout <dominio> [--kind domain|storage50|sends100] [--period monthly|annual] [--payer-email <correo>] [--json]
+mailmask billing cancel-addon <addonId> [--yes] [--json]
+
+mailmask registrations search <dominio> [--json]
+mailmask registrations tlds [--json]
+mailmask registrations register <dominio> [--json]
+mailmask registrations list [--json]
+mailmask registrations renewal <dominio|registroId> [--payer-email <correo>] [--json]
+mailmask registrations cancel-renewal <dominio|registroId> [--yes] [--json]
+mailmask registrations transfer-out <dominio|registroId> [--yes] [--json]
+
+mailmask transfers check <dominio> [--json]
+mailmask transfers dns <dominio|registroId> [--json]
+mailmask transfers set-dns <dominio|registroId> --file <registros.json> [--yes] [--json]
+mailmask transfers approve-dns <dominio|registroId> [--yes] [--json]
+mailmask transfers resend-email <dominio|registroId> [--json]
+
+mailmask referrals get [--json]
+mailmask referrals slug <slug> [--json]
+mailmask referrals name <nombre> [--json]
+
 mailmask aliases list <dominio> [--json]
 mailmask aliases create <dominio> <alias> [destino...] [--mailbox] [--json]
 mailmask aliases update <dominio> <alias> [destino...] [--enable | --disable] [--json]
@@ -162,8 +195,10 @@ adivinar el formato.
 
 ## Confirmación de lo destructivo
 
-`domains delete`, `dns delete`, `aliases delete`, `aliases mailbox delete` y
-`aliases mailbox reset-password` (y lo que se agregue después que borre,
+`domains delete`, `dns delete`, `aliases delete`, `aliases mailbox delete`,
+`aliases mailbox reset-password`, `members remove`, `members cancel-invite`,
+`billing cancel-addon`, `registrations cancel-renewal`, `registrations transfer-out`,
+`transfers set-dns`, `transfers approve-dns` y `account avatar remove` (y lo que se agregue después que borre,
 revoque o envíe a terceros) piden confirmación antes de mutar. En una
 terminal preguntan `[y/N]`; fuera de una terminal (CI, un agente, un script)
 no hay a quién preguntarle, así que exigen `--yes` — sin él salen con código
@@ -216,3 +251,22 @@ que usa esta sesión (la marca `api-keys list`), el comando avisa que la sesión
 quedará sin llave y pide una segunda confirmación (con `--yes`, el aviso va a
 stderr y sigue); al terminar sugiere `mailmask login`, y con `--json` agrega
 `"activeKeyRevoked": true`.
+
+### Cuenta, equipo, cobros y dominios registrados
+
+**El CLI nunca paga, nunca espera el pago y nunca pide, acepta ni muestra un código EPP.**
+`billing checkout`, `registrations register` y `registrations renewal` sólo imprimen la liga
+de MercadoPago y terminan; tú la abres y pagas, y nada cambia hasta entonces. Para traer
+el dominio a otro registrador, `registrations transfer-out` lo pide y el código llega por
+correo al dueño: el comando imprime el aviso, jamás el código (y `registrations list` no
+muestra la pista del código).
+
+`registrations` y `transfers` aceptan el nombre del dominio (`acme.com`) o el id de su
+registro, salvo `transfers check` y `registrations search|register`, que reciben el nombre.
+`transfers set-dns` **reemplaza el inventario completo**: toma un archivo JSON con un arreglo de
+`{ "name": "acme.com", "type": "A", "ttl": 300, "values": ["1.2.3.4"] }`, lo valida antes de tocar la red
+y deja el traslado pendiente de aprobar con `transfers approve-dns`. `account avatar set` toma un
+archivo local (.png, .jpg, .jpeg o .webp, máx. 2 MB) y no tiene `--url`. `account profile` sin flags
+muestra tu perfil; con `--name` cambia el nombre (máx. 60 caracteres; `--name ""` lo borra).
+`members invite` imprime la liga de invitación. Quitar el candado de transferencia no existe en el CLI:
+se hace desde el panel.
