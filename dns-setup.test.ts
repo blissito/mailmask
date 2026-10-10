@@ -27,6 +27,16 @@ function resolver(tabla: Record<string, any>) {
 }
 
 describe("dns-setup", () => {
+  it("con buzones agrega el autodescubrimiento; sin buzones no", () => {
+    assert.ok(!dnsSetupRecords(dom).some((x) => x.id === "autodiscover"));
+    const r = dnsSetupRecords({ ...dom, mailboxes: true });
+    const srv = r.find((x) => x.id === "autodiscover")!;
+    assert.equal(srv.type, "SRV");
+    assert.equal(srv.fqdn, "_autodiscover._tcp.ejemplo.com.mx");
+    assert.equal(srv.value, "0 0 443 imap.mailmask.studio");
+    assert.equal(r.find((x) => x.id === "autoconfig")!.value, "imap.mailmask.studio");
+  });
+
   it("los registros son los de la tabla de /app, con la ayuda en markdown", () => {
     const r = dnsSetupRecords(dom);
     assert.deepEqual(r.map((x) => x.id), ["mx", "verification", "dkim1", "dkim2", "dkim3", "spf", "dmarc"]);
