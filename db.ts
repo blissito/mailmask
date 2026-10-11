@@ -952,9 +952,11 @@ export function recordOrder(input: NewOrder): Order | null {
         grantedBy: input.grantedBy ?? null,
         raw: input.raw ?? null,
         occurredAt: input.occurredAt ?? new Date().toISOString(),
-      }).onConflictDoNothing().returning().get();
+      }).onConflictDoNothing({ target: orders.eventKey }).returning().get();
       // `returning().get()` devuelve undefined cuando el conflicto ganó: la fila ya
-      // existía y este evento es un duplicado.
+      // existía y este evento es un duplicado. El conflicto va dirigido a `eventKey`
+      // a propósito: sin destino, un choque de folio también salía por aquí y la orden
+      // se perdía en silencio, leída como un webhook repetido.
       return r ? rowToOrder(r) : null;
     } catch (err) {
       // Choque de folio: 4 hex son 65k combinaciones por mes, así que pasa poco, pero

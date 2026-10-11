@@ -35,7 +35,7 @@ describe("Libro mayor: idempotencia", () => {
   it("la misma eventKey solo inserta una vez", () => {
     const key = `test:${crypto.randomUUID()}`;
     const first = recordOrder({
-      userEmail: email, kind: "charge", subject: "plan",
+      userEmail: email, kind: "charge" as const, subject: "plan",
       description: "Plan Básico", amountCents: 4900, eventKey: key,
     });
     const second = recordOrder({
@@ -112,6 +112,50 @@ describe("Libro mayor: folios y listado", () => {
   });
 });
 
+describe("Libro mayor: choque de folio", () => {
+  const email = `order-folio-${crypto.randomUUID()}@test.com`;
+  before(() => seedUser(email));
+
+  const asiento = (descripcion: string) => ({
+    userEmail: email, kind: "charge" as const, subject: "plan" as const,
+    description: descripcion, amountCents: 100, eventKey: `test:${crypto.randomUUID()}`,
+  });
+
+  it("con el folio ocupado guarda la orden con otro folio, no la da por duplicada", (t) => {
+    // Dos folios iguales seguidos: el primero choca con la orden ya sembrada y el segundo
+    // sale libre. Son 65 536 folios por mes, así que el choque cae solo de vez en cuando;
+    // cuando caía, la orden se perdía en silencio porque el null se leía como duplicado.
+    const ocupado = [0x11, 0x22];
+    const libre = [0x33, 0x44];
+    let llamadas = 0;
+    t.mock.method(globalThis.crypto, "getRandomValues", (buf: Uint8Array) => {
+      const par = ++llamadas <= 2 ? ocupado : libre;
+      buf[0] = par[0];
+      buf[1] = par[1];
+      return buf;
+    });
+
+    const sembrada = recordOrder(asiento("siembra"));
+    assert.ok(sembrada, "no se pudo sembrar la orden");
+
+    const conChoque = recordOrder(asiento("choque"));
+
+    assert.ok(conChoque, "el choque de folio se leyó como duplicado y la orden se perdió");
+    assert.notEqual(conChoque.number, sembrada.number);
+    assert.equal(listOrders(email).length, 2);
+  });
+
+  it("el mismo eventKey repetido sigue contando como duplicado", () => {
+    const key = `test:${crypto.randomUUID()}`;
+    const antes = listOrders(email).length;
+    const primera = recordOrder({ userEmail: email, kind: "charge" as const, subject: "plan", description: "repetido", amountCents: 100, eventKey: key });
+    const repetida = recordOrder({ userEmail: email, kind: "charge" as const, subject: "plan", description: "repetido", amountCents: 100, eventKey: key });
+
+    assert.ok(primera);
+    assert.equal(repetida, null, "el reintento del mismo evento insertó otra fila");
+    assert.equal(listOrders(email).length, antes + 1);
+  });
+});
 describe("Cortesías", () => {
   const email = `courtesy-${crypto.randomUUID()}@test.com`;
   let domainId = "";
