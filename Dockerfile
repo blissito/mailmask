@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -13,6 +13,10 @@ ENV NODE_ENV=production \
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev --no-audit --no-fund
+
+# Smoke: better-sqlite3 13 ya no compila en install; si falta su binario musl, falla aquí
+# (build) y no al arrancar en prod.
+RUN node -e "new (require('better-sqlite3'))(':memory:').prepare('select 1').get()"
 
 # Application source last — it changes on every deploy, so nothing cacheable follows.
 COPY . .
