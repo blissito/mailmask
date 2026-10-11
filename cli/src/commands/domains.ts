@@ -1,7 +1,9 @@
+import { readFile, stat } from "node:fs/promises";
+import { extname } from "node:path";
 import { defineCommand } from "citty";
 import type { DnsPreset } from "@easybits.cloud/mailmask";
 import { requireClient } from "../client.js";
-import { confirmOrExit, failFromError, printJson } from "../output.js";
+import { confirmOrExit, failFromError, failUsage, printJson } from "../output.js";
 import { resolveDomainId } from "../resolve.js";
 import { PRESETS, jsonArg, domainArg, yesArg } from "../args.js";
 
@@ -149,7 +151,83 @@ const health = defineCommand({
   },
 });
 
+const dnsSetup = defineCommand({
+  meta: { name: "dns-setup", description: "Muestra los registros DNS a pegar en el registrador (con --live, los compara con el DNS público)" },
+  args: { ...domainArg, live: { type: "boolean", description: "Compara cada registro con el DNS público y deduce el panel del registrador" }, ...jsonArg },
+  async run({ args }) {
+    const { client } = await requireClient();
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
+    try {
+      const setup = await client.domains.dnsSetup(id, { live: args.live });
+      if (args.json) return printJson(setup);
+      process.stdout.write(`${setup.domain}\n`);
+      for (const r of setup.records) {
+        const estado = r.ok === true ? "  ✓ ok" : r.ok === false ? "  ✖ falta" : "";
+        process.stdout.write(`  ${r.type}  ${r.name}  ${r.value}  (${r.level})${estado}\n`);
+      }
+      if (setup.registrarHint) process.stdout.write(`  Registrador: ${setup.registrarHint.label} — ${setup.registrarHint.note}\n`);
+    } catch (err) {
+      failFromError(err, { json: args.json });
+    }
+  },
+});
+
+const LOGO_TYPES: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
+const LOGO_MAX_BYTES = 500 * 1024; // mismo tope que el servidor; si cambia allá, moverlo aquí
+
+const logoSet = defineCommand({
+  meta: { name: "set", description: "Cambia el logo de la firma (archivo local PNG, JPG o WebP, máx. 500 KB)" },
+  args: {
+    ...domainArg,
+    file: { type: "positional", description: "Ruta del archivo de imagen" },
+    ...jsonArg,
+  },
+  async run({ args }) {
+    const mime = LOGO_TYPES[extname(args.file).toLowerCase()];
+    if (!mime) failUsage(`Formato no válido: "${args.file}". Usa .png, .jpg, .jpeg o .webp.`, { json: args.json });
+    let size: number;
+    try {
+      size = (await stat(args.file)).size;
+    } catch (err) {
+      failUsage(`No se pudo leer "${args.file}": ${err instanceof Error ? err.message : String(err)}`, { json: args.json });
+    }
+    if (size > LOGO_MAX_BYTES) failUsage(`El logo pesa ${Math.ceil(size / 1024)} KB; el máximo es 500 KB.`, { json: args.json });
+    const bytes = await readFile(args.file);
+    const { client } = await requireClient();
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
+    try {
+      const result = await client.domains.setLogo(id, new Blob([bytes], { type: mime }), args.file.split(/[\\/]/).pop());
+      if (args.json) return printJson(result);
+      process.stdout.write(`✓ Logo actualizado: ${result.logoUrl}\n`);
+    } catch (err) {
+      failFromError(err, { json: args.json });
+    }
+  },
+});
+
+const logoRemove = defineCommand({
+  meta: { name: "remove", description: "Quita el logo de la firma" },
+  args: { ...domainArg, ...yesArg, ...jsonArg },
+  async run({ args }) {
+    const { client } = await requireClient();
+    await confirmOrExit(`¿Quitar el logo de "${args.domain}"?`, { yes: args.yes, json: args.json });
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
+    try {
+      await client.domains.removeLogo(id);
+    } catch (err) {
+      failFromError(err, { json: args.json });
+    }
+    if (args.json) return printJson({ ok: true });
+    process.stdout.write(`✓ Logo quitado: ${args.domain}\n`);
+  },
+});
+
+const logo = defineCommand({
+  meta: { name: "logo", description: "Logo de la firma del dominio" },
+  subCommands: { set: logoSet, remove: logoRemove },
+});
+
 export default defineCommand({
   meta: { name: "domains", description: "Administra los dominios de la cuenta" },
-  subCommands: { list, get, create, delete: del, verify, health },
+  subCommands: { list, get, create, delete: del, verify, health, "dns-setup": dnsSetup, logo },
 });

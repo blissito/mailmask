@@ -98,3 +98,8 @@ export async function confirmOrExit(message: string, opts: { yes?: boolean; json
     process.exit(EXIT.OK);
   }
 }
+
+/** Centavos MXN → "$99.00 MXN". */
+export function formatMxn(cents: number): string {
+  return `$${(cents / 100).toFixed(2)} MXN`;
+}

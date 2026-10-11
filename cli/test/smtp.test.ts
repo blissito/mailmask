@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
 import { MailMaskError } from "@easybits.cloud/mailmask";
-import { fakeClient, trapExit, ExitSignal } from "./test-helpers.js";
+import { fakeClient, trapExit, ExitSignal, captureWrites } from "./test-helpers.js";
 
 let currentClient: ReturnType<typeof fakeClient>["client"];
 
@@ -23,13 +23,8 @@ const PASSWORD = "password-de-prueba";
 const cred = { id: "cr_1", domainId: "dom_1", label: "app", iamUsername: "usuario-de-prueba", createdAt: "now" };
 const created = { id: "cr_1", label: "app", server: "smtp.mailmask.studio", port: 587, encryption: "STARTTLS", username: "usuario-de-prueba", password: PASSWORD, createdAt: "now" };
 
-function captureStdout(): { text: () => string; restore: () => void } {
-  let text = "";
-  const fn = mock.method(process.stdout, "write", (chunk: string) => {
-    text += chunk;
-    return true;
-  });
-  return { text: () => text, restore: () => fn.mock.restore() };
+function captureStdout() {
+  return captureWrites(process.stdout);
 }
 
 describe("smtp create", () => {

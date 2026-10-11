@@ -26,6 +26,9 @@ mailmask domains create <dominio> [--preset vercel|netlify|github-pages|cloudfla
 mailmask domains verify <dominio>
 mailmask domains health <dominio>
 mailmask domains delete <dominio> [--yes] [--json]
+mailmask domains dns-setup <dominio> [--live] [--json]
+mailmask domains logo set <dominio> <archivo> [--json]
+mailmask domains logo remove <dominio> [--yes] [--json]
 
 mailmask dns list <dominio> [--json]
 mailmask dns upsert <dominio> <nombre> <tipo> <valor...> [--ttl 300]
@@ -33,6 +36,69 @@ mailmask dns delete <dominio> <nombre> <tipo> [--yes] [--json]
 mailmask dns preset <dominio> <preset> [--target ...] [--subdomain ...]
 mailmask dns create-zone <dominio>
 mailmask dns delegation <dominio>
+mailmask dns import <dominio> [--json]
+
+mailmask rules list <dominio> [--json]
+mailmask rules create <dominio> --field to|from|subject --match contains|equals|regex --value <texto> --action forward|webhook|discard [--target <destino>] [--priority N] [--disabled] [--json]
+mailmask rules update <dominio> <reglaId> [--field ...] [--match ...] [--value ...] [--action ...] [--target ...] [--priority N] [--enable | --disable] [--json]
+mailmask rules delete <dominio> <reglaId> [--yes] [--json]
+
+mailmask suppressions list <dominio> [--json]
+mailmask suppressions add <dominio> <correo> [--json]
+mailmask suppressions remove <dominio> <correo> [--yes] [--json]
+
+mailmask inbox list <dominio> [--status open|snoozed|closed|unread|deleted] [--alias <máscara>] [--assigned <usuario>] [--q <texto>] [--limit N] [--cursor <c>] [--json]
+mailmask inbox get <dominio> <conversación> [--before <mensaje>] [--json]
+mailmask inbox reply <dominio> <conversación> --markdown <texto> [--cc <a,b>] [--bcc <a,b>] [--no-quote] [--yes] [--json]
+mailmask inbox compose <dominio> --from <máscara> --to <correo> --subject <asunto> --markdown <texto> [--cc <a,b>] [--bcc <a,b>] [--yes] [--json]
+mailmask inbox update <dominio> <conversación> [--status open|snoozed|closed] [--snooze-until <ISO>] [--tags <a,b>] [--priority normal|urgent] [--json]
+mailmask inbox read <dominio> <conversación> [--json]
+mailmask inbox assign <dominio> <conversación> [usuario] [--json]
+mailmask inbox note <dominio> <conversación> <texto> [--json]
+mailmask inbox delete <dominio> <conversación...> [--yes] [--json]
+mailmask inbox restore <dominio> <conversación> [--json]
+mailmask inbox metrics <dominio> [--days N] [--json]
+mailmask inbox attachment <dominio> <conversación> <mensaje> <índice> [-o <archivo>]
+
+mailmask canned list <dominio> [--json]
+mailmask canned create <dominio> --title <título> --body <texto> [--json]
+mailmask canned delete <dominio> <id> [--yes] [--json]
+
+mailmask signature get <dominio> [--json]
+mailmask signature set <dominio> <markdown> [--json]
+
+mailmask account profile [--name <texto>] [--json]
+mailmask account avatar set <archivo> [--json]
+mailmask account avatar remove [--yes] [--json]
+
+mailmask members list <dominio> [--json]
+mailmask members invite <dominio> --email <correo> --name <nombre> [--role admin|agent] [--json]
+mailmask members remove <dominio> <miembroId> [--yes] [--json]
+mailmask members cancel-invite <dominio> <token> [--yes] [--json]
+
+mailmask billing status [--json]
+mailmask billing addons [--json]
+mailmask billing orders [--limit N] [--before <cursor>] [--json]
+mailmask billing checkout <dominio> [--kind domain|storage50|sends100] [--period monthly|annual] [--payer-email <correo>] [--json]
+mailmask billing cancel-addon <addonId> [--yes] [--json]
+
+mailmask registrations search <dominio> [--json]
+mailmask registrations tlds [--json]
+mailmask registrations register <dominio> [--json]
+mailmask registrations list [--json]
+mailmask registrations renewal <dominio|registroId> [--payer-email <correo>] [--json]
+mailmask registrations cancel-renewal <dominio|registroId> [--yes] [--json]
+mailmask registrations transfer-out <dominio|registroId> [--yes] [--json]
+
+mailmask transfers check <dominio> [--json]
+mailmask transfers dns <dominio|registroId> [--json]
+mailmask transfers set-dns <dominio|registroId> --file <registros.json> [--yes] [--json]
+mailmask transfers approve-dns <dominio|registroId> [--yes] [--json]
+mailmask transfers resend-email <dominio|registroId> [--json]
+
+mailmask referrals get [--json]
+mailmask referrals slug <slug> [--json]
+mailmask referrals name <nombre> [--json]
 
 mailmask aliases list <dominio> [--json]
 mailmask aliases create <dominio> <alias> [destino...] [--mailbox] [--json]
@@ -129,8 +195,10 @@ adivinar el formato.
 
 ## Confirmación de lo destructivo
 
-`domains delete`, `dns delete`, `aliases delete`, `aliases mailbox delete` y
-`aliases mailbox reset-password` (y lo que se agregue después que borre,
+`domains delete`, `dns delete`, `aliases delete`, `aliases mailbox delete`,
+`aliases mailbox reset-password`, `members remove`, `members cancel-invite`,
+`billing cancel-addon`, `registrations cancel-renewal`, `registrations transfer-out`,
+`transfers set-dns`, `transfers approve-dns` y `account avatar remove` (y lo que se agregue después que borre,
 revoque o envíe a terceros) piden confirmación antes de mutar. En una
 terminal preguntan `[y/N]`; fuera de una terminal (CI, un agente, un script)
 no hay a quién preguntarle, así que exigen `--yes` — sin él salen con código
@@ -156,9 +224,49 @@ tener otra, revoca y crea una nueva; el SDK no rota el secreto de un webhook
 `email.complained`; un evento mal escrito sale con `1` sin tocar la red.
 `webhooks` y `smtp` piden el dominio activado.
 
-`webhooks delete`, `smtp revoke` y `api-keys revoke` son destructivos: preguntan
+`rules` y `suppressions` son 1:1 con el SDK. `rules create`/`update` validan los
+flags (`--field`, `--match`, `--action`, `--priority` entero, `--target` con `forward`/`webhook`)
+antes de tocar la red; la regex NO se valida en el CLI: una peligrosa la rechaza el
+servidor con 400 y sale con `1` con su mensaje. `domains dns-setup` muestra los
+registros a pegar en el registrador (`--live` los compara con el DNS público).
+`domains logo set` toma un archivo local (.png, .jpg, .jpeg o .webp, máx. 500 KB); no
+hay `--url` porque el servidor sólo acepta URLs firmadas del chat del asistente.
+`dns import` es de sólo lectura: muestra lo que encontró, los nameservers y el aviso,
+sin cambiar nada (límite: 2 cada 5 min, sale con `5`).
+
+La Bandeja (`inbox`), las respuestas guardadas (`canned`) y la firma (`signature`) son
+1:1 con `client.inbox`, `client.canned` y `client.signature`. `inbox get` siempre imprime
+texto (si el mensaje sólo trae HTML, sin etiquetas) y, como en la web, marca la conversación
+como leída; con `--json` cada mensaje trae además `text`. `inbox reply` y `compose` envían
+correo de verdad: piden confirmación y `--yes` fuera de una terminal (`compose` exige el
+dominio activado y gasta cuota de envío). `inbox update --status snoozed` necesita
+`--snooze-until`. `inbox delete` manda de 1 a 200 conversaciones a la papelera (se
+restauran con `inbox restore`). `inbox attachment` escribe los bytes en `-o` o, sin él, a
+stdout; si el adjunto no existe sale con `4` y no deja ningún archivo. `signature set ""`
+borra la firma (máx. 2000 caracteres).
+
+`rules delete`, `suppressions remove`, `inbox reply|compose|delete`, `canned delete`, `domains logo remove`, `webhooks delete`, `smtp revoke` y `api-keys revoke` son destructivos: preguntan
 en una terminal y exigen `--yes` fuera de ella. Si la llave que revocas es la
 que usa esta sesión (la marca `api-keys list`), el comando avisa que la sesión
 quedará sin llave y pide una segunda confirmación (con `--yes`, el aviso va a
 stderr y sigue); al terminar sugiere `mailmask login`, y con `--json` agrega
 `"activeKeyRevoked": true`.
+
+### Cuenta, equipo, cobros y dominios registrados
+
+**El CLI nunca paga, nunca espera el pago y nunca pide, acepta ni muestra un código EPP.**
+`billing checkout`, `registrations register` y `registrations renewal` sólo imprimen la liga
+de MercadoPago y terminan; tú la abres y pagas, y nada cambia hasta entonces. Para traer
+el dominio a otro registrador, `registrations transfer-out` lo pide y el código llega por
+correo al dueño: el comando imprime el aviso, jamás el código (y `registrations list` no
+muestra la pista del código).
+
+`registrations` y `transfers` aceptan el nombre del dominio (`acme.com`) o el id de su
+registro, salvo `transfers check` y `registrations search|register`, que reciben el nombre.
+`transfers set-dns` **reemplaza el inventario completo**: toma un archivo JSON con un arreglo de
+`{ "name": "acme.com", "type": "A", "ttl": 300, "values": ["1.2.3.4"] }`, lo valida antes de tocar la red
+y deja el traslado pendiente de aprobar con `transfers approve-dns`. `account avatar set` toma un
+archivo local (.png, .jpg, .jpeg o .webp, máx. 2 MB) y no tiene `--url`. `account profile` sin flags
+muestra tu perfil; con `--name` cambia el nombre (máx. 60 caracteres; `--name ""` lo borra).
+`members invite` imprime la liga de invitación. Quitar el candado de transferencia no existe en el CLI:
+se hace desde el panel.

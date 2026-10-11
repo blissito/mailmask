@@ -1,0 +1,29 @@
+From: =?UTF-8?B?Sm9zw6kgTcOhcnF1ZXo=?= <jose@cliente.test>
+To: ventas@mailmask.test
+Subject: =?UTF-8?Q?Cotizaci=C3=B3n_a=C3=B1o_2026?=
+Message-ID: <fixture-1@cliente.test>
+Date: Fri, 09 Oct 2026 10:00:00 -0600
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="B1"
+
+--B1
+Content-Type: multipart/alternative; boundary="B2"
+
+--B2
+Content-Type: text/plain; charset=UTF-8
+
+Va la cotizacion.
+--B2
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+<p>Va la <b>cotizaci=C3=B3n</b>.</p>
+--B2--
+--B1
+Content-Type: application/pdf; name="cotizacion.pdf"
+Content-Disposition: attachment; filename="cotizacion.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQgcmVwb3J0ZSBkZSBwcnVlYmEK
+
+--B1--

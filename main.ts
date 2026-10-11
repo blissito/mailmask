@@ -10,6 +10,7 @@ import { revisarPatron } from "./regex-guard.js";
 import { buildDnsSetup } from "./dns-setup.js";
 import { verificarTurnstile } from "./turnstile.js";
 import { generarPerfilApple, nombreArchivoPerfil, IMAP_HOST } from "./apple-profile.js";
+import { ensureMailAutoconfig } from "./mail-autoconfig.js";
 import { addSseClient, notifyBandeja, setPresence, clearPresence, listPresence, notifyPresence } from "./sse-hub.js";
 import { ftsDisponible } from "./pg.js";
 import { createDeviceAuthStore } from "./cli-auth.js";
@@ -62,6 +63,7 @@ import {
   marcarBuzon,
   desmarcarBuzon,
   bytesDeBuzonesDelDominio,
+  listarBuzonesActivos,
   setVerifyToken,
   getUserByVerifyToken,
   verifyUserEmail,
@@ -2457,7 +2459,8 @@ const app = new Elysia({ adapter: node() })
     const access = await checkDomainAccess(user.email, params.id, "read");
     if (!access) return jsonErr("Dominio no encontrado", 404);
     const live = new URL(request.url).searchParams.get("live") === "1";
-    return Response.json(await buildDnsSetup(access.domain, { live }));
+    const mailboxes = listarBuzonesActivos().some((b) => b.domainId === access.domain.id);
+    return Response.json(await buildDnsSetup({ ...access.domain, mailboxes }, { live }));
   }, {
     detail: { tags: ["Domains", "SDK"], summary: "DNS records to paste at the registrar, optionally checked against live DNS", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
@@ -2782,6 +2785,7 @@ const app = new Elysia({ adapter: node() })
         const creado = await crearBuzon({ localPart: alias.toLowerCase(), domain: domain.domain, quotaBytes: bolsa });
         if (creado.ok) {
           marcarBuzon(domain.id, alias.toLowerCase(), { accountId: creado.valor.accountId, quotaBytes: bolsa });
+          void ensureMailAutoconfig(domain);
           buzon = {
             email: creado.valor.email,
             password: creado.valor.password, // Sólo se muestra aquí; no se guarda.
@@ -6280,6 +6284,8 @@ const app = new Elysia({ adapter: node() })
     }
 
     marcarBuzon(domain.id, aliasName, { accountId: creado.valor.accountId, quotaBytes });
+    // Una vez por dominio: que Outlook y Thunderbird encuentren el servidor solos.
+    void ensureMailAutoconfig(domain);
 
     return new Response(JSON.stringify({
       email: creado.valor.email,

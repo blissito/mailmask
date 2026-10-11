@@ -8,14 +8,25 @@ import aliases from "./commands/aliases.js";
 import webhooks from "./commands/webhooks.js";
 import smtp from "./commands/smtp.js";
 import apiKeys from "./commands/api-keys.js";
+import rules from "./commands/rules.js";
+import suppressions from "./commands/suppressions.js";
+import account from "./commands/account.js";
+import members from "./commands/members.js";
+import billing from "./commands/billing.js";
+import registrations from "./commands/registrations.js";
+import transfers from "./commands/transfers.js";
+import referrals from "./commands/referrals.js";
+import inbox from "./commands/inbox.js";
+import canned from "./commands/canned.js";
+import signature from "./commands/signature.js";
 
 const main = defineCommand({
   meta: {
     name: "mailmask",
     version: "0.1.0",
-    description: "CLI oficial de MailMask — dominios, alias, DNS, reglas, envío y más desde la terminal.",
+    description: "CLI oficial de MailMask — dominios, alias, DNS, reglas, equipo, cobros, dominios registrados y más desde la terminal.",
   },
-  subCommands: { login, logout, whoami, domains, dns, aliases, webhooks, smtp, "api-keys": apiKeys },
+  subCommands: { login, logout, whoami, domains, dns, aliases, webhooks, smtp, "api-keys": apiKeys, rules, suppressions, inbox, canned, signature, account, members, billing, registrations, transfers, referrals },
 });
 
 runMain(main);

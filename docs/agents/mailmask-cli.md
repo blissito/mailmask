@@ -180,6 +180,77 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   `failFromError` trata como "corre login" (exit 2). Es engañoso pero cambiarlo toca
   la taxonomía de exit codes; queda para un issue aparte.
 
+- **`rules`, `suppressions`, `domains dns-setup|logo` y `dns import`:** 1:1 con el SDK.
+  `rules create|update` toman `--field` (to|from|subject), `--match`
+  (contains|equals|regex), `--value`, `--action` (forward|webhook|discard), `--target`,
+  `--priority` (entero) y `--disabled` / `--enable|--disable`; los enums viven en
+  `args.ts` (`RULE_*`) y se validan con `failUsage()` antes de `requireClient`, igual
+  que `--target` obligatorio con forward/webhook. **La regex NO se valida en el CLI:**
+  el 400 de `regex-guard.ts` pasa por `failFromError` tal cual (exit 1). `domains
+  logo set` sólo acepta archivo local (.png/.jpg/.jpeg/.webp, ≤ 500 KB, límite
+  replicado del servidor: si cambia, moverlo en los dos lados); **no tiene `--url`**
+  porque `setLogoFromUrl` sólo admite adjuntos firmados del chat del asistente y el
+  servidor rechaza cualquier otra URL. `dns import` es de **sólo lectura** en el
+  servidor, así que NO lleva `confirmOrExit`; su rate limit (2 cada 5 min) cae solo en
+  exit 5. `rules delete`, `suppressions remove` y `domains logo remove` sí confirman
+  ANTES de `resolveDomainId`.
+
+- **`inbox`, `canned` y `signature` (C15):** 1:1 con `client.inbox|canned|signature`.
+
+  | Subcomando | Método del SDK | Notas |
+  |---|---|---|
+  | `inbox list` | `inbox.list(d, opts)` | `--alias` → `opts.to`; `--status` ∈ open/snoozed/closed/unread/deleted |
+  | `inbox get` | `inbox.get` | siempre texto; `--before` pagina hacia atrás |
+  | `inbox reply` / `compose` | `inbox.reply` / `inbox.compose` | `confirmOrExit`; `--from` → `fromAlias`; `--no-quote` → `quote:false` |
+  | `inbox update` | `inbox.update` | `snoozed` exige `--snooze-until` |
+  | `inbox read` / `assign` / `note` | `markRead` / `assign` / `addNote` | `assign` sin usuario desasigna |
+  | `inbox delete` / `restore` | `inbox.delete(d, ids[])` / `restore` | delete: 1..200 ids, `confirmOrExit`; restore sin confirmar |
+  | `inbox metrics` / `attachment` | `metrics` / `attachment` | `<index>` entero ≥ 0 |
+  | `canned list|create|delete` | `canned.*` | delete con `confirmOrExit` |
+  | `signature get|set` | `signature.get|set` | `""` la borra; > 2000 caracteres → `failUsage` |
+
+  **`inbox get` imprime siempre texto:** `textoDeMensaje()` prefiere `body`, luego
+  `bodyDegraded` (el original ya no está) y, si sólo hay `html`, lo pasa sin etiquetas y
+  con las entidades básicas decodificadas. Con `--json` cada mensaje suma `text`. El
+  servidor marca la conversación leída al abrirla: se documenta, no se evita.
+  **`inbox attachment` nunca crea el archivo si la respuesta no es ok:** el SDK ya lanza
+  `MailMaskError` en 4xx/5xx (404 → exit 4); `res.ok` se revisa igual (cinturón) ANTES de
+  `writeFile`. Sin `-o` va a stdout, como `aliases export`.
+  **Orden en reply/compose/delete:** validación de uso (`failUsage`: ids 1..200, `<index>`,
+  `--status`) → `requireClient` → `confirmOrExit` → `resolveDomainId`. Los ids de `inbox
+  delete` salen de `args._.slice(1)`, no de `rawArgs`. **`--no-quote`:** citty lo convierte en
+  `quote=false`, así que el arg se llama `quote` (con `default: true`); declarar `"no-quote"`
+  nunca recibe nada. `compose` exige dominio activado (403 → exit 2, la trampa de arriba).
+## `account`, `members`, `billing`, `registrations`, `transfers` y `referrals`
+
+Dinero y dominios de por medio: el CLI **confirma, no cobra y no expone el EPP**.
+
+- **Cobros = liga impresa.** `billing checkout`, `registrations register` y `registrations renewal`
+  imprimen la liga de MercadoPago (`init_point` / `initPoint`) y terminan con 0 sin esperar el pago,
+  sin hacer polling. Con `--json` imprimen la respuesta del SDK tal cual.
+- **Nunca EPP.** Ningún comando acepta ni imprime un código de autorización. `registrations
+  transfer-out` imprime sólo el `aviso` (el código llega por correo al dueño; en `--json` se
+  proyecta `{ ok, aviso }` aunque la API devolviera más) y `registrations list` quita
+  `transferAuthCodeHint` en texto y en `--json`. `cli/test/cuenta-sin-epp.test.ts` recorre las
+  definiciones de args y falla si alguno se llama `epp|auth-code|authcode`.
+- **`resolveRegistrationId`** (`cli/src/resolve.ts`, gemela de `resolveDomainId`): `registrations`
+  y `transfers` aceptan el nombre del dominio o el id del registro, buscando en
+  `registrations.list()`; si no aparece, lo deja pasar para el 404 de la API. Excepciones: `transfers
+  check` y `registrations search|register` reciben el nombre (aún no hay registro).
+- **Ocho comandos confirman ANTES de `requireClient`/`resolve*`** (sin TTY y sin `--yes`: exit 1 con
+  cero llamadas): `members remove`, `members cancel-invite`, `billing cancel-addon`, `registrations
+  cancel-renewal`, `registrations transfer-out`, `transfers set-dns`, `transfers approve-dns` y
+  `account avatar remove`. `transfers set-dns` valida el archivo ANTES de confirmar y de tocar la red.
+- **`transfers set-dns` reemplaza todo el inventario** (`--file` con un arreglo `{name, type, ttl?, values[]}`);
+  no hay modo de editar un solo registro, por eso confirma y deja el traslado pendiente de `approve-dns`.
+- **Avatar sin `--url`:** `account avatar set <archivo>` valida .png/.jpg/.jpeg/.webp y ≤ 2 MB (límite
+  replicado del servidor, como `domains logo set`) antes de `requireClient`. `setAvatarFromUrl` sólo sirve
+  con adjuntos firmados del asistente. `account profile --name` ≤ 60 caracteres; `--name ""` lo borra.
+- **Fuera de alcance a propósito:** `account me` (lo hará `whoami`), `account export`, y
+  `registrations lock`: poner el candado existe en el SDK pero quitarlo no se expone nunca desde aquí.
+- **Trampa en `docs-cli.test.ts`:** `transfers dns` se llama igual que el grupo `dns`; el lector de
+  rutas sólo expande un nombre como grupo si es de primer nivel, o habría inventado `transfers dns list`.
+
 ## Convención dura — no se negocia en ningún comando futuro
 
 **Ningún registro DNS con `managed: true` se toca desde el CLI, ni con `--force`.**
