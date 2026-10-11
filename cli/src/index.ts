@@ -19,14 +19,16 @@ import referrals from "./commands/referrals.js";
 import inbox from "./commands/inbox.js";
 import canned from "./commands/canned.js";
 import signature from "./commands/signature.js";
+import send from "./commands/send.js";
+import logs from "./commands/logs.js";
 
 const main = defineCommand({
   meta: {
     name: "mailmask",
     version: "0.1.0",
-    description: "CLI oficial de MailMask — dominios, alias, DNS, reglas, equipo, cobros, dominios registrados y más desde la terminal.",
+    description: "CLI oficial de MailMask — dominios, alias, DNS, reglas, envío, logs, equipo, cobros, dominios registrados y más desde la terminal.",
   },
-  subCommands: { login, logout, whoami, domains, dns, aliases, webhooks, smtp, "api-keys": apiKeys, rules, suppressions, inbox, canned, signature, account, members, billing, registrations, transfers, referrals },
+  subCommands: { login, logout, whoami, domains, dns, aliases, webhooks, smtp, "api-keys": apiKeys, rules, suppressions, inbox, canned, signature, account, members, billing, registrations, transfers, referrals, send, logs },
 });
 
 runMain(main);

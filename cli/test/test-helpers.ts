@@ -15,7 +15,7 @@ type Impl = Record<string, (...args: unknown[]) => unknown>;
  * mensaje claro — así una llamada que no se esperaba (p. ej. `dns.upsert`
  * después de que debió abortar por `managed: true`) no pasa inadvertida.
  */
-export function fakeClient(impl: { domains?: Impl; dns?: Impl; apiKeys?: Impl; aliases?: Impl; webhooks?: Impl; smtp?: Impl; rules?: Impl; suppressions?: Impl; inbox?: Impl; canned?: Impl; signature?: Impl; account?: Impl; members?: Impl; billing?: Impl; registrations?: Impl; transfers?: Impl; referrals?: Impl } = {}): { client: MailMask; calls: RecordedCall[] } {
+export function fakeClient(impl: { domains?: Impl; dns?: Impl; apiKeys?: Impl; aliases?: Impl; webhooks?: Impl; smtp?: Impl; rules?: Impl; suppressions?: Impl; inbox?: Impl; canned?: Impl; signature?: Impl; account?: Impl; members?: Impl; billing?: Impl; registrations?: Impl; transfers?: Impl; referrals?: Impl; send?: Impl; logs?: Impl; attachments?: Impl } = {}): { client: MailMask; calls: RecordedCall[] } {
   const calls: RecordedCall[] = [];
   // `domains.list` casi todo comando lo llama primero (resolveDomainId): por
   // omisión devuelve [] para que un test que pasa ya el id (p. ej. "dom_1")
@@ -54,6 +54,9 @@ export function fakeClient(impl: { domains?: Impl; dns?: Impl; apiKeys?: Impl; a
     registrations: resource("registrations", impl.registrations),
     transfers: resource("transfers", impl.transfers),
     referrals: resource("referrals", impl.referrals),
+    send: resource("send", impl.send),
+    logs: resource("logs", impl.logs),
+    attachments: resource("attachments", impl.attachments),
   } as unknown as MailMask;
   return { client, calls };
 }
