@@ -5,8 +5,16 @@ export const PRESETS: DnsPreset[] = [
   "vercel", "netlify", "github-pages", "cloudflare-pages", "render", "fly", "redirect-a-www", "dmarc",
 ];
 
+/**
+ * Los positionales van con `required: true as const` — el `as const` NO es decorativo:
+ * citty 0.2 resuelve el tipo del arg con `T["required"] extends true` (ver su
+ * ParsedPositionalArg), así que un `required: true` que TS ensancha a `boolean` —como
+ * pasa en todo lo que vive en un const suelto, este archivo incluido— deja el
+ * positional como `string | undefined` y obliga a sembrar guardas por todo el CLI
+ * (issue #55).
+ */
 export const jsonArg = { json: { type: "boolean" as const, description: "Salida en JSON para scripts/agentes" } };
-export const domainArg = { domain: { type: "positional" as const, description: "Dominio (acme.com) o su id" } };
+export const domainArg = { domain: { type: "positional" as const, required: true as const, description: "Dominio (acme.com) o su id" } };
 export const yesArg = { yes: { type: "boolean" as const, description: "Confirma sin preguntar (obligatorio fuera de una terminal)" } };
 
 /** Los 5 eventos de `WebhookEvent` del SDK; `webhooks --events` se valida contra esta lista antes de tocar la red. */
@@ -29,4 +37,4 @@ export const BILLING_KINDS = ["domain", "storage50", "sends100"] as const;
 export const BILLING_PERIODS = ["monthly", "annual"] as const;
 
 /** Dominio registrado (acme.com) o el id de su registro: `registrations` y `transfers` aceptan los dos. */
-export const registrationArg = { registration: { type: "positional" as const, description: "Dominio registrado (acme.com) o el id de su registro" } };
+export const registrationArg = { registration: { type: "positional" as const, required: true as const, description: "Dominio registrado (acme.com) o el id de su registro" } };

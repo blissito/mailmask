@@ -7,7 +7,7 @@ import { domainArg, jsonArg, WEBHOOK_EVENTS, yesArg } from "../args.js";
 
 const idArgs = {
   ...domainArg,
-  id: { type: "positional" as const, description: "Id del webhook (lo muestra `webhooks list`)" },
+  id: { type: "positional" as const, required: true as const, description: "Id del webhook (lo muestra `webhooks list`)" },
 };
 const eventsArg = { type: "string" as const, description: `Eventos separados por coma: ${WEBHOOK_EVENTS.join(", ")}` };
 
@@ -60,7 +60,7 @@ const create = defineCommand({
   meta: { name: "create", description: "Crea un webhook (el secreto de firma sale completo sólo aquí)" },
   args: {
     ...domainArg,
-    url: { type: "positional", description: "URL https pública que recibirá los eventos" },
+    url: { type: "positional", required: true as const, description: "URL https pública que recibirá los eventos" },
     events: { ...eventsArg, description: `Obligatorio. ${eventsArg.description}` },
     ...jsonArg,
   },

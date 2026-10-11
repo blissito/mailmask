@@ -29,8 +29,8 @@ const invite = defineCommand({
   meta: { name: "invite", description: "Invita a alguien al equipo del dominio e imprime su liga de invitación" },
   args: {
     ...domainArg,
-    email: { type: "string", required: true, description: "Correo de la persona invitada" },
-    name: { type: "string", required: true, description: "Nombre de la persona invitada" },
+    email: { type: "string", required: true as const, description: "Correo de la persona invitada" },
+    name: { type: "string", required: true as const, description: "Nombre de la persona invitada" },
     role: { type: "string", description: `Rol: ${MEMBER_ROLES.join(" | ")} (por omisión agent)` },
     ...jsonArg,
   },
@@ -52,7 +52,7 @@ const invite = defineCommand({
 
 const remove = defineCommand({
   meta: { name: "remove", description: "Quita a una persona del equipo del dominio" },
-  args: { ...domainArg, member: { type: "positional", description: "Id del miembro (lo muestra members list)" }, ...yesArg, ...jsonArg },
+  args: { ...domainArg, member: { type: "positional", required: true as const, description: "Id del miembro (lo muestra members list)" }, ...yesArg, ...jsonArg },
   async run({ args }) {
     await confirmOrExit(`¿Quitar a ${args.member} del equipo de "${args.domain}"? Pierde el acceso.`, { yes: args.yes, json: args.json });
     const { client } = await requireClient();
@@ -69,7 +69,7 @@ const remove = defineCommand({
 
 const cancelInvite = defineCommand({
   meta: { name: "cancel-invite", description: "Cancela una invitación pendiente" },
-  args: { ...domainArg, token: { type: "positional", description: "Token de la invitación (lo muestra members list)" }, ...yesArg, ...jsonArg },
+  args: { ...domainArg, token: { type: "positional", required: true as const, description: "Token de la invitación (lo muestra members list)" }, ...yesArg, ...jsonArg },
   async run({ args }) {
     await confirmOrExit(`¿Cancelar la invitación ${args.token} de "${args.domain}"? La liga dejará de servir.`, { yes: args.yes, json: args.json });
     const { client } = await requireClient();

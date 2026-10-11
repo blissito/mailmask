@@ -147,6 +147,20 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   viven en `cli/src/args.ts`, no copiados en cada archivo de comando. Cualquier
   lista o flag que vaya a repetirse entre dos o más comandos va ahí, no a mano en
   cada uno.
+- **Positionales en citty 0.2 (issue #55):** van con `required: true as const`. El
+  `as const` NO es decorativo: citty 0.2 resuelve el tipo del arg con
+  `T["required"] extends true` (su `ParsedPositionalArg`), así que un `required: true`
+  que TS ensancha a `boolean` —lo que pasa en todo lo que vive en un const suelto,
+  `domainArg` incluido— deja el positional como `string | undefined` y llena el CLI de
+  guardas. En los `args` inline de `defineCommand` el literal se conserva solo, pero se
+  escribe igual en todos lados para que la regla sea una sola. Los positionales de
+  verdad opcionales (hoy sólo `inbox assign <user>`) van con `required: false`.
+- **La ayuda y el error de uso cambian a la vista con citty 0.2** (no lo causan las
+  anotaciones de args, es su renderer): la ayuda agrega el sufijo `(Required)` a cada
+  positional, el error de uso pierde el ` ERROR ` de consola y queda como
+  `Missing required positional argument: DOMAIN` en stderr (mismo exit 1 y misma
+  antesala: el USAGE por stdout), y la salida se colorea aunque no sea una terminal
+  (0.1 sólo coloreaba en TTY).
 - **Probar un comando que muta (con el SDK simulado):** `cli/test/test-helpers.ts`
   trae `fakeClient()` (un `MailMask` falso por `Proxy`: cada llamada queda en
   `calls`, un método que el test no configuró revienta en vez de devolver

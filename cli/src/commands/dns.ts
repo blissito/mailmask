@@ -80,9 +80,9 @@ const list = defineCommand({
 const upsert = defineCommand({
   meta: { name: "upsert", description: "Reemplaza el conjunto de valores de un (nombre, tipo) — no es un append" },
   args: {
-    domain: { type: "positional", description: "Dominio (acme.com) o su id" },
-    name: { type: "positional", description: "Nombre del registro, p. ej. @ o app" },
-    type: { type: "positional", description: `Tipo: ${RECORD_TYPES.join(", ")}` },
+    domain: { type: "positional", required: true as const, description: "Dominio (acme.com) o su id" },
+    name: { type: "positional", required: true as const, description: "Nombre del registro, p. ej. @ o app" },
+    type: { type: "positional", required: true as const, description: `Tipo: ${RECORD_TYPES.join(", ")}` },
     ttl: { type: "string", description: "TTL en segundos (60–172800, por omisión 300)" },
     json: { type: "boolean", description: "Salida en JSON para scripts/agentes" },
   },
@@ -117,9 +117,9 @@ const upsert = defineCommand({
 const del = defineCommand({
   meta: { name: "delete", description: "Borra un conjunto de registros (nombre, tipo) completo" },
   args: {
-    domain: { type: "positional", description: "Dominio (acme.com) o su id" },
-    name: { type: "positional", description: "Nombre del registro" },
-    type: { type: "positional", description: `Tipo: ${RECORD_TYPES.join(", ")}` },
+    domain: { type: "positional", required: true as const, description: "Dominio (acme.com) o su id" },
+    name: { type: "positional", required: true as const, description: "Nombre del registro" },
+    type: { type: "positional", required: true as const, description: `Tipo: ${RECORD_TYPES.join(", ")}` },
     ...yesArg,
     json: { type: "boolean", description: "Salida en JSON para scripts/agentes" },
   },
@@ -142,8 +142,8 @@ const del = defineCommand({
 const preset = defineCommand({
   meta: { name: "preset", description: "Apunta el dominio a un hosting (Vercel, Netlify, ...) sin escribir los registros a mano" },
   args: {
-    domain: { type: "positional", description: "Dominio (acme.com) o su id" },
-    preset: { type: "positional", description: `Uno de: ${PRESETS.join(", ")}` },
+    domain: { type: "positional", required: true as const, description: "Dominio (acme.com) o su id" },
+    preset: { type: "positional", required: true as const, description: `Uno de: ${PRESETS.join(", ")}` },
     target: { type: "string", description: "Valor del registro (p. ej. el *.vercel.app del proyecto)" },
     subdomain: { type: "string", description: "Subdominio donde aplicarlo; sin esto, fija la raíz Y www" },
     json: { type: "boolean", description: "Salida en JSON para scripts/agentes" },

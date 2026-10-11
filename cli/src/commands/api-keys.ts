@@ -26,7 +26,7 @@ const list = defineCommand({
 
 const create = defineCommand({
   meta: { name: "create", description: "Crea una API key (sale completa sólo aquí)" },
-  args: { name: { type: "positional", description: "Nombre para reconocerla, p. ej. ci-github" }, ...jsonArg },
+  args: { name: { type: "positional", required: true as const, description: "Nombre para reconocerla, p. ej. ci-github" }, ...jsonArg },
   async run({ args }) {
     const { client } = await requireClient();
     try {
@@ -43,7 +43,7 @@ const create = defineCommand({
 
 const revoke = defineCommand({
   meta: { name: "revoke", description: "Revoca una API key; si es la de esta sesión, te quedas sin llave" },
-  args: { id: { type: "positional", description: "Id de la llave (lo muestra `api-keys list`)" }, ...yesArg, ...jsonArg },
+  args: { id: { type: "positional", required: true as const, description: "Id de la llave (lo muestra `api-keys list`)" }, ...yesArg, ...jsonArg },
   async run({ args }) {
     const { client, auth } = await requireClient();
     // Confirmación genérica primero (contrato de la ficha): sin TTY y sin --yes sale con 1 sin tocar la API.

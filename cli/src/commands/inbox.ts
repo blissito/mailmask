@@ -11,7 +11,7 @@ const MAX_DELETE_IDS = 200;
 
 const conversationArgs = {
   ...domainArg,
-  conversation: { type: "positional" as const, description: "Id de la conversación" },
+  conversation: { type: "positional" as const, required: true as const, description: "Id de la conversación" },
 };
 
 /** `a, b ,c` → ["a","b","c"]; vacío o ausente → undefined. */
@@ -123,7 +123,7 @@ const reply = defineCommand({
   meta: { name: "reply", description: "Responde en el hilo desde la máscara del hilo (sale al contacto)" },
   args: {
     ...conversationArgs,
-    markdown: { type: "string", required: true, description: "Cuerpo de la respuesta en markdown" },
+    markdown: { type: "string", required: true as const, description: "Cuerpo de la respuesta en markdown" },
     cc: { type: "string", description: "Copia, separados por coma" },
     bcc: { type: "string", description: "Copia oculta, separados por coma" },
     // citty entiende `--no-quote` como `quote=false`; por eso el arg se llama `quote`.
@@ -155,10 +155,10 @@ const compose = defineCommand({
   meta: { name: "compose", description: "Abre un hilo nuevo con un correo desde una máscara (gasta cuota de envío)" },
   args: {
     ...domainArg,
-    from: { type: "string", required: true, description: "Máscara del dominio desde la que sale (ventas o ventas@acme.com)" },
-    to: { type: "string", required: true, description: "Destinatario" },
-    subject: { type: "string", required: true, description: "Asunto" },
-    markdown: { type: "string", required: true, description: "Cuerpo en markdown" },
+    from: { type: "string", required: true as const, description: "Máscara del dominio desde la que sale (ventas o ventas@acme.com)" },
+    to: { type: "string", required: true as const, description: "Destinatario" },
+    subject: { type: "string", required: true as const, description: "Asunto" },
+    markdown: { type: "string", required: true as const, description: "Cuerpo en markdown" },
     cc: { type: "string", description: "Copia, separados por coma" },
     bcc: { type: "string", description: "Copia oculta, separados por coma" },
     ...yesArg,
@@ -256,7 +256,7 @@ const note = defineCommand({
   meta: { name: "note", description: "Agrega una nota interna (la ve el equipo, nunca el contacto)" },
   args: {
     ...conversationArgs,
-    text: { type: "positional", description: "Texto de la nota" },
+    text: { type: "positional", required: true as const, description: "Texto de la nota" },
     ...jsonArg,
   },
   async run({ args }) {
@@ -276,7 +276,7 @@ const del = defineCommand({
   meta: { name: "delete", description: "Manda de 1 a 200 conversaciones a la papelera (se pueden restaurar)" },
   args: {
     ...domainArg,
-    id: { type: "positional", description: "Id(s) de conversación; acepta varios" },
+    id: { type: "positional", required: true as const, description: "Id(s) de conversación; acepta varios" },
     ...yesArg,
     ...jsonArg,
   },
@@ -338,8 +338,8 @@ const attachment = defineCommand({
   meta: { name: "attachment", description: "Descarga un adjunto de un mensaje, a un archivo o a stdout" },
   args: {
     ...conversationArgs,
-    message: { type: "positional", description: "Id del mensaje" },
-    index: { type: "positional", description: "Posición del adjunto en el mensaje (0, 1, …)" },
+    message: { type: "positional", required: true as const, description: "Id del mensaje" },
+    index: { type: "positional", required: true as const, description: "Posición del adjunto en el mensaje (0, 1, …)" },
     output: { type: "string", alias: "o", description: "Ruta del archivo a escribir; sin esto, sale por stdout" },
     ...jsonArg,
   },

@@ -33,7 +33,7 @@ async function readRecords(file: string, json?: boolean): Promise<DnsRecordInput
 
 const check = defineCommand({
   meta: { name: "check", description: "Requisitos, precio e inventario DNS para traer un dominio (no cobra ni crea nada)" },
-  args: { domain: { type: "positional", description: "Nombre del dominio a trasladar (acme.com)" }, ...jsonArg },
+  args: { domain: { type: "positional", required: true as const, description: "Nombre del dominio a trasladar (acme.com)" }, ...jsonArg },
   async run({ args }) {
     const { client } = await requireClient();
     try {
@@ -73,7 +73,7 @@ const setDns = defineCommand({
   meta: { name: "set-dns", description: "REEMPLAZA el inventario DNS completo del traslado con un archivo JSON; queda pendiente de aprobar" },
   args: {
     ...registrationArg,
-    file: { type: "string", required: true, description: "Archivo JSON: arreglo de { name, type, ttl?, values[] }" },
+    file: { type: "string", required: true as const, description: "Archivo JSON: arreglo de { name, type, ttl?, values[] }" },
     ...yesArg,
     ...jsonArg,
   },

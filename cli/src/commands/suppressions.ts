@@ -6,7 +6,7 @@ import { domainArg, jsonArg, yesArg } from "../args.js";
 
 const emailArgs = {
   ...domainArg,
-  email: { type: "positional" as const, description: "Correo a suprimir / reactivar" },
+  email: { type: "positional" as const, required: true as const, description: "Correo a suprimir / reactivar" },
 };
 
 const list = defineCommand({

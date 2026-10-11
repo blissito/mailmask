@@ -28,8 +28,8 @@ const create = defineCommand({
   meta: { name: "create", description: "Guarda una respuesta para reusarla en la Bandeja" },
   args: {
     ...domainArg,
-    title: { type: "string", required: true, description: "Título con el que la encuentra el equipo" },
-    body: { type: "string", required: true, description: "Texto de la respuesta" },
+    title: { type: "string", required: true as const, description: "Título con el que la encuentra el equipo" },
+    body: { type: "string", required: true as const, description: "Texto de la respuesta" },
     ...jsonArg,
   },
   async run({ args }) {
@@ -49,7 +49,7 @@ const del = defineCommand({
   meta: { name: "delete", description: "Borra una respuesta guardada" },
   args: {
     ...domainArg,
-    id: { type: "positional", description: "Id de la respuesta guardada" },
+    id: { type: "positional", required: true as const, description: "Id de la respuesta guardada" },
     ...yesArg,
     ...jsonArg,
   },
