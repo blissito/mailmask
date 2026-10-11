@@ -9,6 +9,10 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    # tailwindcss se queda en 3.x: v4 rompe build:css (ver docs/agents/dependencias-ci.md).
+    ignore:
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: "/cli"
     schedule:
