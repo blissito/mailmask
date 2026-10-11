@@ -38,13 +38,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # La caja confirma el rollout: /version devuelve el SHA del build. Antes del corte de DNS
-      # todavía responde Fly ("dev"), así que el paso sólo avisa sin fallar.
+      # La caja confirma el rollout: /version devuelve el SHA del build. Si no aparece en ~5 min
+      # (50×6 s, más hasta 5 s por curl) el rollout no llegó: la caja hace rollback y se queda con
+      # la imagen anterior, así que el paso falla en vez de avisar.
       - name: Wait for rollout
         run: |
+          last="sin respuesta"
           for i in $(seq 1 50); do
             v=$(curl -fsS -m 5 https://www.mailmask.studio/version 2>/dev/null || true)
+            [ -n "$v" ] && last="$v"
             [ "$v" = "${{ github.sha }}" ] && { echo "prod en ${{ github.sha }}"; exit 0; }
             sleep 6
           done
-          echo "::warning::prod no reporta ${{ github.sha }} (revisa journalctl -u app-deploy en la caja)"
+          echo "::error::prod no reporta ${{ github.sha }} tras ~5 min; prod está sirviendo: $last. La caja app-host no publicó la imagen nueva (rollback): revisa journalctl -u app-deploy en la caja."
+          exit 1
