@@ -8,8 +8,8 @@ import { domainArg, jsonArg, yesArg } from "../args.js";
 
 /** `<dominio> <alias>`: compartidos entre casi todos los subcomandos de este archivo. */
 const aliasArgs = {
-  domain: { type: "positional" as const, description: "Dominio (acme.com) o su id" },
-  alias: { type: "positional" as const, description: "Parte local de la máscara, p. ej. hola (usa * para catch-all)" },
+  domain: { type: "positional" as const, required: true as const, description: "Dominio (acme.com) o su id" },
+  alias: { type: "positional" as const, required: true as const, description: "Parte local de la máscara, p. ej. hola (usa * para catch-all)" },
 };
 
 // Repetir el comando que creó la contraseña (create / mailbox create) no sirve: la

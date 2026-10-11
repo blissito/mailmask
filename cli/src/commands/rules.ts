@@ -7,7 +7,7 @@ import { RULE_ACTIONS, RULE_FIELDS, RULE_MATCHES, domainArg, jsonArg, yesArg } f
 
 const idArgs = {
   ...domainArg,
-  ruleId: { type: "positional" as const, description: "Id de la regla (lo muestra `rules list`)" },
+  ruleId: { type: "positional" as const, required: true as const, description: "Id de la regla (lo muestra `rules list`)" },
 };
 
 const ruleFlags = {

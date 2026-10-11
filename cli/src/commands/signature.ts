@@ -27,7 +27,7 @@ const set = defineCommand({
   meta: { name: "set", description: 'Fija la firma (markdown, máx. 2000 caracteres); "" la borra' },
   args: {
     ...domainArg,
-    markdown: { type: "positional", description: 'Firma en markdown; "" la borra' },
+    markdown: { type: "positional", required: true as const, description: 'Firma en markdown; "" la borra' },
     ...jsonArg,
   },
   async run({ args }) {

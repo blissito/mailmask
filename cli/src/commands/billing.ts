@@ -103,7 +103,7 @@ const checkout = defineCommand({
 
 const cancelAddon = defineCommand({
   meta: { name: "cancel-addon", description: "Cancela la suscripción de un add-on; el cupo sigue hasta el fin del periodo pagado" },
-  args: { addon: { type: "positional", description: "Id del add-on (lo muestra billing addons)" }, ...yesArg, ...jsonArg },
+  args: { addon: { type: "positional", required: true as const, description: "Id del add-on (lo muestra billing addons)" }, ...yesArg, ...jsonArg },
   async run({ args }) {
     await confirmOrExit(`¿Cancelar el add-on ${args.addon}? Dejará de renovarse.`, { yes: args.yes, json: args.json });
     const { client } = await requireClient();

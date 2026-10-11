@@ -38,7 +38,7 @@ const profile = defineCommand({
 const avatarSet = defineCommand({
   meta: { name: "set", description: "Cambia tu foto (archivo local PNG, JPG o WebP, máx. 2 MB)" },
   args: {
-    file: { type: "positional", description: "Ruta del archivo de imagen" },
+    file: { type: "positional", required: true as const, description: "Ruta del archivo de imagen" },
     ...jsonArg,
   },
   async run({ args }) {

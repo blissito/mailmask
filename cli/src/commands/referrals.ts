@@ -20,7 +20,7 @@ const get = defineCommand({
 
 const slug = defineCommand({
   meta: { name: "slug", description: "Cambia tu slug de referidos (3-30 caracteres: minúsculas, números y guiones)" },
-  args: { slug: { type: "positional", description: "Nuevo slug" }, ...jsonArg },
+  args: { slug: { type: "positional", required: true as const, description: "Nuevo slug" }, ...jsonArg },
   async run({ args }) {
     const { client } = await requireClient();
     try {
@@ -35,7 +35,7 @@ const slug = defineCommand({
 
 const name = defineCommand({
   meta: { name: "name", description: "Cambia el nombre que ven tus invitados (2-40 caracteres)" },
-  args: { name: { type: "positional", description: "Nombre visible" }, ...jsonArg },
+  args: { name: { type: "positional", required: true as const, description: "Nombre visible" }, ...jsonArg },
   async run({ args }) {
     const { client } = await requireClient();
     try {

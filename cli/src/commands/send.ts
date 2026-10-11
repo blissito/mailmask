@@ -215,7 +215,7 @@ const bulk = defineCommand({
   meta: { name: "bulk", description: "Lanza un envío masivo desde un JSON { recipients, subject, html, from? } (pide confirmación)" },
   args: {
     ...domainArg,
-    file: { type: "positional" as const, description: "Archivo .json con recipients, subject, html y from opcional" },
+    file: { type: "positional" as const, required: true as const, description: "Archivo .json con recipients, subject, html y from opcional" },
     ...yesArg,
     ...jsonArg,
   },
@@ -246,7 +246,7 @@ const status = defineCommand({
   meta: { name: "status", description: "Muestra el avance de un envío masivo" },
   args: {
     ...domainArg,
-    jobId: { type: "positional" as const, description: "Id del envío masivo (lo imprime send bulk)" },
+    jobId: { type: "positional" as const, required: true as const, description: "Id del envío masivo (lo imprime send bulk)" },
     ...jsonArg,
   },
   async run({ args }) {

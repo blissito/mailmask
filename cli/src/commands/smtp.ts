@@ -28,7 +28,7 @@ const create = defineCommand({
   meta: { name: "create", description: "Crea una credencial SMTP (la contraseña sale completa sólo aquí; requiere dominio activado)" },
   args: {
     ...domainArg,
-    label: { type: "positional", description: "Etiqueta para reconocerla, p. ej. app-produccion" },
+    label: { type: "positional", required: true as const, description: "Etiqueta para reconocerla, p. ej. app-produccion" },
     ...jsonArg,
   },
   async run({ args }) {
@@ -54,7 +54,7 @@ const revoke = defineCommand({
   meta: { name: "revoke", description: "Revoca una credencial SMTP: deja de servir de inmediato" },
   args: {
     ...domainArg,
-    id: { type: "positional", description: "Id de la credencial (lo muestra `smtp list`)" },
+    id: { type: "positional", required: true as const, description: "Id de la credencial (lo muestra `smtp list`)" },
     ...yesArg,
     ...jsonArg,
   },

@@ -53,7 +53,7 @@ const get = defineCommand({
 const create = defineCommand({
   meta: { name: "create", description: "Registra un dominio y, si se pide, aplica un preset de DNS" },
   args: {
-    domain: { type: "positional", description: "Dominio a registrar, p. ej. acme.com" },
+    domain: { type: "positional", required: true as const, description: "Dominio a registrar, p. ej. acme.com" },
     preset: { type: "string", description: `Aplica este preset tras crear: ${PRESETS.join(", ")}` },
     target: { type: "string", description: "Valor del registro para el preset (p. ej. el CNAME de Vercel)" },
     subdomain: { type: "string", description: "Subdominio donde aplicar el preset (por omisión, la raíz)" },
@@ -179,7 +179,7 @@ const logoSet = defineCommand({
   meta: { name: "set", description: "Cambia el logo de la firma (archivo local PNG, JPG o WebP, máx. 500 KB)" },
   args: {
     ...domainArg,
-    file: { type: "positional", description: "Ruta del archivo de imagen" },
+    file: { type: "positional", required: true as const, description: "Ruta del archivo de imagen" },
     ...jsonArg,
   },
   async run({ args }) {
