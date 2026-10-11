@@ -18,12 +18,14 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc -p tsconfig.json --emitDeclarationOnly",
+    "check:exports": "tsc --noEmit -p scripts/tsconfig.json",
+    "check:runtime": "node scripts/check-runtime.mjs",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "tsup": "^8.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^7.0.2"
   },
   "keywords": [
     "mailmask",
