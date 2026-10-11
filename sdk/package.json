@@ -18,9 +18,10 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsup && tsc -p tsconfig.json --emitDeclarationOnly",
-    "check:exports": "tsc --noEmit -p scripts/tsconfig.json",
+    "build": "tsup && tsc -p tsconfig.json --emitDeclarationOnly && node scripts/postbuild-dts.mjs",
+    "check:exports": "node scripts/check-exports.mjs",
     "check:runtime": "node scripts/check-runtime.mjs",
+    "check:consumer": "node scripts/check-consumer-legacy.mjs",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {

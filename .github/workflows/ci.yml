@@ -74,8 +74,8 @@ jobs:
       - run: npm run build
       # El paquete publica dist/index.d.ts: si el build deja de emitirlo, nadie lo nota hasta publicar.
       - run: test -f dist/index.d.ts
-      # La misma API publicada que en main: el compilador resuelve dist/ contra
-      # sdk/scripts/exports-reference.json (lista tomada en main antes del cambio a TS 7).
+      # La misma API publicada que en main: genera el archivo de comprobación desde
+      # sdk/scripts/exports-reference.json (lista tomada en main antes del cambio a TS 7) y lo pasa por tsc.
       - run: npm run check:exports
       # Los bundles ESM y CJS siguen exportando los tres valores públicos.
       - run: npm run check:runtime

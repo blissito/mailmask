@@ -81,6 +81,15 @@ import { verifyWebhookSignature } from "@easybits.cloud/mailmask";
 const ok = await verifyWebhookSignature(secret, { signature: req.headers["x-mailmask-signature"], timestamp: req.headers["x-mailmask-timestamp"] }, rawBody);
 ```
 
+## TypeScript
+
+Los tipos publicados se pueden consumir desde **TypeScript 4.9 en adelante**, también con
+`moduleResolution: node` (el clásico, sin `exports`). El paquete se compila con TypeScript 7, pero
+el build baja la única sintaxis que un TS viejo no entiende (`export type *`, de TS 5.0) a su
+equivalente (`scripts/postbuild-dts.mjs`): sin eso, un consumidor con TS ≤ 4.9 falla en su propia
+compilación con `TS1383` y desde aquí no se nota. `npm run check:consumer` arma el paquete con
+`npm pack` y lo compila en un proyecto con TypeScript 4.9.5 para confirmarlo.
+
 ## Docs
 
 Full API reference and examples: https://mailmask.studio/docs
