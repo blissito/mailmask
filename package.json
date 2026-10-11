@@ -20,8 +20,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-iam": "^3",
-    "@aws-sdk/client-route-53": "^3.1146.0",
-    "@aws-sdk/client-route-53-domains": "^3.1146.0",
+    "@aws-sdk/client-route-53": "^3.1147.0",
+    "@aws-sdk/client-route-53-domains": "^3.1147.0",
     "@aws-sdk/client-s3": "^3",
     "@aws-sdk/client-ses": "^3",
     "@aws-sdk/client-sesv2": "^3",
