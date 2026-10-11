@@ -41,7 +41,7 @@
     "markdown-it": "^15.0.2",
     "markdown-it-github-alerts": "^1.0.1",
     "mercadopago": "^3.6.1",
-    "motion": "^12.43.0",
+    "motion": "^14.0.0",
     "node-cron": "^3",
     "postal-mime": "^4.0.5",
     "react": "^19.3.0",
