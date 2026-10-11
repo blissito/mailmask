@@ -59,7 +59,7 @@
     "@tiptap/extension-table": "^3.31.4",
     "@tiptap/pm": "^3.31.4",
     "@tiptap/starter-kit": "^3.31.4",
-    "@types/better-sqlite3": "^7",
+    "@types/better-sqlite3": "^9",
     "@types/html-to-text": "^9.0.4",
     "@types/markdown-it": "^14.2.0",
     "@types/node": "^26",
