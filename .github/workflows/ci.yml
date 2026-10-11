@@ -52,6 +52,33 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+  verify-sdk:
+    # sdk/ es su propio paquete (no es workspace del root) y es el único cuyo build emite tipos
+    # con tsc: con TS 7 tsup ya no puede generarlos. Ver docs/agents/dependencias-ci.md.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: sdk
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sdk/package-lock.json
+      - run: npm ci
+      - run: npx tsc -v
+      - run: npm run build
+      # El paquete publica dist/index.d.ts: si el build deja de emitirlo, nadie lo nota hasta publicar.
+      - run: test -f dist/index.d.ts
+      # La misma API publicada que en main: genera el archivo de comprobación desde
+      # sdk/scripts/exports-reference.json (lista tomada en main antes del cambio a TS 7) y lo pasa por tsc.
+      - run: npm run check:exports
+      # Los bundles ESM y CJS siguen exportando los tres valores públicos.
+      - run: npm run check:runtime
   docker:
     # La misma imagen que despliega Fly (Dockerfile), construida sin push en cada PR
     if: github.event_name == 'pull_request'

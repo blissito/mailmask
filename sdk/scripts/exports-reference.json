@@ -1,0 +1,558 @@
+{
+  "nota": "Exports de dist/index.d.ts EN MAIN, antes de subir el SDK a TypeScript 7 (paso 1 del plan). Se obtuvieron con el compilador (checker.getExportsOfModule), no con grep. check-exports.ts los usa como referencia de la API publicada.",
+  "repo": "blissito/mailmask",
+  "commit": "6b9a2c50054fbd9689a9961f424f0fad700bc23a",
+  "capturado": "2026-10-11",
+  "typescript": "5.9.3",
+  "built": [
+    "dist/index.js",
+    "dist/index.cjs",
+    "dist/index.d.ts",
+    "dist/index.d.cts"
+  ],
+  "dtsIdenticos": true,
+  "names": [
+    "AccountExport",
+    "AccountMe",
+    "AccountMeDomainUsage",
+    "AccountProfile",
+    "Addon",
+    "AddonsResponse",
+    "Address",
+    "AddressCreated",
+    "Alias",
+    "AliasCreated",
+    "ApiKey",
+    "AttachmentRef",
+    "BillingStatus",
+    "BulkJob",
+    "BulkJobCreated",
+    "BulkSendInput",
+    "CannedReply",
+    "CheckoutLink",
+    "CreateAddressInput",
+    "CreateAliasInput",
+    "CreateRuleInput",
+    "CreateWebhookInput",
+    "DnsChangeResult",
+    "DnsDelegation",
+    "DnsImportResult",
+    "DnsListResponse",
+    "DnsPreset",
+    "DnsRecord",
+    "DnsRecordType",
+    "DnsRRSet",
+    "DnsRRSetAnotado",
+    "DnsSetup",
+    "DnsSetupRecord",
+    "DnsZoneCreated",
+    "DnsZoneState",
+    "Domain",
+    "DomainCreated",
+    "DomainInvite",
+    "DomainMember",
+    "DomainRegistration",
+    "DomainRegistrationCreated",
+    "DomainSearchResult",
+    "DomainVerification",
+    "EmailLog",
+    "InboxAttachment",
+    "InboxComposeInput",
+    "InboxConversation",
+    "InboxConversationDetail",
+    "InboxListOptions",
+    "InboxMessage",
+    "InboxNote",
+    "InboxPage",
+    "InboxReplyInput",
+    "InboxStatus",
+    "InboxUpdateInput",
+    "MailboxCreated",
+    "MailMask",
+    "MailMaskConfig",
+    "MailMaskError",
+    "Order",
+    "OrdersPage",
+    "ReferralStats",
+    "RenewalLink",
+    "Rule",
+    "RuleAction",
+    "RuleField",
+    "RuleMatch",
+    "SendEmailInput",
+    "SendOptions",
+    "SmtpCredential",
+    "SmtpCredentialCreated",
+    "Suppression",
+    "TldPrice",
+    "TransferCheck",
+    "TransferDnsInventory",
+    "TransferRequirement",
+    "UpdateAddressInput",
+    "UpdateAliasInput",
+    "UpdateRuleInput",
+    "UpdateWebhookInput",
+    "UploadAttachmentInput",
+    "UploadedAttachment",
+    "UploadedEmailImage",
+    "verifyWebhookSignature",
+    "Webhook",
+    "WebhookCreated",
+    "WebhookDelivery",
+    "WebhookEvent",
+    "WebhookPayload",
+    "WebhookSignatureHeaders"
+  ],
+  "detail": [
+    {
+      "name": "AccountExport",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "AccountMe",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "AccountMeDomainUsage",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "AccountProfile",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "Addon",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "AddonsResponse",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "Address",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "AddressCreated",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "Alias",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "AliasCreated",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "ApiKey",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "AttachmentRef",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "BillingStatus",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "BulkJob",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "BulkJobCreated",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "BulkSendInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "CannedReply",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "CheckoutLink",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "CreateAddressInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "CreateAliasInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "CreateRuleInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "CreateWebhookInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DnsChangeResult",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DnsDelegation",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DnsImportResult",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DnsListResponse",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DnsPreset",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DnsRecord",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DnsRecordType",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DnsRRSet",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DnsRRSetAnotado",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DnsSetup",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DnsSetupRecord",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DnsZoneCreated",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DnsZoneState",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "Domain",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DomainCreated",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DomainInvite",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DomainMember",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DomainRegistration",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DomainRegistrationCreated",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DomainSearchResult",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "DomainVerification",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "EmailLog",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "InboxAttachment",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "InboxComposeInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "InboxConversation",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "InboxConversationDetail",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "InboxListOptions",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "InboxMessage",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "InboxNote",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "InboxPage",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "InboxReplyInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "InboxStatus",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "InboxUpdateInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "MailboxCreated",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "MailMask",
+      "value": true,
+      "type": true
+    },
+    {
+      "name": "MailMaskConfig",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "MailMaskError",
+      "value": true,
+      "type": true
+    },
+    {
+      "name": "Order",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "OrdersPage",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "ReferralStats",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "RenewalLink",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "Rule",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "RuleAction",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "RuleField",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "RuleMatch",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "SendEmailInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "SendOptions",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "SmtpCredential",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "SmtpCredentialCreated",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "Suppression",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "TldPrice",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "TransferCheck",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "TransferDnsInventory",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "TransferRequirement",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "UpdateAddressInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "UpdateAliasInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "UpdateRuleInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "UpdateWebhookInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "UploadAttachmentInput",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "UploadedAttachment",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "UploadedEmailImage",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "verifyWebhookSignature",
+      "value": true,
+      "type": false
+    },
+    {
+      "name": "Webhook",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "WebhookCreated",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "WebhookDelivery",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "WebhookEvent",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "WebhookPayload",
+      "value": false,
+      "type": true
+    },
+    {
+      "name": "WebhookSignatureHeaders",
+      "value": false,
+      "type": true
+    }
+  ]
+}
