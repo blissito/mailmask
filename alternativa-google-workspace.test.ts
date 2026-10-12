@@ -1,9 +1,11 @@
 // Lo propio de /alternativa-google-workspace: la comparativa con Google Workspace.
 //
-// Google cobra por persona y en la moneda de cada país, así que la página NO publica la
-// conversión a pesos: publica la CITA (su página oficial de precios, con fecha de consulta) y
+// Google cobra por persona y en la moneda de cada país, así que la página NI la portada publican
+// la conversión a pesos: publican la CITA (su página oficial de precios, con fecha de consulta) y
 // nada más. La tabla completa vive sólo aquí —/pricing y la portada resumen y enlazan— porque
-// dos tablas con la misma cifra es exactamente cómo se desfasan.
+// dos tablas con la misma cifra es exactamente cómo se desfasan. La calculadora de la portada
+// cuenta unidades (licencias contra dominios) por la misma razón: un «$108 × N personas» es una
+// cifra de Google que nadie puede confirmar.
 //
 // Los precios de MailMask sí se publican, y salen de `plans.ts`: si alguien cambia el catálogo
 // sin tocar la página, esta prueba truena. Reglas compartidas: seo-checks.ts ·
@@ -23,6 +25,8 @@ const cuerpo = html.slice(html.indexOf("</head>"));
 const sitemap = leer("public/sitemap.xml");
 const pricing = leer("public/pricing.html");
 const landing = leer("public/landing.html");
+/** El footer de la portada, acotado: un enlace en cualquier parte de la página no es el footer. */
+const footer = landing.slice(landing.lastIndexOf("<footer"), landing.lastIndexOf("</footer>"));
 const meta = (clave: string) => metaDe(head, clave);
 
 /** La cita que comparten la landing y /pricing: misma fuente y misma fecha. */
@@ -84,7 +88,18 @@ test("la tabla completa vive sólo en la página, y /pricing y la portada la res
     assert.ok(!/\$495/.test(pagina), `${nombre} publica una cifra de Google o una fila de más`);
   }
   assert.ok(!/\$140/.test(pricing), "/pricing volvió a publicar la cifra de Google sin fuente");
-  assert.match(landing, /href="\/alternativa-google-workspace"/, "el footer de la portada enlaza la comparativa");
+  assert.match(footer, /href="\/alternativa-google-workspace"/, "el footer de la portada enlaza la comparativa");
+});
+
+test("la portada no publica ningún precio de Google en pesos", () => {
+  // La regla del plan: una cifra de Google que no se pueda confirmar, no se publica. La
+  // calculadora contaba licencias a $108/$140 y vendía un «ahorro al año» que salía de
+  // restarle esa cifra a los precios nuestros.
+  assert.doesNotMatch(landing, /\$(108|140|700|3,500)\b/, "volvió una cifra de Google en pesos a la portada");
+  const js = leer("public/js/landing.js");
+  assert.doesNotMatch(js, /GW_POR_PERSONA|money\(gw\)|calc-savings|calc-badge/, "la calculadora volvió a convertir las licencias de Google a pesos");
+  assert.match(js, /licencias/, "la calculadora dejó de contar licencias");
+  assert.match(landing, /id="calc-gw-licencias"/, "la tarjeta de Google no cuenta licencias");
 });
 
 test("los dos posts de Google Workspace enlazan la comparativa", () => {
