@@ -18,9 +18,24 @@ const nodos = grafo(head);
 const ofertas = (nodos.find((n) => n["@type"] === "Product")?.offers ?? []) as { name: string; price: string }[];
 const precioMostrado = (cents: number) => String(cents / 100);
 
-// Cada tarjeta de la página con su precio a la vista. `data-*` es lo que lee la prueba;
-// el texto de al lado es lo que ve la persona.
-const tarjeta = (attrs: string) => html.match(new RegExp(`<div[^>]*${attrs}[^>]*>[\\s\\S]*?</div>\\s*</div>`))?.[0] ?? "";
+// Cada tarjeta de la página, recortada como el <div> completo que es. `data-*` es lo que lee
+// la prueba; el texto de al lado es lo que ve la persona.
+// Se cuentan los <div> que se abren y se cierran en vez de cortar en el primer `</div></div>`:
+// una expresión perezosa se estira hasta el cierre de la tarjeta SIGUIENTE (la de storage50
+// se tragaba la de sends100 entera) y la prueba acaba leyendo datos de una tarjeta que no es.
+function tarjeta(attrs: string): string {
+  const marca = html.indexOf(attrs);
+  assert.ok(marca !== -1, `la página no trae ${attrs}`);
+  const inicio = html.lastIndexOf("<div", marca);
+  const anidados = /<\/?div(?=[\s>])/g;
+  anidados.lastIndex = html.indexOf(">", inicio) + 1;
+  let abiertos = 1;
+  for (let m = anidados.exec(html); m !== null; m = anidados.exec(html)) {
+    abiertos += m[0] === "</div" ? -1 : 1;
+    if (abiertos === 0) return html.slice(inicio, m.index + "</div>".length);
+  }
+  throw new Error(`${attrs}: el <div> de la tarjeta no cierra`);
+}
 
 test("el @graph de /pricing trae un solo Product con las 5 ofertas y sus precios de plans.ts", () => {
   assert.equal(nodos.filter((n) => n["@type"] === "Product").length, 1, "los precios viven en un solo Product");
