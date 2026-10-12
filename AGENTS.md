@@ -10,6 +10,10 @@ Las reglas detalladas del proyecto viven en `CLAUDE.md`: léelo también.
 
 Antes de abrir un PR, todo lo anterior tiene que pasar en local.
 
+El entorno de pruebas del paquete raíz (Node 22, SQLite en `data/`, sin Postgres ni Redis)
+está declarado en [`.ghosty/factory.md`](.ghosty/factory.md): es lo que la fábrica lee para
+dejar una caja limpia lista antes de correr la suite.
+
 ## Arquitectura
 Monolito con Elysia (Node + `tsx`), servido desde `main.ts`; sin carpeta `src/`,
 cada dominio vive en su propio archivo en la raíz (`auth.ts`, `db.ts`, `ses.ts`,
