@@ -79,3 +79,10 @@ desde una prueba del root da TS2307 y rompe `npm run typecheck`. Para vigilar un
 (`plans.test.ts`), igual que `docs-cli.test.ts` lee los comandos. Con `assert.ok(match)` y una lista
 no vacía ANTES de comparar, la prueba falla —en vez de pasar vacía— si la constante cambia de forma.
 
+
+## `pending_agent_actions` va con FK: crea el usuario antes de archivar
+
+`pending_agent_actions.user_email` es FK a `users.email` con `ON DELETE CASCADE`, y `pg.ts` enciende
+`foreign_keys`, así que archivar una acción (`requireConfirmation` con `via: "turn"`) truena con
+`FOREIGN KEY constraint failed` si ese email no existe. En `agent-actions.test.ts` cada prueba se
+lleva su propio usuario: `createUser(email, "x")` de `db.ts` antes de tocar el módulo.
