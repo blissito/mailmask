@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { debeProgramar, esPreview } from "./preview.js";
 
 /**
  * Programación de tareas que sólo corre cuando el proceso ES el servidor.
@@ -27,7 +28,7 @@ export const esServidor = (() => {
   }
 })();
 
-/** `cron.schedule`, pero inerte fuera del servidor. */
+/** `cron.schedule`, pero inerte fuera del servidor y en preview. */
 export function programar(expr: string, fn: () => void | Promise<void>): void {
-  if (esServidor) cron.schedule(expr, fn);
+  if (debeProgramar(esServidor, esPreview())) cron.schedule(expr, fn);
 }
