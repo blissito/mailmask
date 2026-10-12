@@ -94,8 +94,11 @@ describe("auth: JWT de sesión (HMAC-SHA256)", () => {
     const token = await signJwt({ email: "jwt@example.com" });
     const [h, b, s] = token.split(".");
 
-    const ultima = s.at(-1)!;
-    const firmaTocada = `${h}.${b}.${s.slice(0, -1)}${ultima === "A" ? "B" : "A"}`;
+    // Se toca la PRIMERA letra de la firma, no la última: en base64url el último carácter
+    // lleva bits de relleno, así que cambiarlo puede decodificar a los MISMOS bytes y dejar
+    // la firma válida (la prueba pasaría o fallaría al azar).
+    const primera = s[0];
+    const firmaTocada = `${h}.${b}.${primera === "A" ? "B" : "A"}${s.slice(1)}`;
     assert.equal(await verifyJwt(firmaTocada), null, "la firma ya no cuadra");
 
     const cuerpoFalso = Buffer.from(JSON.stringify({ email: "otro@example.com", exp: 9_999_999_999 })).toString("base64url");
@@ -228,8 +231,13 @@ describe("auth: getAuthUser", () => {
     assert.deepEqual(await getAuthUser(conCookie(`token=${cookie}`)), { email, via: "session" });
   });
 
-  it("un turn token puesto como cookie no es una sesión", async () => {
-    assert.equal(await getAuthUser(conCookie(`token=${mt}`)), null);
+  it("el JWT de un mt_ (sin el prefijo) puesto como cookie no es una sesión", async () => {
+    const cruce = emailDe("cruce");
+    dbmod.createUser(cruce, "no-usado:0000");
+    const suyo = await issueTurnToken(cruce);
+    // Sin el prefijo el token verifica bien: es el `aud` lo que lo detiene (auth.ts:197).
+    // (Con el prefijo `mt_` dentro, `verifyJwt` fallaría por la firma y la prueba no probaría nada.)
+    assert.equal(await getAuthUser(conCookie(`token=${suyo.slice(3)}`)), null);
   });
 
   it("un token de sesión de un correo que no existe devuelve null", async () => {

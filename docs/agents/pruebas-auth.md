@@ -40,5 +40,12 @@ un update directo a `users` — nunca con `mock.method(Date, "now")`, que no mue
 ## Los dos cruces del `mt_`
 
 El turn token se acuña con el **mismo secreto** que la sesión, así que lo único que los separa
-es el `aud`. Vale un caso por lado: un `mt_` puesto como cookie `token` → `getAuthUser` null, y
-un JWT de sesión (sin `aud`) montado como `mt_` → `verifyTurnToken` null.
+es el `aud`. Vale un caso por lado — y hay que armarlos con cuidado, porque un cruce mal armado
+se lee como un acierto:
+
+- **Cookie de sesión con el JWT de un `mt_`**: pon el token **sin el prefijo `mt_`**
+  (`mt.slice(3)`). Con el prefijo, `verifyJwt` truena por la firma y devuelve null por el motivo
+  equivocado —la prueba queda verde pase lo que pase, incluso si se comenta la línea que
+  defiende el cruce—; sin él verifica bien y quien lo detiene es el `if (payload.aud !== undefined)`
+  de `getAuthUser`, que es justo la defensa que se quiere cubrir.
+- **`mt_` con un JWT de sesión** (sin `aud`) → `verifyTurnToken` null: ése sí pasa por el `aud`.
