@@ -18,11 +18,8 @@ const RUTAS = paginasDelSitemap(leer("public/sitemap.xml"));
  */
 const PENDIENTES: Record<string, string[]> = {
   "/": ["og-coincide", "og-propia"],
-  "/blog": ["description-medida", "hreflang", "og-coincide", "jsonld-unico", "jsonld-graph", "og-propia"],
   "/register": ["hreflang", "jsonld-graph", "og-propia"],
   "/login": ["description-medida", "hreflang", "jsonld-graph", "og-propia"],
-  "/terms": ["hreflang", "jsonld-graph", "og-propia", "fecha-visible"],
-  "/privacy": ["hreflang", "jsonld-graph", "og-propia", "fecha-visible"],
   "/docs": [],
 };
 
@@ -202,3 +199,18 @@ test("la fecha visible de / es la del dateModified y la del lastmod del sitemap"
   const lastmod = SITEMAP.match(new RegExp(`<loc>${HOST}/</loc><lastmod>(\\d{4}-\\d{2}-\\d{2})</lastmod>`))?.[1];
   assert.equal(lastmod, web.dateModified, "el lastmod de / en el sitemap");
 });
+
+// Los legales muestran una sola fecha: la visible, la del `dateModified` y la del `lastmod`
+// del sitemap (criterio del ticket). Ficha: docs/agents/seo-paginas-publicas.md
+for (const ruta of ["/terms", "/privacy"]) {
+  test(`la fecha visible de ${ruta} es la del dateModified y la del lastmod del sitemap`, () => {
+    const html = leer(archivoDe(ruta));
+    const visible = html.match(/Actualizado:\s*<time datetime="(\d{4}-\d{2}-\d{2})">/);
+    assert.ok(visible, `falta «Actualizado: <time datetime=…>» a la vista en ${ruta}`);
+    const web = grafo(leerHead(html)).find((n) => n["@type"] === "WebPage");
+    assert.ok(web, `falta el WebPage de ${ruta}`);
+    assert.equal(visible[1], web.dateModified, `la fecha visible y la del JSON-LD en ${ruta}`);
+    const lastmod = SITEMAP.match(new RegExp(`<loc>${HOST}${ruta}</loc><lastmod>(\\d{4}-\\d{2}-\\d{2})</lastmod>`))?.[1];
+    assert.equal(lastmod, web.dateModified, `el lastmod de ${ruta} en el sitemap`);
+  });
+}
