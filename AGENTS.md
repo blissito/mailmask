@@ -54,6 +54,8 @@ pon al día la ficha en el mismo PR y agrega aquí su renglón.
 - [Modo preview](docs/agents/preview.md) — `PREVIEW=1` levanta la app sin efectos afuera: no programa crons, no corre el backfill ni el arranque con efectos, y SES, MercadoPago y Route 53 Domains contestan 503; el porqué del incidente del 11-oct-2026 y la regla de que todo cliente o bloque de arranque nuevo con efectos pasa por `preview.ts`.
 - [Pruebas con módulos doblados y base compartida](docs/agents/pruebas-mocks.md) — mock.module sólo intercepta si el módulo se importa en caliente y con el módulo real esparcido; la base de pruebas es una sola (aísla por ids y URLs); deliverPending procesa todas las pendientes vencidas y Date.now mockeado no reprograma new Date(); renombrar un export obliga a tocar su nombre en `namedExports` de toda la suite (es una llave de texto: ni `tsc` ni la prueba avisan).
 
+- [Pruebas de auth](docs/agents/pruebas-auth.md) — PBKDF2 de 600 000 iteraciones se paga una vez y los usuarios que sólo tienen que existir nacen con un `passwordHash` de relleno; el hash legado (`needsRehash`), el token de otro secreto y el vencido se fabrican a mano con `crypto.subtle`, porque `deriveKey` no se exporta, `JWT_SECRET` y su `CryptoKey` se cachean al importar y `exp < now` es estricto; `Secure` se decide al importar con `FLY_APP_NAME`, así que en pruebas no está.
+
 ## Pull requests
 - Rama nueva desde `main`; el PR explica qué cambia y cómo se probó.
 - El CI tiene que quedar en verde.
