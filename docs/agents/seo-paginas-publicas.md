@@ -1,11 +1,12 @@
 # SEO de las páginas públicas (`public/*.html`, `public/llms.txt`)
 
 **Qué:** convenciones que vigilan las páginas públicas. Las reglas viven en `seo-checks.ts`
-(una sola copia) y las corren dos suites: `public-seo.test.ts` sobre todas las páginas del
-sitemap —`/`, `/pricing`, `/docs`, `/blog`, `/register`, `/login`, `/terms` y `/privacy`— y
-`docs-seo.test.ts` sobre lo propio de `/docs` (su `@graph` completo y `hasPart`) y
-`pricing-seo.test.ts` sobre lo propio de `/pricing` (sus ofertas, atadas a `plans.ts`, y su
-imagen social).
+(una sola copia) y las corren `public-seo.test.ts` (todas las páginas del sitemap, contra su lista de
+`PENDIENTES`) y una suite por página con reglas propias: `docs-seo.test.ts` (`/docs`, `@graph`
+completo y `hasPart`), `pricing-seo.test.ts` (`/pricing`, ofertas atadas a `plans.ts` e imagen
+social), `dominios-seo.test.ts` (`/dominios`, sin cifras por TLD) y
+`alternativa-google-workspace.test.ts` (la comparativa con Google: precios de MailMask atados a
+`plans.ts`, la tabla completa sólo ahí y los precios de Google citados con enlace y fecha).
 
 - **Un solo bloque de metas** arriba del `<style>`: title (≤ 60), description (140–160),
   canonical, hreflang `es-MX` + `x-default`, OG y Twitter. Nada de metas sueltas más abajo.
@@ -17,8 +18,8 @@ imagen social).
 - **`hasPart` apunta a anclas que existen**; los `id` de los `<h2>` no se renombran
   (rompe enlaces y el ranking por sección).
 - **Imagen social propia** (1200×630 JPEG, < 200 KB), renderizada con Chromium desde HTML
-  (`scripts/og-docs.html`, `og-pricing.html`, `og-blog.html`, `og-terms.html` y
-  `og-privacy.html`), no con IA. La genérica del sitio (`img/og-image.png`, PNG) sirve
+  (`scripts/og-docs.html`, `og-pricing.html`, `og-blog.html`, `og-terms.html`,
+  `og-privacy.html` y `og-alternativa-google-workspace.html`), no con IA. La genérica del sitio (`img/og-image.png`, PNG) sirve
   de respaldo, pero cada página del sitemap trae la suya. Tras el deploy hay que refrescarla
   a mano en el Post Inspector de LinkedIn: tiene la anterior en caché. En las plantillas el panel
   derecho es de una sola línea: una línea larga estira la tarjeta más allá del lienzo de 1200 px.
@@ -60,6 +61,15 @@ listado, hacen fallar la prueba** — al arreglar una página se quita su rengl�
 La regla es una función pura (`huecos(ruta, html)` en `seo-checks.ts`), así que la suite la
 prueba también sobre una página de muestra a la que le va quitando piezas: si quitar un
 `canonical` dejara de reportar `canonical`, la prueba falla.
+
+## Precios de terceros: una sola tabla, con fuente y fecha
+
+La comparativa con Google Workspace vive **sólo** en `/alternativa-google-workspace`: `/pricing` y
+la portada dejan un resumen y enlazan. Cada cifra de Google lleva **enlace a su página oficial de
+precios y fecha de consulta** (el bloque `#fuente-precios`), y `/alternativa-google-workspace` y
+`/pricing` comparten la MISMA cita: repetir el número sin la fuente es justo lo que desfasa una
+página de la otra. Google factura por usuario al mes y en la moneda de cada país, así que la
+conversión a pesos no se publica: se enlaza. Lo vigila `alternativa-google-workspace.test.ts`.
 
 ## Trampa: no uses `SoftwareApplication` sin ratings
 
