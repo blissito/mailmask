@@ -18,7 +18,6 @@ const RUTAS = paginasDelSitemap(leer("public/sitemap.xml"));
  */
 const PENDIENTES: Record<string, string[]> = {
   "/": ["og-coincide", "og-propia"],
-  "/pricing": ["description-medida", "hreflang", "og-coincide", "jsonld-unico", "jsonld-graph", "og-propia"],
   "/blog": ["description-medida", "hreflang", "og-coincide", "jsonld-unico", "jsonld-graph", "og-propia"],
   "/register": ["hreflang", "jsonld-graph", "og-propia"],
   "/login": ["description-medida", "hreflang", "jsonld-graph", "og-propia"],
@@ -28,7 +27,7 @@ const PENDIENTES: Record<string, string[]> = {
 };
 
 /** Páginas que además muestran su fecha de actualización (ficha). */
-const CON_FECHA_VISIBLE = ["/", "/docs", "/terms", "/privacy"];
+const CON_FECHA_VISIBLE = ["/", "/docs", "/pricing", "/terms", "/privacy"];
 
 /**
  * Compara lo que la página incumple contra su fila de PENDIENTES. Falla en las dos
