@@ -24,7 +24,7 @@ const PENDIENTES: Record<string, string[]> = {
 };
 
 /** Páginas que además muestran su fecha de actualización (ficha). */
-const CON_FECHA_VISIBLE = ["/", "/docs", "/pricing", "/terms", "/privacy"];
+const CON_FECHA_VISIBLE = ["/", "/docs", "/pricing", "/bandeja-compartida", "/terms", "/privacy"];
 
 /**
  * Compara lo que la página incumple contra su fila de PENDIENTES. Falla en las dos
@@ -214,3 +214,50 @@ for (const ruta of ["/terms", "/privacy"]) {
     assert.equal(lastmod, web.dateModified, `el lastmod de ${ruta} en el sitemap`);
   });
 }
+
+
+// Ticket E (#65): la landing de /bandeja-compartida. Además de las reglas comunes, su contenido
+// tiene que llevar a donde promete —registro y los dos artículos de bandeja— y la landing general
+// tiene que enlazarla: sin eso la página queda huérfana para quien no la encuentre por Google.
+
+const BANDEJA = leer(archivoDe("/bandeja-compartida"));
+
+test("la landing de bandeja compartida enlaza a registro y a los dos artículos", () => {
+  for (const destino of [
+    "/register",
+    "/blog/bandeja-compartida-tutorial",
+    "/blog/bandeja-compartida-vs-helpdesk",
+  ]) {
+    assert.match(BANDEJA, new RegExp(`href="${destino}"`), `falta el enlace a ${destino}`);
+  }
+});
+
+test("el footer de la landing enlaza /bandeja-compartida", () => {
+  assert.match(LANDING, /href="\/bandeja-compartida"/, "la landing general no lleva a la bandeja compartida");
+});
+
+test("gen-sitemap.ts incluye /bandeja-compartida en la lista de páginas", () => {
+  assert.match(
+    leer("scripts/gen-sitemap.ts"),
+    /\{ ruta: "\/bandeja-compartida", archivo: "bandeja-compartida\.html"/,
+    "sin su renglón en la lista de páginas el generador borra la URL del sitemap en silencio",
+  );
+});
+
+test("main.ts sirve /bandeja-compartida y sigue sirviendo /bandeja", () => {
+  const main = leer("main.ts");
+  assert.match(main, /\.get\("\/bandeja-compartida", \(\) => serveStatic\("\/bandeja-compartida\.html"\)\)/);
+  assert.match(main, /\.get\("\/bandeja", \(\) => serveStatic\("\/bandeja\.html"\)\)/);
+});
+
+// El criterio del ticket: la fecha que se ve en la página es la del dateModified y la del
+// lastmod del sitemap. Las tres se mueven juntas o la página miente sobre su frescura.
+test("la fecha visible de /bandeja-compartida es la del dateModified y la del lastmod del sitemap", () => {
+  const visible = BANDEJA.match(/Actualizado:\s*<time datetime="(\d{4}-\d{2}-\d{2})">/);
+  assert.ok(visible, "falta «Actualizado: <time datetime=…>» a la vista");
+  const web = grafo(leerHead(BANDEJA)).find((n) => n["@type"] === "WebPage");
+  assert.ok(web, "falta el WebPage de /bandeja-compartida");
+  assert.equal(visible[1], web.dateModified, "la fecha visible y la del JSON-LD");
+  const lastmod = SITEMAP.match(new RegExp(`<loc>${HOST}/bandeja-compartida</loc><lastmod>(\\d{4}-\\d{2}-\\d{2})</lastmod>`))?.[1];
+  assert.equal(lastmod, web.dateModified, "el lastmod de /bandeja-compartida en el sitemap");
+});
