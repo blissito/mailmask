@@ -55,7 +55,8 @@ añaden `min-h-screen`). `/app` y `/bandeja` son otra cosa: `.app-shell` usa Sor
 ## Piezas
 
 Son CSS normal al tope de `input.css` (líneas ~73 a ~115), **fuera de toda `@layer`**: `.site`,
-`.eyebrow`, `.btn-primary`, `.btn-secondary`, `.card`, `.mock` (con `.mock-bar` y `.mock-dot`),
+`.eyebrow`, `.btn-primary`, `.btn-secondary`, `.card`, `.mock` (con `.mock-bar` y `.mock-dot`), `.hero-il` (la caja de la
+ilustración del hero: 3:2, se lee sin recorte porque la caja y el archivo miden lo mismo),
 `.chip`/`.chip-ok`, `.faq` (`details`/`summary`/`p`), `.icon-draw` (iconos que se dibujan solos;
 `prefers-reduced-motion` los apaga) y `.anim-delay-100…1100`. **Reutilízalas antes de inventar
 clases.**
@@ -99,7 +100,10 @@ sencillos; sin degradados ni 3D. La máscara de luchador aparece en sobres y per
 - En el HTML la caja reservada es 16:9 (`width="1200" height="675"` en el hero del blog,
   `640×360` en las tarjetas de la landing) y el archivo es 3:2: con `object-cover` se recorta.
   No es un error que se arregle aquí, pero al hacer una nueva decide si igualas la caja o
-  asumes el recorte.
+  asumes el recorte. **La pieza `.hero-il` de las landings de venta sí las iguala**: la caja es
+  3:2 (`width="1200" height="800"` + `aspect-ratio: 3 / 2`), así que la ilustración se lee
+  completa, sin recorte. Una ilustración nueva de hero se mide contra esa caja, no contra el
+  16:9 del blog.
 
 ## Historia y tono
 
@@ -120,12 +124,18 @@ siendo claro y útil: el ejemplo canónico es la 404, el luchador con lupa busca
 
 ## Notas
 
-- **Hoy la ilustración no es de las landings.** De las 30 `-il.jpg`, 29 son portadas de blog y
-  una es la de la 404; `/pricing`, `/bandeja-compartida` y `/dominios` no traen ninguna imagen,
-  y la home sólo recicla tres portadas del blog en sus tarjetas (`landing.html:1029-1043`). El
-  hero de la home es una `.mock` (maqueta del producto), no una ilustración.
+- **Las tres landings de venta ya traen su hero ilustrado** (12-oct-2026): `/bandeja-compartida`,
+  `/pricing` y `/dominios` comparten el hero de dos columnas —texto a la izquierda, `.hero-il` a
+  la derecha— y cada una trae su **propia** `<slug>-il.jpg`. El layout es el mismo en las tres:
+  `grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-10 items-center`, con el texto antes que
+  la `figure` en el DOM (así en móvil la ilustración cae debajo). Sólo cambian copy e
+  ilustración; `/pricing` no lleva CTAs. Lo vigila `landings-hero.test.ts`.
+- La **home** sigue aparte: su hero es una `.mock` (maqueta del producto) y sus tarjetas
+  reciclan tres portadas del blog (`landing.html:1029-1043`). Las otras ~29 `-il.jpg` siguen
+  siendo portadas de blog, y la 404 conserva la suya.
 - **Regla para una landing nueva:** si lleva hero ilustrado, trae su **propia**
-  `<slug>-il.jpg` (1200×800, < 200 KB, `alt` que describe la escena) —como la 404— y no recicla
+  `<slug>-il.jpg` (1200×800, < 200 KB, `alt` que describe la escena, en la caja `.hero-il`)
+  —como la 404— y no recicla
   una portada del blog salvo dentro de una tarjeta. *Fijada en esta ficha; si el equipo quiere
   otra cosa, se cambia aquí.*
 - `public/404.html` trae su propio `<style>` con copias a mano de `.btn-primary`, `.eyebrow` y
