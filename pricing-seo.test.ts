@@ -61,6 +61,12 @@ test("los precios que muestra la tarjeta del dominio son los de plans.ts", () =>
   assert.ok(html.includes(attrs), "la tarjeta del dominio perdió su data-plan");
   assert.equal(tarjeta(attrs).match(/data-monthly="(\d+)"/)?.[1], precioMostrado(ADDONS.domain.price));
   assert.equal(tarjeta(attrs).match(/data-yearly="(\d+)"/)?.[1], precioMostrado(DOMAIN_ANNUAL_PRICE));
+  // Los data-* no los lee nadie: el precio que se ve en la tarjeta vive en .plan-price.
+  assert.equal(
+    tarjeta(attrs).match(/class="plan-price[^"]*"[^>]*>\s*\$([\d,]+)/)?.[1],
+    precioMostrado(ADDONS.domain.price),
+    "el $ que muestra la tarjeta del dominio",
+  );
   // El «ahorras» de la página es la diferencia real entre doce meses y el anual.
   const ahorro = (ADDONS.domain.price / 100) * 12 - DOMAIN_ANNUAL_PRICE / 100;
   assert.equal(tarjeta(attrs).match(/data-savings="(\d+)"/)?.[1], String(ahorro));
