@@ -23,6 +23,9 @@ iteraciones de PBKDF2 cada uno. En la suite eso no es gratis:
   que cambiar el env no sirve. Se firma a mano un HS256 con `crypto.subtle` y **otra** llave.
 - **Vencido**: `exp < now` es **estricto**, así que `signJwt(payload, 0)` sigue vigente (ese es
   su propio caso, no el del vencido); el vencido se pide con ttl negativo (`signJwt(payload, -1)`).
+- **Alterado**: toca la **primera** letra de la firma, nunca la última. En base64url el último
+  carácter lleva bits de relleno, así que cambiarlo puede decodificar a los **mismos** bytes y
+  dejar la firma válida: la prueba pasa o falla al azar según la firma que tocó.
 
 ## `Secure` se decide al importar, con `FLY_APP_NAME`, que en pruebas no existe
 
