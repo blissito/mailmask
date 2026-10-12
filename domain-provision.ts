@@ -189,7 +189,7 @@ export async function marcarFalloDeAprovisionamiento(reg: DomainRegistration, er
 export async function iniciarTransferencia(reg: DomainRegistration): Promise<void> {
   const { takeAuthCode, forgetAuthCode } = await import("./domain-transfer.js");
   const { transferDomain } = await import("./route53.js");
-  const { nameserversActuales } = await import("./dns-import.js");
+  const { currentNameservers } = await import("./dns-import.js");
   const { sendTemplate, domainTransferStarted, domainTransferPending } = await import("./emails.js");
 
   const authCode = takeAuthCode(reg.id);
@@ -204,7 +204,7 @@ export async function iniciarTransferencia(reg: DomainRegistration): Promise<voi
   // Se mandan los nameservers ACTUALES del cliente: si no, AWS pone los suyos al completarse
   // y el dominio se queda sin DNS de golpe. Así el transfer no cambia nada, y la migración a
   // nuestra zona la hacemos después, con la zona ya poblada.
-  const ns = await nameserversActuales(reg.domainName).catch(() => [] as string[]);
+  const ns = await currentNameservers(reg.domainName).catch(() => [] as string[]);
 
   try {
     // El contacto es el del cliente: el dominio ya era suyo antes de llegar aquí.

@@ -18,6 +18,12 @@ const backup = await import("./backup.ts");   // en caliente: si ya se importó,
   Esparce el módulo real y pisa nada más lo que doblas.
 - Los imports del código dicen `./ses.js` y el doble se declara sobre `./ses.ts`: tsx los resuelve
   al mismo módulo (así lo hace `domain-renewal.test.ts`). No lo cambies a `.js`.
+- **Renombrar un export rompe los dobles, y `tsc` no lo ve**: el nombre en `namedExports` es una
+  llave de texto, no un símbolo. Si el módulo real pasa de `delegacionActiva` a `getDelegationStatus`
+  y el doble sigue declarando el nombre viejo, sin `...real` el módulo doblado se queda **sin** ese
+  export y truena al llamarlo; con `...real` es peor, porque el doble deja de interceptar **en
+  silencio** y la prueba sigue verde corriendo la implementación de verdad. Al renombrar un export,
+  busca su nombre en `namedExports` de toda la suite (`grep -rn 'nombreViejo' *.test.ts`).
 - Hace falta `--experimental-test-module-mocks`, que ya viene en el script `test`.
 
 ## La base de pruebas es UNA para toda la suite

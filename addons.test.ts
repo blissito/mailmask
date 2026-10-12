@@ -16,8 +16,8 @@ import {
   updateUserSubscription,
   ADDONS,
   ADDONS_FOR_SALE,
-  DOMINIO_ACTIVADO,
-  DOMINIO_GRATIS,
+  DOMAIN_ACTIVATED,
+  DOMAIN_FREE,
 } from "./db.ts";
 import { sqlite } from "./pg.ts";
 
@@ -54,9 +54,9 @@ describe("Derechos por dominio: gratis", () => {
     assert.equal(r.esGratis, true);
     assert.equal(r.activado, false);
     assert.equal(r.bloqueado, false, "el gratis NUNCA se bloquea");
-    assert.equal(r.aliases, DOMINIO_GRATIS.aliases);
-    assert.equal(r.forwardPerHour, DOMINIO_GRATIS.forwardPerHour);
-    assert.equal(r.monthlyForwards, DOMINIO_GRATIS.monthlyForwards);
+    assert.equal(r.aliases, DOMAIN_FREE.aliases);
+    assert.equal(r.forwardPerHour, DOMAIN_FREE.forwardPerHour);
+    assert.equal(r.monthlyForwards, DOMAIN_FREE.monthlyForwards);
   });
 
   it("responde desde la Bandeja pero no inicia correo", () => {
@@ -103,14 +103,14 @@ describe("Derechos por dominio: activado ($99)", () => {
     const r = derechos(d2.id);
     assert.equal(r.activado, true);
     assert.equal(r.bloqueado, false);
-    assert.equal(r.sends, DOMINIO_ACTIVADO.sends);
+    assert.equal(r.sends, DOMAIN_ACTIVATED.sends);
     assert.equal(r.sendsUnlocked, true);
     assert.equal(r.mailboxes, true);
-    assert.equal(r.mailboxBytes, DOMINIO_ACTIVADO.mailboxBytes);
+    assert.equal(r.mailboxBytes, DOMAIN_ACTIVATED.mailboxBytes);
     assert.equal(r.agentes, null, "personas ilimitadas");
-    assert.equal(r.aliases, DOMINIO_ACTIVADO.aliases);
+    assert.equal(r.aliases, DOMAIN_ACTIVATED.aliases);
     assert.equal(r.retencionDias, null, "historial completo");
-    assert.equal(r.logDays, DOMINIO_ACTIVADO.logDays);
+    assert.equal(r.logDays, DOMAIN_ACTIVATED.logDays);
     assert.equal(r.rules && r.webhooks && r.smtpRelay, true);
 
     // El primero sigue siendo el gratis: activar el 2.º no le regala nada al 1.º.
@@ -151,8 +151,8 @@ describe("Derechos por dominio: activado ($99)", () => {
       updateAddon(a.id, { status: "active", currentPeriodEnd: FUTURE });
     }
     const r = derechos(d.id);
-    assert.equal(r.mailboxBytes, DOMINIO_ACTIVADO.mailboxBytes + 100 * GB);
-    assert.equal(r.sends, DOMINIO_ACTIVADO.sends + 100);
+    assert.equal(r.mailboxBytes, DOMAIN_ACTIVATED.mailboxBytes + 100 * GB);
+    assert.equal(r.sends, DOMAIN_ACTIVATED.sends + 100);
   });
 
   it("un add-on de otro dominio no cuenta aquí", () => {
@@ -214,7 +214,7 @@ describe("Derechos por dominio: suscripción legado", () => {
     const a = createAddon(email, "sends25");
     updateAddon(a.id, { status: "active", currentPeriodEnd: FUTURE });
     assert.equal(a.domainId, undefined);
-    assert.equal(derechos(dominio(email).id).sends, DOMINIO_ACTIVADO.sends + 25);
+    assert.equal(derechos(dominio(email).id).sends, DOMAIN_ACTIVATED.sends + 25);
   });
 
   it("con el plan vencido vuelve a la regla normal: el 1.º gratis, el 2.º bloqueado", () => {

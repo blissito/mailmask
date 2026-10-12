@@ -143,11 +143,11 @@ import {
   planPriceCents,
   addonLabel,
   addonPriceCents,
-  LEGACY_ADDONS, ADDONS_FOR_SALE, DOMINIO_ACTIVADO, DOMINIO_GRATIS,
+  LEGACY_ADDONS, ADDONS_FOR_SALE, DOMAIN_ACTIVATED, DOMAIN_FREE,
 } from "./plans.js";
 import type { AddonKind, PlanKey } from "./plans.js";
 
-export { PLANS, ADDONS, DOMAIN_ANNUAL_PRICE, LEGACY_ADDONS, ADDONS_FOR_SALE, DOMINIO_ACTIVADO, DOMINIO_GRATIS, planLabel, planPriceCents, addonLabel, addonPriceCents, LEGACY_PLANS, isLegacyPlan, PLANS_FOR_SALE };
+export { PLANS, ADDONS, DOMAIN_ANNUAL_PRICE, LEGACY_ADDONS, ADDONS_FOR_SALE, DOMAIN_ACTIVATED, DOMAIN_FREE, planLabel, planPriceCents, addonLabel, addonPriceCents, LEGACY_PLANS, isLegacyPlan, PLANS_FOR_SALE };
 export type { AddonKind, PlanKey };
 
 export interface Addon {
@@ -1140,16 +1140,16 @@ export function derechosDeDominio(domain: { id: string; ownerEmail: string }, ow
   if (activado) {
     return {
       activado, esGratis: false, bloqueado: false, legado: legadoVigente,
-      aliases: DOMINIO_ACTIVADO.aliases,
+      aliases: DOMAIN_ACTIVATED.aliases,
       agentes: null,
       mesaActions: true,
-      sends: DOMINIO_ACTIVADO.sends + sendsExtra,
+      sends: DOMAIN_ACTIVATED.sends + sendsExtra,
       sendsUnlocked: true,
       mailboxes: true,
-      mailboxBytes: DOMINIO_ACTIVADO.mailboxBytes + bytesExtra,
-      forwardPerHour: DOMINIO_ACTIVADO.forwardPerHour,
-      monthlyForwards: DOMINIO_ACTIVADO.monthlyForwards,
-      logDays: DOMINIO_ACTIVADO.logDays,
+      mailboxBytes: DOMAIN_ACTIVATED.mailboxBytes + bytesExtra,
+      forwardPerHour: DOMAIN_ACTIVATED.forwardPerHour,
+      monthlyForwards: DOMAIN_ACTIVATED.monthlyForwards,
+      logDays: DOMAIN_ACTIVATED.logDays,
       retencionDias: null,
       rules: true, webhooks: true, smtpRelay: true, api: true,
       addons: todos,
@@ -1157,7 +1157,7 @@ export function derechosDeDominio(domain: { id: string; ownerEmail: string }, ow
   }
   return {
     activado, esGratis, bloqueado, legado: false,
-    aliases: DOMINIO_GRATIS.aliases,
+    aliases: DOMAIN_FREE.aliases,
     agentes: 0,
     mesaActions: true,
     // Un add-on de envíos legado sobre un dominio gratis sigue valiendo lo que se pagó.
@@ -1165,10 +1165,10 @@ export function derechosDeDominio(domain: { id: string; ownerEmail: string }, ow
     sendsUnlocked: sendsExtra > 0,
     mailboxes: false,
     mailboxBytes: 0,
-    forwardPerHour: DOMINIO_GRATIS.forwardPerHour,
-    monthlyForwards: DOMINIO_GRATIS.monthlyForwards,
-    logDays: DOMINIO_GRATIS.logDays,
-    retencionDias: DOMINIO_GRATIS.retencionDias,
+    forwardPerHour: DOMAIN_FREE.forwardPerHour,
+    monthlyForwards: DOMAIN_FREE.monthlyForwards,
+    logDays: DOMAIN_FREE.logDays,
+    retencionDias: DOMAIN_FREE.retencionDias,
     rules: false, webhooks: false, smtpRelay: false, api: true,
     addons: todos,
   };

@@ -1,5 +1,5 @@
 import { statSync } from "node:fs";
-import { programar, esServidor } from "./scheduler.js";
+import { schedule, isServer } from "./scheduler.js";
 import { debeArrancarEfectos, esPreview } from "./preview.js";
 import { deleteEmailFromS3, sendAlert } from "./ses.js";
 import { log } from "./logger.js";
@@ -10,14 +10,14 @@ import { purgeDeletedConversations, purgarConversacionesGratis, wakeSnoozedConve
 import { sendTemplate, expiryWarning, manualActivationExpiring } from "./emails.js";
 import { reconcilePendingAddons } from "./addon-sync.js";
 import { deliverPending, purgeOldDeliveries } from "./webhooks.js";
-import { notifyBandeja } from "./sse-hub.js";
-import { ejecutarBackfill, backfillPendiente } from "./search-backfill.js";
+import { notifyInbox } from "./sse-hub.js";
+import { runBackfill, pendingBackfillCount } from "./search-backfill.js";
 import { estaVivo, diasDeCertificado, leerUso, listarBuzones, congelarBuzon, borrarBuzon, stalwartConfigurado } from "./stalwart.js";
 import { getDomain, claimOnce } from "./db.js";
 import { listarBuzonesActivos, anotarUsoBuzon, buzonesDelUsuario, fijarGraciaBuzon, buzonesConGraciaVencida, desmarcarBuzon } from "./db.js";
 
 // Webhooks: entregas pendientes y reintentos vencidos.
-programar("* * * * *", async () => {
+schedule("* * * * *", async () => {
   try {
     const r = await deliverPending();
     if (r.delivered || r.failed) log("info", "webhook", "Deliveries processed", r);
@@ -27,7 +27,7 @@ programar("* * * * *", async () => {
 });
 
 // Cada 5 minutos — activar add-ons ya pagados cuyo webhook nunca llegó.
-programar("*/5 * * * *", async () => {
+schedule("*/5 * * * *", async () => {
   try {
     await reconcilePendingAddons();
   } catch (err) {
@@ -36,7 +36,7 @@ programar("*/5 * * * *", async () => {
 });
 
 // Daily at 14:00 UTC — warn users whose subscription expires within 3 days
-programar("0 14 * * *", async () => {
+schedule("0 14 * * *", async () => {
   // El remitente y la URL base salían de aquí con un dominio por defecto distinto al
   // de main.ts (`mailmask.studio` contra `www.mailmask.studio`). Ahora los dos vienen
   // de emails.ts.
@@ -95,7 +95,7 @@ programar("0 14 * * *", async () => {
 });
 
 // Every 15 minutes — clean up expired rows
-programar("*/15 * * * *", async () => {
+schedule("*/15 * * * *", async () => {
   try {
     const now = new Date().toISOString();
     const results = await Promise.all([
@@ -125,13 +125,13 @@ programar("*/15 * * * *", async () => {
 // Aquí vivía el apagado de add-ons "cuyo plan base expiró". Desde el 7-sep-2026 los
 // add-ons son independientes de cualquier plan (todas las cuentas son gratis y se compra
 // por dominio), así que ese barrido cancelaría en MercadoPago compras legítimas. Fuera.
-programar("0 4 * * *", async () => {
+schedule("0 4 * * *", async () => {
   try { purgeOldDeliveries(7); } catch (err) { log("warn", "webhook", "purge failed", { error: String(err) }); }
 });
 
 // Diario 5:00 UTC — reconciliar MercadoPago contra la base.
 // Existe porque una clienta pagó y el webhook no la registró; nadie se enteró en semanas.
-programar("0 5 * * *", async () => {
+schedule("0 5 * * *", async () => {
   const mpToken = process.env.MP_ACCESS_TOKEN;
   if (!mpToken) return;
   try {
@@ -181,7 +181,7 @@ programar("0 5 * * *", async () => {
 });
 
 // Daily at 3:00 UTC — purge conversations deleted >15 days ago + their S3 objects
-programar("0 3 * * *", async () => {
+schedule("0 3 * * *", async () => {
   try {
     const s3Keys = await purgeDeletedConversations(15);
     for (const { s3Bucket, s3Key } of s3Keys) {
@@ -202,7 +202,7 @@ programar("0 3 * * *", async () => {
 // El trabajo de verdad vive en `domain-provision.ts` porque tiene que ser idempotente:
 // esta secuencia solía correr entera sin persistir nada a medias, así que un fallo en el
 // paso 3 repetía el paso 1 al minuto siguiente y creaba otra hosted zone cada vez.
-programar("* * * * *", async () => {
+schedule("* * * * *", async () => {
   let regs;
   try {
     regs = getDomainRegistrationsByStatus("registering");
@@ -235,7 +235,7 @@ programar("* * * * *", async () => {
 
 // Cada 10 minutos — transferencias en curso. Tardan de 5 a 7 días y dependen de que el
 // cliente conteste el correo de aprobación de su registrador, así que hay recordatorios.
-programar("*/10 * * * *", async () => {
+schedule("*/10 * * * *", async () => {
   try {
     const { sondearTransferencias } = await import("./domain-provision.js");
     await sondearTransferencias();
@@ -248,7 +248,7 @@ programar("*/10 * * * *", async () => {
 
 // Cada hora. Antes era una variable de entorno con respaldo 21 cuando el real era 16.89:
 // nadie actualiza un número así, y sobre él se calculaba el precio de todos los dominios.
-programar("7 * * * *", async () => {
+schedule("7 * * * *", async () => {
   try {
     const { actualizarTipoDeCambio, lecturaRancia } = await import("./fx.js");
     const lectura = await actualizarTipoDeCambio();
@@ -266,7 +266,7 @@ programar("7 * * * *", async () => {
 // --- Dominios registrados: expiración, avisos y cobranza ---
 
 // 8:00 — la fecha de expiración y el AutoRenew los dice AWS, no nuestra base.
-programar("0 8 * * *", async () => {
+schedule("0 8 * * *", async () => {
   try {
     const { syncDomainExpirations } = await import("./domain-sync.js");
     await syncDomainExpirations();
@@ -276,10 +276,10 @@ programar("0 8 * * *", async () => {
 });
 
 // 8:30 — avisos a 75, 30 y 7 días del vencimiento.
-programar("30 8 * * *", async () => {
+schedule("30 8 * * *", async () => {
   try {
-    const { avisarRenovaciones } = await import("./domain-sync.js");
-    await avisarRenovaciones();
+    const { notifyRenewals } = await import("./domain-sync.js");
+    await notifyRenewals();
   } catch (err) {
     log("error", "cron", "Avisos de renovación fallaron", { error: String(err) });
   }
@@ -287,17 +287,17 @@ programar("30 8 * * *", async () => {
 
 // 8:45 — cobranza de los que no se pudieron cobrar. A los 21 días decide una persona:
 // dejar vencer el dominio de un cliente es irreversible y no se automatiza.
-programar("45 8 * * *", async () => {
+schedule("45 8 * * *", async () => {
   try {
-    const { cobranzaDominios } = await import("./domain-sync.js");
-    await cobranzaDominios();
+    const { chargeDomainRenewals } = await import("./domain-sync.js");
+    await chargeDomainRenewals();
   } catch (err) {
     log("error", "cron", "Cobranza de dominios falló", { error: String(err) });
   }
 });
 
 // 5:10 — MercadoPago a veces pierde el notification_url y el webhook nunca llega.
-programar("10 5 * * *", async () => {
+schedule("10 5 * * *", async () => {
   try {
     const { reconcileDomainRenewals } = await import("./domain-sync.js");
     await reconcileDomainRenewals();
@@ -310,10 +310,10 @@ programar("10 5 * * *", async () => {
 //
 // Arranque diferido: al levantar, el servidor tiene cosas más urgentes que hacer
 // (reconciliar SES, migraciones) y el backfill baja correo de S3.
-if (esServidor && esPreview()) log("info", "preview", "Backfill de búsqueda omitido (PREVIEW=1): no se baja correo de S3");
-if (debeArrancarEfectos(esServidor, esPreview())) {
+if (isServer && esPreview()) log("info", "preview", "Backfill de búsqueda omitido (PREVIEW=1): no se baja correo de S3");
+if (debeArrancarEfectos(isServer, esPreview())) {
   setTimeout(() => {
-    ejecutarBackfill().catch((err) =>
+    runBackfill().catch((err) =>
       log("error", "search", "Backfill inicial falló", { error: String(err) })
     );
   }, 30_000);
@@ -321,10 +321,10 @@ if (debeArrancarEfectos(esServidor, esPreview())) {
 
 // Cada 10 minutos, mientras quede algo por indexar. Cuando termina, la consulta
 // devuelve 0 y no hace nada: es barata (un COUNT sobre un LEFT JOIN indexado).
-programar("*/10 * * * *", async () => {
+schedule("*/10 * * * *", async () => {
   try {
-    if (backfillPendiente() === 0) return;
-    await ejecutarBackfill({ maxMensajes: 500 });
+    if (pendingBackfillCount() === 0) return;
+    await runBackfill({ maxMensajes: 500 });
   } catch (err) {
     log("error", "search", "Backfill periódico falló", { error: String(err) });
   }
@@ -333,11 +333,11 @@ programar("*/10 * * * *", async () => {
 // Snooze: despertar los hilos cuyo plazo venció. Por minuto, que es la
 // granularidad que ofrece la UI; la consulta cae sobre idx_conversations_snoozed
 // y no devuelve nada el 99% de las veces.
-programar("* * * * *", async () => {
+schedule("* * * * *", async () => {
   try {
     const despertadas = wakeSnoozedConversations();
     for (const c of despertadas) {
-      notifyBandeja(c.domainId, "conv_unsnoozed", { conversationId: c.id, subject: c.subject });
+      notifyInbox(c.domainId, "conv_unsnoozed", { conversationId: c.id, subject: c.subject });
     }
     if (despertadas.length) log("info", "mesa", "Conversaciones despertadas", { count: despertadas.length });
   } catch (err) {
@@ -356,7 +356,7 @@ programar("* * * * *", async () => {
 const LIMITE_VOLUMEN_BYTES = 1024 * 1024 * 1024;
 const UMBRAL_AVISO = 0.7;
 
-programar("0 9 * * *", async () => {
+schedule("0 9 * * *", async () => {
   try {
     const ruta = process.env.DATABASE_PATH ?? "./data/mailmask.db";
     // El WAL puede ser una fracción importante del total y también ocupa disco.
@@ -395,7 +395,7 @@ programar("0 9 * * *", async () => {
 // caída, y una alerta que grita por cada parpadeo se aprende a ignorar.
 let fallosSeguidos = 0;
 
-programar("*/5 * * * *", async () => {
+schedule("*/5 * * * *", async () => {
   if (!stalwartConfigurado()) return;
   try {
     if (await estaVivo()) {
@@ -415,7 +415,7 @@ programar("*/5 * * * *", async () => {
 
 // Certificado. Se renueva solo con ACME, pero "se renueva solo" es exactamente el
 // tipo de cosa que se descubre rota el día que caduca.
-programar("0 6 * * *", async () => {
+schedule("0 6 * * *", async () => {
   if (!stalwartConfigurado()) return;
   try {
     const dias = await diasDeCertificado();
@@ -430,7 +430,7 @@ programar("0 6 * * *", async () => {
 
 // Uso por buzón. Lo que guardamos es una CACHÉ de lo que reporta el servidor: todo
 // contador de cuota deriva, así que esto se reconcilia y no se factura contra ello.
-programar("30 6 * * *", async () => {
+schedule("30 6 * * *", async () => {
   if (!stalwartConfigurado()) return;
   try {
     for (const b of listarBuzonesActivos()) {
@@ -454,7 +454,7 @@ programar("30 6 * * *", async () => {
 //
 // Sólo REPORTA. Borrar correo por una discrepancia de inventario es mucho peor que
 // pagar disco de más, y una lista corta en la alerta se revisa a mano en un minuto.
-programar("0 7 * * *", async () => {
+schedule("0 7 * * *", async () => {
   if (!stalwartConfigurado()) return;
   try {
     const enServidor = await listarBuzones();
@@ -478,7 +478,7 @@ programar("0 7 * * *", async () => {
 
 // Gracia vencida: aquí sí se borra el correo, y es irreversible. Va aparte del cron de
 // add-ons a propósito — apagar un cobro y destruir correo no deben compartir un try.
-programar("15 7 * * *", async () => {
+schedule("15 7 * * *", async () => {
   if (!stalwartConfigurado()) return;
   for (const b of buzonesConGraciaVencida()) {
     try {
@@ -500,7 +500,7 @@ programar("15 7 * * *", async () => {
 // (activar el dominio los recupera) y a los 30 se borran DE VERDAD, S3 e índice incluidos.
 // Después de esto no hay "recuperable al pagar": los 30 días son duros, y la landing lo
 // dice así. Va aparte de la papelera de 15 días a propósito: son promesas distintas.
-programar("30 3 * * *", async () => {
+schedule("30 3 * * *", async () => {
   try {
     const { s3Keys, borradas } = purgarConversacionesGratis(30);
     for (const { s3Bucket, s3Key } of s3Keys) {
@@ -508,7 +508,7 @@ programar("30 3 * * *", async () => {
       catch (err) { log("warn", "cron", "No se pudo borrar el objeto de S3 de un hilo purgado", { s3Key, error: String(err) }); }
     }
     // Una pestaña abierta mostraría hilos ya borrados hasta recargar.
-    for (const c of borradas) notifyBandeja(c.domainId, "conv_deleted", { conversationId: c.id, actor: "sistema" });
+    for (const c of borradas) notifyInbox(c.domainId, "conv_deleted", { conversationId: c.id, actor: "sistema" });
     if (borradas.length) log("info", "cron", "Retención del gratis aplicada", { hilos: borradas.length, objetosS3: s3Keys.length });
   } catch (err) {
     log("error", "cron", "Falló la retención del dominio gratis", { error: String(err) });
@@ -521,7 +521,7 @@ programar("30 3 * * *", async () => {
 // Un add-on `domain` con source "manual" no tiene preapproval que lo renueve: nació de un
 // pago único cuando el checkout de suscripción no funcionó (insightslab.com.mx, 1-oct-2026).
 // La última semana se le avisa al dueño una vez al día. 15:00 UTC = 9:00 en CDMX.
-programar("0 15 * * *", async () => {
+schedule("0 15 * * *", async () => {
   try {
     const ahora = Date.now();
     const semana = ahora + 7 * 86_400_000;
@@ -545,7 +545,7 @@ programar("0 15 * * *", async () => {
 
 // Lunes 15:00 UTC (9:00 CDMX) — resumen interno de los reportes DMARC a admin. El
 // `claimOnce` por fecha evita un segundo correo si el proceso se reinicia a esa hora.
-programar("0 15 * * 1", async () => {
+schedule("0 15 * * 1", async () => {
   try {
     const lunes = new Date().toISOString().slice(0, 10);
     if (!claimOnce("dmarc-digest", lunes, 14)) return;

@@ -83,8 +83,8 @@ describe("API de DNS", () => {
           nameservers: ["ns1.proveedor.com"],
           warning: "aviso",
         }),
-        delegacionActiva: async (_d: string, esperados: string[]) => ({ delegated: false, observed: ["ns1.proveedor.com"], expected: esperados }),
-        nameserversActuales: async () => ["ns1.proveedor.com"],
+        getDelegationStatus: async (_d: string, expected: string[]) => ({ delegated: false, observed: ["ns1.proveedor.com"], expected }),
+        currentNameservers: async () => ["ns1.proveedor.com"],
       },
     });
 

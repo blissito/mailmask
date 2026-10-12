@@ -138,7 +138,7 @@ let seleccionadas = new Set();
 let ultimaMarcada = -1;
 let unreadCount = 0;
 // Presencia de los compañeros en el dominio, tal como llega por SSE.
-let presencias = [];
+let presences = [];
 
 // --- Init ---
 document.addEventListener("DOMContentLoaded", async () => {
@@ -409,7 +409,7 @@ async function loadConversations(opts = {}) {
       if (c.unread) unreadIds.add(c.id); else unreadIds.delete(c.id);
     }
     if (typeof data.unreadCount === "number") { unreadCount = data.unreadCount; updateTitle(); }
-    if (Array.isArray(data.presence)) { presencias = data.presence; renderPresence(); }
+    if (Array.isArray(data.presence)) { presences = data.presence; renderPresence(); }
     mostrarAvisoIndexado(data);
     renderList();
   } finally {
@@ -539,7 +539,7 @@ function convRowHtml(c, i) {
     }
     if (c.assignedTo) meta += `<span class="mesa-tag mesa-tag-assigned" title="${esc(c.assignedTo)}">${avatarHtml(c.assignedTo, "mesa-avatar-xs")}${esc(personName(c.assignedTo))}</span>`;
 
-    const puntoPresencia = presencias.some(p => p.conversationId === c.id && p.email !== currentUser?.email)
+    const puntoPresencia = presences.some(p => p.conversationId === c.id && p.email !== currentUser?.email)
       ? `<span class="mesa-presence-dot" title="Alguien más está en este hilo"></span>` : "";
     if (seleccionadas.has(c.id)) classes += " mesa-conv--marcada";
     return `<div class="${classes}" data-idx="${i}" data-id="${esc(c.id)}">
@@ -2004,7 +2004,7 @@ let convsConPresencia = new Set();
 
 function aplicarPresenciaEnLista() {
   const ahora = new Set(
-    presencias
+    presences
       .filter(p => p.conversationId && p.email !== currentUser?.email)
       .map(p => p.conversationId)
   );
@@ -2018,7 +2018,7 @@ function aplicarPresenciaEnLista() {
 function renderPresence() {
   const barra = document.getElementById("presence-bar");
   if (!barra) return;
-  const otros = presencias.filter(p =>
+  const otros = presences.filter(p =>
     p.email !== currentUser?.email && activeConv && p.conversationId === activeConv.id);
   if (otros.length === 0) {
     barra.classList.add("mesa-hidden");
@@ -2331,7 +2331,7 @@ function connectSSE(domainId) {
 
   sseSource.addEventListener("presence", (e) => {
     try {
-      presencias = JSON.parse(e.data).agents || [];
+      presences = JSON.parse(e.data).agents || [];
       renderPresence();
       aplicarPresenciaEnLista();
     } catch (err) { console.error("SSE presence:", err); }

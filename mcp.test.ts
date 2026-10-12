@@ -54,8 +54,8 @@ describe("MCP: agentes contra la app", () => {
     mock.module("./dns-import.ts", {
       namedExports: {
         snapshotDns: async () => ({ found: [], nameservers: [], warning: "aviso" }),
-        delegacionActiva: async (_d: string, e: string[]) => ({ delegated: false, observed: ["ns1.viejo.com"], expected: e }),
-        nameserversActuales: async () => ["ns1.viejo.com"],
+        getDelegationStatus: async (_d: string, e: string[]) => ({ delegated: false, observed: ["ns1.viejo.com"], expected: e }),
+        currentNameservers: async () => ["ns1.viejo.com"],
       },
     });
 

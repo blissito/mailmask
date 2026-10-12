@@ -115,8 +115,8 @@ describe("SDK ↔ servidor: contrato", () => {
     mock.module("./dns-import.ts", {
       namedExports: {
         snapshotDns: async () => ({ found: [], nameservers: [], warning: "aviso" }),
-        delegacionActiva: async (_d: string, esperados: string[]) => ({ delegated: false, observed: ["ns1.viejo.com"], expected: esperados }),
-        nameserversActuales: async () => ["ns1.viejo.com"],
+        getDelegationStatus: async (_d: string, expected: string[]) => ({ delegated: false, observed: ["ns1.viejo.com"], expected }),
+        currentNameservers: async () => ["ns1.viejo.com"],
       },
     });
 

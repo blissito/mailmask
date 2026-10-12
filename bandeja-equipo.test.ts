@@ -272,7 +272,7 @@ describe("Presencia", () => {
     clearPresence(dom, "ana@x.com");
   });
 
-  it("no filtra presencias entre dominios", () => {
+  it("no filtra la presencia entre dominios", () => {
     const a = `dom-${sufijo()}`;
     const b = `dom-${sufijo()}`;
     setPresence(a, "ana@x.com", "Ana", "c1", "viewing");

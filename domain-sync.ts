@@ -12,18 +12,18 @@ import {
   type DomainRegistration,
 } from "./db.js";
 
-const DIA = 864e5;
+const DAY = 864e5;
 /**
  * Días antes del vencimiento en los que se avisa, y sólo una vez cada uno. Ascendente a
  * propósito: a 25 días toca el hito de 30, no el de 75, o el aviso se quedaría en el
  * primero para siempre.
  */
-const HITOS_AVISO = [7, 30, 75];
+const REMINDER_MILESTONES = [7, 30, 75];
 /** Reintentos de cobranza, en días desde el primer rechazo. */
-const HITOS_COBRANZA = [3, 7, 14];
-const DIAS_HASTA_DECISION_HUMANA = 21;
+const DUNNING_MILESTONES = [3, 7, 14];
+const DAYS_TO_HUMAN_DECISION = 21;
 
-const dias = (iso: string | null) => (iso ? Math.floor((Date.parse(iso) - Date.now()) / DIA) : null);
+const daysUntil = (iso: string | null) => (iso ? Math.floor((Date.parse(iso) - Date.now()) / DAY) : null);
 
 /**
  * Relee de AWS la fecha de expiración y el AutoRenew. `expiresAt` se calculaba como
@@ -52,7 +52,7 @@ export async function syncDomainExpirations(): Promise<void> {
       // dominio sigue siendo nuestro y la ausencia en la lista era un espejismo.
       const sigue = await getDomainDetail(reg.domainName).then(() => true).catch(() => false);
       if (!sigue) {
-        await cerrarTransferOut(reg);
+        await closeTransferOut(reg);
         continue;
       }
     }
@@ -64,7 +64,7 @@ export async function syncDomainExpirations(): Promise<void> {
         expiresAt,
         awsAutoRenew: detalle.autoRenew,
         lastSyncedAt: new Date().toISOString(),
-        nextChargeAt: expiresAt ? new Date(Date.parse(expiresAt) - 60 * DIA).toISOString() : null,
+        nextChargeAt: expiresAt ? new Date(Date.parse(expiresAt) - 60 * DAY).toISOString() : null,
       });
 
       // Candado de transferencia: guarda el estado, lo vuelve a poner si venció su plazo
@@ -82,7 +82,7 @@ export async function syncDomainExpirations(): Promise<void> {
         );
       }
 
-      const faltan = dias(expiresAt);
+      const faltan = daysUntil(expiresAt);
       if (faltan !== null && faltan < 90 && reg.renewalStatus !== "active") {
         sinRenovacion.push(`${reg.domainName} — ${reg.ownerEmail} — vence en ${faltan} días`);
       }
@@ -102,7 +102,7 @@ export async function syncDomainExpirations(): Promise<void> {
 }
 
 /** El dominio ya salió: se marca, se deja de cobrar y se avisa. */
-async function cerrarTransferOut(reg: DomainRegistration): Promise<void> {
+async function closeTransferOut(reg: DomainRegistration): Promise<void> {
   const { sendAlert } = await import("./ses.js");
   const token = process.env.MP_ACCESS_TOKEN;
   if (reg.mpPreapprovalId && reg.renewalStatus === "active" && token) {
@@ -127,17 +127,17 @@ async function cerrarTransferOut(reg: DomainRegistration): Promise<void> {
 }
 
 /** Avisos a T-75, T-30 y T-7. `warnedAt` guarda el hito ya avisado para no repetir. */
-export async function avisarRenovaciones(): Promise<void> {
+export async function notifyRenewals(): Promise<void> {
   const regs = getDomainRegistrationsByStatus("registered");
   if (!regs.length) return;
 
   const { sendTemplate, domainRenewalUpcoming } = await import("./emails.js");
 
   for (const reg of regs) {
-    const faltan = dias(reg.expiresAt);
+    const faltan = daysUntil(reg.expiresAt);
     if (faltan === null || faltan < 0) continue;
 
-    const hito = HITOS_AVISO.find((h) => faltan <= h);
+    const hito = REMINDER_MILESTONES.find((h) => faltan <= h);
     if (hito === undefined) continue;
     // `warnedAt` guarda el hito, no una fecha: así el de 30 se manda aunque ya se haya
     // mandado el de 75.
@@ -162,7 +162,7 @@ export async function avisarRenovaciones(): Promise<void> {
  * Cobranza de los dominios en `past_due`. **Nunca automatiza la pérdida del dominio**: a los
  * 21 días deja de insistir y le pasa la decisión a una persona.
  */
-export async function cobranzaDominios(): Promise<void> {
+export async function chargeDomainRenewals(): Promise<void> {
   const regs = getDomainRegistrationsByStatus("registered").filter((r) => r.renewalStatus === "past_due");
   if (!regs.length) return;
 
@@ -170,9 +170,9 @@ export async function cobranzaDominios(): Promise<void> {
   const { sendAlert } = await import("./ses.js");
 
   for (const reg of regs) {
-    const desde = reg.dunningStartedAt ? Math.floor((Date.now() - Date.parse(reg.dunningStartedAt)) / DIA) : 0;
+    const desde = reg.dunningStartedAt ? Math.floor((Date.now() - Date.parse(reg.dunningStartedAt)) / DAY) : 0;
 
-    if (desde >= DIAS_HASTA_DECISION_HUMANA) {
+    if (desde >= DAYS_TO_HUMAN_DECISION) {
       await sendAlert(
         "cobranza-dominio",
         `${reg.domainName} (${reg.ownerEmail}) lleva ${desde} días sin poder cobrarse y vence ${reg.expiresAt ?? "?"}.\n\nDecide: se le insiste, se le ofrece transfer-out, o se asume el costo. NO lo dejes vencer sin decidirlo.`,
@@ -180,7 +180,7 @@ export async function cobranzaDominios(): Promise<void> {
       continue;
     }
 
-    if (!HITOS_COBRANZA.includes(desde)) continue;
+    if (!DUNNING_MILESTONES.includes(desde)) continue;
 
     try {
       await sendTemplate(reg.ownerEmail, domainChargeFailed({

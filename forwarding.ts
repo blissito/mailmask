@@ -3,9 +3,9 @@ import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchE
 import { sendTemplate, firstEmailReceived, forwardCapWarning, forwardCapReached } from "./emails.js";
 import { checkRateLimit } from "./rate-limit.js";
 import { log } from "./logger.js";
-import { programar } from "./scheduler.js";
+import { schedule } from "./scheduler.js";
 import { acotarTexto } from "./regex-guard.js";
-import { notifyBandeja } from "./sse-hub.js";
+import { notifyInbox } from "./sse-hub.js";
 import { depositarEnImap, imapHabilitado } from "./imap-store.js";
 import { emitEvent } from "./webhooks.js";
 import { dmarcReportAddress, ingestDmarcReport } from "./dmarc-reports.js";
@@ -634,7 +634,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
       if (rawContent) {
         try {
           const mesa = await saveToMesa(rawContent, from, recipient, subject, domain.id, s3Bucket, s3Key, true);
-          notifyBandeja(domain.id, mesa.isNew ? "new_conversation" : "new_message", {
+          notifyInbox(domain.id, mesa.isNew ? "new_conversation" : "new_message", {
             conversationId: mesa.conversationId, from, subject,
           });
         } catch (err) {
@@ -658,7 +658,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     if (rawContent) {
       try {
         const mesa = await saveToMesa(rawContent, from, recipient, subject, domain.id, s3Bucket, s3Key);
-        notifyBandeja(domain.id, mesa.isNew ? "new_conversation" : "new_message", {
+        notifyInbox(domain.id, mesa.isNew ? "new_conversation" : "new_message", {
           conversationId: mesa.conversationId, from, subject,
         });
       } catch (err) {
@@ -918,7 +918,7 @@ async function doForward(rawContent: string, from: string, to: string, domainId:
 
 // --- Retry cron (every 5 minutes) ---
 
-programar("*/5 * * * *", async () => {
+schedule("*/5 * * * *", async () => {
   const now = Date.now();
   const items = await listForwardQueue();
   let processed = 0;

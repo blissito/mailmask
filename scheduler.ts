@@ -18,7 +18,7 @@ import { debeProgramar, esPreview } from "./preview.js";
  */
 const MAIN = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "main.ts");
 
-export const esServidor = (() => {
+export const isServer = (() => {
   const arg = process.argv[1];
   if (!arg) return false;
   try {
@@ -29,6 +29,6 @@ export const esServidor = (() => {
 })();
 
 /** `cron.schedule`, pero inerte fuera del servidor y en preview. */
-export function programar(expr: string, fn: () => void | Promise<void>): void {
-  if (debeProgramar(esServidor, esPreview())) cron.schedule(expr, fn);
+export function schedule(expr: string, fn: () => void | Promise<void>): void {
+  if (debeProgramar(isServer, esPreview())) cron.schedule(expr, fn);
 }

@@ -547,7 +547,7 @@ Override with env vars `S3_BUCKET` and `S3_BACKUP_BUCKET` respectively.
 - **Regex de usuario**: las reglas con `match: "regex"` pasan por `revisarPatron()` de `regex-guard.ts` al guardarse (POST y PUT de reglas), y el texto se acota con `acotarTexto()` antes de evaluarlo en `forwarding.ts`. Es la única defensa posible: en tiempo de evaluación no se puede interrumpir un `RegExp.test()` porque es síncrono — el `setTimeout` que había alrededor devolvía a los 20 s con un tope de 50 ms. Explicado para el público en `/blog/que-es-redos-expresiones-regulares`.
 - **Recursos SES por dominio**: un dominio necesita tres cosas en SES —identidad, regla de recepción en el rule set y config set— y "verificado" sólo mira la identidad. Sin la regla, SES contesta `550 5.1.1 mailbox unavailable` a todo y MailMask no se entera. `ensureDomainInbound()` en `ses.ts` reconcilia base contra SES al arrancar y en `POST /api/domains/:id/verify`. Nació de brendago.design (sep-2026): el DELETE limpió SES, la fila revivió de un respaldo y la reparación manual de agosto sólo devolvió la identidad. El config set lleva además un **event destination** al tópico `SNS_OUTBOUND_TOPIC_ARN` (rebotes y quejas → `/api/webhooks/ses-events`, firmado igual que el de entrada); sin ese secret la lista de supresión no se alimenta nunca. `ensureConfigSetEventDestination()` rellena el destino en sets viejos.
 - **Lista de supresión**: la alimenta el webhook de eventos (rebote `Permanent` y queja), se consulta y edita por API (`/api/domains/:id/suppressions`, reason `manual`) y la aplican **los tres envíos del usuario (incluidos cc/bcc) y también el reenvío** (`doForward` en `forwarding.ts` descarta con `status: "discarded"` y lo anota en el log del dominio). Insistir a un buzón que rebotó Permanent daña la reputación del dominio en SES.
-- **Tareas programadas**: nunca llames a `cron.schedule()` directo — usa `programar()` de `scheduler.ts`, que sólo agenda si el proceso arrancó `main.ts`. `node-cron` se re-agenda cada segundo, así que un solo `schedule` al importar un módulo dejaba vivo para siempre el proceso de pruebas. Eso obligaba a `--test-force-exit`, que truncaba el reporte: `npm test` decía 244 tests en una corrida y 293 en la siguiente, siempre en verde. Por la misma razón el `app.listen()` y las reparaciones de arranque de `main.ts` van bajo `esServidor`.
+- **Tareas programadas**: nunca llames a `cron.schedule()` directo — usa `schedule()` de `scheduler.ts`, que sólo agenda si el proceso arrancó `main.ts`. `node-cron` se re-agenda cada segundo, así que un solo `schedule` al importar un módulo dejaba vivo para siempre el proceso de pruebas. Eso obligaba a `--test-force-exit`, que truncaba el reporte: `npm test` decía 244 tests en una corrida y 293 en la siguiente, siempre en verde. Por la misma razón el `app.listen()` y las reparaciones de arranque de `main.ts` van bajo `isServer`.
 
 - **Migraciones**: el snapshot de drizzle sigue desincronizado respecto a `api_keys`. `drizzle-kit generate` pedirá input interactivo y quiere emitir un `ALTER TABLE api_keys` que **rompería producción**. Hasta que se reconcilie, escribe las migraciones a mano en `drizzle/` y agrégalas a `meta/_journal.json`.
 - **`api_keys` se repara sola al arrancar** (`pg.ts`, justo después de `migrate()`). El paso de llaves en claro a SHA-256 se aplicó a producción con `scripts/migrate-api-keys-hash.ts`, un script suelto que nunca entró a las migraciones: por eso **toda base nueva —tests, dev, un despliegue limpio— nacía con la tabla vieja y `createApiKey` moría** con `no column named key_hash`. Producción funcionaba y nadie lo veía. La reparación es idempotente (sólo actúa si existe la columna `key`), conserva las llaves hasheándolas y no toca una base ya migrada. Va en código y no en un `.sql` porque hay bases en los dos estados y SQL no puede preguntar por una columna. El script suelto queda como referencia histórica.
@@ -650,10 +650,21 @@ La clave del sitio es pública y vive en el HTML; la secreta es `TURNSTILE_SECRE
 - [ ] **Renombrar identificadores en español a inglés** (anotado 15-sep-2026). Regla del repo: código en
   inglés, comentarios y strings en español. Se coló mucho legado: `derechosDeDominio`, `porDominio`,
   `suscripcionLegadoVigente`, `dominioMasAntiguo`, `esGratis`/`bloqueado`/`activado` en `DerechosDominio`,
-  `revisarPatron`, `acotarTexto`, `programar`, `precioDeTransferencia`, `asegurarDominio`, `crearBuzon`,
+  `revisarPatron`, `acotarTexto`, ~~`programar`~~, `precioDeTransferencia`, `asegurarDominio`, `crearBuzon`,
   `purgarConversacionesGratis`, `procesarPagoDominio`, `bytesDeBuzonesDelDominio`, `corteRetencion`,
   `ajustarIframe`, `convsNuevasEnVivo`, `seleccionadas`… Inventariar con
   `grep -rnoE "(function|const|let) [a-z]+[áéíóúñ]?[A-Za-z]*(ar|er|ir|ado|ida|ion|os|as)\b"` y revisar a mano.
+  **Avance (sprint #8, 12-oct-2026) — módulos del sprint renombrados**: `plans.ts` (`DOMINIO_ACTIVADO`→
+  `DOMAIN_ACTIVATED`, `DOMINIO_GRATIS`→`DOMAIN_FREE`), `sse-hub.ts` (`notifyBandeja`→`notifyInbox`,
+  `presencias`→`presences`), `dns-import.ts` (`enTandas`→`inBatches`, `consultar`→`queryRecord`,
+  `nameserversActuales`→`currentNameservers`, `Inventario`→`DnsInventory`, `EstadoDelegacion`→
+  `DelegationStatus`, `delegacionActiva`→`getDelegationStatus` y sus constantes), `scheduler.ts`
+  (`esServidor`→`isServer`, `programar`→`schedule`), `search-backfill.ts` (`ejecutarBackfill`→`runBackfill`,
+  `backfillPendiente`→`pendingBackfillCount`, `ResultadoBackfill`→`BackfillResult`, `LOTE`/`PAUSA_MS`/
+  `dormir`/`corriendo`) y `domain-sync.ts` (`avisarRenovaciones`→`notifyRenewals`, `cobranzaDominios`→
+  `chargeDomainRenewals`, `cerrarTransferOut`→`closeTransferOut`, `DIA`/`dias`/`HITOS_*`). Queda el resto
+  del legado —`preview.ts` incluido, que sigue con `esServidor` como parámetro de `debeProgramar`— y todo
+  lo demás de la lista. La llave JSON `backfillPendiente` NO se toca: la lee `public/js/bandeja.js`.
   Ojo: `porDominio`/`derechos` viajan en el JSON de `/api/auth/me` y los lee el front — renombrar los dos
   lados en el mismo commit, y el MCP/SDK si exponen alguno. Sin cambiar comportamiento; `npm test` en verde.
 
@@ -808,7 +819,7 @@ respaldo es una promesa.
 
 Respaldo consistente: `systemctl stop stalwart` + `--export` cuesta **22 s de caída** y da
 840 KB en 19 subespacios. El reenvío y la Bandeja no se enteran (van por SES). Falta
-comprobar que **restaura** (`--import` en un store vacío) y automatizarlo con `programar()`.
+comprobar que **restaura** (`--import` en un store vacío) y automatizarlo con `schedule()`.
 
 **No recrear la caja para cambiar de tier.** En `mail-svc` el tier es `custom` (2 vCPU,
 2 GB): "bajar a micro" da la misma VM. Y recrear cambia el `sandboxId`, que se lleva por

@@ -5,17 +5,17 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as dns from "node:dns/promises";
 import { checkInboundMx, domainFlagStatus, refreshDomainFlags, saveDomainFlags } from "./domain-flags.js";
-import { programar, esServidor } from "./scheduler.js";
+import { schedule, isServer } from "./scheduler.js";
 import { assertNoPreview, debeArrancarEfectos, esPreview, PreviewDeshabilitado } from "./preview.js";
 import { revisarPatron } from "./regex-guard.js";
 import { buildDnsSetup } from "./dns-setup.js";
 import { verificarTurnstile } from "./turnstile.js";
 import { generarPerfilApple, nombreArchivoPerfil, IMAP_HOST } from "./apple-profile.js";
 import { ensureMailAutoconfig } from "./mail-autoconfig.js";
-import { addSseClient, notifyBandeja, setPresence, clearPresence, listPresence, notifyPresence } from "./sse-hub.js";
+import { addSseClient, notifyInbox, setPresence, clearPresence, listPresence, notifyPresence } from "./sse-hub.js";
 import { ftsDisponible } from "./pg.js";
 import { createDeviceAuthStore } from "./cli-auth.js";
-import { backfillPendiente } from "./search-backfill.js";
+import { pendingBackfillCount } from "./search-backfill.js";
 import { db } from "./pg.js";
 import { users as usersTable, tokens as tokensTable } from "./schema.js";
 import { eq } from "drizzle-orm";
@@ -59,8 +59,8 @@ import {
   derechosPorDominioId,
   listEffectiveAddonsForDomain,
   ADDONS_FOR_SALE,
-  DOMINIO_ACTIVADO,
-  DOMINIO_GRATIS,
+  DOMAIN_ACTIVATED,
+  DOMAIN_FREE,
   marcarBuzon,
   desmarcarBuzon,
   bytesDeBuzonesDelDominio,
@@ -519,7 +519,7 @@ async function discardSentFiles(keys: string[]): Promise<void> {
 /** Normaliza y valida una lista de direcciones de Cc/Bcc. */
 /** Días de retención de logs de un dominio, según sus derechos (gratis 7, activado 90). */
 async function ownerLogDays(domainId: string): Promise<number> {
-  return derechosPorDominioId(domainId)?.logDays ?? DOMINIO_GRATIS.logDays;
+  return derechosPorDominioId(domainId)?.logDays ?? DOMAIN_FREE.logDays;
 }
 
 function parseCopyList(value: unknown, max = 20): string[] {
@@ -683,7 +683,7 @@ function applyDeliveryStatus(message: any, status: "delivered" | "bounced" | "co
       log("info", "ses", "Evento de SES sin mensaje que le corresponda", { sesId, status });
     }
     if (hit) {
-      notifyBandeja(hit.domainId, "delivery_status", { conversationId: hit.conversationId, messageId: hit.id, status, detail });
+      notifyInbox(hit.domainId, "delivery_status", { conversationId: hit.conversationId, messageId: hit.id, status, detail });
     }
     const source = String(message.mail?.source ?? "");
     const headerId = message.mail?.commonHeaders?.messageId;
@@ -4849,7 +4849,7 @@ const app = new Elysia({ adapter: node() })
         nextCursor: null,
         aliases: listConversationAliases(domainId),
         mode: ftsDisponible ? "search" : "search-degraded",
-        backfillPendiente: backfillPendiente(),
+        backfillPendiente: pendingBackfillCount(),
       }), { headers: { "content-type": "application/json" } });
     }
 
@@ -4881,7 +4881,7 @@ const app = new Elysia({ adapter: node() })
       mode: "list",
       unreadCount: primeraPagina ? countUnread(domainId, auth.email) : undefined,
       presence: primeraPagina ? listPresence(domainId) : undefined,
-      backfillPendiente: primeraPagina ? backfillPendiente() : undefined,
+      backfillPendiente: primeraPagina ? pendingBackfillCount() : undefined,
     }), { headers: { "content-type": "application/json" } });
   }, {
     detail: { tags: ["Bandeja"], summary: "List conversations for a domain", security: [{ cookieAuth: [] }] },
@@ -5655,7 +5655,7 @@ const app = new Elysia({ adapter: node() })
       // lo devuelva como no leído.
       markConversationRead(domainId, conv.id, auth.email, ahoraReply);
 
-      notifyBandeja(domainId, "conv_replied", {
+      notifyInbox(domainId, "conv_replied", {
         conversationId: conv.id,
         messageId: replyMsg.id,
         lastMessageAt: ahoraReply,
@@ -5707,7 +5707,7 @@ const app = new Elysia({ adapter: node() })
     const updated = await updateConversation(domainId, params.id, { assignedTo: assignedTo ?? undefined });
     if (!updated) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
 
-    notifyBandeja(domainId, "conv_assigned", { conversationId: updated.id, assignedTo: updated.assignedTo ?? null, actor: gate.auth.email });
+    notifyInbox(domainId, "conv_assigned", { conversationId: updated.id, assignedTo: updated.assignedTo ?? null, actor: gate.auth.email });
 
     return new Response(JSON.stringify(updated), {
       headers: { "content-type": "application/json" },
@@ -5740,7 +5740,7 @@ const app = new Elysia({ adapter: node() })
       createdAt: new Date().toISOString(),
     });
 
-    notifyBandeja(domainId, "conv_note", { conversationId: conv.id, noteId: note.id, author: auth.email, actor: auth.email });
+    notifyInbox(domainId, "conv_note", { conversationId: conv.id, noteId: note.id, author: auth.email, actor: auth.email });
 
     return new Response(JSON.stringify(note), {
       status: 201,
@@ -5796,7 +5796,7 @@ const app = new Elysia({ adapter: node() })
     const updated = await updateConversation(domainId, params.id, updates);
     if (!updated) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
 
-    notifyBandeja(domainId, "conv_updated", {
+    notifyInbox(domainId, "conv_updated", {
       conversationId: updated.id,
       status: updated.status,
       priority: updated.priority,
@@ -5833,7 +5833,7 @@ const app = new Elysia({ adapter: node() })
     const deleted = await softDeleteConversation(domainId, params.id);
     if (!deleted) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
 
-    notifyBandeja(domainId, "conv_deleted", { conversationId: params.id, actor: auth.email });
+    notifyInbox(domainId, "conv_deleted", { conversationId: params.id, actor: auth.email });
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
@@ -5869,7 +5869,7 @@ const app = new Elysia({ adapter: node() })
     }
 
     if (borradas.length) {
-      notifyBandeja(domainId, "convs_deleted", { conversationIds: borradas, actor: gate.auth.email });
+      notifyInbox(domainId, "convs_deleted", { conversationIds: borradas, actor: gate.auth.email });
       log("info", "mesa", "Borrado en lote", { domainId, pedidas: ids.length, borradas: borradas.length, actor: gate.auth.email });
     }
 
@@ -5896,7 +5896,7 @@ const app = new Elysia({ adapter: node() })
     const restored = await restoreConversation(domainId, params.id);
     if (!restored) return new Response(JSON.stringify({ error: "Conversación no encontrada" }), { status: 404 });
 
-    notifyBandeja(domainId, "conv_restored", { conversationId: params.id, actor: auth.email });
+    notifyInbox(domainId, "conv_restored", { conversationId: params.id, actor: auth.email });
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "content-type": "application/json" },
@@ -7713,8 +7713,8 @@ const app = new Elysia({ adapter: node() })
 
     let delegated = d.dnsZoneStatus === "active";
     if (!delegated && d.dnsNameservers?.length) {
-      const { delegacionActiva } = await import("./dns-import.js");
-      const estado = await delegacionActiva(d.domain, d.dnsNameservers);
+      const { getDelegationStatus } = await import("./dns-import.js");
+      const estado = await getDelegationStatus(d.domain, d.dnsNameservers);
       delegated = estado.delegated;
       if (delegated) {
         updateDomain(d.id, { dnsZoneStatus: "active", dnsDelegatedAt: new Date().toISOString() });
@@ -7809,8 +7809,8 @@ const app = new Elysia({ adapter: node() })
     const d = access.domain;
     if (!d.dnsNameservers?.length) return jsonErr("Este dominio todavía no tiene zona DNS en MailMask.", 409);
 
-    const { delegacionActiva } = await import("./dns-import.js");
-    const estado = await delegacionActiva(d.domain, d.dnsNameservers);
+    const { getDelegationStatus } = await import("./dns-import.js");
+    const estado = await getDelegationStatus(d.domain, d.dnsNameservers);
 
     updateDomain(d.id, {
       dnsCheckedAt: new Date().toISOString(),
@@ -8268,7 +8268,7 @@ const app = new Elysia({ adapter: node() })
 
 // --- Bulk send cron (every minute, processes 14 emails/sec) ---
 
-programar("* * * * *", async () => {
+schedule("* * * * *", async () => {
   const jobs = await listPendingBulkJobs();
   if (jobs.length === 0) return;
 
@@ -8314,7 +8314,7 @@ programar("* * * * *", async () => {
     // por lote, no por destinatario: antes se mandaba `job.html` también como parte
     // text/plain y quien leyera en modo texto recibía el marcado.
     const bulkRendered = resolveEmailBody({ html: job.html });
-    const bulkLogDays = jobDerechos?.logDays ?? DOMINIO_GRATIS.logDays;
+    const bulkLogDays = jobDerechos?.logDays ?? DOMAIN_FREE.logDays;
 
     for (const recipient of batch) {
       // Check suppression
@@ -8360,7 +8360,7 @@ programar("* * * * *", async () => {
 
 // --- Monitoring cron (every 5 minutes) ---
 
-programar("*/5 * * * *", async () => {
+schedule("*/5 * * * *", async () => {
   const queueDepth = await getQueueDepth();
   const deadLetterCount = await getDeadLetterCount();
 
@@ -8373,7 +8373,7 @@ programar("*/5 * * * *", async () => {
 
 // --- Daily backup cron (4:00 UTC) ---
 
-programar("0 4 * * *", async () => {
+schedule("0 4 * * *", async () => {
   try {
     const result = await runDbBackup();
     log("info", "backup", "Daily backup completed", {
@@ -8388,7 +8388,7 @@ programar("0 4 * * *", async () => {
 // Imágenes que se subieron al compositor y nunca se enviaron. Las que sí salieron ya
 // se borran al enviar; esto recoge los borradores abandonados, que si no se acumulan
 // para siempre. A las 4:20 para no chocar con el respaldo de las 4:00.
-programar("20 4 * * *", async () => {
+schedule("20 4 * * *", async () => {
   try {
     const removed = await sweepOrphanEmailImages(24);
     if (removed > 0) log("info", "ses", "Orphan email images swept", { removed });
@@ -8397,7 +8397,7 @@ programar("20 4 * * *", async () => {
   }
 });
 
-if (esServidor) {
+if (isServer) {
   const port = parseInt(process.env.PORT ?? "8000", 10);
   app.listen({ port, hostname: "0.0.0.0" }, () => {
     console.log(`MailMask running on port ${port}`);
@@ -8442,8 +8442,8 @@ process.on("unhandledRejection", (err) => {
 // Receipt rule repair already imported at top
 // En preview NO corre: repara receipt rules de SES, toca SNS y reconcilia contra la API de
 // AWS. Es exactamente lo que la preview del 11-oct-2026 le hizo a producción.
-if (esServidor && esPreview()) log("info", "preview", "Arranque con efectos omitido (PREVIEW=1): no se repara SES ni SNS");
-if (debeArrancarEfectos(esServidor, esPreview())) (async () => {
+if (isServer && esPreview()) log("info", "preview", "Arranque con efectos omitido (PREVIEW=1): no se repara SES ni SNS");
+if (debeArrancarEfectos(isServer, esPreview())) (async () => {
   try {
     // Sin una lectura fresca, el precio de los dominios cae al respaldo del entorno. El cron
     // corre en el minuto 7, así que un arranque a las 8:10 dejaría casi una hora cotizando

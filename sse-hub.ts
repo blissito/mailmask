@@ -19,7 +19,7 @@ export function addSseClient(userId: string, domainId: string, controller: Reada
   };
 }
 
-export function notifyBandeja(domainId: string, event: string, data: Record<string, unknown>): void {
+export function notifyInbox(domainId: string, event: string, data: Record<string, unknown>): void {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   const encoder = new TextEncoder();
   const encoded = encoder.encode(payload);
@@ -48,7 +48,7 @@ export function getSseClientCount(): number {
 // Vive en memoria del proceso a propósito. Es estado de ~30 segundos que cada
 // agente reescribe cada 15: meterlo en SQLite sería un fsync en el volumen de Fly
 // por dato desechable, y crearía una segunda verdad que al reiniciar deja
-// presencias fantasma. El TTL en memoria muere con el proceso, que es lo correcto.
+// una presencia fantasma. El TTL en memoria muere con el proceso, que es lo correcto.
 //
 // ⚠️ Presencia y SSE son locales al proceso. Con 2+ máquinas se rompen (el SSE ya
 // se rompe hoy). No escalar `fly.toml` sin resolver antes el bus: Redis pub/sub o
@@ -68,7 +68,7 @@ const TTL_VIEWING = 35_000;
 const TTL_TYPING = 12_000;
 
 // Clave por email, no por conexión: tres pestañas del mismo agente colapsan solas.
-const presencias = new Map<string, Map<string, Presence>>();
+const presences = new Map<string, Map<string, Presence>>();
 
 export function setPresence(
   domainId: string,
@@ -77,8 +77,8 @@ export function setPresence(
   conversationId: string | null,
   state: "viewing" | "typing",
 ): void {
-  if (!presencias.has(domainId)) presencias.set(domainId, new Map());
-  presencias.get(domainId)!.set(email, {
+  if (!presences.has(domainId)) presences.set(domainId, new Map());
+  presences.get(domainId)!.set(email, {
     email,
     name,
     conversationId,
@@ -88,14 +88,14 @@ export function setPresence(
 }
 
 export function clearPresence(domainId: string, email: string): void {
-  const m = presencias.get(domainId);
+  const m = presences.get(domainId);
   if (!m) return;
   m.delete(email);
-  if (m.size === 0) presencias.delete(domainId);
+  if (m.size === 0) presences.delete(domainId);
 }
 
 export function listPresence(domainId: string): Presence[] {
-  const m = presencias.get(domainId);
+  const m = presences.get(domainId);
   if (!m) return [];
   const ahora = Date.now();
   const vivos: Presence[] = [];
@@ -103,12 +103,12 @@ export function listPresence(domainId: string): Presence[] {
     if (p.expira <= ahora) m.delete(email);
     else vivos.push(p);
   }
-  if (m.size === 0) presencias.delete(domainId);
+  if (m.size === 0) presences.delete(domainId);
   return vivos;
 }
 
 // Se manda el snapshot completo, no deltas: con cinco agentes son cinco objetos y
 // no hay forma de que el cliente se desincronice.
 export function notifyPresence(domainId: string): void {
-  notifyBandeja(domainId, "presence", { agents: listPresence(domainId) });
+  notifyInbox(domainId, "presence", { agents: listPresence(domainId) });
 }
