@@ -3,7 +3,9 @@
 **Qué:** convenciones que vigilan las páginas públicas. Las reglas viven en `seo-checks.ts`
 (una sola copia) y las corren dos suites: `public-seo.test.ts` sobre todas las páginas del
 sitemap —`/`, `/pricing`, `/docs`, `/blog`, `/register`, `/login`, `/terms` y `/privacy`— y
-`docs-seo.test.ts` sobre lo propio de `/docs` (su `@graph` completo y `hasPart`).
+`docs-seo.test.ts` sobre lo propio de `/docs` (su `@graph` completo y `hasPart`) y
+`pricing-seo.test.ts` sobre lo propio de `/pricing` (sus ofertas, atadas a `plans.ts`, y su
+imagen social).
 
 - **Un solo bloque de metas** arriba del `<style>`: title (≤ 60), description (140–160),
   canonical, hreflang `es-MX` + `x-default`, OG y Twitter. Nada de metas sueltas más abajo.
@@ -14,7 +16,7 @@ sitemap —`/`, `/pricing`, `/docs`, `/blog`, `/register`, `/login`, `/terms` y 
 - **`hasPart` apunta a anclas que existen**; los `id` de los `<h2>` no se renombran
   (rompe enlaces y el ranking por sección).
 - **Imagen social propia** (1200×630 JPEG, < 200 KB), renderizada con Chromium desde HTML
-  (`scripts/og-docs.html`), no con IA. La genérica del sitio (`img/og-image.png`, PNG) sirve
+  (`scripts/og-docs.html`, `scripts/og-pricing.html`), no con IA. La genérica del sitio (`img/og-image.png`, PNG) sirve
   de respaldo, pero cada página del sitemap trae la suya. Tras el deploy hay que refrescarla
   a mano en el Post Inspector de LinkedIn: tiene la anterior en caché.
 - **`llms.txt` es un contrato con agentes:** no puede contradecir `/docs` ni anunciar
@@ -47,7 +49,7 @@ listado, hacen fallar la prueba** — al arreglar una página se quita su rengl�
 | `jsonld-unico`, `jsonld-graph` | un solo `<script>` de JSON-LD, y con `@graph` |
 | `softwareapplication` | ni `SoftwareApplication`, ni `MobileApplication`, ni `WebApplication` (ver la trampa) |
 | `og-imagen`, `og-medidas`, `og-propia` | la imagen existe en `public/`, mide 1200×630 igual que sus metas, y no es la tarjeta genérica `img/og-image.png` |
-| `fecha-visible` | «Actualizado: <time datetime>» en `/` (landing, junto al ©), `/docs`, `/terms` y `/privacy` |
+| `fecha-visible` | «Actualizado: <time datetime>» en `/` (landing, junto al ©), `/docs`, `/pricing`, `/terms` y `/privacy` |
 
 La regla es una función pura (`huecos(ruta, html)` en `seo-checks.ts`), así que la suite la
 prueba también sobre una página de muestra a la que le va quitando piezas: si quitar un
@@ -56,3 +58,16 @@ prueba también sobre una página de muestra a la que le va quitando piezas: si 
 ## Trampa: no uses `SoftwareApplication` sin ratings
 
 Google exige `aggregateRating` o `review` en `SoftwareApplication` y el Rich Results Test marca el nodo como inválido si faltan; no se inventan ratings. El SDK va como `SoftwareSourceCode` (sin rich result que validar) y las dos suites fallan si reaparece `SoftwareApplication`.
+
+## Precios: manda `plans.ts`
+
+Lo que se cobra vive en `plans.ts` (`ADDONS.*.price` y `DOMAIN_ANNUAL_PRICE`). `/pricing` lo
+repite en tres lados: las ofertas del `@graph`, los `data-monthly`/`data-yearly`/`data-price`
+de las tarjetas —que el toggle de `landing.js` usa para cambiar el número a la vista— y el
+`+$99` de los bloques de add-on. `pricing-seo.test.ts` amarra los tres al catálogo: cambiar
+un precio en `plans.ts` sin tocar la página hace fallar la suite, y al revés también. Ese
+mismo archivo vigila que el «Actualizado» visible sea el `dateModified` y el `<lastmod>` del
+sitemap, como en `/`.
+
+El anual ($999) no es un add-on: va como quinta `Offer` con su `UnitPriceSpecification` de
+`billingDuration: P1Y`, para que no se lea como otro cobro mensual de $999.

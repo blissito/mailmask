@@ -4,100 +4,162 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Un solo bloque de metas: title, description, canonical, hreflang y OG/Twitter.
+         Lo vigilan public-seo.test.ts y pricing-seo.test.ts (ficha: docs/agents/seo-paginas-publicas.md). -->
     <title>Precios — MailMask</title>
     <meta
       name="description"
-      content="Planes y precios de MailMask. Email profesional en tu dominio gratis para empezar, $99 MXN al mes por dominio. Sin contratos ni sorpresas."
+      content="Planes y precios de MailMask: email profesional en tu dominio, gratis para empezar y $99 MXN al mes por dominio. Sin contratos ni cobro por persona."
     />
     <link rel="canonical" href="https://www.mailmask.studio/pricing" />
+    <link rel="alternate" hreflang="es-MX" href="https://www.mailmask.studio/pricing" />
+    <link rel="alternate" hreflang="x-default" href="https://www.mailmask.studio/pricing" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:url" content="https://www.mailmask.studio/pricing" />
     <meta property="og:title" content="Precios — MailMask" />
     <meta
       property="og:description"
-      content="Planes y precios de MailMask. Email profesional en tu dominio gratis para empezar, $99 MXN al mes por dominio."
+      content="Planes y precios de MailMask: email profesional en tu dominio, gratis para empezar y $99 MXN al mes por dominio. Sin contratos ni cobro por persona."
     />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.mailmask.studio/pricing" />
-    <meta property="og:locale" content="es_MX" />
-    <meta property="og:site_name" content="MailMask" />
-    <meta property="og:image" content="https://www.mailmask.studio/img/og-image.png" />
+    <meta property="og:image" content="https://www.mailmask.studio/img/og-pricing.jpg" />
+    <meta property="og:image:secure_url" content="https://www.mailmask.studio/img/og-pricing.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="MailMask — email profesional en tu dominio" />
-    <meta name="twitter:image" content="https://www.mailmask.studio/img/og-image.png" />
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta property="og:image:alt" content="Precios de MailMask: gratis para empezar y $99 MXN al mes por dominio" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Precios — MailMask" />
-    <meta name="twitter:description" content="Planes y precios de MailMask. Email profesional en tu dominio gratis para empezar, $99 MXN al mes por dominio. Sin contratos ni sorpresas." />
-    <meta name="twitter:image:alt" content="MailMask — email profesional en tu dominio" />
-    <meta property="og:image:secure_url" content="https://www.mailmask.studio/img/og-image.png" />
-    <meta property="og:image:type" content="image/png" />
     <meta name="twitter:site" content="@HectorBlisS" />
     <meta name="twitter:creator" content="@HectorBlisS" />
+    <meta name="twitter:title" content="Precios — MailMask" />
+    <meta
+      name="twitter:description"
+      content="Planes y precios de MailMask: email profesional en tu dominio, gratis para empezar y $99 MXN al mes por dominio. Sin contratos ni cobro por persona."
+    />
+    <meta name="twitter:image" content="https://www.mailmask.studio/img/og-pricing.jpg" />
+    <meta name="twitter:image:alt" content="Precios de MailMask: gratis para empezar y $99 MXN al mes por dominio" />
+
+    <!-- Un solo JSON-LD: un `@graph` con #org y #website compartidos, el WebPage de /pricing
+         (con su breadcrumb y su dateModified) y UN Product con las 5 ofertas de hoy.
+         Los precios de estas ofertas están amarrados a plans.ts por pricing-seo.test.ts. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://www.mailmask.studio/#org",
+            "name": "MailMask",
+            "url": "https://www.mailmask.studio/",
+            "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" }
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://www.mailmask.studio/#website",
+            "url": "https://www.mailmask.studio/",
+            "name": "MailMask",
+            "inLanguage": "es-MX",
+            "publisher": { "@id": "https://www.mailmask.studio/#org" }
+          },
+          {
+            "@type": "WebPage",
+            "@id": "https://www.mailmask.studio/pricing#webpage",
+            "url": "https://www.mailmask.studio/pricing",
+            "name": "Precios — MailMask",
+            "description": "Planes y precios de MailMask: email profesional en tu dominio, gratis para empezar y $99 MXN al mes por dominio. Sin contratos ni cobro por persona.",
+            "inLanguage": "es-MX",
+            "isPartOf": { "@id": "https://www.mailmask.studio/#website" },
+            "about": { "@id": "https://www.mailmask.studio/#org" },
+            "breadcrumb": { "@id": "https://www.mailmask.studio/pricing#breadcrumb" },
+            "primaryImageOfPage": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/og-pricing.jpg" },
+            "dateModified": "2026-10-12"
+          },
+          {
+            "@type": "BreadcrumbList",
+            "@id": "https://www.mailmask.studio/pricing#breadcrumb",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+              { "@type": "ListItem", "position": 2, "name": "Precios", "item": "https://www.mailmask.studio/pricing" }
+            ]
+          },
+          {
+            "@type": "Product",
+            "@id": "https://www.mailmask.studio/pricing#product",
+            "name": "MailMask",
+            "description": "Correo de tu dominio para todo tu equipo. Gratis para empezar; $99 MXN al mes por dominio con todo incluido y personas ilimitadas. Anual por $999.",
+            "category": "BusinessApplication",
+            "brand": { "@id": "https://www.mailmask.studio/#org" },
+            "url": "https://www.mailmask.studio/pricing",
+            "offers": [
+              {
+                "@type": "Offer",
+                "name": "Gratis",
+                "description": "Un dominio, reenvío, 5 máscaras y Bandeja con 7 días de historial.",
+                "price": "0",
+                "priceCurrency": "MXN",
+                "availability": "https://schema.org/InStock",
+                "url": "https://www.mailmask.studio/pricing"
+              },
+              {
+                "@type": "Offer",
+                "name": "Dominio activado",
+                "description": "Todo para un dominio: bandeja compartida con personas ilimitadas, buzones IMAP con 10 GB, 50 correos nuevos al día, reglas, webhooks, SMTP y API.",
+                "price": "99",
+                "priceCurrency": "MXN",
+                "priceValidUntil": "2027-12-31",
+                "availability": "https://schema.org/InStock",
+                "url": "https://www.mailmask.studio/pricing"
+              },
+              {
+                "@type": "Offer",
+                "name": "+50 GB de buzón",
+                "description": "50 GB más para los buzones de un dominio activado. Acumulable.",
+                "price": "99",
+                "priceCurrency": "MXN",
+                "availability": "https://schema.org/InStock",
+                "url": "https://www.mailmask.studio/pricing#addons"
+              },
+              {
+                "@type": "Offer",
+                "name": "+100 envíos al día",
+                "description": "100 correos nuevos más al día en un dominio activado. Acumulable.",
+                "price": "99",
+                "priceCurrency": "MXN",
+                "availability": "https://schema.org/InStock",
+                "url": "https://www.mailmask.studio/pricing#addons"
+              },
+              {
+                "@type": "Offer",
+                "name": "Dominio activado — anual",
+                "description": "Doce meses de dominio activado pagados por adelantado: $999 en vez de $1,188 (dos meses de regalo).",
+                "price": "999",
+                "priceCurrency": "MXN",
+                "availability": "https://schema.org/InStock",
+                "url": "https://www.mailmask.studio/pricing",
+                "priceSpecification": {
+                  "@type": "UnitPriceSpecification",
+                  "price": "999",
+                  "priceCurrency": "MXN",
+                  "billingDuration": "P1Y",
+                  "billingIncrement": 1
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+
     <script src="/js/analytics.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
     <link rel="stylesheet" href="/css/styles.css" />
     <script src="/js/theme.js"></script>
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
-          { "@type": "ListItem", "position": 2, "name": "Precios", "item": "https://www.mailmask.studio/pricing" }
-        ]
-      }
-    </script>
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "Product",
-        "name": "MailMask",
-        "description": "Correo de tu dominio para todo tu equipo. Gratis para empezar; $99 MXN al mes por dominio con todo incluido y personas ilimitadas.",
-        "brand": { "@type": "Organization", "name": "MailMask" },
-        "offers": [
-          {
-            "@type": "Offer",
-            "name": "Gratis",
-            "description": "Un dominio, reenvío, 5 máscaras y Bandeja con 7 días de historial.",
-            "price": "0",
-            "priceCurrency": "MXN",
-            "availability": "https://schema.org/InStock",
-            "url": "https://www.mailmask.studio/pricing"
-          },
-          {
-            "@type": "Offer",
-            "name": "Dominio activado",
-            "description": "Todo para un dominio: bandeja compartida con personas ilimitadas, buzones IMAP con 10 GB, 50 correos nuevos al día, reglas, webhooks, SMTP y API.",
-            "price": "99",
-            "priceCurrency": "MXN",
-            "priceValidUntil": "2027-12-31",
-            "availability": "https://schema.org/InStock",
-            "url": "https://www.mailmask.studio/pricing"
-          },
-          {
-            "@type": "Offer",
-            "name": "+50 GB de buzón",
-            "description": "50 GB más para los buzones de un dominio activado. Acumulable.",
-            "price": "99",
-            "priceCurrency": "MXN",
-            "availability": "https://schema.org/InStock",
-            "url": "https://www.mailmask.studio/pricing#addons"
-          },
-          {
-            "@type": "Offer",
-            "name": "+100 envíos al día",
-            "description": "100 correos nuevos más al día en un dominio activado. Acumulable.",
-            "price": "99",
-            "priceCurrency": "MXN",
-            "availability": "https://schema.org/InStock",
-            "url": "https://www.mailmask.studio/pricing#addons"
-          }
-        ]
-      }
-    </script>
-</head>
+  </head>
   <body class="site bg-bg text-fg antialiased">
     <!-- Top nav -->
     <nav class="fixed top-0 inset-x-0 z-40 border-b border-line/70 bg-bg/85 backdrop-blur">
@@ -270,7 +332,7 @@
       </p>
 
       <div class="grid md:grid-cols-2 gap-6 mt-14 max-w-4xl mx-auto">
-        <div class="card p-6 flex flex-col">
+        <div class="card p-6 flex flex-col" data-addon="storage50" data-price="99">
           <h3 class="font-bold text-lg">+50 GB de buzón</h3>
           <div class="mt-2"><span class="text-3xl font-semibold tracking-tight">+$99</span><span class="text-fg-subtle text-sm"> MXN/mes</span></div>
           <p class="text-sm text-fg-muted mt-4 flex-1">
@@ -280,7 +342,7 @@
           <a href="/app" class="mt-5 block w-full text-center btn-secondary !py-2.5">Agregar desde tu panel</a>
         </div>
 
-        <div class="card p-6 flex flex-col">
+        <div class="card p-6 flex flex-col" data-addon="sends100" data-price="99">
           <h3 class="font-bold text-lg">+100 envíos al día</h3>
           <div class="mt-2"><span class="text-3xl font-semibold tracking-tight">+$99</span><span class="text-fg-subtle text-sm"> MXN/mes</span></div>
           <p class="text-sm text-fg-muted mt-4 flex-1">
@@ -336,6 +398,9 @@
         </div>
       </div>
       <p class="text-center text-fg-subtle text-xs mt-6">
+        Actualizado: <time datetime="2026-10-12">12 de octubre de 2026</time>
+      </p>
+      <p class="text-center text-fg-subtle text-xs mt-1">
         © 2026 by <a href="https://fixter.org" target="_blank" rel="noopener" class="hover:text-fg underline decoration-dotted transition-colors">fixter.org</a>
       </p>
     </footer>
