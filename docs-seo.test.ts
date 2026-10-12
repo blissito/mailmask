@@ -4,36 +4,17 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 
-const HOST = "https://www.mailmask.studio";
+import { HOST, grafo as leerGrafo, leerHead, meta as metaDe, metas as metasDe, medidasJpeg } from "./seo-checks.ts";
+
 const html = readFileSync(new URL("./public/docs.html", import.meta.url), "utf8");
-const head = html.slice(0, html.indexOf("</head>"));
+const head = leerHead(html);
 
-const metas = [...head.matchAll(/<meta\s+(name|property)="([^"]+)"\s+content="([^"]*)"\s*\/?>/g)].map((m) => ({ clave: m[2], valor: m[3] }));
-const meta = (clave: string) => metas.find((m) => m.clave === clave)?.valor;
-
-function grafo(): any[] {
-  const scripts = [...head.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
-  assert.equal(scripts.length, 1, "el JSON-LD va en un solo <script>");
-  const json = JSON.parse(scripts[0][1]);
-  assert.ok(Array.isArray(json["@graph"]), "falta @graph");
-  return json["@graph"];
-}
-
-/** Ancho y alto de un JPEG leyendo su marcador SOF. */
-function medidasJpeg(buf: Buffer): { w: number; h: number } {
-  assert.equal(buf.readUInt16BE(0), 0xffd8, "no es un JPEG");
-  let i = 2;
-  while (i < buf.length) {
-    assert.equal(buf[i], 0xff);
-    const marcador = buf[i + 1];
-    const largo = buf.readUInt16BE(i + 2);
-    if (marcador >= 0xc0 && marcador <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marcador)) {
-      return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
-    }
-    i += 2 + largo;
-  }
-  throw new Error("JPEG sin SOF");
-}
+// Las reglas de la cabecera (metas, @graph, medidas de la imagen) viven en seo-checks.ts:
+// son las mismas que vigila public-seo.test.ts sobre el resto del sitemap. Aquí quedan
+// los chequeos propios de /docs (el @graph completo, hasPart y el SDK como SourceCode).
+const metas = metasDe(head);
+const meta = (clave: string) => metaDe(head, clave);
+const grafo = () => leerGrafo(head);
 
 test("un title, una description, un canonical y un H1", () => {
   assert.equal((head.match(/<title>/g) ?? []).length, 1);
