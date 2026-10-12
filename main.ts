@@ -6,6 +6,7 @@ import * as path from "node:path";
 import * as dns from "node:dns/promises";
 import { checkInboundMx, domainFlagStatus, refreshDomainFlags, saveDomainFlags } from "./domain-flags.js";
 import { programar, esServidor } from "./scheduler.js";
+import { assertNoPreview, debeArrancarEfectos, esPreview, PreviewDeshabilitado } from "./preview.js";
 import { revisarPatron } from "./regex-guard.js";
 import { buildDnsSetup } from "./dns-setup.js";
 import { verificarTurnstile } from "./turnstile.js";
@@ -232,6 +233,7 @@ import {
   encodeHeader,
   sendAlert,
   checkSesHealth,
+  getSesOutbound,
   deleteOldBackups,
   getConfigSetName,
   listBackups,
@@ -846,9 +848,25 @@ interface AccessResult {
   role: string;
 }
 
+/**
+ * En preview, los caminos con efecto afuera (SES, MercadoPago, Route 53 Domains) contestan
+ * 503 con el motivo en vez de intentarlo y fallar a media operación. Los `catch` que se
+ * comen el error lo llaman primero; para los que no lo atrapan está el `onError` global.
+ */
+function preview503(err: unknown): Response | null {
+  if (err instanceof PreviewDeshabilitado) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 503,
+      headers: { "content-type": "application/json" },
+    });
+  }
+  return null;
+}
+
 // Cancela un preapproval en MercadoPago. Lanza si MP responde error, para que el caller
 // decida si aborta o solo lo registra.
 async function cancelMpPreapproval(preapprovalId: string, accessToken: string): Promise<void> {
+  assertNoPreview("mercadopago");
   const res = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
     method: "PUT",
     headers: {
@@ -1456,6 +1474,11 @@ const app = new Elysia({ adapter: node() })
         return new Response("Not found", { status: 404 });
       }
     }
+    // Un guard de preview que nadie atrapó no es un error interno: es la app diciendo que
+    // esa acción no aplica aquí. 503 con el motivo, sin ensuciar el log de errores.
+    const deshabilitado = preview503(error);
+    if (deshabilitado) return deshabilitado;
+
     log("error", "server", "Unhandled error", { error: String(error) });
     return new Response(JSON.stringify({ error: "Error interno" }), {
       status: 500,
@@ -2388,8 +2411,10 @@ const app = new Elysia({ adapter: node() })
       checks.dkim = { ok: false, detail: "No hay tokens DKIM configurados" };
     } else {
       try {
-        const { SESClient, GetIdentityDkimAttributesCommand } = await import("@aws-sdk/client-ses");
-        const sesClient = new SESClient({ region: AWS_REGION });
+        const { GetIdentityDkimAttributesCommand } = await import("@aws-sdk/client-ses");
+        // Por el getter de `ses.ts` y no un cliente suelto: así el guard de preview cubre
+        // también esta lectura, sin depender de que alguien se acuerde aquí.
+        const sesClient = await getSesOutbound();
         const dkimRes = await sesClient.send(new GetIdentityDkimAttributesCommand({ Identities: [d] }));
         const dkimAttrs = dkimRes.DkimAttributes?.[d];
         if (dkimAttrs?.DkimVerificationStatus === "Success") {
@@ -4042,6 +4067,7 @@ const app = new Elysia({ adapter: node() })
       );
     }
 
+    assertNoPreview("mercadopago");
     const res = await fetch(
       `https://api.mercadopago.com/preapproval/${subId}`,
       {
@@ -4212,6 +4238,7 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "Billing no configurado" }), { status: 500 });
     }
 
+    assertNoPreview("mercadopago");
     const addon = createAddon(auth.email, addonKind, dominio.id);
     try {
       const { default: MercadoPagoConfig, PreApproval } = await import("mercadopago").then((m) => ({
@@ -4293,6 +4320,8 @@ const app = new Elysia({ adapter: node() })
       try {
         await cancelMpPreapproval(addon.mpPreapprovalId, mpAccessToken);
       } catch (err) {
+        const p503 = preview503(err);
+        if (p503) return p503;
         log("error", "billing", "MP add-on cancel error", { error: String(err), addonId: addon.id });
         return new Response(JSON.stringify({ error: "Error al cancelar en MercadoPago" }), { status: 500 });
       }
@@ -4487,6 +4516,8 @@ const app = new Elysia({ adapter: node() })
       });
     } catch (err) {
       decrementSendCount(domain.id); // devolver la cuota reservada
+      const p503 = preview503(err);
+      if (p503) return p503;
       log("error", "ses", "Outbound send failed", { error: String(err), domainId: domain.id });
       return new Response(JSON.stringify({ error: "Error enviando email" }), { status: 500 });
     }
@@ -5081,6 +5112,8 @@ const app = new Elysia({ adapter: node() })
       logOutbound(domain.id, fromAddress, recipient, String(subject), withImages.html ?? rendered.text, composeSesId, limits.logDays);
     } catch (err) {
       decrementSendCount(domain.id);
+      const p503 = preview503(err);
+      if (p503) return p503;
       log("error", "ses", "Compose send failed", { error: String(err), domainId: domain.id });
       return new Response(JSON.stringify({ error: "Error enviando email" }), { status: 500 });
     }
@@ -5634,6 +5667,8 @@ const app = new Elysia({ adapter: node() })
         headers: { "content-type": "application/json" },
       });
     } catch (err) {
+      const p503 = preview503(err);
+      if (p503) return p503;
       log("error", "ses", "Mesa reply failed", { error: String(err) });
       return new Response(JSON.stringify({ error: "Error enviando respuesta" }), { status: 500 });
     }
@@ -6938,6 +6973,7 @@ const app = new Elysia({ adapter: node() })
       return new Response(JSON.stringify({ error: "MercadoPago no configurado" }), { status: 500, headers: { "content-type": "application/json" } });
     }
 
+    assertNoPreview("mercadopago");
     try {
       const { Preference } = await import("mercadopago");
       const preference = new Preference({ accessToken: mpAccessToken });
@@ -7149,6 +7185,7 @@ const app = new Elysia({ adapter: node() })
     const pista = saveAuthCode(reg.id, authCode);
     updateDomainRegistration(reg.id, { transferAuthCodeHint: pista });
 
+    assertNoPreview("mercadopago");
     try {
       const { Preference } = await import("mercadopago");
       const preference = new Preference({ accessToken: mpAccessToken });
@@ -7516,6 +7553,8 @@ const app = new Elysia({ adapter: node() })
 
     const mpAccessToken = process.env.MP_ACCESS_TOKEN;
     if (!mpAccessToken) return jsonErr("Billing no configurado", 500);
+
+    assertNoPreview("mercadopago");
 
     // El primer cobro cae 60 días antes del vencimiento: AWS renueva sola unos 45 días
     // antes en varios TLDs, así que hay que haber cobrado para entonces.
@@ -8401,7 +8440,10 @@ process.on("unhandledRejection", (err) => {
 
 // Repair receipt rules missing SNS TopicArn (one-time fix for rules created before SNS_TOPIC_ARN was set)
 // Receipt rule repair already imported at top
-if (esServidor) (async () => {
+// En preview NO corre: repara receipt rules de SES, toca SNS y reconcilia contra la API de
+// AWS. Es exactamente lo que la preview del 11-oct-2026 le hizo a producción.
+if (esServidor && esPreview()) log("info", "preview", "Arranque con efectos omitido (PREVIEW=1): no se repara SES ni SNS");
+if (debeArrancarEfectos(esServidor, esPreview())) (async () => {
   try {
     // Sin una lectura fresca, el precio de los dominios cae al respaldo del entorno. El cron
     // corre en el minuto 7, así que un arranque a las 8:10 dejaría casi una hora cotizando

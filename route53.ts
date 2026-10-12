@@ -1,12 +1,17 @@
 import { log } from "./logger.js";
 import { AWS_REGION } from "./ses.js";
 import type { WhoisContacto } from "./db.js";
+import { assertNoPreview } from "./preview.js";
 
 // Lazy-loaded AWS SDK clients (same pattern as ses.ts)
 let _route53Domains: any;
 let _route53: any;
 
 async function getRoute53Domains() {
+  // Registrar, transferir o renovar cuesta dinero real y es irreversible (una redención ronda
+  // los $90 USD). El guard va en el cliente y no en las tres funciones para que una operación
+  // nueva sobre dominios no se salte la compuerta.
+  assertNoPreview("route53-domains");
   if (!_route53Domains) {
     const { Route53DomainsClient } = await import("@aws-sdk/client-route-53-domains");
     // Route 53 Domains API is only available in us-east-1

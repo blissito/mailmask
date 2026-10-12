@@ -2,6 +2,7 @@ import { log } from "./logger.js";
 import { db } from "./pg.js";
 import { tokens } from "./schema.js";
 import { eq, and, gt } from "drizzle-orm";
+import { assertNoPreview } from "./preview.js";
 
 // MailMask is pinned to us-east-1. SES inbound only exists in us-east-1,
 // us-west-2 and eu-west-1, and all receipt rules, the inbound S3 bucket and
@@ -15,7 +16,14 @@ let _sesOutbound: any;
 let _sesInbound: any;
 let _s3: any;
 
-async function getSesOutbound() {
+/**
+ * En preview no se toca SES: un envío desde una copia de la app es un correo real con la
+ * reputación del dominio real. El guard vive aquí y no en cada caller (`emails.ts`, dmarc,
+ * `sendAlert`) para que una puerta nueva no se cuele. Es LA fuente del cliente: main.ts
+ * también lo pide por aquí.
+ */
+export async function getSesOutbound() {
+  assertNoPreview("ses");
   if (!_sesOutbound) {
     const { SESClient } = await import("@aws-sdk/client-ses");
     _sesOutbound = new SESClient({ region: AWS_REGION });
@@ -23,7 +31,9 @@ async function getSesOutbound() {
   return _sesOutbound;
 }
 
-async function getSesInbound() {
+/** Inbound: leer correo y reparar receipt rules es justo lo que la preview del 11-oct tocó. */
+export async function getSesInbound() {
+  assertNoPreview("ses");
   if (!_sesInbound) {
     const { SESClient } = await import("@aws-sdk/client-ses");
     _sesInbound = new SESClient({ region: AWS_REGION });

@@ -1,5 +1,6 @@
 import { statSync } from "node:fs";
 import { programar, esServidor } from "./scheduler.js";
+import { debeArrancarEfectos, esPreview } from "./preview.js";
 import { deleteEmailFromS3, sendAlert } from "./ses.js";
 import { log } from "./logger.js";
 import { db } from "./pg.js";
@@ -309,7 +310,8 @@ programar("10 5 * * *", async () => {
 //
 // Arranque diferido: al levantar, el servidor tiene cosas más urgentes que hacer
 // (reconciliar SES, migraciones) y el backfill baja correo de S3.
-if (esServidor) {
+if (esServidor && esPreview()) log("info", "preview", "Backfill de búsqueda omitido (PREVIEW=1): no se baja correo de S3");
+if (debeArrancarEfectos(esServidor, esPreview())) {
   setTimeout(() => {
     ejecutarBackfill().catch((err) =>
       log("error", "search", "Backfill inicial falló", { error: String(err) })
