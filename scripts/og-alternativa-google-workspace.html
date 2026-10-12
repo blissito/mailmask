@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<!--
+  Plantilla de la imagen social de /alternativa-google-workspace
+  (public/img/og-alternativa-google-workspace.jpg, 1200×630).
+  No se hace con IA: se renderiza con Chromium y se pasa a JPEG.
+    1. Abre este archivo en Chromium con viewport 1200×630 y captura PNG (sin fullPage).
+    2. convert og-alternativa-google-workspace.png -strip -quality 82 -sampling-factor 4:2:0 \
+         public/img/og-alternativa-google-workspace.jpg
+  Debe quedar < 200 KB. Colores = tokens de public/css/input.css; sin fuentes externas.
+  El panel derecho va en UNA sola línea por renglón: una línea larga estira la tarjeta más allá
+  del lienzo de 1200 px.
+  Sin cifras de Google: su precio oficial es por usuario al mes y no incluye impuestos, y la
+  página no publica la conversión a pesos (ficha: docs/agents/seo-paginas-publicas.md).
+-->
+<html lang="es-MX">
+<head>
+<meta charset="UTF-8">
+<title>og-alternativa-google-workspace</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background: #faf6ee; color: #1c1917;
+    font-family: "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
+    display: grid; grid-template-columns: 620px 1fr; gap: 48px;
+    padding: 64px 72px; position: relative;
+  }
+  body::before { content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 12px; background: #d7263d; }
+  .left { display: flex; flex-direction: column; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 16px; font-size: 34px; font-weight: 700; letter-spacing: -0.01em; }
+  h1 { font-size: 52px; line-height: 1.06; font-weight: 800; letter-spacing: -0.035em; }
+  h1 span { color: #b31f33; }
+  .sub { font-size: 23px; line-height: 1.35; color: #57534e; margin-top: 18px; }
+  .chips { display: flex; flex-wrap: nowrap; gap: 8px; }
+  .chips b { font-size: 18px; font-weight: 600; padding: 6px 13px; border: 2px solid #e4dccd; border-radius: 999px; background: #fffdf9; white-space: nowrap; }
+  .rate { align-self: center; }
+  .card { background: #fffdf9; border: 2px solid #e4dccd; border-radius: 22px; padding: 20px 22px 22px;
+          box-shadow: 0 22px 0 -10px #e4dccd; }
+  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+          font-size: 17px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #78716c;
+          padding-bottom: 12px; border-bottom: 2px solid #f2ecdf; }
+  .row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+         padding: 14px 0; border-top: 2px solid #f2ecdf; }
+  .row:first-of-type { border-top: 0; }
+  .row span { font-size: 21px; font-weight: 600; color: #1c1917; white-space: nowrap; }
+  .row b { font-size: 17px; font-weight: 700; padding: 5px 12px; border-radius: 999px;
+           border: 2px solid #bbf7d0; background: #f0fdf4; color: #15803d; white-space: nowrap; }
+  .row b.warn { border-color: #e4dccd; background: #faf6ee; color: #78716c; }
+  .foot { margin-top: 14px; padding-top: 14px; border-top: 2px solid #f2ecdf; font-size: 17px; color: #78716c; white-space: nowrap; }
+</style>
+</head>
+<body>
+  <section class="left">
+    <div class="brand">
+      <svg width="56" height="56" viewBox="0 0 80 80" fill="none" aria-hidden="true">
+        <ellipse cx="40" cy="42" rx="28" ry="24" fill="#a0182c"/>
+        <ellipse cx="40" cy="38" rx="28" ry="22" fill="#d7263d"/>
+        <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/>
+        <ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/>
+        <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/>
+        <circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
+        <circle cx="30.2" cy="34.9" r="1.9" fill="#fff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#fff"/>
+        <path d="M40 18 L40 26" stroke="#f2b705" stroke-width="2" stroke-linecap="round"/>
+        <path d="M36 19 L40 26 L44 19" stroke="#f2b705" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </svg>
+      MailMask
+    </div>
+    <div>
+      <h1>Correo por dominio,<br><span>no por persona.</span></h1>
+      <p class="sub">La alternativa a Google Workspace, para quien sólo quiere que su equipo tenga correo.</p>
+    </div>
+    <div class="chips"><b>Sin licencias</b><b>DKIM + SPF</b><b>Migrar en días</b></div>
+  </section>
+  <section class="rate" aria-hidden="true">
+    <div class="card">
+      <div class="head"><span>1 dominio</span><span>al mes</span></div>
+      <div class="row"><span>Google Workspace</span><b class="warn">Licencia × persona</b></div>
+      <div class="row"><span>MailMask</span><b>$99 MXN, equipo entero</b></div>
+      <div class="row"><span>Personas de más</span><b>Sin costo extra</b></div>
+      <div class="foot">Precios citados con fuente y fecha</div>
+    </div>
+  </section>
+</body>
+</html>

@@ -263,7 +263,7 @@
               "name": "¿En qué se diferencia de Google Workspace?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "Google Workspace cobra por usuario ($140 MXN al mes cada uno). Si necesitas 5 personas con correo, pagas 5 licencias: $700. Con MailMask un dominio activado cuesta $99 al mes y entran las personas que sean — buzones ilimitados, Bandeja compartida sin límite de asientos, máscaras ilimitadas. Cada una puede reenviar a uno o varios destinos o guardar su propio correo. Pagas por dominio, no por persona."
+                "text": "Google Workspace cobra por usuario: su precio es por usuario al mes y no incluye impuestos, según su página oficial de precios (https://workspace.google.com/pricing?hl=es_mx), consultada el 12 de octubre de 2026. La comparativa completa está en https://www.mailmask.studio/alternativa-google-workspace. Con MailMask un dominio activado cuesta $99 al mes y entran las personas que sean — buzones ilimitados, Bandeja compartida sin límite de asientos, máscaras ilimitadas. Cada una puede reenviar a uno o varios destinos o guardar su propio correo. Pagas por dominio, no por persona."
               }
             },
             {
@@ -735,7 +735,7 @@
       <!-- El gráfico: una línea trepa con cada persona, la otra no se mueve -->
       <div class="bg-bg-elev border border-line rounded-2xl p-4 sm:p-6 overflow-hidden">
         <svg id="calc-chart" viewBox="0 0 720 300" width="100%" role="img" aria-labelledby="chartT" style="display:block">
-          <title id="chartT">Costo mensual según el número de personas con buzón</title>
+          <title id="chartT">Unidades que pagas al mes según el número de personas con buzón: una licencia de Google por persona, un dominio de MailMask</title>
           <g id="chart-grid"></g>
           <path id="line-gw" fill="none" stroke="rgb(var(--fg-subtle))" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
           <path id="area-mm" fill="rgb(var(--accent))" fill-opacity="0.08" stroke="none" />
@@ -749,12 +749,17 @@
           <text x="360" y="295" fill="rgb(var(--fg-subtle))" font-family="system-ui,sans-serif" font-size="12" text-anchor="middle">personas con buzón →</text>
         </svg>
       </div>
+      <p class="text-center text-xs text-fg-muted mt-3">
+        El eje cuenta unidades que pagas al mes, no pesos: en Google, una licencia por persona con
+        buzón; en MailMask, un dominio (el primero gratis, los activados a $99 cada uno, con las
+        personas que sean).
+      </p>
 
       <div class="grid sm:grid-cols-3 gap-4 mt-6 text-center">
         <div class="border border-line rounded-2xl p-4 bg-bg-elev">
           <p class="text-xs text-fg-muted uppercase tracking-wide mb-1">Google Workspace</p>
-          <p id="calc-gw-price" class="text-2xl font-semibold text-fg">$648</p>
-          <p class="text-xs text-fg-muted mt-1">$108 × <span id="calc-gw-users">6</span> personas</p>
+          <p id="calc-gw-licencias" class="text-2xl font-semibold text-fg">6 licencias</p>
+          <p class="text-xs text-fg-muted mt-1">una por persona con buzón</p>
         </div>
         <div class="border-2 border-accent rounded-2xl p-4 bg-bg-elev ">
           <p class="text-xs text-fg-muted uppercase tracking-wide mb-1">MailMask</p>
@@ -763,20 +768,29 @@
           <p id="calc-mm-envio" class="text-xs text-accent-text mt-1">$99 si además quieres iniciar correos, equipo y buzones</p>
         </div>
         <div class="border border-line rounded-2xl p-4 bg-bg-elev">
-          <p class="text-xs text-fg-muted uppercase tracking-wide mb-1">Ahorro al año</p>
-          <p id="calc-savings" class="text-2xl font-semibold text-accent-text">$6,600</p>
-          <p id="calc-badge" class="text-xs text-fg-muted mt-1">85% menos</p>
+          <p class="text-xs text-fg-muted uppercase tracking-wide mb-1">Por persona de más</p>
+          <p class="text-2xl font-semibold text-accent-text">$0</p>
+          <p class="text-xs text-fg-muted mt-1">en MailMask; en Google, otra licencia</p>
         </div>
       </div>
 
       <p class="text-center text-xs text-fg-muted mt-5 max-w-2xl mx-auto">
         En MailMask el precio no cambia con el tamaño del equipo: los miembros no cuestan extra.
-        En Workspace, cada persona que necesita buzón es otra licencia.
+        En Workspace, cada persona que necesita buzón es otra licencia: el precio lo fija Google por
+        usuario al mes y no incluye impuestos. El vigente está en su
+        <a href="https://workspace.google.com/pricing?hl=es_mx" target="_blank" rel="noopener" class="hover:underline">página oficial de precios</a>,
+        consultada el <time datetime="2026-10-12">12 de octubre de 2026</time>.
       </p>
     </div>
     <!-- Comparison -->
     <div class="max-w-3xl mx-auto mt-16">
       <h3 class="text-2xl font-semibold tracking-tight text-center mb-8">MailMask vs Google Workspace</h3>
+      <p class="text-center text-fg-muted mb-8 max-w-2xl mx-auto">
+        Google cobra <strong class="text-fg">una licencia por persona</strong> (su precio es por usuario
+        al mes y no incluye impuestos). Aquí el dominio activado cuesta
+        <strong class="text-fg">$99 MXN al mes</strong> con las personas que sean:
+        <a href="/alternativa-google-workspace" class="text-accent-text hover:underline">la comparativa completa, con fuente y fecha, está aquí →</a>
+      </p>
       <div
         class="bg-bg-elev rounded-2xl border border-line overflow-hidden"
       >
@@ -786,27 +800,6 @@
           <div></div>
           <div class="text-center text-fg-muted">Google Workspace</div>
           <div class="text-center text-fg">MailMask</div>
-        </div>
-        <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
-        >
-          <div class="text-fg-muted">1 dominio, 1 persona</div>
-          <div class="text-center">$140 MXN/mes</div>
-          <div class="text-center text-accent-text font-semibold">Gratis</div>
-        </div>
-        <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
-        >
-          <div class="text-fg-muted">1 dominio, 5 personas</div>
-          <div class="text-center">$700 MXN/mes</div>
-          <div class="text-center text-accent-text font-semibold">$99 MXN/mes</div>
-        </div>
-        <div
-          class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
-        >
-          <div class="text-fg-muted">5 dominios, 5 personas c/u</div>
-          <div class="text-center">$3,500 MXN/mes</div>
-          <div class="text-center text-accent-text font-semibold">$495 MXN/mes</div>
         </div>
         <div
           class="comparison-row grid grid-cols-3 px-4 py-3 border-t border-line"
@@ -981,8 +974,10 @@
             <span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span>
           </summary>
           <p>
-            Google Workspace cobra por usuario ($140 MXN al mes cada uno). Si
-            necesitas 5 personas con correo, pagas 5 licencias: $700. Con MailMask
+            Google Workspace cobra por usuario: su precio es por usuario al mes y no
+            incluye impuestos, según su <a href="https://workspace.google.com/pricing?hl=es_mx" target="_blank" rel="noopener" class="text-accent-text hover:underline">página oficial de precios</a>
+            (consultada el <time datetime="2026-10-12">12 de octubre de 2026</time>).
+            <a href="/alternativa-google-workspace" class="text-accent-text hover:underline">La comparativa completa está aquí</a>. Con MailMask
             un dominio activado cuesta $99 al mes y entran las personas que sean —
             buzones ilimitados, Bandeja compartida sin límite de asientos, máscaras
             ilimitadas. Cada una puede reenviar a uno o varios destinos (Gmail,
@@ -1058,9 +1053,10 @@
           <svg class="w-6 h-6" viewBox="0 0 80 80" fill="none" aria-hidden="true"><ellipse cx="40" cy="42" rx="28" ry="24" fill="rgb(var(--mascara-sombra))"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mascara))"/><ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="30.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="26.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><circle cx="50.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><path d="M40 18 L40 26" stroke="rgb(var(--gold))" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="rgb(var(--gold))" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
           MailMask <span class="text-fg-subtle font-normal">· mailmask.studio</span>
         </div>
-        <div class="text-fg-muted text-sm flex gap-5">
+        <div class="text-fg-muted text-sm flex flex-wrap justify-center gap-5">
           <a href="/bandeja-compartida" class="hover:text-fg transition-colors">Bandeja compartida</a>
           <a href="/dominios" class="hover:text-fg transition-colors">Dominios</a>
+          <a href="/alternativa-google-workspace" class="hover:text-fg transition-colors">Alternativa a Google Workspace</a>
           <a href="/terms" class="hover:text-fg transition-colors">Términos</a>
           <a href="/privacy" class="hover:text-fg transition-colors">Privacidad</a>
           <a href="/docs" class="hover:text-fg transition-colors">Docs</a>

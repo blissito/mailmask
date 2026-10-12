@@ -1309,7 +1309,7 @@ const app = new Elysia({ adapter: node() })
              "Export", "Bandeja", "Agents", "Domain Registration", "Assistant"],
       paths: [
         "/", "/login", "/register", "/app", "/composer-demo", "/cli/authorize", "/css/*", "/js/*", "/img/*",
-        "/favicon.svg", "/landing", "/pricing", "/bandeja", "/bandeja-compartida", "/dominios", "/admin",
+        "/favicon.svg", "/landing", "/pricing", "/bandeja", "/bandeja-compartida", "/dominios", "/alternativa-google-workspace", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
         "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/.well-known/mcp-registry-auth", "/health", "/healthz", "/docs", "/mcp", "/api/internal/outbound",
@@ -1539,6 +1539,7 @@ const app = new Elysia({ adapter: node() })
   .get("/pricing", () => serveStatic("/pricing.html"))
   .get("/bandeja-compartida", () => serveStatic("/bandeja-compartida.html"))
   .get("/dominios", () => serveStatic("/dominios.html"))
+  .get("/alternativa-google-workspace", () => serveStatic("/alternativa-google-workspace.html"))
   .get("/bandeja", () => serveStatic("/bandeja.html"))
   .get("/admin", async ({ request }) => {
     const user = await getAuthUser(request);
