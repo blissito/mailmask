@@ -57,3 +57,25 @@ que es justo lo que usan `emitEvent` y `deliverPending` para armar `nextAt`.
 Git no puede fusionar un `add/add` del mismo camino: dos PRs que crean `webhooks.test.ts` chocan
 aunque su contenido sea distinto. Si el archivo ya está tomado, usa otro nombre en vez de esperar
 el merge.
+
+## Congelar el reloj con `mock.timers` (y por qué `mock.method(Date, "now")` no basta)
+
+Para el borde exacto de una ventana de tiempo (`|ahora - ts| > tolerancia`) hace falta que
+`Date.now()` NO avance entre el cálculo del timestamp y la verificación, y arriba ya quedó dicho que
+`mock.method(Date, "now")` sólo sustituye ese método. `mock.timers.enable({ apis: ["Date"], now: T0 })`
+congela el reloj entero (`mock.timers.reset()` lo suelta en el `afterEach`): así el caso justo en el
+límite pasa y `+1 ms` se rechaza sin depender de lo que tarde la máquina. Lo usa `sdk-verify.test.ts`.
+
+**No frena WebCrypto.** `verifyWebhookSignature` del SDK (`sdk/src/verify.ts`) firma con
+`crypto.subtle` y es `async`; congelar sólo `Date` no toca las promesas, así que la verificación
+resuelve normal (probado en Node 22). Si algún día dejara de resolver, el plan B es pasar
+`toleranceMs` explícito y usar timestamps relativos con margen amplio en vez del borde exacto.
+
+## Un contrato con otro paquete: leer el fuente, no importarlo
+
+`cli/src/args.ts` hace `import type` de `@easybits.cloud/mailmask`, que no está en el root: importarlo
+desde una prueba del root da TS2307 y rompe `npm run typecheck`. Para vigilar una constante del CLI
+(`BILLING_KINDS`) sin importarlo, se lee el archivo como texto y se extrae con regex
+(`plans.test.ts`), igual que `docs-cli.test.ts` lee los comandos. Con `assert.ok(match)` y una lista
+no vacía ANTES de comparar, la prueba falla —en vez de pasar vacía— si la constante cambia de forma.
+
