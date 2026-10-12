@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Un solo bloque de metas: title, description, canonical, hreflang y OG/Twitter.
+         Lo vigila public-seo.test.ts (ficha: docs/agents/seo-paginas-publicas.md). -->
+    <title>Dominios: registrar y transferir el tuyo — MailMask</title>
+    <meta
+      name="description"
+      content="Registra tu dominio nuevo o trae el que ya tienes: revisamos los requisitos antes de cobrar, el DNS sólo se mueve con tu visto bueno y tu correo queda andando."
+    />
+    <link rel="canonical" href="https://www.mailmask.studio/dominios" />
+    <link rel="alternate" hreflang="es-MX" href="https://www.mailmask.studio/dominios" />
+    <link rel="alternate" hreflang="x-default" href="https://www.mailmask.studio/dominios" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:url" content="https://www.mailmask.studio/dominios" />
+    <meta property="og:title" content="Dominios: registrar y transferir el tuyo — MailMask" />
+    <meta
+      property="og:description"
+      content="Registra tu dominio nuevo o trae el que ya tienes: revisamos los requisitos antes de cobrar, el DNS sólo se mueve con tu visto bueno y tu correo queda andando."
+    />
+    <meta property="og:image" content="https://www.mailmask.studio/img/og-dominios.jpg" />
+    <meta property="og:image:secure_url" content="https://www.mailmask.studio/img/og-dominios.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Registrar y transferir dominios en MailMask" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@HectorBlisS" />
+    <meta name="twitter:creator" content="@HectorBlisS" />
+    <meta name="twitter:title" content="Dominios: registrar y transferir el tuyo — MailMask" />
+    <meta
+      name="twitter:description"
+      content="Registra tu dominio nuevo o trae el que ya tienes: revisamos los requisitos antes de cobrar, el DNS sólo se mueve con tu visto bueno y tu correo queda andando."
+    />
+    <meta name="twitter:image" content="https://www.mailmask.studio/img/og-dominios.jpg" />
+    <meta name="twitter:image:alt" content="Registrar y transferir dominios en MailMask" />
+
+    <!-- Un solo JSON-LD: un `@graph` con #org y #website compartidos, el WebPage de
+         /dominios (con su breadcrumb, su dateModified y su FAQ) y nada más. Sin
+         SoftwareApplication: Google lo marca inválido sin ratings (ver la ficha). -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://www.mailmask.studio/#org",
+            "name": "MailMask",
+            "url": "https://www.mailmask.studio/",
+            "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" }
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://www.mailmask.studio/#website",
+            "url": "https://www.mailmask.studio/",
+            "name": "MailMask",
+            "inLanguage": "es-MX",
+            "publisher": { "@id": "https://www.mailmask.studio/#org" }
+          },
+          {
+            "@type": "WebPage",
+            "@id": "https://www.mailmask.studio/dominios#webpage",
+            "url": "https://www.mailmask.studio/dominios",
+            "name": "Dominios: registrar y transferir el tuyo — MailMask",
+            "description": "Registra tu dominio nuevo o trae el que ya tienes: revisamos los requisitos antes de cobrar, el DNS sólo se mueve con tu visto bueno y tu correo queda andando.",
+            "dateModified": "2026-10-12",
+            "inLanguage": "es-MX",
+            "isPartOf": { "@id": "https://www.mailmask.studio/#website" },
+            "about": { "@id": "https://www.mailmask.studio/#org" },
+            "breadcrumb": { "@id": "https://www.mailmask.studio/dominios#breadcrumb" },
+            "mainEntity": { "@id": "https://www.mailmask.studio/dominios#faq" }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "@id": "https://www.mailmask.studio/dominios#breadcrumb",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Inicio",
+                "item": "https://www.mailmask.studio/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Dominios",
+                "item": "https://www.mailmask.studio/dominios"
+              }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://www.mailmask.studio/dominios#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "¿Puedo traer un dominio que ya está en otro registrador?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Sí. Es una transferencia de entrada: revisamos los requisitos antes de cobrarte y sólo después movemos los nameservers, con tu inventario de DNS aprobado."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Por qué mi dominio aún no se puede transferir?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "ICANN bloquea 60 días desde el registro o desde un cambio reciente, y el candado de transferencia del registrador también la detiene. Los dos se van solos; nosotros no podemos saltarlos."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Cuánto tarda una transferencia?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Entre 5 y 7 días desde que apruebas el correo del registrador. En el camino el dominio sigue funcionando donde está: nada se mueve hasta que tú apruebas."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Dónde veo el precio de mi dominio?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Al buscarlo, antes de pagar. El precio depende de la extensión y no lo escondemos ni lo publicamos de adorno: te lo decimos exacto con tu resultado."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Qué pasa con mi correo actual durante la transferencia?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Sigue igual. Tu correo y tu web viven en tu zona de DNS, y no la tocamos hasta que apruebes el inventario de registros que te mostramos antes."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Necesito comprar el dominio para tener correo profesional?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Puedes empezar gratis con un dominio que ya tengas conectado. Al activarlo se abre equipo ilimitado, buzones y envío, y el plan anual es el que sale mejor."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+
+    <script src="/js/analytics.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <script src="/js/theme.js"></script>
+  </head>
+  <body class="site bg-bg text-fg antialiased">
+    <!-- Top nav -->
+    <nav class="fixed top-0 inset-x-0 z-40 border-b border-line/70 bg-bg/85 backdrop-blur">
+      <div class="max-w-6xl mx-auto flex items-center gap-6 px-5 h-14">
+        <a href="/" class="flex items-center gap-2 font-bold text-[15px] text-fg">
+          <svg class="w-7 h-7" viewBox="0 0 80 80" fill="none" aria-hidden="true"><ellipse cx="40" cy="42" rx="28" ry="24" fill="rgb(var(--mascara-sombra))"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mascara))"/><ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="30.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="26.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><circle cx="50.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><path d="M40 18 L40 26" stroke="rgb(var(--gold))" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="rgb(var(--gold))" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+          MailMask
+        </a>
+        <div class="hidden sm:flex items-center gap-5 ml-4 text-sm text-fg-muted">
+          <a href="/#como-funciona" class="hover:text-fg transition-colors">Cómo funciona</a>
+          <a href="/pricing" class="hover:text-fg transition-colors">Precios</a>
+          <a href="/docs" class="hover:text-fg transition-colors">Docs</a>
+          <a href="/blog" class="hover:text-fg transition-colors">Blog</a>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+          <button type="button" data-theme-toggle class="theme-toggle inline-flex h-9 w-9 items-center justify-center rounded-full border border-line text-fg-muted hover:text-fg transition-colors" aria-label="Cambiar tema">
+            <svg class="h-4 w-4 sun" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path stroke-linecap="round" d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4l1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            <svg class="h-4 w-4 moon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+          </button>
+          <a href="/login" class="hidden sm:inline text-sm font-medium text-fg-muted hover:text-fg transition-colors px-3">Iniciar sesión</a>
+          <a href="/register" class="btn-primary !px-4 !py-2 !text-sm">Empezar</a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="max-w-6xl mx-auto px-5 pt-32 pb-8 md:pt-40">
+      <p class="eyebrow mb-3">Dominios</p>
+      <div class="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 lg:gap-16 items-end">
+        <h1 class="text-4xl sm:text-5xl font-semibold tracking-tight">Tu nombre en internet, con correo que sí llega.</h1>
+        <div>
+          <p class="text-lg text-fg-muted leading-relaxed">
+            Registra uno nuevo o trae el que ya tienes. Antes de mover nada revisamos que la
+            transferencia <strong class="font-semibold text-accent-text">pueda ocurrir de verdad</strong>,
+            y tu zona de DNS no se toca hasta que apruebes lo que vas a mover — es lo que evita que
+            la web y el correo se caigan a media mudanza.
+          </p>
+          <div class="flex flex-wrap items-center gap-3 mt-5">
+            <a href="/register" class="btn-primary">Buscar mi dominio</a>
+            <a href="/pricing" class="btn-secondary">Ver precios</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dos caminos -->
+    <section class="max-w-5xl mx-auto px-5 py-12">
+      <h2 class="text-2xl font-semibold tracking-tight mb-6">Dos caminos, el mismo final</h2>
+      <div class="grid md:grid-cols-2 gap-5">
+        <div class="bg-bg-elev border border-line rounded-2xl p-6">
+          <p class="eyebrow mb-2">Registrar</p>
+          <p class="font-semibold mb-2">El dominio todavía está libre</p>
+          <p class="text-sm text-fg-muted leading-relaxed mb-4">
+            Buscas el nombre, ves el precio de esa extensión con tu resultado y lo registras.
+            Queda a tu nombre desde el primer minuto, con los nameservers de MailMask puestos.
+          </p>
+          <ul class="space-y-2 text-sm text-fg-muted leading-relaxed">
+            <li>Buscador con las extensiones que manejamos; si no aparece la tuya, te lo decimos.</li>
+            <li>Sin cargo anual escondido: el precio de la extensión se muestra antes de pagar.</li>
+            <li>Renovación por adelantado, sin sorpresa el mes que vence.</li>
+          </ul>
+        </div>
+        <div class="bg-bg-elev border border-line rounded-2xl p-6">
+          <p class="eyebrow mb-2">Transferir</p>
+          <p class="font-semibold mb-2">El dominio ya es tuyo, en otro registrador</p>
+          <p class="text-sm text-fg-muted leading-relaxed mb-4">
+            Lo traemos completo —con su historial y su antigüedad— revisando los requisitos antes
+            de cobrarte. Si algo lo bloquea, te lo decimos antes y no te cobramos la mudanza.
+          </p>
+          <ul class="space-y-2 text-sm text-fg-muted leading-relaxed">
+            <li>Un solo pago por la transferencia.</li>
+            <li>Tus registros de DNS entran a un inventario que revisas y corriges antes de aprobarlo.</li>
+            <li>Se conserva la antigüedad: no arrancas de cero en los buscadores.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="text-fg-subtle text-sm mt-4">
+        El precio exacto de tu dominio lo ves al buscarlo, con tu extensión y tu resultado. No
+        publicamos una tabla de «desde» que después no cuadre al pagar.
+      </p>
+    </section>
+
+    <!-- Cómo funciona la transferencia -->
+    <section class="max-w-3xl mx-auto px-5 py-12">
+      <h2 class="text-2xl font-semibold tracking-tight mb-4">Traer un dominio que ya tiene correo y web</h2>
+      <p class="text-fg-muted leading-relaxed mb-6">
+        Mover un dominio en uso es delicado: si cambiamos sus nameservers con la zona vacía, su web
+        y su correo mueren en el acto. Por eso nada se mueve sin que tú apruebes primero. Éste es el
+        camino real, paso por paso.
+      </p>
+
+      <ol class="space-y-5">
+        <li class="flex gap-4">
+          <span class="flex-none w-7 h-7 rounded-full bg-bg-inset border border-line text-sm font-semibold flex items-center justify-center text-accent-text">1</span>
+          <div>
+            <p class="font-semibold">Revisamos que se pueda, antes de cobrar</p>
+            <p class="text-sm text-fg-muted leading-relaxed">
+              Consultamos al registrador actual y a los registros públicos del dominio: que la
+              transferencia esté permitida, que el dominio tenga más de 60 días y que el candado de
+              transferencia esté apagado. Hay dos cosas que sólo tú puedes confirmar: que la
+              privacidad WHOIS esté apagada y que puedas leer el correo del contacto administrativo.
+            </p>
+          </div>
+        </li>
+        <li class="flex gap-4">
+          <span class="flex-none w-7 h-7 rounded-full bg-bg-inset border border-line text-sm font-semibold flex items-center justify-center text-accent-text">2</span>
+          <div>
+            <p class="font-semibold">Nos pasas el código de autorización (EPP)</p>
+            <p class="text-sm text-fg-muted leading-relaxed">
+              Lo pides en el panel de tu registrador actual; a veces se llama «código EPP», «auth
+              code» o «código de transferencia». Entregarlo es entregar el dominio, así que lo
+              guardamos cifrado y lo borramos en cuanto el registrador acepta la solicitud.
+            </p>
+          </div>
+        </li>
+        <li class="flex gap-4">
+          <span class="flex-none w-7 h-7 rounded-full bg-bg-inset border border-line text-sm font-semibold flex items-center justify-center text-accent-text">3</span>
+          <div>
+            <p class="font-semibold">El registrador te escribe a ti</p>
+            <p class="text-sm text-fg-muted leading-relaxed">
+              Mandamos la solicitud y el registrador actual envía un correo de aprobación al contacto
+              administrativo. Si no lo contestas, la transferencia se cancela sola en unos días —
+              por eso pedimos que ese buzón sea tuyo y esté accesible.
+            </p>
+          </div>
+        </li>
+        <li class="flex gap-4">
+          <span class="flex-none w-7 h-7 rounded-full bg-bg-inset border border-line text-sm font-semibold flex items-center justify-center text-accent-text">4</span>
+          <div>
+            <p class="font-semibold">Tú apruebas el inventario de DNS y ahí sí se mueve</p>
+            <p class="text-sm text-fg-muted leading-relaxed">
+              Antes de tocar los nameservers te mostramos los registros que encontramos para que los
+              revises y corrijas lo que haga falta. El traspaso sigue su curso por su lado —los 5 a 7
+              días del paso 3— y sólo cuando termina <em>y</em> tu inventario está aprobado el
+              dominio apunta a MailMask: hasta entonces tu web y tu correo siguen donde están.
+            </p>
+          </div>
+        </li>
+      </ol>
+
+      <p class="text-fg-subtle text-sm mt-6">
+        ¿Aún no cumple los 60 días o el candado sigue puesto? Te decimos exactamente qué falta y
+        con qué registrador hablarlo, en vez de dejarte esperando una transferencia que no va a pasar.
+      </p>
+    </section>
+
+    <!-- Correo en tu dominio -->
+    <section class="max-w-5xl mx-auto px-5 py-12">
+      <div class="grid lg:grid-cols-2 gap-6 lg:gap-14 items-center">
+        <div>
+          <h2 class="text-2xl font-semibold tracking-tight mb-4">Y ya que es tuyo, que tenga tu correo</h2>
+          <p class="text-fg-muted leading-relaxed mb-4">
+            El dominio es gratis para empezar: una persona, una dirección, reenvío a donde ya
+            trabajas. Al <strong class="font-semibold text-fg">activarlo</strong> se abre todo lo demás
+            sobre ese dominio — sin pagar por cabeza.
+          </p>
+          <ul class="space-y-3 text-fg-muted leading-relaxed">
+            <li><strong class="font-semibold text-fg">Personas ilimitadas</strong> con la bandeja compartida del equipo.</li>
+            <li><strong class="font-semibold text-fg">Buzones de verdad</strong> (IMAP) además del reenvío, para las direcciones que lo necesitan.</li>
+            <li><strong class="font-semibold text-fg">Envío autenticado</strong> con SPF, DKIM y DMARC puestos por nosotros, para que no caiga en spam.</li>
+          </ul>
+          <p class="text-fg-subtle text-sm mt-4">
+            El plan anual del dominio activado son <strong class="font-semibold text-fg">$999 MXN</strong>
+            — dos meses de regalo frente a pagarlo mes con mes. El desglose completo está en
+            <a href="/pricing" class="text-accent-text hover:underline">precios</a>.
+          </p>
+        </div>
+        <div class="bg-bg-elev border border-line rounded-2xl p-6">
+          <p class="text-xs uppercase tracking-wider text-fg-subtle mb-3">Tu dominio activado</p>
+          <ul class="space-y-3 text-sm">
+            <li class="flex items-baseline justify-between gap-4 border-b border-line pb-3">
+              <span class="text-fg-muted">Direcciones</span><span class="font-semibold text-fg">ilimitadas</span>
+            </li>
+            <li class="flex items-baseline justify-between gap-4 border-b border-line pb-3">
+              <span class="text-fg-muted">Correo saliente</span><span class="font-semibold text-fg">por dominio, no por persona</span>
+            </li>
+            <li class="flex items-baseline justify-between gap-4 border-b border-line pb-3">
+              <span class="text-fg-muted">Buzón incluido</span><span class="font-semibold text-fg">10 GB</span>
+            </li>
+            <li class="flex items-baseline justify-between gap-4 border-b border-line pb-3">
+              <span class="text-fg-muted">Registros del historial</span><span class="font-semibold text-fg">90 días</span>
+            </li>
+            <li class="flex items-baseline justify-between gap-4">
+              <span class="text-fg-muted">Bandeja compartida</span><span class="font-semibold text-accent-text">incluida</span>
+            </li>
+          </ul>
+          <a href="/bandeja-compartida" class="inline-block mt-5 text-sm text-accent-text hover:underline">
+            Cómo trabaja el equipo en la bandeja compartida →
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="max-w-3xl mx-auto px-5 py-12">
+      <h2 class="text-2xl font-semibold tracking-tight mb-6">Preguntas que nos hacen seguido</h2>
+      <dl class="space-y-6">
+        <div>
+          <dt class="font-semibold mb-2">¿Puedo traer un dominio que ya está en otro registrador?</dt>
+          <dd class="text-fg-muted leading-relaxed text-sm">Sí. Es una transferencia de entrada: revisamos los requisitos antes de cobrarte y sólo movemos los nameservers cuando apruebas el inventario de DNS.</dd>
+        </div>
+        <div>
+          <dt class="font-semibold mb-2">¿Por qué mi dominio aún no se puede transferir?</dt>
+          <dd class="text-fg-muted leading-relaxed text-sm">ICANN bloquea 60 días desde el registro o desde un cambio reciente, y el candado de transferencia del registrador también la frena. Los dos se van solos; nosotros no podemos saltarlos y no te cobramos por intentarlo.</dd>
+        </div>
+        <div>
+          <dt class="font-semibold mb-2">¿Cuánto tarda una transferencia?</dt>
+          <dd class="text-fg-muted leading-relaxed text-sm">Entre 5 y 7 días desde que apruebas el correo del registrador. Mientras tanto el dominio sigue funcionando donde está.</dd>
+        </div>
+        <div>
+          <dt class="font-semibold mb-2">¿Dónde veo el precio de mi dominio?</dt>
+          <dd class="text-fg-muted leading-relaxed text-sm">Al buscarlo, antes de pagar. Depende de la extensión, así que te lo damos exacto con tu resultado en vez de una tabla de «desde» que luego no cuadra.</dd>
+        </div>
+        <div>
+          <dt class="font-semibold mb-2">¿Qué pasa con mi correo durante la transferencia?</dt>
+          <dd class="text-fg-muted leading-relaxed text-sm">Sigue igual. Tu correo y tu web viven en tu zona de DNS y no la tocamos hasta que apruebas el inventario de registros que te mostramos.</dd>
+        </div>
+        <div>
+          <dt class="font-semibold mb-2">¿Necesito comprar un dominio para tener correo profesional?</dt>
+          <dd class="text-fg-muted leading-relaxed text-sm">Puedes empezar gratis conectando un dominio que ya tengas. Al activarlo se abre equipo ilimitado, buzones y envío sobre ese dominio.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- Artículos -->
+    <section class="max-w-6xl mx-auto px-5 py-12">
+      <h2 class="text-2xl font-semibold tracking-tight mb-6">Para seguirle</h2>
+      <div class="grid md:grid-cols-2 gap-5">
+        <a href="/blog/enviar-emails-desde-dominio" class="bg-bg-elev border border-line rounded-2xl p-6 hover:border-fg-subtle transition-colors">
+          <p class="text-xs uppercase tracking-wider text-fg-subtle mb-2">Guía</p>
+          <p class="font-semibold mb-2">Cómo enviar correo desde tu propio dominio</p>
+          <p class="text-sm text-fg-muted leading-relaxed">Los registros SPF, DKIM y DMARC que hacen que tus correos lleguen a la bandeja de entrada y no al spam. Qué hace cada uno y cuál se te puede olvidar.</p>
+        </a>
+        <a href="/blog/migrar-google-workspace-a-mailmask" class="bg-bg-elev border border-line rounded-2xl p-6 hover:border-fg-subtle transition-colors">
+          <p class="text-xs uppercase tracking-wider text-fg-subtle mb-2">Migración</p>
+          <p class="font-semibold mb-2">Migrar de Google Workspace a MailMask</p>
+          <p class="text-sm text-fg-muted leading-relaxed">Qué se lleva y qué se deja al salir de un cobro por persona: tus direcciones, tus reglas de reenvío y tu bandeja, sin que se caiga el correo del equipo en el cambio.</p>
+        </a>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="max-w-6xl mx-auto px-5 py-16">
+      <div class="bg-bg-elev border border-line rounded-2xl p-8 text-center">
+        <h2 class="text-2xl font-semibold tracking-tight mb-3">Busca tu dominio y mira el precio real</h2>
+        <p class="text-fg-muted leading-relaxed max-w-2xl mx-auto mb-5">
+          Escríbelo, ve si está libre y cuánto cuesta esa extensión. Si ya es tuyo en otro
+          registrador, el mismo buscador te dice si se puede traer hoy o qué le falta.
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <a href="/register" class="btn-primary">Buscar mi dominio</a>
+          <a href="/docs" class="btn-secondary">Leer los docs</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-line py-10 mt-8">
+      <div class="max-w-6xl mx-auto px-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-fg text-sm font-semibold">
+          <svg class="w-6 h-6" viewBox="0 0 80 80" fill="none" aria-hidden="true"><ellipse cx="40" cy="42" rx="28" ry="24" fill="rgb(var(--mascara-sombra))"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mascara))"/><ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="30.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="26.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><circle cx="50.7" cy="38.9" r="1.15" fill="#ffffff" opacity="0.85"/><path d="M40 18 L40 26" stroke="rgb(var(--gold))" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="rgb(var(--gold))" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+          MailMask <span class="text-fg-subtle font-normal">· mailmask.studio</span>
+        </div>
+        <div class="text-fg-muted text-sm flex gap-5">
+          <a href="/terms" class="hover:text-fg transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-fg transition-colors">Privacidad</a>
+          <a href="/docs" class="hover:text-fg transition-colors">Docs</a>
+          <a href="/blog" class="hover:text-fg transition-colors">Blog</a>
+          <a href="/login" class="hover:text-fg transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-fg-subtle text-xs mt-6">
+        Actualizado: <time datetime="2026-10-12">12 de octubre de 2026</time>
+      </p>
+      <p class="text-center text-fg-subtle text-xs mt-1">
+        © 2026 by <a href="https://fixter.org" target="_blank" rel="noopener" class="hover:text-fg underline decoration-dotted transition-colors">fixter.org</a>
+      </p>
+    </footer>
+    <script src="/js/landing.js" defer></script>
+  </body>
+</html>
