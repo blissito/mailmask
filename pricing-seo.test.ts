@@ -79,6 +79,12 @@ test("los bloques de add-on muestran el precio de plans.ts", () => {
     const precio = precioMostrado(ADDONS[kind].price);
     assert.equal(bloque.match(/data-price="(\d+)"/)?.[1], precio, `el data-price de ${kind}`);
     assert.ok(bloque.includes(`+$${precio}`), `el bloque ${kind} no muestra +$${precio}`);
+    // La captura es la SUYA, no la de al lado: si el bloque se estira hasta el siguiente,
+    // el +$99 de la tarjeta vecina hace pasar la aserción de arriba.
+    for (const vecino of ["storage50", "sends100"] as const) {
+      if (vecino === kind) continue;
+      assert.ok(!bloque.includes(`data-addon="${vecino}"`), `el bloque de ${kind} se estiró hasta ${vecino}`);
+    }
   }
 });
 
