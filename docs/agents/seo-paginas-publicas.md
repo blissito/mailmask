@@ -12,13 +12,16 @@ imagen social).
 - **JSON-LD en un único `@graph`** con `#org` (Organization) y `#website` (WebSite) como
   nodos compartidos; el resto los referencia por `@id` en vez de repetir nombre y logo.
 - **`dateModified` = la fecha visible** («Actualizado: <fecha>», con `<time datetime>`).
-  Al editar la página, se cambian las dos y el `lastmod` del sitemap.
+  Al editar la página, se cambian las dos y el `lastmod` del sitemap. En los legales
+  (`/terms`, `/privacy`) `public-seo.test.ts` amarra las tres: la visible, el `dateModified` y el `lastmod`.
 - **`hasPart` apunta a anclas que existen**; los `id` de los `<h2>` no se renombran
   (rompe enlaces y el ranking por sección).
 - **Imagen social propia** (1200×630 JPEG, < 200 KB), renderizada con Chromium desde HTML
-  (`scripts/og-docs.html`, `scripts/og-pricing.html`), no con IA. La genérica del sitio (`img/og-image.png`, PNG) sirve
+  (`scripts/og-docs.html`, `og-pricing.html`, `og-blog.html`, `og-terms.html` y
+  `og-privacy.html`), no con IA. La genérica del sitio (`img/og-image.png`, PNG) sirve
   de respaldo, pero cada página del sitemap trae la suya. Tras el deploy hay que refrescarla
-  a mano en el Post Inspector de LinkedIn: tiene la anterior en caché.
+  a mano en el Post Inspector de LinkedIn: tiene la anterior en caché. En las plantillas el panel
+  derecho es de una sola línea: una línea larga estira la tarjeta más allá del lienzo de 1200 px.
 - **`llms.txt` es un contrato con agentes:** no puede contradecir `/docs` ni anunciar
   instalaciones que no existen (hoy la CLI no está en npm). Lo vigila `llms.test.ts`.
 - **Sitemap:** `npx tsx scripts/gen-sitemap.ts` toma el `lastmod` del último commit con
