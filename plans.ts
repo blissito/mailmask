@@ -110,7 +110,7 @@ export function planPriceCents(plan?: string | null): number {
 export const ADDONS_FOR_SALE = ["domain", "storage50", "sends100"] as const;
 
 /** Lo que trae un dominio activado sin add-ons extra. Es la tabla de precios en código. */
-export const DOMINIO_ACTIVADO = {
+export const DOMAIN_ACTIVATED = {
   aliases: 1000,           // "ilimitadas" en la página
   sends: 50,
   mailboxBytes: 10 * 1024 * 1024 * 1024,
@@ -120,7 +120,7 @@ export const DOMINIO_ACTIVADO = {
 } as const;
 
 /** Lo que trae el único dominio gratis de una cuenta. */
-export const DOMINIO_GRATIS = {
+export const DOMAIN_FREE = {
   aliases: 5,
   sends: 0,
   forwardPerHour: 100,

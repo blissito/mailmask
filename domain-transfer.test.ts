@@ -62,8 +62,8 @@ describe("transferencia de dominios", () => {
           nameservers: ["ns1.viejo.com"],
           warning: "aviso",
         }),
-        nameserversActuales: async () => ["ns1.viejo.com", "ns2.viejo.com"],
-        delegacionActiva: async () => ({ delegated: false, observed: [], expected: [] }),
+        currentNameservers: async () => ["ns1.viejo.com", "ns2.viejo.com"],
+        getDelegationStatus: async () => ({ delegated: false, observed: [], expected: [] }),
       },
     });
     const realSes = await import("./ses.ts");

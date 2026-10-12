@@ -30,7 +30,7 @@ import {
   type Domain, type DerechosDominio,
 } from "./db.js";
 import { sendRawFromDomain, stripHeaders, getConfigSetName, threadRefsFor, normalizeAddress, MAX_RAW_MESSAGE_BYTES } from "./ses.js";
-import { notifyBandeja } from "./sse-hub.js";
+import { notifyInbox } from "./sse-hub.js";
 import { emitEvent } from "./webhooks.js";
 import { log } from "./logger.js";
 
@@ -309,7 +309,7 @@ function threadIntoBandeja(o: {
       createdAt: now, messageId: messageId || undefined, sesMessageId: sesMessageId || undefined,
     });
     indexMessage({ messageId: msg.id, conversationId: conv.id, domainId: domain.id, from: address, subject, text });
-    notifyBandeja(domain.id, "new_conversation", { conversationId: conv.id, from: contact, subject });
+    notifyInbox(domain.id, "new_conversation", { conversationId: conv.id, from: contact, subject });
     return conv.id;
   }
 
@@ -323,7 +323,7 @@ function threadIntoBandeja(o: {
     lastMessageAt: now,
     messageCount: conv.messageCount + 1,
   });
-  notifyBandeja(domain.id, "conv_replied", {
+  notifyInbox(domain.id, "conv_replied", {
     conversationId: conv.id, messageId: msg.id, lastMessageAt: now,
     messageCount: conv.messageCount + 1, actor: address,
   });

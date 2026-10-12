@@ -17,7 +17,7 @@ Route 53, que cuesta dinero real y es irreversible.
 |---|---|
 | Arranque con efectos: reparación SES/SNS, tipo de cambio, reconciliación de dominios y suscripciones SNS | `main.ts`, bloque de arranque, tras `debeArrancarEfectos` |
 | Backfill de búsqueda (baja correo de S3) | `cron.ts:312`, tras `debeArrancarEfectos` |
-| Todos los crons | `scheduler.ts` → `programar()`, que ya pasa por `debeProgramar` |
+| Todos los crons | `scheduler.ts` → `schedule()`, que ya pasa por `debeProgramar` |
 | SES: salida, inbound, receipt rules, `sendAlert` | getters `getSesOutbound`/`getSesInbound` de `ses.ts` |
 | MercadoPago: alta y cancelación de cobros (`PreApproval`, `Preference`, PUT a `/preapproval`) | `assertNoPreview("mercadopago")` en las rutas y en `cancelMpPreapproval` (`main.ts`) |
 | Route 53 Domains: registrar, transferir y renovar | getter `getRoute53Domains()` de `route53.ts` |
@@ -32,7 +32,7 @@ preview también se caen sus lecturas (buscar disponibilidad, leer el detalle de
 
 - Un cliente de AWS nuevo va detrás de un getter que llame a `assertNoPreview(...)`, nunca con
   un `new XClient(...)` suelto dentro de una ruta.
-- Un bloque de arranque con efectos usa `debeArrancarEfectos(esServidor, esPreview())` y deja
+- Un bloque de arranque con efectos usa `debeArrancarEfectos(isServer, esPreview())` y deja
   una línea de log que diga que se omitió.
 - Los endpoints traducen `PreviewDeshabilitado` a 503: los `catch` que se comen el error
   llaman a `preview503(err)` primero, y el `onError` global cubre a los que no lo atrapan.

@@ -14,18 +14,18 @@ import { fetchEmailFromS3 } from "./ses.js";
 import { extractPlainBody } from "./forwarding.js";
 import { log } from "./logger.js";
 
-const LOTE = 25;
-const PAUSA_MS = 2000;
+const BATCH_SIZE = 25;
+const PAUSE_MS = 2000;
 
-const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function backfillPendiente(): number {
+export function pendingBackfillCount(): number {
   return contarSinIndexar();
 }
 
-let corriendo = false;
+let running = false;
 
-export interface ResultadoBackfill {
+export interface BackfillResult {
   indexados: number;
   errores: number;
   restantes: number;
@@ -38,16 +38,16 @@ export interface ResultadoBackfill {
  * así que interrumpirlo a la mitad y relanzarlo no reindexa lo ya hecho. Un
  * mensaje que falla se marca como "error" para no reintentarlo en bucle infinito.
  */
-export async function ejecutarBackfill(opts?: {
+export async function runBackfill(opts?: {
   lote?: number;
   pausaMs?: number;
   maxMensajes?: number;
-}): Promise<ResultadoBackfill> {
-  if (corriendo) return { indexados: 0, errores: 0, restantes: backfillPendiente() };
-  corriendo = true;
+}): Promise<BackfillResult> {
+  if (running) return { indexados: 0, errores: 0, restantes: pendingBackfillCount() };
+  running = true;
 
-  const lote = opts?.lote ?? LOTE;
-  const pausaMs = opts?.pausaMs ?? PAUSA_MS;
+  const lote = opts?.lote ?? BATCH_SIZE;
+  const pausaMs = opts?.pausaMs ?? PAUSE_MS;
   const maxMensajes = opts?.maxMensajes ?? Infinity;
 
   let indexados = 0;
@@ -93,13 +93,13 @@ export async function ejecutarBackfill(opts?: {
 
       // Pausa entre lotes para no saturar S3 ni acaparar el event loop: esto
       // corre en el mismo proceso que atiende el correo entrante.
-      await dormir(pausaMs);
+      await sleep(pausaMs);
     }
   } finally {
-    corriendo = false;
+    running = false;
   }
 
-  const restantes = backfillPendiente();
+  const restantes = pendingBackfillCount();
   if (indexados || errores) {
     log("info", "search", "Backfill del índice", { indexados, errores, restantes });
   }

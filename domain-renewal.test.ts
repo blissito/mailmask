@@ -121,27 +121,27 @@ describe("renovación anual de dominios", () => {
     // Otros casos dejan sus propias filas: se cuentan sólo los de este dominio.
     const mios = () => correos.filter((c) => c.subject.includes(reg.domainName));
 
-    await sync.avisarRenovaciones();
+    await sync.notifyRenewals();
     assert.equal(mios().length, 1);
     assert.match(mios()[0].subject, /vence el/);
     assert.equal(dbmod.getDomainRegistration(reg.id).warnedAt, "30");
 
     // Segunda pasada el mismo día: no debe repetir.
     correos.length = 0;
-    await sync.avisarRenovaciones();
+    await sync.notifyRenewals();
     assert.equal(mios().length, 0);
 
     // Al cruzar el hito de 7 sí vuelve a avisar.
     dbmod.updateDomainRegistration(reg.id, { expiresAt: new Date(Date.now() + 5 * 864e5).toISOString() });
     correos.length = 0;
-    await sync.avisarRenovaciones();
+    await sync.notifyRenewals();
     assert.equal(mios().length, 1);
     assert.equal(dbmod.getDomainRegistration(reg.id).warnedAt, "7");
   });
 
   it("a quien ya tiene la renovación activa se le avisa sin asustarlo", async () => {
     const reg = registrar({ expiresAt: new Date(Date.now() + 5 * 864e5).toISOString(), renewalStatus: "active" });
-    await sync.avisarRenovaciones();
+    await sync.notifyRenewals();
     const mio = correos.find((c) => c.subject.includes(reg.domainName));
     assert.ok(mio);
     assert.match(mio!.subject, /se renueva el/);

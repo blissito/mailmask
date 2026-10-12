@@ -10,14 +10,14 @@ import type { RRSet, RRSetTipo } from "./dns-records.js";
 import { dropCnameConflicts } from "./dns-records.js";
 
 /** Resolvers públicos, para no depender del caché del sistema. */
-const PUBLICOS = ["8.8.8.8", "1.1.1.1"];
+const PUBLIC_RESOLVERS = ["8.8.8.8", "1.1.1.1"];
 
 /**
  * Sin AXFR no se puede enumerar la zona de otro: sólo se puede *preguntar por nombres*. Esta
  * lista es una heurística de lo que la gente tiene de verdad, y por eso el resultado se le
  * enseña al cliente con la advertencia de que puede faltar algo.
  */
-const NOMBRES = [
+const COMMON_NAMES = [
   "www", "mail", "smtp", "imap", "pop", "ftp", "blog", "api", "app", "admin", "shop",
   "tienda", "dev", "staging", "test", "cdn", "static", "m", "webmail", "portal", "docs",
   "autodiscover", "autoconfig", "_dmarc", "_domainkey", "default._domainkey",
@@ -28,29 +28,29 @@ const NOMBRES = [
   "_acme-challenge", "_github-pages-challenge",
 ];
 
-const TIPOS_APEX: RRSetTipo[] = ["A", "AAAA", "MX", "TXT", "CAA"];
-const TIPOS_SUB: RRSetTipo[] = ["A", "AAAA", "CNAME", "TXT"];
+const APEX_TYPES: RRSetTipo[] = ["A", "AAAA", "MX", "TXT", "CAA"];
+const SUB_TYPES: RRSetTipo[] = ["A", "AAAA", "CNAME", "TXT"];
 
-const TIEMPO_CONSULTA_MS = 4000;
-const TIEMPO_TOTAL_MS = 45_000;
+const QUERY_TIMEOUT_MS = 4000;
+const TOTAL_TIMEOUT_MS = 45_000;
 /**
  * Consultas simultáneas. Sin freno se disparaban ~150 de golpe contra el servidor
  * autoritativo del cliente: parece un abuso, empieza a descartar y el inventario sale
  * incompleto — y con distinto contenido en cada corrida. Es lo peor que puede pasar aquí,
  * porque de esta lista depende que no se le caiga el sitio al mover el dominio.
  */
-const CONCURRENCIA = 6;
+const CONCURRENCY = 6;
 
 function resolver(servidores: string[]): Resolver {
   // `tries: 2` porque un UDP perdido no es "no existe": con 1 intento, un paquete caído
   // borra un registro del inventario sin que nadie se entere.
-  const r = new Resolver({ timeout: TIEMPO_CONSULTA_MS, tries: 2 });
+  const r = new Resolver({ timeout: QUERY_TIMEOUT_MS, tries: 2 });
   r.setServers(servidores);
   return r;
 }
 
 /** Ejecuta con un tope de simultáneas, en vez de soltarlo todo a la vez. */
-export async function enTandas<T>(tareas: (() => Promise<T>)[], limite: number): Promise<T[]> {
+export async function inBatches<T>(tareas: (() => Promise<T>)[], limite: number): Promise<T[]> {
   const salida: T[] = [];
   let i = 0;
   const obreros = Array.from({ length: Math.min(limite, tareas.length) }, async () => {
@@ -63,7 +63,7 @@ export async function enTandas<T>(tareas: (() => Promise<T>)[], limite: number):
   return salida;
 }
 
-async function consultar(r: Resolver, nombre: string, tipo: RRSetTipo): Promise<RRSet | null> {
+async function queryRecord(r: Resolver, nombre: string, tipo: RRSetTipo): Promise<RRSet | null> {
   try {
     switch (tipo) {
       case "A": {
@@ -105,16 +105,16 @@ async function consultar(r: Resolver, nombre: string, tipo: RRSetTipo): Promise<
 }
 
 /** Los nameservers autoritativos del dominio hoy, según los resolvers públicos. */
-export async function nameserversActuales(domain: string): Promise<string[]> {
+export async function currentNameservers(domain: string): Promise<string[]> {
   try {
-    const ns = await resolver(PUBLICOS).resolveNs(domain);
+    const ns = await resolver(PUBLIC_RESOLVERS).resolveNs(domain);
     return ns.map((n) => n.toLowerCase().replace(/\.$/, "")).sort();
   } catch {
     return [];
   }
 }
 
-export interface Inventario {
+export interface DnsInventory {
   found: RRSet[];
   nameservers: string[];
   warning: string;
@@ -128,34 +128,34 @@ export interface Inventario {
  * Pregunta a los nameservers autoritativos actuales y no al resolver del sistema: así se lee
  * la zona tal como está, sin la copia con TTL que tenga en medio cualquier caché.
  */
-export async function snapshotDns(domain: string, nombresExtra: string[] = []): Promise<Inventario> {
+export async function snapshotDns(domain: string, extraNames: string[] = []): Promise<DnsInventory> {
   const apex = domain.toLowerCase().replace(/\.$/, "");
-  const ns = await nameserversActuales(apex);
+  const ns = await currentNameservers(apex);
 
   // Si los NS no resuelven a una IP utilizable, se cae a los públicos.
-  let servidores = PUBLICOS;
+  let servidores = PUBLIC_RESOLVERS;
   if (ns.length) {
-    const ips = await Promise.all(ns.slice(0, 3).map((n) => resolver(PUBLICOS).resolve4(n).catch(() => [])));
+    const ips = await Promise.all(ns.slice(0, 3).map((n) => resolver(PUBLIC_RESOLVERS).resolve4(n).catch(() => [])));
     const planas = ips.flat();
     if (planas.length) servidores = planas;
   }
   const r = resolver(servidores);
 
   const tareas: (() => Promise<RRSet | null>)[] = [];
-  for (const t of TIPOS_APEX) tareas.push(() => consultar(r, apex, t));
+  for (const t of APEX_TYPES) tareas.push(() => queryRecord(r, apex, t));
   // Los nombres que ya conocemos por la base valen más que la heurística: los CNAME de DKIM
   // de SES llevan un token aleatorio (`fj4k2…._domainkey`) que ninguna lista puede adivinar.
   // Sin esto, el inventario de un dominio nuestro perdía su propia firma DKIM.
-  for (const sub of [...new Set([...NOMBRES, ...nombresExtra])]) {
-    for (const t of TIPOS_SUB) tareas.push(() => consultar(r, `${sub}.${apex}`, t));
+  for (const sub of [...new Set([...COMMON_NAMES, ...extraNames])]) {
+    for (const t of SUB_TYPES) tareas.push(() => queryRecord(r, `${sub}.${apex}`, t));
   }
 
   // Un corte a medias devolvía el inventario VACÍO, que es peor que uno incompleto: el
   // cliente lo aprobaría creyendo que su zona no tenía nada. Ahora se conserva lo que sí
   // alcanzó a responder y se avisa.
   let truncado = false;
-  const corte = new Promise<"corte">((res) => setTimeout(() => { truncado = true; res("corte"); }, TIEMPO_TOTAL_MS));
-  const resultados = await Promise.race([enTandas(tareas, CONCURRENCIA), corte]);
+  const corte = new Promise<"corte">((res) => setTimeout(() => { truncado = true; res("corte"); }, TOTAL_TIMEOUT_MS));
+  const resultados = await Promise.race([inBatches(tareas, CONCURRENCY), corte]);
 
   const found: RRSet[] = Array.isArray(resultados)
     ? (resultados as (RRSet | null)[]).filter((x): x is RRSet => !!x)
@@ -164,7 +164,7 @@ export async function snapshotDns(domain: string, nombresExtra: string[] = []): 
   // Los NS y el SOA del apex son del proveedor viejo: no se copian.
   const limpio = dropCnameConflicts(found.filter((x) => !(x.name === apex && (x.type === "NS" || (x.type as string) === "SOA"))));
 
-  log("info", "route53", "DNS snapshot", { domain: apex, encontrados: limpio.length, ns: ns.length, extra: nombresExtra.length });
+  log("info", "route53", "DNS snapshot", { domain: apex, encontrados: limpio.length, ns: ns.length, extra: extraNames.length });
 
   return {
     found: limpio,
@@ -176,7 +176,7 @@ export async function snapshotDns(domain: string, nombresExtra: string[] = []): 
   };
 }
 
-export interface EstadoDelegacion {
+export interface DelegationStatus {
   delegated: boolean;
   observed: string[];
   expected: string[];
@@ -186,13 +186,13 @@ export interface EstadoDelegacion {
  * Durante la propagación se mezclan los viejos y los nuevos, así que basta con ver **uno**
  * de los nuestros para decir que ya empezó a delegar.
  */
-export async function delegacionActiva(domain: string, esperados: string[]): Promise<EstadoDelegacion> {
-  const observed = await nameserversActuales(domain);
-  const expected = esperados.map((n) => n.toLowerCase().replace(/\.$/, "")).sort();
+export async function getDelegationStatus(domain: string, expected: string[]): Promise<DelegationStatus> {
+  const observed = await currentNameservers(domain);
+  const normalized = expected.map((n) => n.toLowerCase().replace(/\.$/, "")).sort();
   return {
-    delegated: expected.length > 0 && observed.some((o) => expected.includes(o)),
+    delegated: normalized.length > 0 && observed.some((o) => normalized.includes(o)),
     observed,
-    expected,
+    expected: normalized,
   };
 }
 
