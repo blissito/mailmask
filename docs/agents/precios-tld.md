@@ -26,10 +26,12 @@ después, el módulo real ya quedó cargado y las pruebas cotizan con el tipo de
 ## Bug abierto (documentado, sin arreglar)
 
 Cuando el precio calculado cae **exacto en una decena**, el `-1` del redondeo queda 1 MXN por
-debajo del piso: costo de 200 MXN → 259 MXN en vez de 260 (`Math.ceil(260/10)*10 - 1 = 259`).
-Está fijado con `{ todo: true }` en la suite; el día que se arregle, se quita el `todo`. Lo
-mismo pasa con el `×1.2` cuando su resultado es múltiplo de 10 (no pierde contra el piso, pero
-sí contra lo que promete el comentario de «hacia arriba, nunca hacia abajo»).
+debajo de lo prometido, en las dos ramas: costo de 200 MXN → 259 MXN en vez de 260
+(`Math.ceil(260/10)*10 - 1 = 259`), y 400 MXN × 1.2 = 480 → 479 MXN. Lo fijan **dos pruebas
+`{ todo: true }`**, una por rama; las pruebas «buenas» del cruce usan a propósito costos que no
+caen en decena (208 y 420 MXN), para no fijar el defecto como esperado. El día que se arregle
+el redondeo se quitan los dos `todo`; mientras, quitar sólo uno deja la contradicción de que la
+suite afirme 25900 donde la otra prueba exige 26000.
 
 **Cómo aplicarlo:** el precio termina en un PreApproval de MercadoPago que ya no se puede
 cambiar, así que cobrar bajo se repite en cada renovación. Antes de tocar `alPrecioDeVenta`,

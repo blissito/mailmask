@@ -105,16 +105,18 @@ describe("precio de transferencia", () => {
 
   it("los dos lados del cruce margen/piso", async () => {
     // El cruce es costo = 300 MXN (usdCents = 1500): abajo gana +60, arriba gana ×1.2.
-    respuestaAws = () => ({ transferUsdCents: 1000, renewUsdCents: 1000 });   // 200 MXN de costo
+    // Los dos costos se eligen para que el precio NO caiga exacto en una decena: cuando cae,
+    // entra el bug del redondeo y la prueba fijaría el defecto como esperado (ver los `todo`).
+    respuestaAws = () => ({ transferUsdCents: 1040, renewUsdCents: 1040 });   // 208 MXN de costo
     const chico = await mod.precioDeTransferencia(".pruebacrucebajo");
-    // 200 + 60 = 260 manda sobre 240 → 26 → 259 MXN.
-    assert.equal(chico.transferMxnCents, 25900);
+    // 208 × 1.2 = 249.6 pierde contra 208 + 60 = 268 → 26.8 → 269 MXN.
+    assert.equal(chico.transferMxnCents, 26900);
 
-    respuestaAws = () => ({ transferUsdCents: 2000, renewUsdCents: 2000 });   // 400 MXN de costo
+    respuestaAws = () => ({ transferUsdCents: 2100, renewUsdCents: 2100 });   // 420 MXN de costo
     const grande = await mod.precioDeTransferencia(".pruebacrucealto");
-    // 400 × 1.2 = 480 manda sobre 460 → 48 → 479 MXN.
-    assert.equal(grande.transferMxnCents, 47900);
-    assert.ok(grande.transferMxnCents > 46000, "el margen quedó por debajo del piso");
+    // 420 × 1.2 = 504 manda sobre 480 → 50.4 → 509 MXN.
+    assert.equal(grande.transferMxnCents, 50900);
+    assert.ok(grande.transferMxnCents > 48000, "el margen quedó por debajo del piso");
   });
 
   it("redondea hacia arriba a decenas menos uno", async () => {
@@ -135,6 +137,16 @@ describe("precio de transferencia", () => {
 
     // Hoy devuelve 25900: Math.ceil(260/10)*10 - 1 = 259, un peso abajo del piso.
     assert.ok(r.transferMxnCents >= 26000, `bajó del piso: ${r.transferMxnCents}`);
+  });
+
+  it("nunca vende por debajo del margen de 1.2×", { todo: "bug conocido: 400 MXN de costo × 1.2 = 480, exacto en decena, y el -1 del redondeo lo deja en 479 MXN (misma causa que el piso)" }, async () => {
+    // 20 USD × 20 = 400 MXN; el margen manda: 400 × 1.2 = 480 MXN.
+    respuestaAws = () => ({ transferUsdCents: 2000, renewUsdCents: 2000 });
+
+    const r = await mod.precioDeTransferencia(".pruebamargennexacto");
+
+    // Hoy devuelve 47900: no pierde contra el piso (460), pero sí contra el ×1.2 prometido.
+    assert.ok(r.transferMxnCents >= 48000, `bajó del margen: ${r.transferMxnCents}`);
   });
 
   it("la renovación cae al precio de transferencia si AWS no da uno", async () => {
