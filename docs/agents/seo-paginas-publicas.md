@@ -24,6 +24,9 @@ imagen social).
   derecho es de una sola línea: una línea larga estira la tarjeta más allá del lienzo de 1200 px.
 - **`llms.txt` es un contrato con agentes:** no puede contradecir `/docs` ni anunciar
   instalaciones que no existen (hoy la CLI no está en npm). Lo vigila `llms.test.ts`.
+- **Sitemap:** una página pública nueva va en DOS lados o el generador la borra en silencio: la
+  fila de `paginas` en `scripts/gen-sitemap.ts` (ruta, archivo, freq, prio) y su `<url>` en
+  `public/sitemap.xml`.
 - **Sitemap:** `npx tsx scripts/gen-sitemap.ts` toma el `lastmod` del último commit con
   `git log`; en un checkout sin `.git` (tarball) cae al mtime y deja todas las fechas
   iguales — córrelo en un clon con historia, o edita a mano sólo el `<lastmod>` que cambió.

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<!--
+  Plantilla de la imagen social de /bandeja-compartida (public/img/og-bandeja-compartida.jpg, 1200×630).
+  No se hace con IA: se renderiza con Chromium y se pasa a JPEG.
+    1. Abre este archivo en Chromium con viewport 1200×630 y captura PNG (sin fullPage).
+    2. convert og-bandeja-compartida.png -strip -quality 82 -sampling-factor 4:2:0 public/img/og-bandeja-compartida.jpg
+  Debe quedar < 200 KB. Colores = tokens de public/css/input.css; sin fuentes externas.
+  El panel derecho va en UNA sola línea: una línea larga estira la tarjeta más allá del lienzo.
+-->
+<html lang="es-MX">
+<head>
+<meta charset="UTF-8">
+<title>og-bandeja-compartida</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background: #faf6ee; color: #1c1917;
+    font-family: "Helvetica Neue", Helvetica, Arial, "Segoe UI", sans-serif;
+    display: grid; grid-template-columns: 620px 1fr; gap: 48px;
+    padding: 64px 72px; position: relative;
+  }
+  body::before { content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 12px; background: #d7263d; }
+  .left { display: flex; flex-direction: column; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 16px; font-size: 34px; font-weight: 700; letter-spacing: -0.01em; }
+  h1 { font-size: 54px; line-height: 1.06; font-weight: 800; letter-spacing: -0.035em; }
+  h1 span { color: #b31f33; }
+  .sub { font-size: 24px; line-height: 1.35; color: #57534e; margin-top: 18px; }
+  .chips { display: flex; flex-wrap: nowrap; gap: 8px; }
+  .chips b { font-size: 18px; font-weight: 600; padding: 6px 13px; border: 2px solid #e4dccd; border-radius: 999px; background: #fffdf9; white-space: nowrap; }
+  .rate { align-self: center; }
+  .card { background: #fffdf9; border: 2px solid #e4dccd; border-radius: 22px; padding: 20px 22px 22px;
+          box-shadow: 0 22px 0 -10px #e4dccd; }
+  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+          font-size: 17px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #78716c;
+          padding-bottom: 12px; border-bottom: 2px solid #f2ecdf; }
+  .row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+         padding: 12px 0; border-top: 2px solid #f2ecdf; font-size: 20px; color: #57534e; }
+  .row:first-of-type { border-top: 0; }
+  .row b { font-size: 22px; font-weight: 700; color: #1c1917; white-space: nowrap; }
+  .row.hl span { color: #1c1917; font-weight: 600; white-space: nowrap; }
+  .row.hl b { font-size: 30px; color: #b31f33; letter-spacing: -0.03em; }
+  .row.hl small { font-size: 16px; font-weight: 600; color: #57534e; letter-spacing: 0; margin-left: 3px; }
+  .warn { display: flex; align-items: center; gap: 9px; font-size: 17px; font-weight: 600; color: #b45309;
+          background: rgba(245, 158, 11, 0.09); border: 2px solid rgba(245, 158, 11, 0.3);
+          border-radius: 12px; padding: 9px 12px; margin-top: 12px; white-space: nowrap; }
+  .warn.dim { color: #a16207; font-weight: 500; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #d97706; flex: none; }
+  .dot.hollow { background: transparent; border: 2px solid #d97706; }
+  .foot { margin-top: 12px; padding-top: 14px; border-top: 2px solid #f2ecdf; font-size: 17px; color: #78716c; white-space: nowrap; }
+</style>
+</head>
+<body>
+  <section class="left">
+    <div class="brand">
+      <svg width="56" height="56" viewBox="0 0 80 80" fill="none" aria-hidden="true">
+        <ellipse cx="40" cy="42" rx="28" ry="24" fill="#a0182c"/>
+        <ellipse cx="40" cy="38" rx="28" ry="22" fill="#d7263d"/>
+        <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/>
+        <ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/>
+        <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/>
+        <circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
+        <circle cx="30.2" cy="34.9" r="1.9" fill="#fff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#fff"/>
+        <path d="M40 18 L40 26" stroke="#f2b705" stroke-width="2" stroke-linecap="round"/>
+        <path d="M36 19 L40 26 L44 19" stroke="#f2b705" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </svg>
+      MailMask
+    </div>
+    <div>
+      <h1>Un buzón, todo el equipo.<br><span>Sin pisarse.</span></h1>
+      <p class="sub">Asignación, aviso de colisión y notas internas, sobre las direcciones de tu dominio.</p>
+    </div>
+    <div class="chips"><b>Personas ilimitadas</b><b>Sin cobro por agente</b><b>En vivo</b></div>
+  </section>
+  <section class="rate" aria-hidden="true">
+    <div class="card">
+      <div class="head"><span>Bandeja · soporte@</span><span>hoy</span></div>
+      <div class="row"><span>Sin asignar</span><b>4</b></div>
+      <div class="row hl"><span>Primera respuesta</span><b>12<small>min</small></b></div>
+      <div class="warn"><span class="dot"></span><span>Ana está viendo este hilo</span></div>
+      <div class="warn dim"><span class="dot hollow"></span><span>Ana está escribiendo…</span></div>
+      <div class="foot">$99 MXN al mes por dominio</div>
+    </div>
+  </section>
+</body>
+</html>

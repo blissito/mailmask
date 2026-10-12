@@ -27,6 +27,7 @@ function lastmod(file: string): string {
 const paginas: { ruta: string; archivo: string; freq: string; prio: string }[] = [
   { ruta: "/", archivo: "landing.html", freq: "weekly", prio: "1.0" },
   { ruta: "/pricing", archivo: "pricing.html", freq: "weekly", prio: "0.9" },
+  { ruta: "/bandeja-compartida", archivo: "bandeja-compartida.html", freq: "monthly", prio: "0.8" },
   { ruta: "/docs", archivo: "docs.html", freq: "weekly", prio: "0.9" },
   { ruta: "/blog", archivo: "blog/index.html", freq: "weekly", prio: "0.8" },
   { ruta: "/register", archivo: "register.html", freq: "monthly", prio: "0.6" },
