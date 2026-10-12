@@ -40,6 +40,15 @@ test("la única cifra en pesos de la página es el plan anual de plans.ts", () =
   }
 });
 
+test("si la página dice que transferir sale más barato que renovar, TLD_PRICES lo respalda", () => {
+  const dice = /transferencia[^.]*m[aá]s barat[ao] que renovar/i.test(cuerpo);
+  const algunaMasBarata = Object.values(TLD_PRICES).some((t) => t.transferMxnCents < t.renewMxnCents);
+  assert.ok(
+    !dice || algunaMasBarata,
+    "la página promete transferencia más barata que renovar y en TLD_PRICES ninguna extensión lo es (en .click/.link es más cara)",
+  );
+});
+
 test("el @graph de /dominios no deja @id colgantes y no trae SoftwareApplication", () => {
   const nodos = grafo(head);
   const ids = new Set(nodos.map((n) => n["@id"]));

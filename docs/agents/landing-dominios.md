@@ -25,6 +25,12 @@ hace fallar la suite, y al revés también.
 Por eso en la página no se escribe `$99` (el mes del dominio activado) ni un `$0`: cualquier
 cifra nueva en pesos tiene que salir de `plans.ts` o la prueba truena.
 
+Tampoco se **compara** transferir con renovar. `TLD_PRICES` cobra lo mismo por las dos cosas en
+casi todas las extensiones, y en `.click`/`.link` la transferencia cuesta más (229 frente a
+109/139). Decir «transferir sale más barato» es la misma promesa sin fuente que una cifra
+inventada, así que `dominios-seo.test.ts` la caza: si la frase aparece, exige que alguna extensión
+de verdad lo cumpla.
+
 ## La transferencia se describe tal como es
 
 La sección de transferir sigue el flujo real de `domain-transfer.ts`, no el de un folleto:
@@ -37,6 +43,16 @@ La sección de transferir sigue el flujo real de `domain-transfer.ts`, no el de 
 - La solicitud tarda **5 a 7 días** y depende de que el cliente apruebe el correo del registrador.
 - **Nada se mueve sin el inventario de DNS aprobado**: si se cambian los nameservers con la zona
   vacía, la web y el correo del cliente mueren en el acto.
+
+Son **dos relojes distintos** y confundirlos cuenta una historia falsa: los 5 a 7 días son de la
+solicitud y corren desde que el cliente aprueba el correo del registrador, no desde que aprueba el
+inventario de DNS. Los nameservers se mueven cuando ocurren **las dos cosas**: el traspaso
+terminado y el inventario aprobado (`finalizeDomainRegistration` en `domain-provision.ts` no toca
+nada mientras `dnsImportStatus !== "approved"` y avisa a los 3 días de espera).
+
+El inventario tampoco es «tus registros entran, nada se pierde»: `snapshotDns` (`dns-import.ts`)
+lee una lista de nombres comunes en el DNS público y el propio código pide revisarlos a mano, así
+que la página lo ofrece como **borrador que el cliente corrige antes de aprobar**.
 
 Si el flujo cambia, esta ficha y la sección de la página se mueven juntas.
 
