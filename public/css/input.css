@@ -78,6 +78,11 @@
 .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-[rgb(var(--accent-text))]; }
 .btn-secondary { @apply inline-flex items-center justify-center gap-2 rounded-full border border-line bg-bg-elev px-6 py-3 text-[15px] font-semibold text-fg transition-colors hover:border-fg-subtle; }
 .card { @apply rounded-2xl border border-line bg-bg-elev; }
+/* Ilustración del hero de las landings: la caja reservada es 3:2, igual que el archivo
+   (1200×800), así que `object-cover` no recorta nada. En móvil cae debajo del texto
+   porque en el DOM va después de la columna de texto. */
+.hero-il { @apply overflow-hidden rounded-2xl border border-line bg-bg-elev; }
+.hero-il img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; }
 .mock { @apply overflow-hidden rounded-2xl border border-line bg-bg-elev shadow-[0_24px_60px_-30px_rgb(var(--shadow)/0.25)]; }
 .mock-bar { @apply flex items-center gap-2 border-b border-line bg-bg-inset px-4 py-2.5 text-xs text-fg-muted; }
 .mock-dot { @apply h-2.5 w-2.5 rounded-full bg-line; }
