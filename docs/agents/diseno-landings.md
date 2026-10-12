@@ -2,7 +2,7 @@
 
 **Qué:** la identidad visual del sitio público —paleta, tema, fuentes, piezas, ilustraciones y
 tono—, que hoy vive sólo en `public/css/input.css` y repartida entre las landings. Lee esto
-antes de hacer una página pública nueva (`/dominios`, PR #75, es lo que la motivó) para no
+antes de hacer una página pública nueva (`/dominios` fue lo que la motivó) para no
 reconstruirla a ojo. El SEO va aparte: `seo-paginas-publicas.md`.
 
 ## Paleta
@@ -54,13 +54,18 @@ añaden `min-h-screen`). `/app` y `/bandeja` son otra cosa: `.app-shell` usa Sor
 
 ## Piezas
 
-Viven en el `@layer components` de `input.css`. **Reutilízalas antes de inventar clases:**
-`.btn-primary`, `.btn-secondary`, `.card`, `.mock` (con `.mock-bar` y `.mock-dot`),
-`.chip`/`.chip-ok`, `.faq` (`details`/`summary`/`p`), `.eyebrow`, `.icon-draw` (iconos que se
-dibujan solos; `prefers-reduced-motion` los apaga) y `.anim-delay-100…1100`.
+Son CSS normal al tope de `input.css` (líneas ~73 a ~115), **fuera de toda `@layer`**: `.site`,
+`.eyebrow`, `.btn-primary`, `.btn-secondary`, `.card`, `.mock` (con `.mock-bar` y `.mock-dot`),
+`.chip`/`.chip-ok`, `.faq` (`details`/`summary`/`p`), `.icon-draw` (iconos que se dibujan solos;
+`prefers-reduced-motion` los apaga) y `.anim-delay-100…1100`. **Reutilízalas antes de inventar
+clases.**
 
-En el mismo `@layer` están las `.app-*`, `.dom*` y `.plan-card`: son del dashboard, no de las
-landings.
+El único `@layer components` del archivo abre en la línea 163 y es el del dashboard (`.app-*`,
+`.dom*`, `.plan-card`); no se usa en las landings.
+
+**Dónde va una pieza nueva de landing:** al tope, junto a las demás, **no** dentro de
+`@layer components`. En Tailwind 3 lo que vive en una capa se purga si su clase no aparece en
+el `content` del config; lo que está fuera de capa sale siempre al `styles.css`.
 
 ## Compilar el CSS
 
@@ -83,7 +88,8 @@ Dibujo plano de **línea negra gruesa** con rellenos negros sólidos, fondo crem
 rojo de máscara como **único** color fuerte y un toque de oro (la estrella). Personas y objetos
 sencillos; sin degradados ni 3D. La máscara de luchador aparece en sobres y personajes.
 
-- Formato y peso: **JPEG 1200×800, < 200 KB** (las que corren hoy van de 87 a 142 KB).
+- Formato y peso: **JPEG 1200×800, < 200 KB**. Las 30 `-il.jpg` de hoy van de ~70 KB
+  (`forwarding-il.jpg`) a 184 KB (`redos-il.jpg`); ninguna pasa del tope.
 - Nombres: `public/img/<slug>-il.jpg` y `public/blog/img/<slug>-il.jpg`.
 - `alt` describe la escena («un luchador enmascarado con lupa busca entre cajones de sobres»),
   no «imagen de…».
@@ -114,7 +120,15 @@ siendo claro y útil: el ejemplo canónico es la 404, el luchador con lupa busca
 
 ## Notas
 
+- **Hoy la ilustración no es de las landings.** De las 30 `-il.jpg`, 29 son portadas de blog y
+  una es la de la 404; `/pricing`, `/bandeja-compartida` y `/dominios` no traen ninguna imagen,
+  y la home sólo recicla tres portadas del blog en sus tarjetas (`landing.html:1029-1043`). El
+  hero de la home es una `.mock` (maqueta del producto), no una ilustración.
+- **Regla para una landing nueva:** si lleva hero ilustrado, trae su **propia**
+  `<slug>-il.jpg` (1200×800, < 200 KB, `alt` que describe la escena) —como la 404— y no recicla
+  una portada del blog salvo dentro de una tarjeta. *Fijada en esta ficha; si el equipo quiere
+  otra cosa, se cambia aquí.*
 - `public/404.html` trae su propio `<style>` con copias a mano de `.btn-primary`, `.eyebrow` y
   el resto, aunque carga `/css/styles.css`: si cambia una pieza, la 404 no la sigue.
-- El PR #75 (`/dominios`) traerá `docs/agents/landing-dominios.md` para la regla de cero cifras
-  por TLD: enlázala desde aquí cuando exista en `main`, en vez de repetirla.
+- La regla de cero cifras por extensión de `/dominios` vive en
+  [`landing-dominios.md`](landing-dominios.md); esta ficha no la repite.
