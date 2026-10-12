@@ -47,7 +47,7 @@ listado, hacen fallar la prueba** — al arreglar una página se quita su rengl�
 | `jsonld-unico`, `jsonld-graph` | un solo `<script>` de JSON-LD, y con `@graph` |
 | `softwareapplication` | ni `SoftwareApplication`, ni `MobileApplication`, ni `WebApplication` (ver la trampa) |
 | `og-imagen`, `og-medidas`, `og-propia` | la imagen existe en `public/`, mide 1200×630 igual que sus metas, y no es la tarjeta genérica `img/og-image.png` |
-| `fecha-visible` | «Actualizado: <time datetime>» en `/docs`, `/terms` y `/privacy` |
+| `fecha-visible` | «Actualizado: <time datetime>» en `/` (landing, junto al ©), `/docs`, `/terms` y `/privacy` |
 
 La regla es una función pura (`huecos(ruta, html)` en `seo-checks.ts`), así que la suite la
 prueba también sobre una página de muestra a la que le va quitando piezas: si quitar un

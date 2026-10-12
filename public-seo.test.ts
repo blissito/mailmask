@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { HOST, archivoDe, huecos, paginasDelSitemap } from "./seo-checks.ts";
+import { HOST, archivoDe, grafo, huecos, leerHead, paginasDelSitemap } from "./seo-checks.ts";
 
 const leer = (ruta: string) => readFileSync(new URL(`./${ruta}`, import.meta.url), "utf8");
 
@@ -17,7 +17,7 @@ const RUTAS = paginasDelSitemap(leer("public/sitemap.xml"));
  * og-propia · fecha-visible (ver la ficha).
  */
 const PENDIENTES: Record<string, string[]> = {
-  "/": ["og-coincide", "jsonld-unico", "jsonld-graph", "softwareapplication", "og-propia"],
+  "/": ["og-coincide", "og-propia"],
   "/pricing": ["description-medida", "hreflang", "og-coincide", "jsonld-unico", "jsonld-graph", "og-propia"],
   "/blog": ["description-medida", "hreflang", "og-coincide", "jsonld-unico", "jsonld-graph", "og-propia"],
   "/register": ["hreflang", "jsonld-graph", "og-propia"],
@@ -28,7 +28,7 @@ const PENDIENTES: Record<string, string[]> = {
 };
 
 /** Páginas que además muestran su fecha de actualización (ficha). */
-const CON_FECHA_VISIBLE = ["/docs", "/terms", "/privacy"];
+const CON_FECHA_VISIBLE = ["/", "/docs", "/terms", "/privacy"];
 
 /**
  * Compara lo que la página incumple contra su fila de PENDIENTES. Falla en las dos
@@ -136,4 +136,70 @@ test("un hueco nuevo y un pendiente ya arreglado hacen fallar la comparación", 
   assert.throws(() => revisar("/muestra", muestraSin('<link rel="canonical" href="' + HOST + '/muestra" />'), []), /nuevos/);
   assert.throws(() => revisar("/muestra", MUESTRA, ["canonical"]), /arreglados/);
   assert.doesNotThrow(() => revisar("/muestra", MUESTRA, []));
+});
+
+// El JSON-LD de la landing (`/`): un solo `@graph` con Organization, WebSite, WebPage,
+// BreadcrumbList, Product y FAQPage. Los planes y precios viven en UN Product —el
+// SoftwareApplication que los duplicaba y que Google marca inválido sin ratings ya no existe—
+// y `dateModified` es la misma fecha que se ve en el pie y que el `lastmod` del sitemap.
+// Ficha: docs/agents/seo-paginas-publicas.md
+
+const LANDING = leer("public/landing.html");
+const SITEMAP = leer("public/sitemap.xml");
+const nodosDeLaLanding = () => grafo(leerHead(LANDING));
+
+test("el @graph de / trae FAQPage con 10 Question con Answer y el BreadcrumbList «Inicio»", () => {
+  const nodos = nodosDeLaLanding();
+  const faq = nodos.find((n) => n["@type"] === "FAQPage");
+  assert.ok(faq, "falta el FAQPage");
+  assert.equal(faq.mainEntity.length, 10, "el plan pide las 10 preguntas frecuentes");
+  for (const q of faq.mainEntity) {
+    assert.equal(q["@type"], "Question");
+    assert.ok(q.name, "una Question va sin name");
+    assert.equal(q.acceptedAnswer?.["@type"], "Answer", `«${q.name}» sin Answer`);
+    assert.ok(q.acceptedAnswer.text.length > 40, `respuesta demasiado corta en «${q.name}»`);
+  }
+
+  const bc = nodos.find((n) => n["@type"] === "BreadcrumbList");
+  assert.ok(bc, "falta el BreadcrumbList (la ruta «Inicio»)");
+  assert.deepEqual(bc.itemListElement.map((i: any) => i.name), ["Inicio"]);
+  assert.equal(bc.itemListElement[0].item, `${HOST}/`);
+});
+
+test("el @graph de / trae un solo Product con sus 4 offers y brand #org", () => {
+  const nodos = nodosDeLaLanding();
+  const productos = nodos.filter((n) => n["@type"] === "Product");
+  assert.equal(productos.length, 1, `hay ${productos.length} Product: los precios viven en uno solo`);
+  const [producto] = productos;
+  assert.equal(producto.brand["@id"], `${HOST}/#org`);
+  assert.equal(producto.offers.length, 4);
+  assert.deepEqual([...new Set(producto.offers.map((o: any) => o.priceCurrency))], ["MXN"]);
+
+  // El SoftwareApplication que se borró traía su propia AggregateOffer con los mismos precios.
+  const plano = JSON.stringify(nodos);
+  assert.doesNotMatch(plano, /SoftwareApplication|MobileApplication|WebApplication|AggregateOffer/);
+  assert.equal([...plano.matchAll(/"price":"(\d+)"/g)].length, 4, "los precios se declaran una sola vez");
+});
+
+test("el WebPage de / no deja referencias colgantes y declara la fecha de actualización", () => {
+  const nodos = nodosDeLaLanding();
+  const ids = new Set(nodos.map((n) => n["@id"]));
+  assert.ok(ids.has(`${HOST}/#org`) && ids.has(`${HOST}/#website`) && ids.has(`${HOST}/#webpage`));
+  for (const m of JSON.stringify(nodos).matchAll(/\{"@id":"([^"]+)"\}/g)) {
+    assert.ok(ids.has(m[1]), `@id colgante ${m[1]}`);
+  }
+  const web = nodos.find((n) => n["@type"] === "WebPage");
+  assert.ok(web, "falta el WebPage");
+  assert.match(web.dateModified, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(web.isPartOf["@id"], `${HOST}/#website`);
+  assert.equal(web.breadcrumb["@id"], `${HOST}/#breadcrumb`);
+});
+
+test("la fecha visible de / es la del dateModified y la del lastmod del sitemap", () => {
+  const web = nodosDeLaLanding().find((n) => n["@type"] === "WebPage");
+  const visible = LANDING.match(/Actualizado:\s*<time datetime="(\d{4}-\d{2}-\d{2})">/);
+  assert.ok(visible, "falta «Actualizado: <time datetime=…>» a la vista");
+  assert.equal(visible[1], web.dateModified, "la fecha visible y la del JSON-LD");
+  const lastmod = SITEMAP.match(new RegExp(`<loc>${HOST}/</loc><lastmod>(\\d{4}-\\d{2}-\\d{2})</lastmod>`))?.[1];
+  assert.equal(lastmod, web.dateModified, "el lastmod de / en el sitemap");
 });

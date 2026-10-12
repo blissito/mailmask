@@ -58,198 +58,229 @@
     <link rel="stylesheet" href="/css/styles.css" />
     <script src="/js/theme.js"></script>
     <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" }
-        ]
-      }
-    </script>
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "MailMask",
-        "applicationCategory": "BusinessApplication",
-        "operatingSystem": "Cloud-based",
-        "url": "https://www.mailmask.studio",
-        "description": "Correo de tu dominio para todo tu equipo: gratis para empezar y $99 MXN al mes por dominio con todo incluido — bandeja compartida, buzones IMAP, envío autenticado DKIM+SPF, REST API y SMTP relay. Personas ilimitadas.",
-        "offers": {
-          "@type": "AggregateOffer",
-          "lowPrice": "0",
-          "highPrice": "99",
-          "priceCurrency": "MXN",
-          "offerCount": 2
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "name": "MailMask",
+          "url": "https://www.mailmask.studio",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://www.mailmask.studio/img/og-image.png",
+            "width": 1200,
+            "height": 630
+          },
+          "image": "https://www.mailmask.studio/img/og-image.png",
+          "description": "Correo profesional en tu propio dominio, para todo tu equipo. Gratis para empezar: apunta tu dominio y ya recibes correo. Por $99 MXN al mes por dominio: bandeja compartida con historial completo, buzones IMAP para Apple Mail y Outlook, envío firmado con DKIM y SPF, API y SMTP. Personas ilimitadas: se cobra por dominio, no por persona.",
+          "sameAs": [
+            "https://x.com/HectorBlisS",
+            "https://github.com/HectorBlisS",
+            "https://www.linkedin.com/in/hectorbliss/",
+            "https://fixter.org"
+          ],
+          "areaServed": "MX",
+          "knowsLanguage": [
+            "es-MX",
+            "es"
+          ],
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "email": "soporte@mailmask.studio",
+            "contactType": "customer support",
+            "availableLanguage": [
+              "Spanish"
+            ]
+          },
+          "@id": "https://www.mailmask.studio/#org"
         },
-        "featureList": ["Shared Inbox", "IMAP Mailboxes", "Email Forwarding", "DKIM/SPF Authentication", "REST API", "SMTP Relay", "Webhooks"]
-      }
-    </script>
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "Organization",
-        "name": "MailMask",
-        "url": "https://www.mailmask.studio",
-        "logo": {
-          "@type": "ImageObject",
-          "url": "https://www.mailmask.studio/img/og-image.png",
-          "width": 1200,
-          "height": 630
+        {
+          "@type": "WebSite",
+          "@id": "https://www.mailmask.studio/#website",
+          "url": "https://www.mailmask.studio/",
+          "name": "MailMask",
+          "inLanguage": "es-MX",
+          "publisher": {
+            "@id": "https://www.mailmask.studio/#org"
+          }
         },
-        "image": "https://www.mailmask.studio/img/og-image.png",
-        "description": "Correo profesional en tu propio dominio, para todo tu equipo. Gratis para empezar: apunta tu dominio y ya recibes correo. Por $99 MXN al mes por dominio: bandeja compartida con historial completo, buzones IMAP para Apple Mail y Outlook, envío firmado con DKIM y SPF, API y SMTP. Personas ilimitadas: se cobra por dominio, no por persona.",
-        "sameAs": [
-          "https://x.com/HectorBlisS",
-          "https://github.com/HectorBlisS",
-          "https://www.linkedin.com/in/hectorbliss/",
-          "https://fixter.org"
-        ],
-        "areaServed": "MX",
-        "knowsLanguage": ["es-MX", "es"],
-        "contactPoint": {
-          "@type": "ContactPoint",
-          "email": "soporte@mailmask.studio",
-          "contactType": "customer support",
-          "availableLanguage": ["Spanish"]
+        {
+          "@type": "WebPage",
+          "@id": "https://www.mailmask.studio/#webpage",
+          "url": "https://www.mailmask.studio/",
+          "name": "MailMask — email profesional en tu dominio",
+          "description": "Correo de tu dominio para todo tu equipo: gratis para empezar y $99 MXN al mes por dominio con todo incluido — bandeja compartida, buzones IMAP, envío autenticado DKIM+SPF, REST API y SMTP relay. Personas ilimitadas.",
+          "inLanguage": "es-MX",
+          "isPartOf": {
+            "@id": "https://www.mailmask.studio/#website"
+          },
+          "about": {
+            "@id": "https://www.mailmask.studio/#org"
+          },
+          "breadcrumb": {
+            "@id": "https://www.mailmask.studio/#breadcrumb"
+          },
+          "dateModified": "2026-10-12"
+        },
+        {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Inicio",
+              "item": "https://www.mailmask.studio/"
+            }
+          ],
+          "@id": "https://www.mailmask.studio/#breadcrumb"
+        },
+        {
+          "@type": "Product",
+          "name": "MailMask",
+          "description": "Correo de tu dominio para todo tu equipo: gratis para empezar y $99 MXN al mes por dominio con todo incluido — bandeja compartida, buzones IMAP, envío autenticado DKIM+SPF, REST API y SMTP relay. Personas ilimitadas.",
+          "brand": {
+            "@id": "https://www.mailmask.studio/#org"
+          },
+          "offers": [
+            {
+              "@type": "Offer",
+              "name": "Gratis",
+              "description": "Un dominio, reenvío, 5 máscaras y Bandeja con 7 días de historial.",
+              "price": "0",
+              "priceCurrency": "MXN",
+              "availability": "https://schema.org/InStock",
+              "url": "https://www.mailmask.studio/#pricing"
+            },
+            {
+              "@type": "Offer",
+              "name": "Dominio activado",
+              "description": "Todo para un dominio: bandeja compartida con personas ilimitadas, buzones IMAP con 10 GB, 50 correos nuevos al día, reglas, webhooks, SMTP y API.",
+              "price": "99",
+              "priceCurrency": "MXN",
+              "priceValidUntil": "2027-12-31",
+              "availability": "https://schema.org/InStock",
+              "url": "https://www.mailmask.studio/#pricing"
+            },
+            {
+              "@type": "Offer",
+              "name": "+50 GB de buzón",
+              "price": "99",
+              "priceCurrency": "MXN",
+              "availability": "https://schema.org/InStock",
+              "url": "https://www.mailmask.studio/pricing"
+            },
+            {
+              "@type": "Offer",
+              "name": "+100 envíos al día",
+              "price": "99",
+              "priceCurrency": "MXN",
+              "availability": "https://schema.org/InStock",
+              "url": "https://www.mailmask.studio/pricing"
+            }
+          ],
+          "@id": "https://www.mailmask.studio/#product",
+          "url": "https://www.mailmask.studio/",
+          "category": "BusinessApplication",
+          "featureList": [
+            "Shared Inbox",
+            "IMAP Mailboxes",
+            "Email Forwarding",
+            "DKIM/SPF Authentication",
+            "REST API",
+            "SMTP Relay",
+            "Webhooks"
+          ]
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "¿Qué es una máscara de email?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Una máscara (alias) es una dirección como ventas@tudominio.com que reenvía los emails a tu inbox personal (Gmail, Outlook, etc.), o que guarda su correo en un buzón propio si activas el dominio. Tú decides si creas cuentas nuevas o sigues leyendo donde ya lees."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿Necesito un servidor de correo?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. MailMask se encarga de todo. Solo necesitas configurar unos registros DNS en tu proveedor de dominio y listo. No hay servidores que mantener."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿Puedo enviar emails desde mi dominio?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Sí, y sale firmado con tu dominio. Responder desde la Bandeja está incluido también en la cuenta gratis; iniciar correos nuevos viene con el dominio activado ($99 al mes): 50 al día, y bloques de +100 por $99. Al agregar tu dominio, MailMask configura DKIM y SPF automáticamente — Gmail y Outlook muestran \"firmado por tudominio.com\" junto al remitente, lo que mejora la entregabilidad y evita que tus emails caigan en spam."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿Qué pasa con mis emails si cancelo?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Al cancelar la activación, mantienes todo hasta el fin del periodo pagado. Después el dominio vuelve a ser gratis (si es tu primero) y sigue reenviando; los correos que ya te reenviamos siguen en tu inbox. Si tenías buzones IMAP, quedan en solo lectura 30 días para que descargues todo en formato .mbox antes de borrarse."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿Es seguro? ¿Leen mis emails?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No leemos tus emails. Se procesan automáticamente para reenviarlos a tu destino. Si usas la Bandeja, el contenido se guarda en nuestra infraestructura de AWS y conservamos el historial completo de tus conversaciones (asunto, texto y respuestas); el correo original con formato y adjuntos se conserva 90 días. Puedes eliminar las que quieras cuando quieras. Usamos Amazon SES, la misma infraestructura que usan miles de empresas."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿Qué incluye la cuenta gratis y qué pasa a los 7 días?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Un dominio, 5 máscaras que reenvían a donde ya lees tu correo (hasta 1,000 al mes), y la Bandeja para leer y responder. La Bandeja muestra los últimos 7 días; los guardamos 30 por si activas el dominio y quieres el historial completo, y a los 30 se borran de verdad. Lo que ya reenviamos a tu inbox es tuyo y se queda."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿Cuánto tarda la configuración?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Crear tu cuenta toma 1 minuto. Configurar los registros DNS depende de tu proveedor, pero generalmente toma entre 2 y 10 minutos. La propagación DNS puede tardar hasta 48 horas, aunque normalmente es mucho menos."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿MailMask reemplaza a Gmail o Outlook?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Sí, si tú quieres. La Bandeja es un lugar completo de trabajo: ahí llega el correo de tu dominio, guarda el historial de cada conversación, respondes y escribes correos nuevos, sin que nada pase por Gmail. Y si prefieres no cambiar tu rutina, tampoco tienes que hacerlo: MailMask reenvía a donde ya lees tu correo. Muchos usan las dos cosas. Y si prefieres leer en tu app de escritorio, también: el dominio activado te da buzones IMAP en tu propio dominio, cada uno con su contraseña, sin pasar por Gmail."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿En qué se diferencia de Google Workspace?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Google Workspace cobra por usuario ($140 MXN al mes cada uno). Si necesitas 5 personas con correo, pagas 5 licencias: $700. Con MailMask un dominio activado cuesta $99 al mes y entran las personas que sean — buzones ilimitados, Bandeja compartida sin límite de asientos, máscaras ilimitadas. Cada una puede reenviar a uno o varios destinos o guardar su propio correo. Pagas por dominio, no por persona."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "¿Puedo enviar emails desde mi dominio con un cliente de correo?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Sí, y sin configurar nada: desde el navegador. En la Bandeja recibes, respondes y escribes correos nuevos con el botón Redactar, saliendo como ventas@tudominio.com. ¿Y si prefieres Outlook, Thunderbird o Apple Mail? Para enviar desde ahí también: el dominio activado incluye credenciales SMTP que pones como servidor de salida, con DKIM y SPF. Y para recibir en ellos: buzones IMAP ilimitados con 10 GB en imap.mailmask.studio (y +50 GB por $99 cuando hagan falta). También puedes seguir reenviando al buzón que ya usas, o las dos cosas."
+              }
+            }
+          ],
+          "@id": "https://www.mailmask.studio/#faq"
         }
-      }
+      ]
+    }
     </script>
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "Product",
-        "name": "MailMask",
-        "description": "Correo de tu dominio para todo tu equipo. Gratis para empezar; $99 MXN al mes por dominio con todo incluido y personas ilimitadas.",
-        "brand": { "@type": "Organization", "name": "MailMask" },
-        "offers": [
-          {
-            "@type": "Offer",
-            "name": "Gratis",
-            "description": "Un dominio, reenvío, 5 máscaras y Bandeja con 7 días de historial.",
-            "price": "0",
-            "priceCurrency": "MXN",
-            "availability": "https://schema.org/InStock",
-            "url": "https://www.mailmask.studio/#pricing"
-          },
-          {
-            "@type": "Offer",
-            "name": "Dominio activado",
-            "description": "Todo para un dominio: bandeja compartida con personas ilimitadas, buzones IMAP con 10 GB, 50 correos nuevos al día, reglas, webhooks, SMTP y API.",
-            "price": "99",
-            "priceCurrency": "MXN",
-            "priceValidUntil": "2027-12-31",
-            "availability": "https://schema.org/InStock",
-            "url": "https://www.mailmask.studio/#pricing"
-          },
-          {
-            "@type": "Offer",
-            "name": "+50 GB de buzón",
-            "price": "99",
-            "priceCurrency": "MXN",
-            "availability": "https://schema.org/InStock",
-            "url": "https://www.mailmask.studio/pricing"
-          },
-          {
-            "@type": "Offer",
-            "name": "+100 envíos al día",
-            "price": "99",
-            "priceCurrency": "MXN",
-            "availability": "https://schema.org/InStock",
-            "url": "https://www.mailmask.studio/pricing"
-          }
-        ]
-      }
-    </script>
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "FAQPage",
-        "mainEntity": [
-          {
-            "@type": "Question",
-            "name": "¿Qué es una máscara de email?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Una máscara (alias) es una dirección como ventas@tudominio.com que reenvía los emails a tu inbox personal (Gmail, Outlook, etc.), o que guarda su correo en un buzón propio si activas el dominio. Tú decides si creas cuentas nuevas o sigues leyendo donde ya lees."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "¿Necesito un servidor de correo?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "No. MailMask se encarga de todo. Solo necesitas configurar unos registros DNS en tu proveedor de dominio y listo. No hay servidores que mantener."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "¿Puedo enviar emails desde mi dominio?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Sí, y sale firmado con tu dominio. Responder desde la Bandeja está incluido también en la cuenta gratis; iniciar correos nuevos viene con el dominio activado ($99 al mes): 50 al día, y bloques de +100 por $99. Al agregar tu dominio, MailMask configura DKIM y SPF automáticamente — Gmail y Outlook muestran \"firmado por tudominio.com\" junto al remitente, lo que mejora la entregabilidad y evita que tus emails caigan en spam."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "¿Qué pasa con mis emails si cancelo?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Al cancelar la activación, mantienes todo hasta el fin del periodo pagado. Después el dominio vuelve a ser gratis (si es tu primero) y sigue reenviando; los correos que ya te reenviamos siguen en tu inbox. Si tenías buzones IMAP, quedan en solo lectura 30 días para que descargues todo en formato .mbox antes de borrarse."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "¿Es seguro? ¿Leen mis emails?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "No leemos tus emails. Se procesan automáticamente para reenviarlos a tu destino. Si usas la Bandeja, el contenido se guarda en nuestra infraestructura de AWS y conservamos el historial completo de tus conversaciones (asunto, texto y respuestas); el correo original con formato y adjuntos se conserva 90 días. Puedes eliminar las que quieras cuando quieras. Usamos Amazon SES, la misma infraestructura que usan miles de empresas."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "¿Qué incluye la cuenta gratis y qué pasa a los 7 días?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Un dominio, 5 máscaras que reenvían a donde ya lees tu correo (hasta 1,000 al mes), y la Bandeja para leer y responder. La Bandeja muestra los últimos 7 días; los guardamos 30 por si activas el dominio y quieres el historial completo, y a los 30 se borran de verdad. Lo que ya reenviamos a tu inbox es tuyo y se queda."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "¿Cuánto tarda la configuración?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Crear tu cuenta toma 1 minuto. Configurar los registros DNS depende de tu proveedor, pero generalmente toma entre 2 y 10 minutos. La propagación DNS puede tardar hasta 48 horas, aunque normalmente es mucho menos."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "¿MailMask reemplaza a Gmail o Outlook?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Sí, si tú quieres. La Bandeja es un lugar completo de trabajo: ahí llega el correo de tu dominio, guarda el historial de cada conversación, respondes y escribes correos nuevos, sin que nada pase por Gmail. Y si prefieres no cambiar tu rutina, tampoco tienes que hacerlo: MailMask reenvía a donde ya lees tu correo. Muchos usan las dos cosas. Y si prefieres leer en tu app de escritorio, también: el dominio activado te da buzones IMAP en tu propio dominio, cada uno con su contraseña, sin pasar por Gmail."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "¿En qué se diferencia de Google Workspace?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Google Workspace cobra por usuario ($140 MXN al mes cada uno). Si necesitas 5 personas con correo, pagas 5 licencias: $700. Con MailMask un dominio activado cuesta $99 al mes y entran las personas que sean — buzones ilimitados, Bandeja compartida sin límite de asientos, máscaras ilimitadas. Cada una puede reenviar a uno o varios destinos o guardar su propio correo. Pagas por dominio, no por persona."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "¿Puedo enviar emails desde mi dominio con un cliente de correo?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Sí, y sin configurar nada: desde el navegador. En la Bandeja recibes, respondes y escribes correos nuevos con el botón Redactar, saliendo como ventas@tudominio.com. ¿Y si prefieres Outlook, Thunderbird o Apple Mail? Para enviar desde ahí también: el dominio activado incluye credenciales SMTP que pones como servidor de salida, con DKIM y SPF. Y para recibir en ellos: buzones IMAP ilimitados con 10 GB en imap.mailmask.studio (y +50 GB por $99 cuando hagan falta). También puedes seguir reenviando al buzón que ya usas, o las dos cosas."
-            }
-          }
-        ]
-      }
-    </script>
-      <meta name="twitter:image:alt" content="MailMask — email profesional en tu dominio" />
+    <meta name="twitter:image:alt" content="MailMask — email profesional en tu dominio" />
     <meta name="twitter:site" content="@HectorBlisS" />
     <meta name="twitter:creator" content="@HectorBlisS" />
 </head>
@@ -1036,6 +1067,9 @@
         </div>
       </div>
       <p class="text-center text-fg-subtle text-xs mt-6">
+        Actualizado: <time datetime="2026-10-12">12 de octubre de 2026</time>
+      </p>
+      <p class="text-center text-fg-subtle text-xs mt-1">
         © 2026 by <a href="https://fixter.org" target="_blank" rel="noopener" class="hover:text-fg underline decoration-dotted transition-colors">fixter.org</a>
       </p>
     </footer>
