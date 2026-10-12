@@ -8,7 +8,10 @@ pruebas que lo fijan están en `webhooks.test.ts` (raíz).
   string** (`String(Date.now())`), no segundos ni ISO: un receptor que asuma otra unidad
   rechaza todo.
 - **Cambiar el formato rompe a todos los receptores a la vez.** Por eso el formato y la
-  ventana son contrato, no detalle: un refactor que los conserve deja la suite en verde.
+  ventana son contrato, no detalle: la suite lo fija contra un HMAC calculado aparte de
+  `signPayload` (si la firma sólo se comparara contra sí misma, cambiar el mensaje a
+  `${body}.${timestamp}` seguiría en verde), y un refactor que conserve el formato la deja
+  en verde igual.
 - **La tolerancia es estricta y el timestamp entra dos veces:** el valor numérico se compara
   con `Math.abs(Date.now() - ts) > toleranceMs` (por defecto 5 min) y el string original
   entra en el mensaje firmado. Justo a 5 min **pasa**; se rechaza al pasarse por 1 ms.

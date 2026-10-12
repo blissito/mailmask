@@ -7,9 +7,14 @@
 // Lo que se fija aquí es el CONTRATO —qué firma se acepta y cuál se rechaza—, no la
 // implementación: un refactor que lo conserve debe dejar estas pruebas en verde. Los dos
 // bordes que hoy se comportan de una manera concreta quedan dichos en comentario.
+//
+// El mensaje firmado SÍ es contrato, así que el primer caso no se conforma con que firmar y
+// verificar coincidan entre sí: compara contra un HMAC calculado aparte. Sin eso, cambiar
+// `${timestamp}.${body}` por `${body}.${timestamp}` dejaba todo en verde.
 
 import { describe, it, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 
 import { signPayload, verifyWebhookSignature } from "./webhooks.ts";
 
@@ -36,23 +41,34 @@ function firmar(ts: number, opts: { secreto?: string; cuerpo?: string } = {}): {
   return { signature: signPayload(opts.secreto ?? SECRETO, timestamp, opts.cuerpo ?? CUERPO), timestamp };
 }
 
+/**
+ * Firma calculada APARTE, sin pasar por `signPayload`: es el vector del contrato. Si alguien
+ * cambia el mensaje firmado (p. ej. a `${CUERPO}.${timestamp}`, o el timestamp a segundos),
+ * esto deja de coincidir aunque firma y verificación sigan siendo consistentes entre sí.
+ */
+function firmaDeReferencia(ts: number): string {
+  return `sha256=${createHmac("sha256", SECRETO).update(`${String(ts)}.${CUERPO}`).digest("hex")}`;
+}
+
 describe("firma de webhooks", () => {
   afterEach(() => {
     mock.restoreAll();
   });
 
-  it("signPayload es determinista y su formato es `sha256=` + 64 hex", () => {
-    const a = signPayload(SECRETO, String(T0), CUERPO);
-    const b = signPayload(SECRETO, String(T0), CUERPO);
+  it("signPayload produce el vector del contrato: `sha256=` + HMAC-SHA256(secreto, \"timestamp.body\")", () => {
+    const esperado = firmaDeReferencia(T0);
 
-    assert.match(a, /^sha256=[0-9a-f]{64}$/);
-    assert.equal(b, a, "mismo secreto, timestamp y cuerpo dan la misma firma");
+    assert.match(esperado, /^sha256=[0-9a-f]{64}$/, "sha256= + 64 hex");
+    assert.equal(signPayload(SECRETO, String(T0), CUERPO), esperado, "el mensaje firmado es `${timestamp}.${body}`");
+    assert.equal(signPayload(SECRETO, String(T0), CUERPO), signPayload(SECRETO, String(T0), CUERPO), "determinista");
   });
 
   it("acepta una firma recién hecha con el mismo secreto, timestamp y cuerpo", () => {
     reloj(T0);
 
     assert.equal(verifyWebhookSignature(SECRETO, firmar(T0), CUERPO), true);
+    // Y la que sale de una implementación aparte, no de `signPayload`.
+    assert.equal(verifyWebhookSignature(SECRETO, { signature: firmaDeReferencia(T0), timestamp: String(T0) }, CUERPO), true);
   });
 
   it("rechaza si cambia un solo carácter del cuerpo, del secreto o de la firma", () => {
