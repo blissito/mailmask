@@ -1312,7 +1312,7 @@ const app = new Elysia({ adapter: node() })
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/bandeja-compartida", "/dominios", "/alternativa-google-workspace", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
-        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/.well-known/mcp-registry-auth", "/health", "/healthz", "/docs", "/mcp", "/api/internal/outbound",
+        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/.well-known/mcp-registry-auth", "/.well-known/openai-apps-challenge", "/health", "/healthz", "/docs", "/mcp", "/api/internal/outbound",
       ],
       staticFile: true,
     },
@@ -1585,6 +1585,13 @@ const app = new Elysia({ adapter: node() })
   .get(MCP_REGISTRY_AUTH_PATH, () => new Response(`v=MCPv1; k=ed25519; p=${MCP_REGISTRY_PUBLIC_KEY}\n`, {
     headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=300" },
   }))
+  // Verificación de dominio del directorio de apps de ChatGPT: el portal de OpenAI da un token y lo
+  // lee en texto plano. Vive en el secreto OPENAI_APPS_CHALLENGE; sin él, 404.
+  .get("/.well-known/openai-apps-challenge", () => {
+    const token = process.env.OPENAI_APPS_CHALLENGE?.trim();
+    if (!token) return new Response("Not found", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
+    return new Response(token, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
+  })
 
   // --- Auth ---
 

@@ -100,6 +100,13 @@ describe("OAuth del MCP", () => {
     }
     const local = await req("/oauth/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ redirect_uris: ["http://127.0.0.1:3333/cb"] }) });
     assert.equal(local.status, 201);
+    // Los regresos de ChatGPT (con iss, RFC 9207, y el legado por callback) y el de Claude.
+    for (const uri of ["https://chatgpt.com/connector_platform_oauth_redirect", "https://chatgpt.com/connector/oauth/abc123", "https://claude.ai/api/mcp/auth_callback"]) {
+      const r = await req("/oauth/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ redirect_uris: [uri] }) });
+      assert.equal(r.status, 201, uri);
+    }
+    const as = await (await req("/.well-known/oauth-authorization-server")).json();
+    assert.equal(as.authorization_response_iss_parameter_supported, true);
   });
 
   it("authorize sin sesión manda al login con next; con datos malos no redirige al cliente", async () => {

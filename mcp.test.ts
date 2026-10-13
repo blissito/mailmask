@@ -124,6 +124,22 @@ describe("MCP: agentes contra la app", () => {
     assert.match(otro.headers.get("location") ?? "", /^https?:\/\/www\.mailmask\.studio\/docs$/);
   });
 
+  it("la verificación de ChatGPT sale de OPENAI_APPS_CHALLENGE y da 404 sin él", async () => {
+    const url = "http://localhost/.well-known/openai-apps-challenge";
+    const prev = process.env.OPENAI_APPS_CHALLENGE;
+    try {
+      delete process.env.OPENAI_APPS_CHALLENGE;
+      assert.equal((await app.fetch(new Request(url))).status, 404);
+      process.env.OPENAI_APPS_CHALLENGE = "tok_123\n";
+      const res = await app.fetch(new Request(url));
+      assert.equal(res.status, 200);
+      assert.match(res.headers.get("content-type") ?? "", /text\/plain/);
+      assert.equal(await res.text(), "tok_123");
+    } finally {
+      if (prev === undefined) delete process.env.OPENAI_APPS_CHALLENGE; else process.env.OPENAI_APPS_CHALLENGE = prev;
+    }
+  });
+
   it("initialize y tools/list traen el catálogo", async () => {
     const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "0" } });
     assert.equal(init.status, 200);
