@@ -147,7 +147,9 @@ function getClient(clientId: string | undefined): (ClientRow & { redirectUris: s
 
 export function registerClient(body: unknown, ip: string): Response {
   // Registro abierto (cualquiera puede registrar un cliente), así que el tope por IP es la defensa.
-  if (!checkRateLimit(`oauth-register:${ip}`, 20, 3600_000).allowed) return oauthError("too_many_requests", "Demasiados registros; intenta en una hora.", 429);
+  // Amplio a propósito: todo claude.ai registra desde el mismo rango (160.79.104.0/21) y con 20/h
+  // el conector del directorio se quedaba sin registro para todos los usuarios (13-oct-2026).
+  if (!checkRateLimit(`oauth-register:${ip}`, 2000, 3600_000).allowed) return oauthError("too_many_requests", "Demasiados registros; intenta en una hora.", 429);
   const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const uris = b.redirect_uris;
   if (!Array.isArray(uris) || uris.length === 0 || uris.length > 10 || !uris.every(validRedirectUri)) {

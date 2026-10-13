@@ -134,6 +134,21 @@ describe("MCP: agentes contra la app", () => {
     assert.ok(!nombres.some((n: string) => n.includes("api_key")), "las API keys no se fabrican por MCP");
   });
 
+  it("cada herramienta lleva title y anotaciones para el directorio de Claude", async () => {
+    const { READ_ONLY_TOOLS, DESTRUCTIVE_TOOLS } = await import("./mcp.js");
+    const tools = (await rpc("tools/list")).json.result.tools as { name: string; title?: string; annotations?: Record<string, unknown> }[];
+    const nombres = new Set(tools.map((t) => t.name));
+    // Un nombre mal escrito en las listas dejaría una herramienta sin su anotación real.
+    for (const n of [...READ_ONLY_TOOLS, ...DESTRUCTIVE_TOOLS]) assert.ok(nombres.has(n), `${n} no existe`);
+    for (const t of tools) {
+      assert.ok(t.title && t.annotations?.title === t.title, `${t.name} sin title`);
+      assert.equal(typeof t.annotations?.readOnlyHint, "boolean", `${t.name} sin readOnlyHint`);
+      assert.equal(typeof t.annotations?.destructiveHint, "boolean", `${t.name} sin destructiveHint`);
+      if (/^(delete|remove|revoke|cancel)_/.test(t.name)) assert.equal(t.annotations?.destructiveHint, true, `${t.name} debe ser destructiva`);
+      if (/^(list|get)_/.test(t.name)) assert.equal(t.annotations?.readOnlyHint, true, `${t.name} debe ser de lectura`);
+    }
+  });
+
   it("create_domain devuelve los registros DNS y create_alias con buzón funciona en activado", async () => {
     const r = await call("create_domain", { domain: `mcp-${suffix}.com` });
     assert.equal(r.status, 200);

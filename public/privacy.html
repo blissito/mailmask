@@ -61,7 +61,7 @@
             "name": "Política de Privacidad | MailMask",
             "description": "Política de privacidad de MailMask: qué datos tratamos, cómo se almacena el contenido de los correos, retención y tus derechos sobre la información.",
             "inLanguage": "es-MX",
-            "dateModified": "2026-09-07",
+            "dateModified": "2026-10-13",
             "isPartOf": {
               "@id": "https://www.mailmask.studio/#website"
             },
@@ -88,7 +88,7 @@
     <div class="max-w-3xl mx-auto px-4 py-16">
       <a href="/" class="text-mask-500 hover:text-mask-400 text-sm mb-8 inline-block">← Volver al inicio</a>
       <h1 class="text-3xl font-extrabold mb-8">Política de Privacidad</h1>
-      <p class="text-zinc-400 text-sm mb-8">Actualizado: <time datetime="2026-09-07">7 de septiembre de 2026</time></p>
+      <p class="text-zinc-400 text-sm mb-8">Actualizado: <time datetime="2026-10-13">13 de octubre de 2026</time></p>
 
       <div class="space-y-8 text-zinc-300 text-sm leading-relaxed">
         <section>
@@ -174,13 +174,24 @@
           <p>Usamos una cookie de sesión (JWT) para autenticación. No usamos cookies de rastreo ni de terceros.</p>
         </section>
 
+        <section id="agentes">
+          <h2 class="text-lg font-semibold text-zinc-100 mb-3">9. Agentes de IA y conectores (MCP)</h2>
+          <p>Puedes conectar tu cuenta a un agente de inteligencia artificial (Claude, ChatGPT, Ghosty u otro cliente MCP) desde <code>https://www.mailmask.studio/mcp</code>, con OAuth o con una API key.</p>
+          <ul class="list-disc list-inside space-y-2 mt-2">
+            <li><strong>Qué ve el agente:</strong> sólo lo que tú puedes ver y hacer en tu cuenta (dominios, direcciones, Bandeja, DNS, envíos), y sólo cuando se lo pides en una conversación. No le damos acceso a otras cuentas, a tus API keys ni a tu contraseña.</li>
+            <li><strong>Qué guardamos:</strong> el registro del cliente que se conectó (nombre y dirección de regreso), y el token de acceso como hash, que vence en una hora; el de renovación dura 60 días. No guardamos tus conversaciones con el agente: esas viven en el servicio del agente y se rigen por su propia política.</li>
+            <li><strong>Lo que el agente lee de tus correos</strong> sale de MailMask hacia el proveedor del agente (por ejemplo, Anthropic en el caso de Claude) para que pueda responderte. Nosotros no lo usamos para entrenar modelos.</li>
+            <li><strong>Cómo cortar el acceso:</strong> desconecta el conector desde el cliente, o cambia tu contraseña de MailMask para invalidar al instante todas las conexiones.</li>
+          </ul>
+        </section>
+
         <section>
-          <h2 class="text-lg font-semibold text-zinc-100 mb-3">9. Cambios a esta política</h2>
+          <h2 class="text-lg font-semibold text-zinc-100 mb-3">10. Cambios a esta política</h2>
           <p>Te notificaremos por email sobre cambios significativos con al menos 15 días de anticipación.</p>
         </section>
 
         <section>
-          <h2 class="text-lg font-semibold text-zinc-100 mb-3">10. Contacto</h2>
+          <h2 class="text-lg font-semibold text-zinc-100 mb-3">11. Contacto</h2>
           <p>Para consultas sobre privacidad, escríbenos a <span class="text-mask-400">soporte@mailmask.studio</span>.</p>
         </section>
       </div>

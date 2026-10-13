@@ -178,6 +178,37 @@ const KEYWORDS: Record<string, string> = {
   export_link: "exportar descargar datos respaldo json",
 };
 
+// Anotaciones que exige el directorio de conectores de Claude: `title` legible y
+// `readOnlyHint`/`destructiveHint` en todas. Lectura = no cambia nada del usuario (las
+// ligas de pago sí crean un cobro pendiente, por eso no entran). Destructiva = borra,
+// revoca, cancela o reemplaza algo sin vuelta atrás desde aquí. `mcp.test.ts` exige que
+// toda herramienta caiga en una de las dos listas o sea escritura no destructiva a propósito.
+export const READ_ONLY_TOOLS = new Set([
+  "list_domains", "get_domain", "domain_health", "list_aliases", "list_dns_records", "dns_delegation_status",
+  "import_dns_records", "list_rules", "list_webhooks", "webhook_deliveries", "bulk_status", "list_logs",
+  "list_suppressions", "list_smtp_credentials", "domain_dns_setup", "billing_status", "list_addons",
+  "search_domains", "domain_prices", "list_registrations", "transfer_check", "transfer_status", "transfer_dns",
+  "renewal_status", "list_members", "get_signature", "list_canned_replies", "inbox_list", "inbox_attachment",
+  "inbox_metrics", "list_orders", "referral_status", "export_link", "get_profile", "apple_profile_link",
+  "mailbox_export_link", "search_tools",
+]);
+export const DESTRUCTIVE_TOOLS = new Set([
+  "delete_domain", "delete_alias", "delete_mailbox", "reset_mailbox_password", "set_dns_record", "delete_dns_record",
+  "delete_rule", "delete_webhook", "remove_suppression", "revoke_smtp_credential", "approve_transfer_dns",
+  "transfer_out", "remove_member", "cancel_invite", "delete_canned_reply", "inbox_delete", "delete_domain_logo",
+  "cancel_addon", "cancel_renewal", "delete_profile_photo",
+]);
+// Las que tocan el mundo fuera de la cuenta: mandan correo, publican DNS o llaman a un webhook.
+const OPEN_WORLD_TOOLS = new Set([
+  "send_email", "bulk_send", "inbox_reply", "inbox_send", "invite_member", "test_webhook", "set_dns_record",
+  "delete_dns_record", "point_domain_to", "transfer_out", "transfer_start", "register_domain", "approve_transfer_dns",
+]);
+const ACRONYMS: Record<string, string> = { dns: "DNS", smtp: "SMTP", imap: "IMAP" };
+export function toolTitle(name: string): string {
+  const words = name.split("_").map((w) => ACRONYMS[w] ?? w);
+  return words.map((w, i) => (i === 0 ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
+}
+
 const domainId = z.string().describe("ID del dominio (de list_domains)");
 const attachmentsShape = z.array(z.object({ key: z.string(), filename: z.string(), contentType: z.string().optional() }))
   .max(10).optional().describe("Adjuntos devueltos por upload_attachment");
@@ -224,7 +255,14 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
         return fallo(e);
       }
     };
-    server.registerTool(name, { description, inputSchema: shape }, cb as unknown as Parameters<typeof server.registerTool>[2]);
+    const readOnly = READ_ONLY_TOOLS.has(name);
+    const annotations = {
+      title: toolTitle(name),
+      readOnlyHint: readOnly,
+      destructiveHint: readOnly ? false : DESTRUCTIVE_TOOLS.has(name),
+      openWorldHint: OPEN_WORLD_TOOLS.has(name),
+    };
+    server.registerTool(name, { title: annotations.title, description, inputSchema: shape, annotations }, cb as unknown as Parameters<typeof server.registerTool>[2]);
   };
 
   // --- Dominios ---
