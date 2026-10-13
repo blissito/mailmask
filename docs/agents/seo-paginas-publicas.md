@@ -25,6 +25,9 @@ social), `dominios-seo.test.ts` (`/dominios`, sin cifras por TLD) y
   derecho es de una sola línea: una línea larga estira la tarjeta más allá del lienzo de 1200 px.
 - **`llms.txt` es un contrato con agentes:** no puede contradecir `/docs` ni anunciar
   instalaciones que no existen (hoy la CLI no está en npm). Lo vigila `llms.test.ts`.
+  La prueba «Enlaces incluye las landings públicas» exige las tres landings ya enlazadas
+  (`/bandeja-compartida`, `/dominios`, `/alternativa-google-workspace`): una landing nueva hay que
+  sumarla a mano a esa lista y a `## Enlaces`, o queda sin vigilar.
 - **Sitemap:** una página pública nueva va en DOS lados o el generador la borra en silencio: la
   fila de `paginas` en `scripts/gen-sitemap.ts` (ruta, archivo, freq, prio) y su `<url>` en
   `public/sitemap.xml`.
