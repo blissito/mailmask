@@ -1,0 +1,45 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "mailmask",
+  "version": "1.0.0",
+  "description": "Manage your MailMask email domains, addresses and shared inbox from ChatGPT.",
+  "author": {
+    "name": "MailMask",
+    "url": "https://www.mailmask.studio"
+  },
+  "homepage": "https://www.mailmask.studio",
+  "keywords": [
+    "email",
+    "domains",
+    "dns",
+    "inbox",
+    "forwarding"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "MailMask",
+        "shortDescription": "Email on your own domain",
+        "longDescription": "MailMask (mailmask.studio) gives you professional email on your own domain: forwarding addresses, mailboxes, DNS, and a shared team inbox. This app lets you work with your account from ChatGPT: list your domains and check their health, see and create email addresses, review DNS records, read and reply to messages in your shared inbox, and look at sending logs. Payments are never made inside ChatGPT: they always open as a link on mailmask.studio. Sign-in uses your MailMask account through OAuth; the app only sees what you can see in MailMask, and you can revoke access at any time.",
+        "developerName": "MailMask",
+        "category": "Productivity",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "websiteURL": "https://www.mailmask.studio",
+        "supportURL": "https://www.mailmask.studio/docs",
+        "privacyPolicyURL": "https://www.mailmask.studio/privacy",
+        "termsOfServiceURL": "https://www.mailmask.studio/terms",
+        "defaultPrompt": [
+          "Is my domain's email set up correctly?",
+          "Create a sales@ address on my domain that forwards to me",
+          "What's new in my MailMask shared inbox?"
+        ],
+        "composerIcon": "./assets/icon.png",
+        "logo": "./assets/icon.png",
+        "logoDark": "./assets/icon-dark.png"
+      }
+    }
+  }
+}
