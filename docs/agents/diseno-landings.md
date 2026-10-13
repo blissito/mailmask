@@ -135,7 +135,15 @@ siendo claro y útil: el ejemplo canónico es la 404, el luchador con lupa busca
   `FAQPage` en el `@graph`, «Para seguirle» que cruza a las otras landings y CTA de cierre. Las
   tarjetas de características llevan icono de línea (24×24, `stroke-width 1.5`,
   `text-accent-text`). La de `/alternativa-google-workspace` se generó con Canva
-  (`generate-image` → diseño 3:2 → exportar JPG 1200×800).
+  (`generate-image` con `dominios-il.jpg` como `imageReferences` para copiar el trazo → diseño 3:2 →
+  exportar JPG 1200×800).
+- **FAQ:** siempre el acordeón `.faq` (`details`/`summary`/`p`) con el layout de dos columnas de
+  `/pricing`; la primera pregunta va `open`. Nada de `<dl>`.
+- **Testimonios:** la pieza `figure.card.testimonial` de la home, antes del FAQ. Sólo citas
+  **literales**: Brenda sale de su video (YouTube `KRfrU_mZxmY`, transcrito con whisper) y Rosy dio
+  permiso el 5-oct-2026. Nunca parafrasear una cita.
+- **Métrica gancho:** evaluada el 12-oct-2026 contra producción (12 dominios verificados, 22
+  entregados) y descartada por ahora: no se publica una cifra que no presuma.
 - La **home** sigue aparte: su hero es una `.mock` (maqueta del producto) y sus tarjetas
   reciclan tres portadas del blog (`landing.html:1029-1043`). Las otras ~29 `-il.jpg` siguen
   siendo portadas de blog, y la 404 conserva la suya.
