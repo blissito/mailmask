@@ -1,4 +1,4 @@
-// El hero ilustrado de las tres landings de venta: MISMO layout en las tres y una
+// El hero ilustrado de las cuatro landings de venta: MISMO layout en las cuatro y una
 // ilustración propia por página (3:2, 1200×800, sin recorte). Ficha:
 // docs/agents/diseno-landings.md · Reglas comunes de lo público: seo-checks.ts
 import { test } from "node:test";
@@ -10,14 +10,15 @@ import { medidasJpeg } from "./seo-checks.ts";
 const local = (ruta: string) => new URL(`./${ruta}`, import.meta.url);
 const leer = (ruta: string) => readFileSync(local(ruta), "utf8");
 
-/** Las tres landings con hero ilustrado. */
+/** Las cuatro landings con hero ilustrado. */
 const PAGINAS = [
   { ruta: "/bandeja-compartida", archivo: "public/bandeja-compartida.html", slug: "bandeja-compartida" },
   { ruta: "/pricing", archivo: "public/pricing.html", slug: "pricing" },
   { ruta: "/dominios", archivo: "public/dominios.html", slug: "dominios" },
+  { ruta: "/alternativa-google-workspace", archivo: "public/alternativa-google-workspace.html", slug: "alternativa-google-workspace" },
 ] as const;
 
-/** El layout del hero, idéntico en las tres: es lo que las hace la misma familia. */
+/** El layout del hero, idéntico en las cuatro: es lo que las hace la misma familia. */
 const GRID = "grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-10 items-center";
 const FIGURA = '<figure class="hero-il">';
 
@@ -34,7 +35,7 @@ function bloqueHero(archivo: string): string {
 for (const { ruta, archivo, slug } of PAGINAS) {
   test(`${ruta}: hero de dos columnas, con el texto antes de la ilustración`, () => {
     const hero = bloqueHero(archivo);
-    assert.ok(hero.includes(GRID), `el hero no usa el grid de las tres landings: ${GRID}`);
+    assert.ok(hero.includes(GRID), `el hero no usa el grid de las cuatro landings: ${GRID}`);
     assert.ok(hero.includes(FIGURA), `el hero no trae ${FIGURA}`);
     // El orden en el DOM es lo que en móvil deja la ilustración debajo del texto.
     const grid = hero.indexOf(GRID);
@@ -70,7 +71,7 @@ test("la pieza .hero-il está en input.css y en el styles.css que se versiona", 
   assert.match(leer("public/css/styles.css"), /\.hero-il\s*\{/, "falta recompilar styles.css");
 });
 
-test("las tres páginas usan el MISMO hero: sólo cambian copy e ilustración", () => {
+test("las cuatro páginas usan el MISMO hero: sólo cambian copy e ilustración", () => {
   // Se tira el texto de la columna izquierda (ahí sí cambia el copy, y /pricing no lleva
   // CTAs a propósito) y se deja sólo el andamiaje: grid, columna, figure e img.
   const andamiaje = (hero: string) =>
@@ -79,7 +80,6 @@ test("las tres páginas usan el MISMO hero: sólo cambian copy e ilustración", 
       .replace(/<img[^>]*>/, "<img>")
       .replace(/\s+/g, " ")
       .trim();
-  const [bandeja, pricing, dominios] = PAGINAS.map(({ archivo }) => andamiaje(bloqueHero(archivo)));
-  assert.equal(pricing, bandeja, "/pricing diverge del hero común");
-  assert.equal(dominios, bandeja, "/dominios diverge del hero común");
+  const [bandeja, ...resto] = PAGINAS.map(({ ruta, archivo }) => ({ ruta, hero: andamiaje(bloqueHero(archivo)) }));
+  for (const { ruta, hero } of resto) assert.equal(hero, bandeja.hero, `${ruta} diverge del hero común`);
 });

@@ -93,6 +93,52 @@
                 "item": "https://www.mailmask.studio/bandeja-compartida"
               }
             ]
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://www.mailmask.studio/bandeja-compartida#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "¿Cuántas personas pueden usar la Bandeja?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Con el dominio gratis, una persona y los últimos 7 días a la vista. Al activarlo ($99 MXN al mes) entran las personas que quieras y ves el historial completo."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Qué pasa si dos personas abren el mismo correo?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "La Bandeja avisa en vivo: ves quién más tiene abierta la conversación y quién está escribiendo una respuesta, antes de que contesten dos veces."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿El cliente ve el correo personal de quien contesta?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. La respuesta sale desde la dirección del dominio, como soporte@ o ventas@, y en el mismo hilo que el cliente empezó."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Responder desde la Bandeja gasta mis envíos del día?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Contestar una conversación no descuenta de los 50 correos nuevos al día; esos son para los correos que empiezas tú."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Tengo que cambiar de registrador mi dominio?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Conectas el dominio que ya tienes cambiando su MX, o apuntando sus nameservers a MailMask; también puedes registrarlo o transferirlo aquí. Los tres caminos están en dominios."
+                }
+              }
+            ]
           }
         ]
       }
@@ -118,6 +164,8 @@
         </a>
         <div class="hidden sm:flex items-center gap-5 ml-4 text-sm text-fg-muted">
           <a href="/#como-funciona" class="hover:text-fg transition-colors">Cómo funciona</a>
+          <a href="/bandeja-compartida" class="hover:text-fg transition-colors">Bandeja</a>
+          <a href="/dominios" class="hover:text-fg transition-colors">Dominios</a>
           <a href="/pricing" class="hover:text-fg transition-colors">Precios</a>
           <a href="/docs" class="hover:text-fg transition-colors">Docs</a>
           <a href="/blog" class="hover:text-fg transition-colors">Blog</a>
@@ -222,38 +270,47 @@
       <h2 class="text-2xl font-semibold tracking-tight mb-8">Lo que trae la Bandeja del dominio</h2>
       <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
         <div class="bg-bg-elev border border-line rounded-2xl p-6">
+          <svg class="w-6 h-6 text-accent-text mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 11h6m-2.5-2.5L22 11l-2.5 2.5"/></svg>
           <p class="font-semibold mb-2">Asignación</p>
           <p class="text-sm text-fg-muted leading-relaxed">Cualquier agente toma la conversación o se la pasa a otro. Una vez asignada, el resto del equipo sabe que alguien ya se está encargando.</p>
         </div>
         <div class="bg-bg-elev border border-line rounded-2xl p-6">
+          <svg class="w-6 h-6 text-accent-text mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="15" height="12" rx="2"/><path d="m3 8 7.5 5L18 8"/><circle cx="20" cy="5" r="2.5" fill="currentColor" stroke="none"/></svg>
           <p class="font-semibold mb-2">Sin leer por persona</p>
           <p class="text-sm text-fg-muted leading-relaxed">Que tu compañera la haya leído no te la marca leída a ti, y sigue sin leer aunque recargues o cambies de computadora.</p>
         </div>
         <div class="bg-bg-elev border border-line rounded-2xl p-6">
+          <svg class="w-6 h-6 text-accent-text mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7 4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 6 6v1"/></svg>
           <p class="font-semibold mb-2">Respuesta desde la dirección</p>
           <p class="text-sm text-fg-muted leading-relaxed">El correo sale como <code class="font-mono text-[0.95em]">soporte@tudominio.com</code>, no como tu correo personal. El cliente nunca ve quién del equipo escribió.</p>
         </div>
         <div class="bg-bg-elev border border-line rounded-2xl p-6">
+          <svg class="w-6 h-6 text-accent-text mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M8 12h8M8 16h5"/></svg>
           <p class="font-semibold mb-2">Notas internas</p>
           <p class="text-sm text-fg-muted leading-relaxed">Contexto que el cliente no ve, para pasarle el hilo a otra persona sin reenviar correos ni explicar de cero.</p>
         </div>
         <div class="bg-bg-elev border border-line rounded-2xl p-6">
+          <svg class="w-6 h-6 text-accent-text mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
           <p class="font-semibold mb-2">Estados y posponer</p>
           <p class="text-sm text-fg-muted leading-relaxed">Abierta, pospuesta o cerrada. Al posponer eliges cuándo vuelve —en 1 hora, mañana a las 9, el lunes— y si el cliente contesta antes, despierta al instante.</p>
         </div>
         <div class="bg-bg-elev border border-line rounded-2xl p-6">
+          <svg class="w-6 h-6 text-accent-text mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 5 5"/></svg>
           <p class="font-semibold mb-2">Búsqueda dentro del cuerpo</p>
           <p class="text-sm text-fg-muted leading-relaxed">Busca en remitente, asunto y texto del correo, con acentos o sin ellos: <code class="font-mono text-[0.95em]">informacion</code> encuentra <code class="font-mono text-[0.95em]">información</code>.</p>
         </div>
         <div class="bg-bg-elev border border-line rounded-2xl p-6">
+          <svg class="w-6 h-6 text-accent-text mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3 5 14h6l-1 7 8-11h-6z"/></svg>
           <p class="font-semibold mb-2">En vivo, sin recargar</p>
           <p class="text-sm text-fg-muted leading-relaxed">Los correos nuevos aparecen solos y también los cambios de tus compañeros: si alguien responde, asigna o cierra, tú lo ves al momento.</p>
         </div>
         <div class="bg-bg-elev border border-line rounded-2xl p-6">
+          <svg class="w-6 h-6 text-accent-text mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>
           <p class="font-semibold mb-2">Urgente y atajos</p>
           <p class="text-sm text-fg-muted leading-relaxed">Marca lo que necesita atención inmediata para que suba en la lista. Con teclado: <code class="font-mono text-[0.95em]">j k</code> para moverte, <code class="font-mono text-[0.95em]">o</code> abrir, <code class="font-mono text-[0.95em]">r</code> responder, <code class="font-mono text-[0.95em]">n</code> nota, <code class="font-mono text-[0.95em]">a</code> asignar, <code class="font-mono text-[0.95em]">s</code> posponer, <code class="font-mono text-[0.95em]">/</code> buscar.</p>
         </div>
         <div class="bg-bg-elev border border-line rounded-2xl p-6">
+          <svg class="w-6 h-6 text-accent-text mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M2 20h20"/></svg>
           <p class="font-semibold mb-2">Métricas del equipo</p>
           <p class="text-sm text-fg-muted leading-relaxed">Primera respuesta (mediana y p90), cuántas conversaciones entraron y nadie contestó, y cuántas siguen sin asignar. Sin reportes inflados.</p>
         </div>
@@ -313,10 +370,37 @@
       </p>
     </section>
 
+    <!-- FAQ -->
+    <section class="max-w-3xl mx-auto px-5 py-12">
+      <h2 class="text-2xl font-semibold tracking-tight mb-6">Preguntas que nos hacen seguido</h2>
+      <dl class="space-y-6">
+        <div>
+          <dt class="font-semibold mb-2">¿Cuántas personas pueden usar la Bandeja?</dt>
+          <dd class="text-fg-muted leading-relaxed text-sm">Con el dominio gratis, una persona y los últimos 7 días a la vista. Al activarlo ($99 MXN al mes) entran las personas que quieras y ves el historial completo.</dd>
+        </div>
+        <div>
+          <dt class="font-semibold mb-2">¿Qué pasa si dos personas abren el mismo correo?</dt>
+          <dd class="text-fg-muted leading-relaxed text-sm">La Bandeja avisa en vivo: ves quién más tiene abierta la conversación y quién está escribiendo una respuesta, antes de que contesten dos veces.</dd>
+        </div>
+        <div>
+          <dt class="font-semibold mb-2">¿El cliente ve el correo personal de quien contesta?</dt>
+          <dd class="text-fg-muted leading-relaxed text-sm">No. La respuesta sale desde la dirección del dominio, como soporte@ o ventas@, y en el mismo hilo que el cliente empezó.</dd>
+        </div>
+        <div>
+          <dt class="font-semibold mb-2">¿Responder desde la Bandeja gasta mis envíos del día?</dt>
+          <dd class="text-fg-muted leading-relaxed text-sm">No. Contestar una conversación no descuenta de los 50 correos nuevos al día; esos son para los correos que empiezas tú.</dd>
+        </div>
+        <div>
+          <dt class="font-semibold mb-2">¿Tengo que cambiar de registrador mi dominio?</dt>
+          <dd class="text-fg-muted leading-relaxed text-sm">No. Conectas el dominio que ya tienes cambiando su MX, o apuntando sus nameservers a MailMask; también puedes registrarlo o transferirlo aquí. Los tres caminos están en <a href="/dominios" class="text-accent-text hover:underline">dominios</a>.</dd>
+        </div>
+      </dl>
+    </section>
+
     <!-- Artículos -->
     <section class="max-w-6xl mx-auto px-5 py-12">
       <h2 class="text-2xl font-semibold tracking-tight mb-6">Para seguirle</h2>
-      <div class="grid md:grid-cols-2 gap-5">
+      <div class="grid md:grid-cols-3 gap-5">
         <a href="/blog/bandeja-compartida-tutorial" class="bg-bg-elev border border-line rounded-2xl p-6 hover:border-fg-subtle transition-colors">
           <p class="text-xs uppercase tracking-wider text-fg-subtle mb-2">Tutorial · 11 min</p>
           <p class="font-semibold mb-2">Cómo usar la Bandeja compartida paso a paso</p>
@@ -326,6 +410,11 @@
           <p class="text-xs uppercase tracking-wider text-fg-subtle mb-2">Comparativa · 9 min</p>
           <p class="font-semibold mb-2">Bandeja compartida vs helpdesk: ¿cuál necesitas?</p>
           <p class="text-sm text-fg-muted leading-relaxed">Cuánto cuesta de verdad Zendesk, Freshdesk o Help Scout por agente, y en qué punto tu equipo ya necesita el aparato completo de tickets.</p>
+        </a>
+        <a href="/dominios" class="bg-bg-elev border border-line rounded-2xl p-6 hover:border-fg-subtle transition-colors">
+          <p class="text-xs uppercase tracking-wider text-fg-subtle mb-2">Dominios</p>
+          <p class="font-semibold mb-2">Registrar, transferir o sólo apuntar tu dominio</p>
+          <p class="text-sm text-fg-muted leading-relaxed">Tres caminos para conectar tu dominio: registrarlo aquí, traerlo de otro registrador o dejarlo donde está y sólo cambiar sus nameservers.</p>
         </a>
       </div>
     </section>

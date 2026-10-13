@@ -148,6 +148,44 @@
                 }
               }
             ]
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://www.mailmask.studio/pricing#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "¿Por qué por dominio y no por persona?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Porque el costo de darte correo no crece con las personas, crece con los dominios y el almacenamiento. Google cobra por cada persona: una licencia por usuario al mes, sin impuestos, según su página oficial de precios (consultada el 12 de octubre de 2026); aquí un equipo de cinco paga lo mismo que uno. La comparativa completa."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Qué pasa con mi segundo dominio?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "El primero es gratis. Del segundo en adelante, cada dominio se activa por $99 al mes: mientras no lo actives, guarda el correo en la Bandeja pero no lo reenvía."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Puedo activar, cancelar y volver a activar?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Sí. Al cancelar conservas todo hasta el fin del periodo pagado; después el dominio vuelve a gratis (si es tu primero). Tus buzones quedan 30 días en solo lectura con descarga .mbox antes de borrarse."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Cómo se cobra?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Con MercadoPago, mes a mes. Cada dominio y cada bloque es su propio cargo de $99, así que en tu estado de cuenta ves exactamente qué estás pagando y cancelas cualquiera por separado."
+                }
+              }
+            ]
           }
         ]
       }
@@ -169,9 +207,10 @@
           MailMask
         </a>
         <div class="hidden sm:flex items-center gap-5 ml-4 text-sm text-fg-muted">
-          <a href="#como-funciona" class="hover:text-fg transition-colors">Cómo funciona</a>
-          <a href="#bandeja" class="hover:text-fg transition-colors">Bandeja</a>
-          <a href="#pricing" class="hover:text-fg transition-colors">Precios</a>
+          <a href="/#como-funciona" class="hover:text-fg transition-colors">Cómo funciona</a>
+          <a href="/bandeja-compartida" class="hover:text-fg transition-colors">Bandeja</a>
+          <a href="/dominios" class="hover:text-fg transition-colors">Dominios</a>
+          <a href="/pricing" class="hover:text-fg transition-colors">Precios</a>
           <a href="/docs" class="hover:text-fg transition-colors">Docs</a>
           <a href="/blog" class="hover:text-fg transition-colors">Blog</a>
         </div>
@@ -333,6 +372,43 @@
             <summary>¿Cómo se cobra?<span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span></summary>
             <p>Con MercadoPago, mes a mes. Cada dominio y cada bloque es su propio cargo de $99, así que en tu estado de cuenta ves exactamente qué estás pagando y cancelas cualquiera por separado.</p>
           </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- Artículos -->
+    <section class="max-w-6xl mx-auto px-5 py-12">
+      <h2 class="text-2xl font-semibold tracking-tight mb-6">Para seguirle</h2>
+      <div class="grid md:grid-cols-3 gap-5">
+        <a href="/alternativa-google-workspace" class="bg-bg-elev border border-line rounded-2xl p-6 hover:border-fg-subtle transition-colors">
+          <p class="text-xs uppercase tracking-wider text-fg-subtle mb-2">Comparativa</p>
+          <p class="font-semibold mb-2">MailMask vs Google Workspace</p>
+          <p class="text-sm text-fg-muted leading-relaxed">La cuenta completa, con los precios de Google citados de su página oficial: cuánto pagas por persona allá y cuánto por dominio aquí.</p>
+        </a>
+        <a href="/bandeja-compartida" class="bg-bg-elev border border-line rounded-2xl p-6 hover:border-fg-subtle transition-colors">
+          <p class="text-xs uppercase tracking-wider text-fg-subtle mb-2">Bandeja compartida</p>
+          <p class="font-semibold mb-2">Un buzón para todo el equipo</p>
+          <p class="text-sm text-fg-muted leading-relaxed">Asignación, notas internas y aviso en vivo cuando dos personas abren el mismo correo, incluidos en el dominio activado.</p>
+        </a>
+        <a href="/dominios" class="bg-bg-elev border border-line rounded-2xl p-6 hover:border-fg-subtle transition-colors">
+          <p class="text-xs uppercase tracking-wider text-fg-subtle mb-2">Dominios</p>
+          <p class="font-semibold mb-2">Registrar, transferir o sólo apuntar tu dominio</p>
+          <p class="text-sm text-fg-muted leading-relaxed">Tres caminos para conectar tu dominio: registrarlo aquí, traerlo de otro registrador o dejarlo donde está y sólo cambiar sus nameservers.</p>
+        </a>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="max-w-6xl mx-auto px-5 py-16">
+      <div class="bg-bg-elev border border-line rounded-2xl p-8 text-center">
+        <h2 class="text-2xl font-semibold tracking-tight mb-3">Empieza gratis y activa cuando lo necesites</h2>
+        <p class="text-fg-muted leading-relaxed max-w-2xl mx-auto mb-5">
+          Conecta tu dominio sin tarjeta. Cuando el equipo crezca o quieras enviar y tener buzones,
+          lo activas por $99 MXN al mes, con las personas que sean.
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <a href="/register" class="btn-primary">Empezar gratis</a>
+          <a href="/dominios" class="btn-secondary">Conectar mi dominio</a>
         </div>
       </div>
     </section>

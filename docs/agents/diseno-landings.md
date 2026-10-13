@@ -124,12 +124,18 @@ siendo claro y útil: el ejemplo canónico es la 404, el luchador con lupa busca
 
 ## Notas
 
-- **Las tres landings de venta ya traen su hero ilustrado** (12-oct-2026): `/bandeja-compartida`,
-  `/pricing` y `/dominios` comparten el hero de dos columnas —texto a la izquierda, `.hero-il` a
-  la derecha— y cada una trae su **propia** `<slug>-il.jpg`. El layout es el mismo en las tres:
+- **Las cuatro landings de venta ya traen su hero ilustrado** (12-oct-2026): `/bandeja-compartida`,
+  `/pricing`, `/dominios` y `/alternativa-google-workspace` comparten el hero de dos columnas —texto a la izquierda, `.hero-il` a
+  la derecha— y cada una trae su **propia** `<slug>-il.jpg`. El layout es el mismo en las cuatro:
   `grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-10 items-center`, con el texto antes que
   la `figure` en el DOM (así en móvil la ilustración cae debajo). Sólo cambian copy e
   ilustración; `/pricing` no lleva CTAs. Lo vigila `landings-hero.test.ts`.
+- **Lo común de las cuatro** (auditoría del 12-oct-2026): el mismo menú (Cómo funciona,
+  Bandeja, Dominios, Precios, Docs, Blog, con rutas absolutas fuera de la home), FAQ visible con su
+  `FAQPage` en el `@graph`, «Para seguirle» que cruza a las otras landings y CTA de cierre. Las
+  tarjetas de características llevan icono de línea (24×24, `stroke-width 1.5`,
+  `text-accent-text`). La de `/alternativa-google-workspace` se generó con Canva
+  (`generate-image` → diseño 3:2 → exportar JPG 1200×800).
 - La **home** sigue aparte: su hero es una `.mock` (maqueta del producto) y sus tarjetas
   reciclan tres portadas del blog (`landing.html:1029-1043`). Las otras ~29 `-il.jpg` siguen
   siendo portadas de blog, y la 404 conserva la suya.
