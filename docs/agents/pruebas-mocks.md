@@ -136,3 +136,8 @@ lo único falso es el SDK.
   probar nada.
 - **`PREVIEW` no puede estar en `1`** en el proceso de pruebas: `getRoute53Domains()` llama
   `assertNoPreview` y truena antes de llegar al doble.
+
+- **Una prueba de la lista vacía sólo prueba algo si el detalle TAMBIÉN falla.** Con
+  `GetDomainDetail` contestando, la segunda opinión salva al dominio y la prueba pasa aunque la
+  guarda de `enLaCuenta?.size` no esté: el escenario fiel es unas credenciales apuntando a OTRA
+  cuenta (lista vacía *y* `DomainNotFound`). Se comprueba con el mutante `if (enLaCuenta && …)`.

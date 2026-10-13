@@ -16,7 +16,7 @@ import assert from "node:assert/strict";
 
 const DAY = 864e5;
 const suffix = Date.now();
-/** El reloj real, para devolverlo al final: el proceso es de este archivo y nadie más. */
+/** El `fetch` real, para devolverlo al final: el proceso es de este archivo y nadie más. */
 const fetchReal = globalThis.fetch;
 
 /** Lo que "dice AWS" de los dominios de ESTE archivo. */
@@ -25,8 +25,13 @@ const aws = new Map<string, { expiry: Date; autoRenew: boolean; locked: boolean;
 const fueraDeLaCuenta = new Set<string>();
 /** Dominios cuyo `GetDomainDetail` falla con algo que NO es `DomainNotFound`. */
 const detalleConError = new Map<string, string>();
-/** `ListDomains` contesta `Domains: []`, como unas credenciales apuntando a otra cuenta. */
-let listaVacia = false;
+/**
+ * El escenario REAL de la lista vacía: unas credenciales que apuntan a OTRA cuenta. Entonces
+ * `ListDomains` viene vacío **y** `GetDomainDetail` no encuentra nada, que es lo que hace que
+ * la guarda de `enLaCuenta?.size` sea la única que salva el cobro. Con el detalle contestando,
+ * la segunda opinión salvaría al dominio igual y la prueba no probaría nada.
+ */
+let otraCuenta = false;
 /** Si tiene un dominio, ése llega en la SEGUNDA página (el resto, en la primera). */
 let enLaSegundaPagina: string | null = null;
 /** Cada comando que recibió el cliente falso, como `ListDomainsCommand:ejemplo.com`. */
@@ -69,7 +74,7 @@ class ClienteRoute53DomainsFalso {
 
     switch (comando) {
       case "ListDomainsCommand": {
-        if (listaVacia) return { Domains: [] };
+        if (otraCuenta) return { Domains: [] };
         // `dbmod` todavía no existe cuando se construye el cliente: se resuelve aquí.
         const nombres = nombresRegistrados(DB);
         // Un dominio en la segunda página: si `listRegisteredDomains` no siguiera el
@@ -89,7 +94,7 @@ class ClienteRoute53DomainsFalso {
       case "GetDomainDetailCommand": {
         const error = detalleConError.get(dominio!);
         if (error) throw errorConNombre(error, `no se pudo leer ${dominio}: ${error}`);
-        const d = aws.get(dominio!);
+        const d = otraCuenta ? undefined : aws.get(dominio!);
         // Igual que AWS: un dominio que no está en la cuenta no tiene detalle.
         if (!d) throw errorConNombre("DomainNotFound", `No such domain: ${dominio}`);
         return {
@@ -181,7 +186,7 @@ describe("sincronización de la fecha de expiración con AWS", () => {
     llamadasFetch.length = 0;
     detalleConError.clear();
     fueraDeLaCuenta.clear();
-    listaVacia = false;
+    otraCuenta = false;
     enLaSegundaPagina = null;
   });
 
@@ -236,17 +241,25 @@ describe("sincronización de la fecha de expiración con AWS", () => {
   });
 
   it("una lista de dominios vacía no le quita el cobro a nadie", async () => {
+    // Credenciales apuntando a otra cuenta: `ListDomains` vacío y el detalle sin nada. Es
+    // el único escenario en el que la guarda de `enLaCuenta?.size` es lo que salva el
+    // cobro; con un detalle que sí contesta, la segunda opinión salvaría al dominio y esta
+    // prueba pasaría aunque la guarda no estuviera.
     const reg = registrar("vacia", { renewalStatus: "active", mpPreapprovalId: `pre-vacia-${suffix}` });
-    listaVacia = true;
+    otraCuenta = true;
 
     await sync.syncDomainExpirations();
 
-    listaVacia = false;
+    otraCuenta = false;
     const fresco = DB.getDomainRegistration(reg.id);
     assert.equal(fresco.status, "registered");
     assert.equal(fresco.renewalStatus, "active");
     assert.equal(llamadasFetch.length, 0, "una lista vacía no debe cancelar nada en MercadoPago");
-    assert.equal(alertaDe("transfer-out-completado"), undefined);
+    assert.equal(
+      alertas.filter((a) => a.tipo === "transfer-out-completado" && a.mensaje.includes(reg.domainName)).length,
+      0,
+      "una lista vacía no debe declarar transfer-outs",
+    );
   });
 
   it("ausente de la lista pero AWS todavía lo describe: sigue cobrándose con la fecha nueva", async () => {
