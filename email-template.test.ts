@@ -33,6 +33,17 @@ function conClase(html: string): string[] {
   return [...html.matchAll(/<([a-z0-9]+)([^>]*\bclass="[^"]*"[^>]*)>/gi)].map((m) => m[0]);
 }
 
+/** Las clases sueltas que aparecen en el documento de salida, sin repetir. */
+function clasesDe(html: string): string[] {
+  const clases = new Set<string>();
+  for (const tag of conClase(html)) {
+    for (const clase of (tag.match(/class="([^"]*)"/)?.[1] ?? "").split(/\s+/)) {
+      if (clase) clases.add(clase);
+    }
+  }
+  return [...clases].sort();
+}
+
 // ~2 KB de markdown: un correo de verdad —encabezados, párrafos, lista, tabla, caja de
 // color, imagen y firma—, no un "hola" de dos líneas.
 const CUERPO_TIPICO = [
@@ -149,13 +160,26 @@ describe("EMAIL_STYLES: la hoja que el motor de Word puede leer", () => {
 });
 
 describe("la cadena real (sanitizeEmailHtml): wrap + juice", () => {
-  // Tabla y caja de color a propósito: son las clases que juice tiene que resolver.
+  // Tabla y las cinco cajas de color a propósito: son las clases que juice tiene que
+  // resolver, y las que se quedan sin regla si alguien toca la hoja.
+  const alertas = ["note", "tip", "important", "warning", "caution"]
+    .map(
+      (tipo) =>
+        `<table class="alert alert-${tipo}"><tr><td class="alert-cell alert-cell-${tipo}">` +
+        `<p class="alert-title alert-title-${tipo}">${tipo}</p><p>Dato</p></td></tr></table>`,
+    )
+    .join("");
   const { html } = sanitizeEmailHtml(
     '<h2>Sección</h2><p>Hola</p>' +
       '<table class="data"><tr><th>A</th></tr><tr><td>1</td></tr></table>' +
-      '<table class="alert alert-note"><tr><td class="alert-cell alert-cell-note">' +
-      '<p class="alert-title alert-title-note">Nota</p><p>Dato</p></td></tr></table>',
+      alertas,
   );
+
+  // El tipo de la caja va como gancho en la tabla (`class="alert alert-note"`) y NO tiene
+  // regla propia a propósito: el color lo pintan `.alert-cell-<tipo>` y `.alert-title-<tipo>`.
+  // Cualquier OTRA clase sin regla es una regla que se perdió: el elemento se queda con el
+  // estilo que le presten sus otros selectores —o con ninguno— y nada lo avisa.
+  const SIN_REGLA_A_PROPOSITO = /^alert-(note|tip|important|warning|caution)$/;
 
   it("no deja ningún <style>: Gmail se llevaría el formato al recortar el head", () => {
     assert.ok(!/<style[\s>]/i.test(html), "quedó un <style> en la salida");
@@ -164,9 +188,21 @@ describe("la cadena real (sanitizeEmailHtml): wrap + juice", () => {
   it("no deja ninguna clase sin su estilo inline", () => {
     const conClases = conClase(html);
     // Sin esto la prueba pasaría vacía si un día el shell pierde sus clases.
-    assert.ok(conClases.length >= 4, `el caso debe traer clases (shell, tabla y caja) y trajo ${conClases.length}`);
+    assert.ok(conClases.length >= 8, `el caso debe traer clases (shell, tabla y cajas) y trajo ${conClases.length}`);
     const pelonas = conClases.filter((tag) => !/\bstyle="/i.test(tag));
     assert.equal(pelonas.length, 0, `etiquetas con class y sin regla inline: ${pelonas.join(" | ")}`);
+  });
+
+  it("cada clase de la salida tiene su regla en EMAIL_STYLES", () => {
+    const clases = clasesDe(html);
+    assert.ok(clases.length >= 8, `el caso debe traer clases (shell, tabla y cajas) y trajo ${clases.length}`);
+    // Un `style=` de otro selector no basta: al <p class="alert-title alert-title-note"> le
+    // queda el estilo de `p.alert-title`, así que sin esta prueba se puede borrar la regla
+    // del título de una caja y la suite sigue verde con el color perdido.
+    const sinRegla = clases.filter(
+      (clase) => !SIN_REGLA_A_PROPOSITO.test(clase) && !new RegExp(`\\.${clase}(?![\\w-])`).test(EMAIL_STYLES),
+    );
+    assert.deepEqual(sinRegla, [], `clases sin regla en la hoja: ${sinRegla.join(", ")}`);
   });
 
   it("el fondo, la tipografía y el color de la hoja llegan inlineados", () => {
