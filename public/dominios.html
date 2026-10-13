@@ -109,6 +109,14 @@
               },
               {
                 "@type": "Question",
+                "name": "¿Puedo usar MailMask sin transferir mi dominio?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Sí. Cambia sólo sus nameservers por los de MailMask en tu registrador actual: el dominio sigue registrado y renovándose allá, y el DNS lo editas aquí. Antes copiamos los registros que ya tienes. Si no quieres delegar, te damos los registros para copiarlos en tu proveedor."
+                }
+              },
+              {
+                "@type": "Question",
                 "name": "¿Por qué mi dominio aún no se puede transferir?",
                 "acceptedAnswer": {
                   "@type": "Answer",
@@ -195,7 +203,7 @@
           <p class="eyebrow mb-3">Dominios</p>
           <h1 class="text-4xl sm:text-5xl font-semibold tracking-tight">Tu nombre en internet, con correo que sí llega.</h1>
           <p class="text-lg text-fg-muted leading-relaxed mt-5">
-            Registra uno nuevo o trae el que ya tienes. Antes de mover nada revisamos que la
+            Registra uno nuevo, trae el que ya tienes o sólo apunta sus nameservers aquí. Antes de mover nada revisamos que la
             transferencia <strong class="font-semibold text-accent-text">pueda ocurrir de verdad</strong>,
             y tu zona de DNS no se toca hasta que apruebes lo que vas a mover — es lo que evita que
             la web y el correo se caigan a media mudanza.
@@ -212,9 +220,9 @@
     </section>
 
     <!-- Dos caminos -->
-    <section class="max-w-5xl mx-auto px-5 py-12">
-      <h2 class="text-2xl font-semibold tracking-tight mb-6">Dos caminos, el mismo final</h2>
-      <div class="grid md:grid-cols-2 gap-5">
+    <section class="max-w-6xl mx-auto px-5 py-12">
+      <h2 class="text-2xl font-semibold tracking-tight mb-6">Tres caminos, el mismo final</h2>
+      <div class="grid md:grid-cols-3 gap-5">
         <div class="bg-bg-elev border border-line rounded-2xl p-6">
           <p class="eyebrow mb-2">Registrar</p>
           <p class="font-semibold mb-2">El dominio todavía está libre</p>
@@ -239,6 +247,19 @@
             <li>Un solo pago por la transferencia.</li>
             <li>Tus registros de DNS entran a un inventario que revisas y corriges antes de aprobarlo.</li>
             <li>Se conserva la antigüedad: no arrancas de cero en los buscadores.</li>
+          </ul>
+        </div>
+        <div class="bg-bg-elev border border-line rounded-2xl p-6">
+          <p class="eyebrow mb-2">Sólo nameservers</p>
+          <p class="font-semibold mb-2">El dominio se queda donde está</p>
+          <p class="text-sm text-fg-muted leading-relaxed mb-4">
+            No lo transfieres ni pagas mudanza: en tu registrador actual cambias sus nameservers por
+            los de MailMask y el DNS lo editas desde aquí. Sigue registrado y renovándose allá.
+          </p>
+          <ul class="space-y-2 text-sm text-fg-muted leading-relaxed">
+            <li>Sin código EPP ni espera de días: tarda lo que tarde el DNS en propagarse.</li>
+            <li>Antes de darte los nameservers copiamos los registros que ya tienes; revisa la lista, porque desde fuera puede faltar alguno.</li>
+            <li>¿Prefieres no delegar? Te damos los registros para copiarlos en tu proveedor.</li>
           </ul>
         </div>
       </div>
@@ -366,6 +387,10 @@
         <div>
           <dt class="font-semibold mb-2">¿Puedo traer un dominio que ya está en otro registrador?</dt>
           <dd class="text-fg-muted leading-relaxed text-sm">Sí. Es una transferencia de entrada: revisamos los requisitos antes de cobrarte y sólo movemos los nameservers cuando apruebas el inventario de DNS.</dd>
+        </div>
+        <div>
+          <dt class="font-semibold mb-2">¿Puedo usar MailMask sin transferir mi dominio?</dt>
+          <dd class="text-fg-muted leading-relaxed text-sm">Sí. Cambia sólo sus nameservers por los de MailMask en tu registrador actual: el dominio sigue registrado y renovándose allá, y el DNS lo editas aquí. Antes copiamos los registros que ya tienes. Si no quieres delegar, te damos los registros para copiarlos en tu proveedor.</dd>
         </div>
         <div>
           <dt class="font-semibold mb-2">¿Por qué mi dominio aún no se puede transferir?</dt>
