@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { HOST } from "./seo-checks.ts";
 
 const llms = readFileSync(new URL("./public/llms.txt", import.meta.url), "utf8");
 const docs = readFileSync(new URL("./public/docs.html", import.meta.url), "utf8").replace(/<[^>]+>/g, "");
@@ -10,6 +11,23 @@ const docs = readFileSync(new URL("./public/docs.html", import.meta.url), "utf8"
 // Cambiar a `true` el día que `mailmask-cli` exista en npm — y entonces cambiar la instalación
 // en cli/README.md, public/docs.html#cli y public/llms.txt en el mismo PR.
 const CLI_PUBLICADO_EN_NPM = false;
+
+// Rutas del sitemap que llms.txt no tiene por qué anunciar: los artículos del blog se vigilan
+// aparte (uno por artículo) y el resto son pantallas de la app, no páginas públicas.
+const EXCLUIDAS = ["/login", "/register", "/terms", "/privacy"];
+
+/** URLs del sitemap que sí son páginas públicas: todas menos los artículos `/blog/<slug>` y EXCLUIDAS. */
+function paginasPublicas(sitemap: string): string[] {
+  return [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)]
+    .map((m) => m[1])
+    .filter((url) => {
+      if (!url.startsWith(`${HOST}/`)) return false;
+      const ruta = url.slice(HOST.length);
+      return !ruta.startsWith("/blog/") && !EXCLUIDAS.includes(ruta);
+    });
+}
+
+const escaparRegex = (texto: string) => texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 test("llms.txt abre con un título `# ` y un blockquote de resumen", () => {
   assert.match(llms, /^# \S/);
@@ -70,5 +88,18 @@ test("la descripción de cada landing en Enlaces es la de su página", () => {
     const meta = html.match(/<meta\s+name="description"\s+content="([^"]+)"/);
     assert.ok(meta, `public/${slug}.html no trae meta description`);
     assert.ok(lineas.includes("  " + meta[1]), `Enlaces no repite la description de /${slug}`);
+  }
+});
+
+// El sitemap es la fuente: una página pública nueva entra a la vigilancia sola, sin tocar esta
+// lista a mano (por eso no se usa `paginasDelSitemap` de seo-checks.ts: su filtro es otro).
+test("toda landing del sitemap aparece en llms.txt", () => {
+  const sitemap = readFileSync(new URL("./public/sitemap.xml", import.meta.url), "utf8");
+  const urls = paginasPublicas(sitemap);
+  assert.ok(urls.length > 0, "no se extrajo ninguna URL del sitemap: revisa el patrón de <loc>");
+  for (const url of urls) {
+    // Token completo: `/dominios` no puede darse por presente por el `/dominios-x` de otra línea.
+    const enLlms = new RegExp(`${escaparRegex(url)}(?=$|\\s|\\)|\\.(?:\\s|$))`);
+    assert.match(llms, enLlms, `llms.txt no menciona ${url}`);
   }
 });
