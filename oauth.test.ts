@@ -25,7 +25,7 @@ describe("OAuth del MCP", () => {
     const verifier = randomBytes(32).toString("base64url");
     return { verifier, challenge: createHash("sha256").update(verifier).digest("base64url") };
   };
-  const mcp = (token: string, method = "tools/list") => req("/mcp", {
+  const mcp = (token: string, method = "tools/list", path = "/mcp") => req(path, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `Bearer ${token}` },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: {} }),
@@ -42,8 +42,8 @@ describe("OAuth del MCP", () => {
   }
 
   /** authorize (con sesión) → consentimiento → code. */
-  async function getCode(clientId: string, challenge: string, state = "s1"): Promise<string> {
-    const q = new URLSearchParams({ response_type: "code", client_id: clientId, redirect_uri: REDIRECT, state, code_challenge: challenge, code_challenge_method: "S256", resource: "http://localhost/mcp", scope: "mailmask" });
+  async function getCode(clientId: string, challenge: string, state = "s1", resource = "http://localhost/mcp"): Promise<string> {
+    const q = new URLSearchParams({ response_type: "code", client_id: clientId, redirect_uri: REDIRECT, state, code_challenge: challenge, code_challenge_method: "S256", resource, scope: "mailmask" });
     const page = await req(`/oauth/authorize?${q}`, { headers: { cookie } });
     assert.equal(page.status, 200);
     const html = await page.text();
@@ -241,5 +241,36 @@ describe("OAuth del MCP", () => {
 
   it("mk_ sigue funcionando en /mcp", async () => {
     assert.equal((await mcp(apiKey)).status, 200);
+  });
+  it("/mcp/directory: metadata propia y un token sólo vale en el recurso para el que se pidió", async () => {
+    const md = await req("/.well-known/oauth-protected-resource/mcp/directory");
+    assert.equal(md.status, 200);
+    const j = await md.json();
+    assert.equal(j.resource, "http://localhost/mcp/directory");
+    assert.deepEqual(j.authorization_servers, ["http://localhost"]);
+
+    const clientId = await register();
+    const p = pkce();
+    const code = await getCode(clientId, p.challenge, "d1", "http://localhost/mcp/directory");
+    const t = await (await req("/oauth/token", form({ grant_type: "authorization_code", code, redirect_uri: REDIRECT, client_id: clientId, code_verifier: p.verifier, resource: "http://localhost/mcp/directory" }))).json();
+    assert.match(t.access_token, /^mo_/);
+    const dir = await mcp(t.access_token, "tools/list", "/mcp/directory");
+    assert.equal(dir.status, 200);
+    const names = (await dir.json()).result.tools.map((x: { name: string }) => x.name);
+    assert.ok(names.includes("list_domains") && !names.includes("activation_link"));
+    const full = await mcp(t.access_token, "tools/list", "/mcp");
+    assert.equal(full.status, 401);
+    assert.match(full.headers.get("www-authenticate")!, /error="invalid_token"/);
+
+    // Y al revés: el de /mcp no entra al de directorios.
+    const p2 = pkce();
+    const t2 = await (await req("/oauth/token", form({ grant_type: "authorization_code", code: await getCode(clientId, p2.challenge), redirect_uri: REDIRECT, client_id: clientId, code_verifier: p2.verifier }))).json();
+    assert.equal((await mcp(t2.access_token, "tools/list", "/mcp/directory")).status, 401);
+
+    // Un resource que no es nuestro: invalid_target.
+    const q = new URLSearchParams({ response_type: "code", client_id: clientId, redirect_uri: REDIRECT, state: "x", code_challenge: pkce().challenge, code_challenge_method: "S256", resource: "http://localhost/mcp/otro" });
+    const bad = await req(`/oauth/authorize?${q}`, { headers: { cookie } });
+    assert.equal(bad.status, 302);
+    assert.equal(new URL(bad.headers.get("location")!).searchParams.get("error"), "invalid_target");
   });
 });

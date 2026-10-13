@@ -71,6 +71,13 @@ vía `sdk.inbox` (mismos `requireBandeja`, recorte de 7 días del gratis y topes
 topes por IP. Fuera a propósito: API keys, admin, presencia/SSE, EPP, confirmar transfer-out (va por
 correo), cupones y el cancel del plan legado (sin suscriptores).
 
+**`/mcp/directory` (13-oct-2026)**: el mismo servidor filtrado por `DIRECTORY_ALLOWLIST` (sin cobros,
+compras, transferencias, referidos ni tools que devuelvan secretos) con `MCP_DIRECTORY_INSTRUCTIONS`, para los
+directorios de Claude y ChatGPT; OAuth con su propio `resource` y metadata en
+`/.well-known/oauth-protected-resource/mcp/directory`. Una tool nueva no entra ahí sola: hay que agregarla a la
+lista y revisarla contra las políticas. Ficha: `docs/agents/chatgpt-app-directorio.md`. Las cuentas
+`*-review@mailmask.studio` no mandan correo a terceros reales (`sandbox.ts`).
+
 ## OAuth 2.1 del MCP (`oauth.ts`, 4-oct-2026)
 
 Cualquier cliente MCP con el spec de autorización (Ghosty, Claude) conecta `/mcp` sólo con la URL.

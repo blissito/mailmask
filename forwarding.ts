@@ -9,6 +9,7 @@ import { notifyInbox } from "./sse-hub.js";
 import { depositarEnImap, imapHabilitado } from "./imap-store.js";
 import { emitEvent } from "./webhooks.js";
 import { dmarcReportAddress, ingestDmarcReport } from "./dmarc-reports.js";
+import { sandboxBlockedFromDomain } from "./sandbox.js";
 
 // --- SNS notification types ---
 
@@ -860,6 +861,20 @@ async function doForward(rawContent: string, from: string, to: string, domainId:
       forwardedTo: to,
       sizeBytes: rawContent.length,
       error: "Destino en lista de supresión",
+    }, logDays);
+    return;
+  }
+  // Cuenta de revisión (`sandbox.ts`): no reenvía a terceros reales. Se descarta como la
+  // supresión, para que no se reintente ni acabe en la cola muerta.
+  if (sandboxBlockedFromDomain(domainName, [to]).length) {
+    await addLog({
+      domainId,
+      timestamp: new Date().toISOString(),
+      from, to: originalTo, subject,
+      status: "discarded",
+      forwardedTo: to,
+      sizeBytes: rawContent.length,
+      error: "Cuenta de revisión: no reenvía a terceros",
     }, logDays);
     return;
   }

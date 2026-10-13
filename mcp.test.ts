@@ -32,6 +32,13 @@ describe("MCP: agentes contra la app", () => {
     return { status: res.status, json: await res.json().catch(() => null) };
   };
   const call = (name: string, args: Record<string, unknown>, apiKey?: string) => rpc("tools/call", { name, arguments: args }, apiKey ?? key);
+  // Endpoint de directorios: mismo servidor filtrado por DIRECTORY_ALLOWLIST.
+  const rpcDir = async (method: string, params: Record<string, unknown> = {}, apiKey: string | null = key) => {
+    const headers: Record<string, string> = { "content-type": "application/json", accept: "application/json, text/event-stream" };
+    if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+    const res = await app.fetch(new Request("http://localhost/mcp/directory", { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: ++idRpc, method, params }) }));
+    return { status: res.status, headers: res.headers, json: await res.json().catch(() => null) };
+  };
 
   before(async () => {
     const realSes = await import("./ses.ts");
@@ -344,7 +351,7 @@ describe("MCP: agentes contra la app", () => {
   it("apple_profile_link sin buzón es isError con la salida, no una liga rota", async () => {
     const r = await call("apple_profile_link", { domainId: dominioGratisId, alias: "nadie" }, keyGratis);
     assert.equal(r.json.result.isError, true);
-    assert.match(r.json.result.content[0].text, /create_mailbox/);
+    assert.match(r.json.result.content[0].text, /no tiene buzón/);
   });
 
   it("perfil: get/update_profile y set_profile_photo rechaza una URL que no es adjunto firmado", async () => {
@@ -459,5 +466,88 @@ describe("MCP: agentes contra la app", () => {
     assert.ok((await buscar("correos recibidos")).includes("inbox_list"));
     assert.ok((await buscar("archivar")).includes("inbox_mark"));
     assert.ok((await buscar("facturas")).includes("list_orders"));
+  });
+  it("/mcp/directory: sin cobros ni secretos, y nada nombra lo que se quitó", async () => {
+    const { DIRECTORY_ALLOWLIST, MCP_DIRECTORY_INSTRUCTIONS } = await import("./mcp.js");
+    const full = (await rpc("tools/list")).json.result.tools as { name: string }[];
+    const fullNames = new Set(full.map((t) => t.name));
+    for (const n of DIRECTORY_ALLOWLIST) assert.ok(fullNames.has(n), `${n} no existe en el completo`);
+
+    const init = await rpcDir("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "0" } });
+    assert.equal(init.status, 200);
+    const instructions: string = init.json.result.instructions;
+    assert.equal(instructions, MCP_DIRECTORY_INSTRUCTIONS);
+    assert.ok(instructions.length <= 6000);
+
+    const tools = (await rpcDir("tools/list")).json.result.tools as { name: string; description: string; inputSchema: { properties?: Record<string, unknown> } }[];
+    const names = tools.map((t) => t.name);
+    assert.deepEqual(new Set(names), DIRECTORY_ALLOWLIST);
+    const excluded = [...fullNames].filter((n) => !DIRECTORY_ALLOWLIST.has(n));
+    for (const n of ["activation_link", "renewal_link", "register_domain", "transfer_start", "cancel_addon", "cancel_renewal", "list_addons",
+      "list_orders", "billing_status", "create_mailbox", "reset_mailbox_password", "create_webhook", "create_smtp_credential", "export_link"]) {
+      assert.ok(excluded.includes(n), `${n} debe quedar fuera`);
+    }
+    // Ni descripciones, ni esquemas, ni la guía nombran lo excluido, pagos o el endpoint completo.
+    const textos = [instructions, ...tools.map((t) => `${t.description} ${JSON.stringify(t.inputSchema)}`)];
+    for (const txt of textos) {
+      for (const n of excluded) assert.ok(!new RegExp(`\\b${n}\\b`).test(txt), `menciona ${n}: ${txt.slice(0, 80)}`);
+      assert.ok(!/mercadopago|checkout|payment link|liga de pago|\/mcp\b/i.test(txt), `habla de cobros o del endpoint: ${txt.slice(0, 80)}`);
+    }
+    // create_alias sin el parámetro que devuelve la contraseña del buzón.
+    const ca = tools.find((t) => t.name === "create_alias")!;
+    assert.ok(!("mailbox" in (ca.inputSchema.properties ?? {})));
+    assert.ok(!/credentials/i.test(ca.description));
+  });
+
+  it("/mcp/directory: lo excluido no se puede llamar ni encontrar, y create_alias ignora mailbox", async () => {
+    const dom = (await call("create_domain", { domain: `mcp-dir-${suffix}.com` })).json.result.structuredContent.domain;
+    const pago = await rpcDir("tools/call", { name: "activation_link", arguments: { domainId: dom.id } });
+    assert.ok(pago.json.error || pago.json.result?.isError, JSON.stringify(pago.json));
+    const buscar = await rpcDir("tools/call", { name: "search_tools", arguments: { query: "pagar activar renovar comprar transferir contraseña secreto" } });
+    const encontrados = buscar.json.result.structuredContent.result.map((t: { name: string }) => t.name);
+    const { DIRECTORY_ALLOWLIST } = await import("./mcp.js");
+    for (const n of encontrados) assert.ok(DIRECTORY_ALLOWLIST.has(n), `search_tools devolvió ${n}`);
+    const a = await rpcDir("tools/call", { name: "create_alias", arguments: { domainId: dom.id, alias: "dir", destinations: ["a@example.com"], mailbox: true } });
+    assert.ok(!a.json.result.isError, JSON.stringify(a.json.result));
+    assert.ok(!a.json.result.structuredContent.errorBuzon, "no debió intentar crear el buzón");
+    assert.ok(!dbmod.listAliases(dom.id).find((x: { alias: string; mailboxEnabled?: boolean }) => x.alias === "dir")?.mailboxEnabled);
+  });
+
+  it("/mcp/directory sin credencial anuncia SU metadata OAuth", async () => {
+    const r = await rpcDir("tools/list", {}, null);
+    assert.equal(r.status, 401);
+    assert.equal(r.headers.get("www-authenticate"), 'Bearer resource_metadata="http://localhost/.well-known/oauth-protected-resource/mcp/directory"');
+  });
+
+  it("cuenta de revisión: no manda correo ni invita a terceros reales; a sus dominios y a example.com sí", async () => {
+    const { sandboxBlockedRecipients, isSandboxAccount } = await import("./sandbox.js");
+    const rev = `dir-${suffix}-review@mailmask.studio`;
+    assert.ok(isSandboxAccount(rev));
+    assert.ok(!isSandboxAccount(email));
+    dbmod.createUser(rev, "x");
+    await dbmod.updateUserSubscription(rev, { plan: "equipo", status: "active", mpSubscriptionId: `sub-${rev}`, currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString() });
+    const revKey = (await dbmod.createApiKey(rev, "rev")).plaintextKey;
+    const domName = `rev-${suffix}.com`;
+    const dom = dbmod.createDomain(rev, domName, ["dk"], "vf");
+    dbmod.updateDomain(dom.id, { verified: true });
+    dbmod.createAlias(dom.id, "hola", [rev]);
+
+    assert.deepEqual(sandboxBlockedRecipients(rev, [`a@${domName}`, "b@example.com", "c@x.test", rev, "Real <real@gmail.com>"]), ["real@gmail.com"]);
+    assert.deepEqual(sandboxBlockedRecipients(email, ["real@gmail.com"]), []);
+
+    const antes = enviados.length;
+    const fuera = await call("send_email", { domainId: dom.id, to: "real@gmail.com", subject: "x", markdown: "x", from: "hola" }, revKey);
+    assert.equal(fuera.json.result.isError, true);
+    assert.match(fuera.json.result.content[0].text, /HTTP 403.*revisión/);
+    const cc = await call("send_email", { domainId: dom.id, to: "a@example.com", cc: ["real@gmail.com"], subject: "x", markdown: "x", from: "hola" }, revKey);
+    assert.equal(cc.json.result.isError, true);
+    const inv = await call("invite_member", { domainId: dom.id, email: "real@gmail.com", name: "Real" }, revKey);
+    assert.equal(inv.json.result.isError, true);
+    assert.match(inv.json.result.content[0].text, /HTTP 403/);
+    assert.equal(enviados.length, antes, "no salió nada");
+
+    const dentro = await call("send_email", { domainId: dom.id, to: "cliente@example.com", subject: "x", markdown: "x", from: "hola" }, revKey);
+    assert.ok(!dentro.json.result.isError, JSON.stringify(dentro.json.result));
+    assert.equal(enviados.at(-1)?.to, "cliente@example.com");
   });
 });

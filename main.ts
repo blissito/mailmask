@@ -253,8 +253,9 @@ import { log } from "./logger.js";
 import { createSmtpIamCredential, revokeSmtpIamCredential } from "./ses.js";
 import { crearBuzon, cambiarPassword, borrarBuzon, exportarBuzon } from "./stalwart.js";
 import { atenderMcp } from "./mcp.js";
+import { sandboxSendResponse } from "./sandbox.js";
 import {
-  protectedResourceMetadata, authorizationServerMetadata, protectedResourceMetadataUrl,
+  protectedResourceMetadata, authorizationServerMetadata, protectedResourceMetadataUrl, resourceFor, type McpResourcePath,
   registerClient, authorizeGet, authorizePost, tokenEndpoint, revokeEndpoint, verifyOAuthAccessToken,
 } from "./oauth.js";
 import { logOutbound, handleInternalOutbound } from "./outbound-relay.js";
@@ -269,7 +270,7 @@ const MCP_REGISTRY_AUTH_PATH = "/.well-known/mcp-registry-auth";
 
 /** Rutas que hablan con clientes MCP de cualquier origen (sólo Bearer, nunca cookie): CORS abierto. */
 function isOpenCorsPath(path: string): boolean {
-  return path === "/mcp" || path.startsWith("/.well-known/oauth-") || path === "/oauth/token" || path === "/oauth/register" || path === "/oauth/revoke";
+  return path === "/mcp" || path === "/mcp/directory" || path.startsWith("/.well-known/oauth-") || path === "/oauth/token" || path === "/oauth/register" || path === "/oauth/revoke";
 }
 const MCP_REGISTRY_PUBLIC_KEY = "+L7eynWTl5U/ZUd1DbrylPBzJHKTE0TzU9qdO8n8Vos=";
 import {
@@ -1286,6 +1287,52 @@ const deviceAuth = createDeviceAuthStore({
 
 // --- App ---
 
+
+// `/mcp` y `/mcp/directory` comparten todo: auth, topes, IP y el servidor; sólo cambia el
+// perfil de herramientas y el recurso OAuth (un token sirve sólo donde se pidió).
+async function handleMcp(request: Request, path: McpResourcePath): Promise<Response> {
+  if (request.method === "OPTIONS") return new Response(null, { status: 204 });
+  if (request.method !== "POST") {
+    // Sin sesiones no hay stream que reanudar (GET) ni sesión que cerrar (DELETE).
+    return new Response(JSON.stringify({ error: "Método no permitido" }), { status: 405, headers: { "content-type": "application/json", allow: "POST" } });
+  }
+  const auth = request.headers.get("authorization") ?? "";
+  // `mt_` = turn token del asistente de /app (5 min); `mk_` = API key de siempre.
+  // Sin credencial, el 401 anuncia la metadata OAuth (spec MCP de autorización): un cliente
+  // MCP la sigue, se registra y pide permiso; una persona con `mk_` sigue igual que antes.
+  const challenge = (extra = "") => `Bearer resource_metadata="${protectedResourceMetadataUrl(request, path)}"${extra}`;
+  if (!auth.startsWith("Bearer mk_") && !auth.startsWith("Bearer mt_") && !auth.startsWith("Bearer mo_")) {
+    return new Response(JSON.stringify({ error: "Manda tu API key (Authorization: Bearer mk_…) o conéctate con OAuth." }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": challenge() } });
+  }
+  // La llave se valida aquí sin gastar el tope por llave: cada herramienta vuelve a
+  // pasar por getAuthUser en la ruta interna, y contarla dos veces dejaba 30/min en
+  // vez de 60. Contra el escaneo de llaves queda el tope por IP.
+  const limited = await rateLimitGuard(getIp(request), 120, 60_000);
+  if (limited) return limited;
+  const bearer = auth.slice("Bearer ".length);
+  const user = bearer.startsWith("mt_") ? await verifyTurnToken(bearer)
+    : bearer.startsWith("mo_") ? oauthUserFor(bearer, resourceFor(request, path))
+    : await getUserByApiKey(bearer);
+  if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": challenge(', error="invalid_token"') } });
+  // Las llamadas internas llevan la IP del cliente: sin ella todos los agentes caían en
+  // el mismo cubo "unknown" de los topes por IP (responder, redactar, adjuntos).
+  const clientIp = getIp(request);
+  const fetchLocal = ((url: string | URL | Request, init?: RequestInit) => {
+    const req = new Request(url as string, init);
+    if (clientIp !== "unknown") req.headers.set(TRUSTED_IP_HEADER, clientIp);
+    return app.fetch(req);
+  }) as unknown as typeof fetch;
+  const res = await atenderMcp(request, { apiKey: auth.slice("Bearer ".length), fetchLocal, profile: path === "/mcp/directory" ? "directory" : "full" });
+  res.headers.set("access-control-allow-origin", "*");
+  return res;
+}
+
+/** Un `mo_` vale sólo en el recurso para el que se emitió (RFC 8707). */
+function oauthUserFor(token: string, resource: string) {
+  const t = verifyOAuthAccessToken(token);
+  return t && t.resource === resource ? t : null;
+}
+
 const app = new Elysia({ adapter: node() })
   .use(openapi({
     documentation: {
@@ -1312,7 +1359,7 @@ const app = new Elysia({ adapter: node() })
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/bandeja-compartida", "/dominios", "/alternativa-google-workspace", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
-        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/.well-known/mcp-registry-auth", "/.well-known/openai-apps-challenge", "/health", "/healthz", "/docs", "/mcp", "/api/internal/outbound",
+        "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/.well-known/mcp-registry-auth", "/.well-known/openai-apps-challenge", "/health", "/healthz", "/docs", "/mcp", "/mcp/directory", "/api/internal/outbound",
       ],
       staticFile: true,
     },
@@ -1370,7 +1417,7 @@ const app = new Elysia({ adapter: node() })
     if (url.pathname === "/api/bandeja/presence") return;
     // /mcp sólo acepta Bearer (nunca cookie), así que no hay CSRF que proteger; sin
     // Bearer la propia ruta contesta 401 en vez de un 403 confuso.
-    if (url.pathname === "/mcp") return;
+    if (url.pathname === "/mcp" || url.pathname === "/mcp/directory") return;
     // OAuth del MCP: register/token/revoke los llama un cliente sin cookie; el POST del
     // consentimiento se protege con su ticket de un solo uso atado a la sesión (`oauth.ts`).
     if (url.pathname.startsWith("/oauth/")) return;
@@ -2647,6 +2694,7 @@ const app = new Elysia({ adapter: node() })
   // --- OAuth 2.1 del MCP (`oauth.ts`): descubrimiento, DCR, consentimiento y tokens ---
   .get("/.well-known/oauth-protected-resource", ({ request }) => protectedResourceMetadata(request))
   .get("/.well-known/oauth-protected-resource/mcp", ({ request }) => protectedResourceMetadata(request))
+  .get("/.well-known/oauth-protected-resource/mcp/directory", ({ request }) => protectedResourceMetadata(request, "/mcp/directory"))
   .get("/.well-known/oauth-authorization-server", ({ request }) => authorizationServerMetadata(request))
   .post("/oauth/register", ({ request, body }) => registerClient(body, getIp(request)))
   .get("/oauth/authorize", async ({ request, query }) => {
@@ -2662,42 +2710,9 @@ const app = new Elysia({ adapter: node() })
   .post("/oauth/revoke", ({ request, body }) => revokeEndpoint(request, body, getIp(request)))
 
   // --- MCP: agentes de IA con la misma API key de siempre ---
-  .all("/mcp", async ({ request }) => {
-    if (request.method === "OPTIONS") return new Response(null, { status: 204 });
-    if (request.method !== "POST") {
-      // Sin sesiones no hay stream que reanudar (GET) ni sesión que cerrar (DELETE).
-      return new Response(JSON.stringify({ error: "Método no permitido" }), { status: 405, headers: { "content-type": "application/json", allow: "POST" } });
-    }
-    const auth = request.headers.get("authorization") ?? "";
-    // `mt_` = turn token del asistente de /app (5 min); `mk_` = API key de siempre.
-    // Sin credencial, el 401 anuncia la metadata OAuth (spec MCP de autorización): un cliente
-    // MCP la sigue, se registra y pide permiso; una persona con `mk_` sigue igual que antes.
-    const challenge = (extra = "") => `Bearer resource_metadata="${protectedResourceMetadataUrl(request)}"${extra}`;
-    if (!auth.startsWith("Bearer mk_") && !auth.startsWith("Bearer mt_") && !auth.startsWith("Bearer mo_")) {
-      return new Response(JSON.stringify({ error: "Manda tu API key (Authorization: Bearer mk_…) o conéctate con OAuth." }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": challenge() } });
-    }
-    // La llave se valida aquí sin gastar el tope por llave: cada herramienta vuelve a
-    // pasar por getAuthUser en la ruta interna, y contarla dos veces dejaba 30/min en
-    // vez de 60. Contra el escaneo de llaves queda el tope por IP.
-    const limited = await rateLimitGuard(getIp(request), 120, 60_000);
-    if (limited) return limited;
-    const bearer = auth.slice("Bearer ".length);
-    const user = bearer.startsWith("mt_") ? await verifyTurnToken(bearer)
-      : bearer.startsWith("mo_") ? verifyOAuthAccessToken(bearer)
-      : await getUserByApiKey(bearer);
-    if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": challenge(', error="invalid_token"') } });
-    // Las llamadas internas llevan la IP del cliente: sin ella todos los agentes caían en
-    // el mismo cubo "unknown" de los topes por IP (responder, redactar, adjuntos).
-    const clientIp = getIp(request);
-    const fetchLocal = ((url: string | URL | Request, init?: RequestInit) => {
-      const req = new Request(url as string, init);
-      if (clientIp !== "unknown") req.headers.set(TRUSTED_IP_HEADER, clientIp);
-      return app.fetch(req);
-    }) as unknown as typeof fetch;
-    const res = await atenderMcp(request, { apiKey: auth.slice("Bearer ".length), fetchLocal });
-    res.headers.set("access-control-allow-origin", "*");
-    return res;
-  }, { detail: { tags: ["MCP"], summary: "Servidor MCP (Streamable HTTP)" } })
+  .all("/mcp", ({ request }) => handleMcp(request, "/mcp"), { detail: { tags: ["MCP"], summary: "Servidor MCP (Streamable HTTP)" } })
+  // Directorios de Claude y ChatGPT: el mismo servidor filtrado (`mcp.ts` → DIRECTORY_ALLOWLIST).
+  .all("/mcp/directory", ({ request }) => handleMcp(request, "/mcp/directory"), { detail: { hide: true } })
 
   // `/addresses` es sinónimo de `/alias` (5-oct-2026: de cara al público ya no se dice
   // "alias" sino "dirección"). Reescribe la ruta y reentra por `app.fetch`, el mismo truco
@@ -4449,6 +4464,8 @@ const app = new Elysia({ adapter: node() })
     const rendered = resolveEmailBody({ markdown, html, body: textBody });
 
     const recipient = normalizeAddress(to);
+    const sandboxApi = sandboxSendResponse(domain.ownerEmail, [recipient, ...sendCc, ...sendBcc]);
+    if (sandboxApi) return sandboxApi;
     for (const addr of [recipient, ...sendCc, ...sendBcc]) {
       if (await isSuppressed(domain.id, addr)) {
         return new Response(JSON.stringify({ error: `Destinatario en lista de supresión (bounce/complaint previo): ${addr}` }), { status: 422 });
@@ -4714,6 +4731,8 @@ const app = new Elysia({ adapter: node() })
     if (invalid.length) {
       return new Response(JSON.stringify({ error: `Emails inválidos: ${invalid.slice(0, 5).join(", ")}` }), { status: 400, headers: { "content-type": "application/json" } });
     }
+    const sandboxBulk = sandboxSendResponse(domain.ownerEmail, recipients);
+    if (sandboxBulk) return sandboxBulk;
 
     // Sin esto un job de 10,000 sale completo aunque el plan tope en 25 al día.
     const usedToday = await getSendCount(domain.id);
@@ -5084,6 +5103,8 @@ const app = new Elysia({ adapter: node() })
     if (await isSuppressed(domain.id, recipient)) {
       return new Response(JSON.stringify({ error: "Destinatario en lista de supresión (bounce/complaint previo)" }), { status: 422 });
     }
+    const sandboxBlocked = sandboxSendResponse(domain.ownerEmail, [recipient, ...cc, ...bcc]);
+    if (sandboxBlocked) return sandboxBlocked;
 
     // Reservar la cuota antes de enviar. Chequear y luego incrementar deja pasar dos
     // peticiones simultáneas por el mismo hueco.
@@ -5576,6 +5597,8 @@ const app = new Elysia({ adapter: node() })
     if (await isSuppressed(domain.id, recipient)) {
       return new Response(JSON.stringify({ error: "Destinatario en lista de supresión (bounce/complaint previo)" }), { status: 422 });
     }
+    const sandboxBlocked = sandboxSendResponse(domain.ownerEmail, [recipient, ...cc, ...bcc]);
+    if (sandboxBlocked) return sandboxBlocked;
 
     // Responder NO consume la cuota del add-on: la Bandeja se vende incluida en todos
     // los planes. El tope de aquí es contra abuso (bucles, scripts), no de producto,
@@ -6047,6 +6070,8 @@ const app = new Elysia({ adapter: node() })
     if (!email || !name) return new Response(JSON.stringify({ error: "email y name requeridos" }), { status: 400 });
     if (!["admin", "agent"].includes(role)) return new Response(JSON.stringify({ error: "role inválido" }), { status: 400 });
 
+    const sandboxInvite = sandboxSendResponse(domain.ownerEmail, [email]);
+    if (sandboxInvite) return sandboxInvite;
     const existing = await getAgentByEmail(domain.id, email);
     if (existing) return new Response(JSON.stringify({ error: "Este email ya es agente de este dominio" }), { status: 409 });
 

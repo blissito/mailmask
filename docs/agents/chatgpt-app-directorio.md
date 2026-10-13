@@ -1,7 +1,11 @@
 # MailMask en el directorio de apps de ChatGPT (13-oct-2026)
 
-Mismo MCP público que el conector de Claude (`https://www.mailmask.studio/mcp`, OAuth 2.1 de
-`oauth.ts`). Sin widgets: el directorio acepta apps sólo con tools. Nada se ha enviado a OpenAI.
+URL que se envía (a OpenAI y al directorio de Claude): **`https://www.mailmask.studio/mcp/directory`**.
+Es el mismo servidor de `/mcp` filtrado por `DIRECTORY_ALLOWLIST` (`mcp.ts`), con su guía
+`MCP_DIRECTORY_INSTRUCTIONS`, mismo OAuth 2.1 de `oauth.ts` con `resource` propio y metadata RFC 9728 en
+`/.well-known/oauth-protected-resource/mcp/directory` (su 401 la anuncia). Un token de `/mcp` no entra a
+`/mcp/directory` ni al revés. `/mcp` (completo) no cambia para nadie y **no** se menciona en los portales.
+Sin widgets: el directorio acepta apps sólo con tools. Nada se ha enviado a OpenAI.
 Copia de lo hecho en Ghosty (`ghosty-studio/docs/claude/chatgpt-app-directorio.md`).
 
 ## Requisitos de OpenAI y dónde se cumplen
@@ -16,18 +20,27 @@ Copia de lo hecho en Ghosty (`ghosty-studio/docs/claude/chatgpt-app-directorio.m
 | Ícono cuadrado ≥48 px; variante oscura opcional | 512 px PNG + SVG | `public/img/chatgpt-app/` (servidos en `/img/chatgpt-app/…`) |
 | Privacidad con datos, fines, destinatarios, retención y controles | §1–§9 de `/privacy` (retención §5, derechos §7, agentes §9) | `public/privacy.html` |
 
-## ⚠️ Riesgo de revisión: cobros dentro de la app
+## Qué queda fuera de `/mcp/directory` (13-oct-2026)
 
-OpenAI no deja vender planes, suscripciones ni upgrades dentro de la app. Varias tools devuelven una
-**liga de pago** que abre la persona (`activation_link`, `renewal_link`, `register_domain`,
-`transfer_start`) o cancelan algo pagado (`cancel_addon`, `cancel_renewal`). Nunca cobran solas, pero el
-revisor puede leerlas como compra dentro de la app. Si lo rechazan: ocultarlas cuando el cliente OAuth
-es ChatGPT (`client_name`/redirect del registro) en vez de tocar el catálogo de Claude.
+OpenAI no deja vender dentro de la app y ningún directorio quiere credenciales en el chat. Fuera:
+
+- **Cobros y compras**: `activation_link`, `billing_status`, `list_addons`, `list_orders`, `cancel_addon`,
+  `cancel_renewal`, `search_domains`, `domain_prices`, `register_domain`, `list_registrations`, todo
+  `transfer_*` (incl. `approve_transfer_dns`, `update_transfer_dns`, `resend_transfer_email`, `transfer_out`),
+  `lock_domain_transfer`, `renewal_status`, `renewal_link`, referidos (`referral_status`, `set_referral_*`).
+- **Secretos**: `create_mailbox`, `reset_mailbox_password` (contraseña del buzón), `create_webhook` (secreto
+  de firma), `*_smtp_credential(s)`, `export_link` (exporta la cuenta entera); `create_alias` pierde el
+  parámetro `mailbox`.
+- **Envío masivo**: `bulk_send`, `bulk_status`.
+
+`search_tools` sólo busca en lo que quedó (no hay otra tool genérica de despacho). La guía, las
+descripciones y los esquemas no nombran nada de lo de arriba ni `/mcp`, ni MercadoPago (lo fija
+`mcp.test.ts`). Volver a meter algo = agregarlo a la lista blanca y revisarlo contra las dos políticas.
 
 ## Lo que hace bliss en el portal (platform.openai.com → Apps)
 
 1. Verificar la organización si no está.
-2. Crear la app con MCP `https://www.mailmask.studio/mcp`, auth OAuth → **DCR**.
+2. Crear la app con MCP `https://www.mailmask.studio/mcp/directory`, auth OAuth → **DCR**.
 3. Copiar el token del dominio a `OPENAI_APPS_CHALLENGE` en `/app/secrets.env` de la caja
    `mailmask-prod` y reiniciar; comprobar con
    `curl https://www.mailmask.studio/.well-known/openai-apps-challenge` y darle «Verify».
@@ -35,12 +48,23 @@ es ChatGPT (`client_name`/redirect del registro) en vez de tocar el catálogo de
 5. Grabar el video (los 5 positivos), subirlo no listado y pegar la liga.
 6. Llenar textos, casos y Review details. Enviar.
 
-## Cuenta de revisor
+## Cuenta de revisor (13-oct-2026)
 
-⚠️ **Pendiente**: no hay cuenta de revisor de MailMask documentada en el repo. Debe: entrar con
-correo + contraseña (sin Google, sin MFA, sin código por correo), tener un dominio activado de muestra
-con 2–3 direcciones, Bandeja con unos correos de prueba y quedarse viva. Las credenciales van sólo
-en el formulario «Review details», nunca aquí.
+`directory-review@mailmask.studio` (la misma para Claude y ChatGPT), creada en prod con
+`scripts/cuenta-revisor.ts` (idempotente; instrucciones de cómo correrlo en la caja en su cabecera).
+Entra con correo + contraseña en `/login` (sin Google, sin MFA, sin códigos). La contraseña vive sólo en
+`~/mailmask-reviewer.txt` de la Mac de bliss (chmod 600) y va únicamente en «Review details»; para rotarla,
+`--reset-password` con el hash nuevo (corta los tokens OAuth emitidos).
+
+Datos: dominio real `demo.mailmask.studio` (SES + registros en la zona de mailmask.studio, DMARC `p=none`),
+activado por cortesía hasta 2027-12-31, direcciones `hello@`, `support@` y `billing@`, y tres conversaciones
+de muestra en la Bandeja (remitentes `example.com/org/net`). El dominio no tiene zona asignada: el editor
+de DNS no puede tocar la de mailmask.studio.
+
+**No manda correo a terceros reales** (`sandbox.ts`): toda cuenta `*-review@mailmask.studio` sólo envía,
+invita o reenvía a su propio correo, a sus dominios o a dominios reservados (`example.com`, `*.test`…).
+Lo frena la ruta (403 legible) y, como última barrera, `ses.ts` (`sendFromDomain`, `sendRawFromDomain`,
+`forwardEmail`); el reenvío bloqueado se descarta como la supresión.
 
 ## Paquete para el formulario (en inglés)
 

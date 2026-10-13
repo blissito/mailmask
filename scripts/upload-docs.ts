@@ -205,6 +205,8 @@ Qué puede hacer la conexión OAuth: lo mismo que una API key mk_ (las 95 herram
 Tokens: acceso mo_ de 1 hora y renovación mr_ de 60 días que rota en cada uso; el cliente los renueva solo. Para dejar de usarla se desconecta desde el cliente (los que implementan revocación llaman a POST /oauth/revoke); para cortar todas las conexiones al instante, se cambia la contraseña de MailMask.
 Detalles técnicos: /mcp sin credencial responde 401 con WWW-Authenticate: Bearer resource_metadata="https://www.mailmask.studio/.well-known/oauth-protected-resource". Metadata en /.well-known/oauth-authorization-server, registro dinámico público en POST /oauth/register, /oauth/authorize con PKCE S256, POST /oauth/token (code y refresh_token) y POST /oauth/revoke.
 
+Apps de los directorios de Claude y ChatGPT: https://www.mailmask.studio/mcp/directory, el mismo servidor sin pagos, activaciones, compra/transferencia/renovación de dominios, pedidos, referidos ni herramientas que devuelvan contraseñas o secretos (eso va en el panel). Mismo OAuth; metadata en /.well-known/oauth-protected-resource/mcp/directory y resource = esa URL; un token sirve sólo en la URL con la que se conectó.
+
 Forma 2 (alternativa) — API key mk_, para clientes sin OAuth, scripts o servidores. La llave se crea en mailmask.studio/app → API Keys y va en Authorization: Bearer mk_...
 
 Conectar desde Claude Code con llave:

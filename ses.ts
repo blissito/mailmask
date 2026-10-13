@@ -3,6 +3,14 @@ import { db } from "./pg.js";
 import { tokens } from "./schema.js";
 import { eq, and, gt } from "drizzle-orm";
 import { assertNoPreview } from "./preview.js";
+import { sandboxBlockedFromDomain, SandboxSendError } from "./sandbox.js";
+
+// Última barrera de las cuentas de revisión (`sandbox.ts`): pase lo que pase arriba, su
+// correo no sale a un tercero real.
+function assertSandboxRecipients(fromAddr: string, recipients: string[]): void {
+  const blocked = sandboxBlockedFromDomain(fromAddr.split("@")[1] ?? "", recipients);
+  if (blocked.length) throw new SandboxSendError(blocked);
+}
 
 // MailMask is pinned to us-east-1. SES inbound only exists in us-east-1,
 // us-west-2 and eu-west-1, and all receipt rules, the inbound S3 bucket and
@@ -531,6 +539,7 @@ export function rewriteFromAndReplyTo(raw: string, from: string, forwardingAddre
 }
 
 export async function forwardEmail(originalRaw: string, from: string, to: string, aliasDomain: string): Promise<void> {
+  assertSandboxRecipients(`x@${aliasDomain}`, [to]);
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
 
@@ -677,6 +686,7 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
   // sobre de SES necesita la dirección pelada.
   const fromAddr = normalizeAddress(from);
   const toAddr = normalizeAddress(to);
+  assertSandboxRecipients(fromAddr, [toAddr, ...(opts?.cc ?? []), ...(opts?.bcc ?? [])]);
   const fromHeader = /<[^>]+>/.test(from) ? stripHeaderInjection(from) : fromAddr;
   const messageId = `<${crypto.randomUUID()}@${fromAddr.split("@")[1] ?? "mailmask.studio"}>`;
   const stamp = Date.now();
@@ -844,6 +854,7 @@ async function sendRawCommand(cmd: any, domain: string, configSet?: string): Pro
  * encuentra otra.
  */
 export async function sendRawFromDomain(raw: string, source: string, destinations: string[], configSet?: string): Promise<string> {
+  assertSandboxRecipients(source, destinations);
   if (Buffer.byteLength(raw, "utf8") > MAX_RAW_MESSAGE_BYTES) {
     throw new Error("El correo excede el tamaño máximo. Usa archivos más ligeros.");
   }

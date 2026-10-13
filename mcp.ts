@@ -304,6 +304,93 @@ export const TOOL_TITLES: Record<string, string> = {
   search_tools: "Search tools",
 };
 
+// --- Endpoint de directorios (`/mcp/directory`, 13-oct-2026) ---
+//
+// Los directorios de Claude y ChatGPT no dejan cobrar dentro de la app ni entregar
+// credenciales. `/mcp/directory` es ESTE mismo servidor filtrado por una lista blanca
+// estricta: lo que no está aquí no se registra, así que tampoco sale en tools/list ni en
+// search_tools. Fuera: todo lo que cobra, compra, activa o devuelve una liga de pago
+// (activación, registro, transferencia y renovación de dominios, add-ons, pedidos,
+// referidos) y todo lo que devuelve un secreto (contraseña de buzón, secreto de webhook,
+// credenciales SMTP, exportación completa de la cuenta). Agregar algo aquí = revisarlo
+// contra la política de los dos directorios. `mcp.test.ts` lo fija.
+export const DIRECTORY_ALLOWLIST = new Set([
+  // Dominios
+  "list_domains", "get_domain", "create_domain", "verify_domain", "domain_health", "delete_domain",
+  // Direcciones (sin crear buzones: devuelven su contraseña)
+  "list_aliases", "create_alias", "update_alias", "delete_alias", "delete_mailbox",
+  "apple_profile_link", "mailbox_export_link",
+  // DNS
+  "domain_dns_setup", "list_dns_records", "create_dns_zone", "dns_delegation_status", "set_dns_record",
+  "delete_dns_record", "import_dns_records", "point_domain_to",
+  // Reglas y webhooks (sin crear webhooks: devuelven su secreto de firma)
+  "list_rules", "create_rule", "update_rule", "delete_rule",
+  "list_webhooks", "update_webhook", "delete_webhook", "test_webhook", "webhook_deliveries",
+  // Envío y registro
+  "send_email", "list_logs", "list_suppressions", "add_suppression", "remove_suppression",
+  // Equipo, firma y respuestas guardadas
+  "list_members", "invite_member", "remove_member", "cancel_invite",
+  "get_signature", "set_signature", "set_domain_logo", "delete_domain_logo",
+  "list_canned_replies", "create_canned_reply", "delete_canned_reply",
+  // Bandeja
+  "inbox_list", "inbox_read", "inbox_attachment", "inbox_reply", "inbox_send", "inbox_mark", "inbox_assign",
+  "inbox_note", "inbox_delete", "inbox_restore", "inbox_metrics", "upload_attachment",
+  // Perfil
+  "get_profile", "update_profile", "set_profile_photo", "delete_profile_photo",
+  "search_tools",
+]);
+
+// Parámetros que el directorio no ve aunque la herramienta sí esté: `mailbox` de
+// create_alias crea un buzón IMAP y devuelve su contraseña.
+const DIRECTORY_OMIT_PARAMS: Record<string, string[]> = { create_alias: ["mailbox"] };
+// Misma idea para la descripción: se quita la frase del parámetro que no existe aquí.
+const DIRECTORY_DESCRIPTION_EDITS: Record<string, Array<[string, string]>> = {
+  create_alias: [[" With `mailbox: true` it also stores mail in an IMAP mailbox (activated domains only) and returns its credentials once.", ""]],
+};
+
+// Las instrucciones del directorio: las del servidor completo sin pagos, compras,
+// transferencias ni credenciales, y sin nombrar herramientas que aquí no existen.
+export const MCP_DIRECTORY_INSTRUCTIONS = `MailMask: correo con tu dominio (máscaras que reenvían, Bandeja compartida, buzones IMAP) y DNS. Hablas con el dueño de la cuenta, casi siempre no técnico: responde en su idioma, corto, y dicta valores exactos.
+Al usuario llámale «dirección» (o máscara) a lo que las tools llaman alias; no le digas «alias». Los nombres *_alias y el campo \`alias\` se quedan así.
+
+## Conectar un dominio (en este orden)
+1. create_domain (o list_domains si ya existe).
+2. domain_dns_setup: los registros exactos (MX, TXT _amazonses, 3 CNAME de DKIM, SPF y DMARC opcional), si ya se ven en el DNS público (ok) y en qué panel pegarlos (registrarHint). Díctalos uno por uno con tipo, nombre y valor.
+3. El usuario los pega en su registrador. Tú no puedes, salvo que la zona sea de MailMask (list_dns_records con zone.status "active").
+4. verify_domain cuando diga que ya los puso. Propagar tarda de minutos a horas: si sale false, vuelve a domain_dns_setup y dile sólo qué registro falta.
+5. domain_health para confirmar MX, SPF, DKIM, máscaras y plan.
+6. create_alias para que el correo llegue a algún lado: sin máscaras activas no se reenvía nada.
+
+## Estado de un dominio
+El MX y la verificación se confirman con domain_health (revisa en vivo). list_domains es inventario: sus banderas pueden ser viejas (si salen null o "unknown", no sabes). Nunca le digas al usuario que algo falla sin domain_health.
+
+## Plan del dominio
+Algunas funciones (máscaras ilimitadas, equipo, envío, reglas, webhooks) piden un dominio activado. Un dominio bloqueado guarda el correo en la Bandeja pero no lo reenvía; no es una falla técnica. Si una herramienta responde que hace falta activar el dominio, dile al usuario que eso se gestiona en su panel de mailmask.studio; no ofrezcas cobros ni ligas de pago.
+
+## Acciones delicadas
+Borrar dominio, máscara, buzón o registro DNS y sacar a un miembro son irreversibles: confírmalo con el usuario antes. Algunas responden que necesitan confirmación: el usuario la aprueba en la app; no reintentes ni busques otra vía.
+
+## DNS administrado por MailMask
+Con zona propia (create_dns_zone y cambiar los nameservers en el registrador) puedes editar registros; enseña la lista \`imported\` antes de que cambie los nameservers: list_dns_records antes de escribir; set_dns_record reemplaza el conjunto completo; point_domain_to para Vercel, Netlify y similares. Los registros de correo están protegidos.
+
+## Bandeja: el correo de la máscara
+Cada máscara recibe en la Bandeja del dominio; desde ahí se lee y se contesta como esa máscara.
+- Lo nuevo: inbox_list con status "unread" (y alias para una máscara) → inbox_read (texto de cada mensaje, notas y adjuntos; lo marca leído) → inbox_attachment si hace falta un adjunto.
+- Contestar: inbox_reply en markdown (lleva firma y cita). Antes de cualquier envío (inbox_reply, inbox_send, send_email), enseña destinatario, asunto y texto al usuario y espera su visto bueno.
+- Escribir a alguien nuevo: inbox_send desde una máscara activa (dominio activado y verificado). send_email no deja hilo.
+- Ordenar: inbox_mark (read, closed = resuelta, snoozed, urgent, tags), inbox_assign, inbox_note (interna, el contacto no la ve), inbox_delete / inbox_restore, inbox_metrics.
+- Adjuntar: upload_attachment y pasa lo que devuelve en attachments.
+
+## Otros
+- Equipo: list_members, invite_member, remove_member.
+- Firma: get_signature y set_signature (markdown), set_domain_logo; respuestas guardadas (list/create/delete_canned_reply).
+- Perfil de la cuenta: get_profile, update_profile (nombre) y set_profile_photo.
+- Buzones IMAP existentes: apple_profile_link configura iPhone y Mac; mailbox_export_link descarga el .mbox. Las contraseñas de buzón, las llaves de API y las credenciales SMTP se gestionan sólo en el panel de mailmask.studio.
+- Los ids de miembros y conversaciones salen de su list_* (list_members, inbox_list).
+- Si no encuentras una herramienta, usa search_tools.`;
+
+export type McpProfile = "full" | "directory";
+
 const domainId = z.string().describe("Domain ID");
 const attachmentsShape = z.array(z.object({ key: z.string(), filename: z.string(), contentType: z.string().optional() }))
   .max(10).optional().describe("Attachment objects returned by the upload tool");
@@ -316,7 +403,8 @@ function pideConfirmacion(titulo: string): Salida {
   return { content: [{ type: "text", text: `Necesita confirmación del usuario: le apareció una tarjeta en el asistente para aprobar «${titulo}». No reintentes; espera a que confirme.` }], structuredContent: { needsConfirmation: true, title: titulo } };
 }
 
-export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }): McpServer {
+export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; profile?: McpProfile }): McpServer {
+  const directory = o.profile === "directory";
   // El SDK sólo conserva `error` del cuerpo; el título de la tarjeta se lee aquí.
   let confirmacion: string | null = null;
   const fetchLocal = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -328,7 +416,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     return res;
   }) as typeof fetch;
   const sdk = new MailMask({ apiKey: o.apiKey, baseUrl: "http://mcp.local", fetch: fetchLocal });
-  const server = new McpServer({ name: "mailmask", version: MCP_VERSION }, { instructions: MCP_INSTRUCTIONS });
+  const server = new McpServer({ name: "mailmask", version: MCP_VERSION }, { instructions: directory ? MCP_DIRECTORY_INSTRUCTIONS : MCP_INSTRUCTIONS });
   const catalogo: { name: string; description: string }[] = [];
 
   // Al agente no se le entrega un `false` viejo: si la revisión pasó de 24 h, las
@@ -341,6 +429,16 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
   });
 
   const tool = <S extends z.ZodRawShape>(name: string, description: string, shape: S, run: (args: z.infer<z.ZodObject<S>>) => Promise<unknown>) => {
+    // Directorio: lo que no está en la lista blanca ni se registra (ni tools/list, ni
+    // search_tools, ni tools/call); los parámetros omitidos ni se ven ni llegan al SDK.
+    if (directory) {
+      if (!DIRECTORY_ALLOWLIST.has(name)) return;
+      const omit = DIRECTORY_OMIT_PARAMS[name] ?? [];
+      if (omit.length) shape = Object.fromEntries(Object.entries(shape).filter(([k]) => !omit.includes(k))) as S;
+      for (const [from, to] of DIRECTORY_DESCRIPTION_EDITS[name] ?? []) description = description.replace(from, to);
+      const runFull = run;
+      run = (args) => runFull(Object.fromEntries(Object.entries(args as Record<string, unknown>).filter(([k]) => !omit.includes(k))) as typeof args);
+    }
     catalogo.push({ name, description });
     // El genérico de registerTool no infiere bien con un shape genérico; el tipado real
     // de `args` lo garantiza la firma de `run`.
@@ -804,7 +902,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
   // funciona en el navegador donde el usuario tiene la sesión de MailMask abierta.
   const requireMailbox = async (d: string, alias: string) => {
     const fila = (await sdk.aliases.list(d)).find((x) => x.alias === alias.toLowerCase());
-    if (!fila?.mailboxEnabled) throw new Error(`La máscara ${alias} no tiene buzón IMAP. Créalo con create_mailbox.`);
+    if (!fila?.mailboxEnabled) throw new Error(`La máscara ${alias} no tiene buzón IMAP. Primero hay que crearle un buzón.`);
   };
   tool("apple_profile_link",
     "Returns a link to the configuration profile that sets up an address's IMAP mailbox in Apple Mail (iPhone, iPad, Mac). It opens in Safari on the device, signed in to MailMask, and asks for the mailbox password when installed.",
@@ -836,7 +934,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
 }
 
 /** Atiende una petición HTTP de `/mcp` ya autenticada. Stateless: un servidor por petición. */
-export async function atenderMcp(request: Request, o: { apiKey: string; fetchLocal: typeof fetch }): Promise<Response> {
+export async function atenderMcp(request: Request, o: { apiKey: string; fetchLocal: typeof fetch; profile?: McpProfile }): Promise<Response> {
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   const server = crearServidorMcp(o);
   await server.connect(transport);

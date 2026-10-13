@@ -35,10 +35,16 @@ export function issuerFor(request: Request): string {
   }
   return new URL(request.url).origin;
 }
-const resourceFor = (request: Request) => `${issuerFor(request)}/mcp`;
+// Recursos protegidos: el MCP completo y el de directorios (el mismo servidor filtrado,
+// `mcp.ts` → DIRECTORY_ALLOWLIST). Un token sirve sólo en el recurso para el que se pidió.
+export const MCP_RESOURCE_PATHS = ["/mcp", "/mcp/directory"] as const;
+export type McpResourcePath = (typeof MCP_RESOURCE_PATHS)[number];
+export const resourceFor = (request: Request, path: McpResourcePath = "/mcp") => `${issuerFor(request)}${path}`;
 
-export function protectedResourceMetadataUrl(request: Request): string {
-  return `${issuerFor(request)}/.well-known/oauth-protected-resource`;
+/** RFC 9728 §3.1: la metadata de un recurso con ruta vive en el well-known + esa ruta. */
+export function protectedResourceMetadataUrl(request: Request, path: McpResourcePath = "/mcp"): string {
+  // `/mcp` conserva la URL de siempre (sin sufijo): es la que ya anunciaban sus 401.
+  return `${issuerFor(request)}/.well-known/oauth-protected-resource${path === "/mcp" ? "" : path}`;
 }
 
 // --- Helpers ---
@@ -99,10 +105,10 @@ function parseScope(raw: unknown): string | null {
 
 // --- Metadata (well-known) ---
 
-export function protectedResourceMetadata(request: Request): Response {
+export function protectedResourceMetadata(request: Request, path: McpResourcePath = "/mcp"): Response {
   const iss = issuerFor(request);
   return json({
-    resource: `${iss}/mcp`,
+    resource: `${iss}${path}`,
     authorization_servers: [iss],
     scopes_supported: OAUTH_SCOPES,
     bearer_methods_supported: ["header"],
@@ -246,9 +252,9 @@ function checkAuthorize(request: Request, q: Record<string, unknown>): Checked {
   }
   const scope = parseScope(q.scope);
   if (!scope) return fail("invalid_scope", `Scopes válidos: ${OAUTH_SCOPES.join(" ")}.`);
-  const expected = resourceFor(request);
-  const resource = str(q.resource) ? canonicalResource(q.resource as string) : expected;
-  if (resource !== expected) return fail("invalid_target", `resource debe ser ${expected}.`);
+  const allowed = MCP_RESOURCE_PATHS.map((p) => resourceFor(request, p));
+  const resource = str(q.resource) ? canonicalResource(q.resource as string) : allowed[0];
+  if (!resource || !allowed.includes(resource)) return fail("invalid_target", `resource debe ser uno de: ${allowed.join(", ")}.`);
   return { ok: true, client, p: { clientId: client.client_id, redirectUri, state, codeChallenge: challenge, scope, resource } };
 }
 
@@ -416,13 +422,13 @@ export function revokeEndpoint(request: Request, body: unknown, ip: string): Res
 }
 
 /** Valida un `mo_…` sin gastar rate limit. Devuelve el correo y el id del token, o null. */
-export function verifyOAuthAccessToken(token: string): { email: string; tokenId: string } | null {
+export function verifyOAuthAccessToken(token: string): { email: string; tokenId: string; resource: string } | null {
   if (!token.startsWith("mo_")) return null;
-  const row = sqlite.prepare("SELECT id, user_email, expires_at, revoked_at, created_at FROM oauth_tokens WHERE token_hash = ? AND kind = 'access'").get(sha256(token)) as
-    { id: string; user_email: string; expires_at: string; revoked_at: string | null; created_at: string } | undefined;
+  const row = sqlite.prepare("SELECT id, user_email, resource, expires_at, revoked_at, created_at FROM oauth_tokens WHERE token_hash = ? AND kind = 'access'").get(sha256(token)) as
+    { id: string; user_email: string; resource: string; expires_at: string; revoked_at: string | null; created_at: string } | undefined;
   if (!row || row.revoked_at || row.expires_at < nowIso()) return null;
   if (staleForUser(row.user_email, row.created_at)) return null;
-  return { email: row.user_email, tokenId: row.id };
+  return { email: row.user_email, tokenId: row.id, resource: row.resource };
 }
 
 // --- HTML ---
