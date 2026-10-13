@@ -27,7 +27,10 @@ social), `dominios-seo.test.ts` (`/dominios`, sin cifras por TLD) y
   instalaciones que no existen (hoy la CLI no está en npm). Lo vigila `llms.test.ts`.
   La prueba «Enlaces incluye las landings públicas» exige las tres landings ya enlazadas
   (`/bandeja-compartida`, `/dominios`, `/alternativa-google-workspace`): una landing nueva hay que
-  sumarla a mano a esa lista y a `## Enlaces`, o queda sin vigilar.
+  sumarla a mano a esa lista y a `## Enlaces`, o queda sin vigilar. El sitemap manda:
+  la prueba «toda landing del sitemap aparece en llms.txt» saca cada `<loc>` de `public/sitemap.xml`
+  (menos los artículos `/blog/<slug>`, `/login`, `/register`, `/terms` y `/privacy`) y exige que la URL
+  esté en `llms.txt` como token completo: una página pública nueva entra a la vigilancia sola.
 - **Sitemap:** una página pública nueva va en DOS lados o el generador la borra en silencio: la
   fila de `paginas` en `scripts/gen-sitemap.ts` (ruta, archivo, freq, prio) y su `<url>` en
   `public/sitemap.xml`.
