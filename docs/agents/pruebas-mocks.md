@@ -71,6 +71,28 @@ límite pasa y `+1 ms` se rechaza sin depender de lo que tarde la máquina. Lo u
 resuelve normal (probado en Node 22). Si algún día dejara de resolver, el plan B es pasar
 `toleranceMs` explícito y usar timestamps relativos con margen amplio en vez del borde exacto.
 
+## Doblar un built-in (`node:dns/promises`) y el timer que `snapshotDns` deja vivo
+
+`dns-import.test.ts` prueba el inventario de DNS sin tocar la red. Dos trampas que no salen en
+las fichas de arriba:
+
+- **El built-in se dobla igual que un módulo del repo**: el doble va antes y con el real esparcido,
+  `mock.module("node:dns/promises", { namedExports: { ...await import("node:dns/promises"), Resolver: FakeResolver } })`,
+  y `await import("./dns-import.ts")` dentro de `before()`. El doble guarda lo que recibe
+  `setServers` y lee una tabla `"nombre|TIPO" → valor`; lo que no está lanza un error con
+  `code: "ENOTFOUND"` (o `ENODATA`). Tiene que ser **fiel al `Resolver` real**: `resolve4(nombre)`
+  sin `{ ttl: true }` devuelve direcciones pelonas y con él `{ address, ttl }`. Si el doble siempre
+  devolviera la forma con TTL, `snapshotDns` recibiría objetos donde espera strings al resolver las
+  IPs de los nameservers, y elegiría mal a quién preguntarle — con las pruebas en verde.
+- **El `setTimeout` de `TOTAL_TIMEOUT_MS` (45 s) de `snapshotDns` no se limpia nunca** (es el bug
+  que reporta el PR, no algo que se arregle desde la prueba). `test-setup.mjs` sólo hace `unref` de
+  los timers de más de un minuto, así que con timers de verdad cada caso dejaría el proceso vivo
+  otros 45 s: `beforeEach` hace `mock.timers.enable({ apis: ["setTimeout"] })` y `afterEach`
+  `mock.timers.reset()`. Para ejercer el camino `truncado: true` a propósito: un doble que nunca
+  responde y `mock.timers.tick(45_000)`, con un `setImmediate` en medio — `snapshotDns` consulta
+  los NS (que sí contestan) ANTES de armar el corte, y sin dejar pasar ese instante el tick no
+  encuentra todavía el timer.
+
 ## Un contrato con otro paquete: leer el fuente, no importarlo
 
 `cli/src/args.ts` hace `import type` de `@easybits.cloud/mailmask`, que no está en el root: importarlo
