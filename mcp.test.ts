@@ -149,6 +149,20 @@ describe("MCP: agentes contra la app", () => {
     }
   });
 
+  it("ninguna descripción nombra otra herramienta ni le da órdenes al modelo (política del directorio)", async () => {
+    const tools = (await rpc("tools/list")).json.result.tools as { name: string; description: string; inputSchema: unknown }[];
+    const nombres = tools.map((t) => t.name);
+    for (const t of tools) {
+      // La descripción y las de sus parámetros: el modelo lee las dos.
+      const texto = `${t.description} ${JSON.stringify(t.inputSchema)}`;
+      for (const otro of nombres) {
+        if (otro === t.name) continue;
+        assert.ok(!new RegExp(`\\b${otro}\\b`).test(texto), `${t.name} menciona ${otro}`);
+      }
+      assert.ok(!/confírm|confirma con|úsala|no digas|pídesela|⚠️|ask the user|confirm with/i.test(t.description), `${t.name} da instrucciones al modelo`);
+    }
+  });
+
   it("create_domain devuelve los registros DNS y create_alias con buzón funciona en activado", async () => {
     const r = await call("create_domain", { domain: `mcp-${suffix}.com` });
     assert.equal(r.status, 200);
@@ -422,7 +436,7 @@ describe("MCP: agentes contra la app", () => {
     }
     const tools = (await rpc("tools/list")).json.result.tools;
     for (const n of ["inbox_reply", "inbox_send", "send_email"]) {
-      assert.match(tools.find((t: { name: string }) => t.name === n).description, /⚠️ Confirma/, `${n} pide confirmar antes de enviar`);
+      assert.equal(tools.find((t: { name: string }) => t.name === n).annotations.openWorldHint, true, `${n} sale del producto`);
     }
     const buscar = async (q: string) => (await call("search_tools", { query: q })).json.result.structuredContent.result.map((t: { name: string }) => t.name);
     assert.ok((await buscar("responder")).includes("inbox_reply"));

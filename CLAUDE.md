@@ -53,7 +53,7 @@ dominios, equipo, firma y logo, respuestas guardadas, `domain_dns_setup`, perfil
 (≤6000 caracteres, lo fija `mcp.test.ts`): es todo lo que un agente partner sabe del producto. **Cada herramienta es el SDK real** (`sdk/src`, que sí viaja
 en la imagen) hablando con la app en proceso vía `app.fetch` — el mismo truco de
 `sdk.test.ts` —, así que no puede desalinearse de una ruta sin que `sdk.test.ts` lo cace.
-Para añadir una: método en el SDK → caso en `sdk.test.ts` → `tool()` en `mcp.ts`. Un
+Para añadir una: método en el SDK → caso en `sdk.test.ts` → `tool()` en `mcp.ts` con descripción **en inglés** que sólo diga qué hace, sus parámetros y qué devuelve, más su título en `TOOL_TITLES` y su lista en `READ_ONLY_TOOLS`/`DESTRUCTIVE_TOOLS` (directorio de Claude, 13-oct-2026: `mcp.test.ts` falla si una descripción nombra otra herramienta o le da órdenes al modelo). El flujo y el «confírmalo con…» van en `MCP_INSTRUCTIONS`. Un
 `MailMaskError` sale como `isError` con `HTTP <status>: <mensaje>` (el 403 del precio es
 información útil para el agente). No se exponen las API keys (un agente con una llave no
 fabrica más); un pago siempre es una liga que abre el

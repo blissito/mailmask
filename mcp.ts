@@ -70,12 +70,12 @@ transfer_out manda el código EPP por correo al dueño, nunca al chat. lock_doma
 Borrar dominio, máscara, buzón o registro DNS, sacar a un miembro, transferir fuera o cancelar un add-on o una renovación (cancel_addon, cancel_renewal) son irreversibles: confírmalo con el usuario antes. Algunas responden que necesitan confirmación: el usuario la aprueba en la app; no reintentes ni busques otra vía.
 
 ## DNS administrado por MailMask
-Con zona propia (create_dns_zone y cambiar los nameservers en el registrador) puedes editar registros: list_dns_records antes de escribir; set_dns_record reemplaza el conjunto completo; point_domain_to para Vercel, Netlify y similares. Los registros de correo están protegidos.
+Con zona propia (create_dns_zone y cambiar los nameservers en el registrador) puedes editar registros; enseña la lista \`imported\` antes de que cambie los nameservers: list_dns_records antes de escribir; set_dns_record reemplaza el conjunto completo; point_domain_to para Vercel, Netlify y similares. Los registros de correo están protegidos.
 
 ## Bandeja: el correo de la máscara
 Cada máscara recibe en la Bandeja del dominio; desde ahí se lee y se contesta como esa máscara.
 - Lo nuevo: inbox_list con status "unread" (y alias para una máscara) → inbox_read (texto de cada mensaje, notas y adjuntos; lo marca leído) → inbox_attachment si hace falta un adjunto.
-- Contestar: inbox_reply en markdown (lleva firma y cita). Antes de enviar, enseña el texto al usuario y espera su visto bueno, salvo que te haya dado instrucciones permanentes.
+- Contestar: inbox_reply en markdown (lleva firma y cita). Antes de cualquier envío (inbox_reply, inbox_send, send_email), enseña destinatario, asunto y texto al usuario y espera su visto bueno, salvo que te haya dado instrucciones permanentes.
 - Escribir a alguien nuevo: inbox_send desde una máscara activa (dominio activado y verificado; gasta envíos del día). send_email no deja hilo.
 - Ordenar: inbox_mark (read, closed = resuelta, snoozed, urgent, tags), inbox_assign, inbox_note (interna, el contacto no la ve), inbox_delete / inbox_restore, inbox_metrics.
 - Adjuntar: upload_attachment y pasa lo que devuelve en attachments.
@@ -87,6 +87,7 @@ Cada máscara recibe en la Bandeja del dominio; desde ahí se lee y se contesta 
 - Perfil de la cuenta (el usuario, no una máscara): get_profile, update_profile (nombre) y set_profile_photo. Para la foto, pide que la adjunte en el chat y pasa la URL de ese adjunto.
 - Buzones IMAP: create_alias con mailbox, o create_mailbox. apple_profile_link configura iPhone y Mac; mailbox_export_link descarga el .mbox.
 - Contraseñas, secretos de webhook y credenciales SMTP salen una sola vez: entrégalas tal cual y avisa que no se pueden volver a ver.
+- Comprar: search_domains antes de register_domain. Los ids de miembros, add-ons, registraciones y conversaciones salen de su list_* (list_members, list_addons, list_registrations, inbox_list).
 - Si no encuentras una herramienta, usa search_tools.`;
 
 // Cómo se ve cada estado de una registración, con las palabras de la app.
@@ -203,16 +204,110 @@ const OPEN_WORLD_TOOLS = new Set([
   "send_email", "bulk_send", "inbox_reply", "inbox_send", "invite_member", "test_webhook", "set_dns_record",
   "delete_dns_record", "point_domain_to", "transfer_out", "transfer_start", "register_domain", "approve_transfer_dns",
 ]);
-const ACRONYMS: Record<string, string> = { dns: "DNS", smtp: "SMTP", imap: "IMAP" };
-export function toolTitle(name: string): string {
-  const words = name.split("_").map((w) => ACRONYMS[w] ?? w);
-  return words.map((w, i) => (i === 0 ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
-}
+// Título legible que el directorio muestra junto a cada herramienta.
+export const TOOL_TITLES: Record<string, string> = {
+  list_domains: "List domains",
+  get_domain: "Get domain",
+  create_domain: "Add domain",
+  verify_domain: "Verify domain",
+  domain_health: "Check domain health",
+  delete_domain: "Delete domain",
+  list_aliases: "List addresses",
+  create_alias: "Create address",
+  update_alias: "Update address",
+  delete_alias: "Delete address",
+  create_mailbox: "Create IMAP mailbox",
+  delete_mailbox: "Delete IMAP mailbox",
+  reset_mailbox_password: "Reset mailbox password",
+  list_dns_records: "List DNS records",
+  create_dns_zone: "Create DNS zone",
+  dns_delegation_status: "Check nameserver delegation",
+  set_dns_record: "Set DNS record",
+  delete_dns_record: "Delete DNS record",
+  import_dns_records: "Read public DNS",
+  point_domain_to: "Point domain to hosting",
+  list_rules: "List routing rules",
+  create_rule: "Create routing rule",
+  update_rule: "Update routing rule",
+  delete_rule: "Delete routing rule",
+  list_webhooks: "List webhooks",
+  create_webhook: "Create webhook",
+  update_webhook: "Update webhook",
+  delete_webhook: "Delete webhook",
+  test_webhook: "Send test webhook",
+  webhook_deliveries: "List webhook deliveries",
+  send_email: "Send email",
+  bulk_send: "Send bulk email",
+  bulk_status: "Get bulk send status",
+  list_logs: "List email logs",
+  list_suppressions: "List suppressed recipients",
+  add_suppression: "Suppress recipient",
+  remove_suppression: "Unsuppress recipient",
+  list_smtp_credentials: "List SMTP credentials",
+  create_smtp_credential: "Create SMTP credential",
+  revoke_smtp_credential: "Revoke SMTP credential",
+  domain_dns_setup: "Get DNS setup records",
+  activation_link: "Get activation payment link",
+  billing_status: "Get legacy subscription",
+  list_addons: "List add-ons",
+  search_domains: "Search domain availability",
+  domain_prices: "List domain prices",
+  register_domain: "Buy domain",
+  list_registrations: "List registered domains",
+  transfer_check: "Check transfer eligibility",
+  transfer_start: "Start domain transfer",
+  transfer_status: "Get transfer status",
+  transfer_dns: "Get transfer DNS inventory",
+  update_transfer_dns: "Update transfer DNS inventory",
+  approve_transfer_dns: "Approve transfer DNS",
+  resend_transfer_email: "Resend transfer approval email",
+  transfer_out: "Transfer domain out",
+  lock_domain_transfer: "Lock domain transfer",
+  renewal_status: "Get renewal status",
+  renewal_link: "Get renewal payment link",
+  list_members: "List team members",
+  invite_member: "Invite team member",
+  remove_member: "Remove team member",
+  cancel_invite: "Cancel invitation",
+  get_signature: "Get email signature",
+  set_signature: "Set email signature",
+  list_canned_replies: "List saved replies",
+  create_canned_reply: "Create saved reply",
+  delete_canned_reply: "Delete saved reply",
+  inbox_list: "List inbox conversations",
+  inbox_read: "Read inbox conversation",
+  inbox_attachment: "Read attachment",
+  inbox_reply: "Reply in conversation",
+  inbox_send: "Send new email from inbox",
+  inbox_mark: "Update conversation state",
+  inbox_assign: "Assign conversation",
+  inbox_note: "Add internal note",
+  inbox_delete: "Move conversations to trash",
+  inbox_restore: "Restore conversation",
+  inbox_metrics: "Get inbox metrics",
+  upload_attachment: "Upload attachment",
+  set_domain_logo: "Set signature logo",
+  delete_domain_logo: "Remove signature logo",
+  list_orders: "List orders",
+  cancel_addon: "Cancel add-on",
+  cancel_renewal: "Cancel domain renewal",
+  referral_status: "Get referral program",
+  set_referral_slug: "Set referral link",
+  set_referral_name: "Set referral name",
+  export_link: "Get account export link",
+  get_profile: "Get profile",
+  update_profile: "Update profile name",
+  set_profile_photo: "Set profile photo",
+  delete_profile_photo: "Remove profile photo",
+  apple_profile_link: "Get Apple Mail setup link",
+  mailbox_export_link: "Get mailbox export link",
+  search_tools: "Search tools",
+};
 
-const domainId = z.string().describe("ID del dominio (de list_domains)");
+const domainId = z.string().describe("Domain ID");
 const attachmentsShape = z.array(z.object({ key: z.string(), filename: z.string(), contentType: z.string().optional() }))
-  .max(10).optional().describe("Adjuntos devueltos por upload_attachment");
-const aliasName = z.string().describe("Parte local de la máscara, sin el dominio: 'hola' para hola@tudominio.com");
+  .max(10).optional().describe("Attachment objects returned by the upload tool");
+const aliasName = z.string().describe("Local part of the address, without the domain: 'hello' for hello@yourdomain.com");
 
 // Con el turn token del asistente (`mt_`), lo destructivo contesta 409 `needs_confirmation`:
 // al usuario le aparece una tarjeta para aprobarlo. No es un error para el modelo, y si
@@ -257,7 +352,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     };
     const readOnly = READ_ONLY_TOOLS.has(name);
     const annotations = {
-      title: toolTitle(name),
+      title: TOOL_TITLES[name] ?? name,
       readOnlyHint: readOnly,
       destructiveHint: readOnly ? false : DESTRUCTIVE_TOOLS.has(name),
       openWorldHint: OPEN_WORLD_TOOLS.has(name),
@@ -267,28 +362,28 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
 
   // --- Dominios ---
   tool("list_domains",
-    "Inventario de dominios de la cuenta (id, plan, reenvíos del mes) con el último estado guardado de MX y verificación y su fecha (checkedAt). Si mxStatus/verifiedStatus es \"unknown\", el dato es viejo: no afirmes que algo falla; confírmalo con domain_health.",
+    "Lists the domains on the account with id, plan, forwards this month, and the last stored MX and verification status with the time it was checked (checkedAt). A mxStatus or verifiedStatus of \"unknown\" means the stored value is older than 24 hours and the flag is returned as null.",
     {}, async () => (await sdk.domains.list()).map(staleFlagsAsNull));
-  tool("get_domain", "Detalle de un dominio. El MX y la verificación son lo último guardado; para confirmarlos, domain_health.", { domainId }, async (a) => staleFlagsAsNull(await sdk.domains.get(a.domainId)));
+  tool("get_domain", "Returns one domain with its plan and the last stored MX and verification status (not a live check).", { domainId }, async (a) => staleFlagsAsNull(await sdk.domains.get(a.domainId)));
   tool("create_domain",
-    "Da de alta un dominio y devuelve los registros DNS que hay que configurar (MX, TXT de verificación, 3 CNAME de DKIM, SPF). El primer dominio de la cuenta es gratis; el segundo en adelante nace bloqueado hasta activarlo ($99 MXN/mes por dominio).",
-    { domain: z.string().describe("Dominio, p. ej. tudominio.com") }, (a) => sdk.domains.create(a.domain));
-  tool("verify_domain", "Vuelve a comprobar en SES si el DNS del dominio ya está verificado (identidad y DKIM) y si el MX apunta a MailMask; guarda el resultado.", { domainId }, (a) => sdk.domains.verify(a.domainId));
-  tool("domain_health", "Revisa EN VIVO el estado del dominio: verificación en SES, MX, SPF, DKIM, máscaras activas y plan. Es la fuente de verdad: úsala antes de decirle al usuario si su MX o su verificación están bien o mal. Guarda lo medido.", { domainId }, (a) => sdk.domains.health(a.domainId));
-  tool("delete_domain", "Borra el dominio con todas sus máscaras, reglas y buzones. Irreversible.", { domainId }, (a) => sdk.domains.delete(a.domainId));
+    "Adds a domain to the account and returns the DNS records to configure at the registrar (MX, verification TXT, 3 DKIM CNAMEs, SPF). The account's first domain is free; additional domains start blocked until activated ($99 MXN/month per domain).",
+    { domain: z.string().describe("Domain, e.g. yourdomain.com") }, (a) => sdk.domains.create(a.domain));
+  tool("verify_domain", "Re-checks with Amazon SES whether the domain's DNS is verified (identity and DKIM) and whether its MX points to MailMask, stores the result and returns it.", { domainId }, (a) => sdk.domains.verify(a.domainId));
+  tool("domain_health", "Checks the domain live: SES verification, MX, SPF, DKIM, active addresses and plan. Returns the measured status and stores it.", { domainId }, (a) => sdk.domains.health(a.domainId));
+  tool("delete_domain", "Permanently deletes the domain with all its addresses, rules and mailboxes.", { domainId }, (a) => sdk.domains.delete(a.domainId));
 
   // --- Máscaras ---
-  tool("list_aliases", "Lista las direcciones (máscaras) de un dominio.", { domainId }, (a) => sdk.aliases.list(a.domainId));
+  tool("list_aliases", "Lists the addresses (aliases) of a domain with their destinations, status and whether they have an IMAP mailbox.", { domainId }, (a) => sdk.aliases.list(a.domainId));
   tool("create_alias",
-    "Crea una máscara. `destinations` son los correos a los que reenvía; '*' como alias es catch-all. Con `mailbox: true` además guarda el correo en un buzón IMAP (sólo dominio activado) y devuelve sus credenciales UNA sola vez. El dominio gratis permite 5 máscaras.",
-    { domainId, alias: aliasName, destinations: z.array(z.string()).optional().describe("Correos destino; puede omitirse si mailbox es true"), mailbox: z.boolean().optional() },
+    "Creates an address (alias) on the domain. `destinations` are the inboxes it forwards to; '*' as alias is a catch-all. With `mailbox: true` it also stores mail in an IMAP mailbox (activated domains only) and returns its credentials once. Free domains allow 5 addresses.",
+    { domainId, alias: aliasName, destinations: z.array(z.string()).optional().describe("Destination emails; may be omitted when mailbox is true"), mailbox: z.boolean().optional() },
     (a) => sdk.aliases.create(a.domainId, { alias: a.alias, destinations: a.destinations, mailbox: a.mailbox }));
-  tool("update_alias", "Activa/desactiva una máscara o cambia sus destinos.", { domainId, alias: aliasName, enabled: z.boolean().optional(), destinations: z.array(z.string()).optional() },
+  tool("update_alias", "Enables or disables an address, or replaces its forwarding destinations.", { domainId, alias: aliasName, enabled: z.boolean().optional(), destinations: z.array(z.string()).optional() },
     (a) => sdk.aliases.update(a.domainId, a.alias, { enabled: a.enabled, destinations: a.destinations }));
-  tool("delete_alias", "Borra una máscara (y su buzón, si tiene).", { domainId, alias: aliasName }, (a) => sdk.aliases.delete(a.domainId, a.alias));
-  tool("create_mailbox", "Crea un buzón IMAP para una máscara existente (dominio activado). Devuelve email, contraseña (una sola vez) y datos IMAP/SMTP.", { domainId, alias: aliasName }, (a) => sdk.aliases.createMailbox(a.domainId, a.alias));
-  tool("delete_mailbox", "Borra el buzón IMAP de una máscara Y TODO SU CORREO. La máscara debe conservar al menos un destino.", { domainId, alias: aliasName }, (a) => sdk.aliases.deleteMailbox(a.domainId, a.alias));
-  tool("reset_mailbox_password", "Genera una contraseña nueva para el buzón IMAP de una máscara y la devuelve UNA sola vez; no se guarda en ningún lado. Úsala cuando el cliente de correo la pide en bucle (p. ej. tras restaurar el servidor).", { domainId, alias: aliasName }, (a) => sdk.aliases.resetMailboxPassword(a.domainId, a.alias));
+  tool("delete_alias", "Permanently deletes an address and its IMAP mailbox, if it has one.", { domainId, alias: aliasName }, (a) => sdk.aliases.delete(a.domainId, a.alias));
+  tool("create_mailbox", "Creates an IMAP mailbox for an existing address (activated domains only). Returns the email, the password (shown once) and the IMAP/SMTP settings.", { domainId, alias: aliasName }, (a) => sdk.aliases.createMailbox(a.domainId, a.alias));
+  tool("delete_mailbox", "Permanently deletes an address's IMAP mailbox and all the mail stored in it. The address must keep at least one forwarding destination.", { domainId, alias: aliasName }, (a) => sdk.aliases.deleteMailbox(a.domainId, a.alias));
+  tool("reset_mailbox_password", "Generates a new password for an address's IMAP mailbox, invalidating the old one, and returns it once; it is not stored anywhere.", { domainId, alias: aliasName }, (a) => sdk.aliases.resetMailboxPassword(a.domainId, a.alias));
 
   // --- DNS ---
   //
@@ -297,77 +392,77 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
   // el conjunto, así que se dice explícitamente cómo se añade un valor sin borrar los otros.
 
   tool("list_dns_records",
-    "Lista los registros DNS del dominio y el estado de su zona. Los que traen `managed: true` los pone MailMask para que el correo funcione y no se pueden borrar. Llámala SIEMPRE antes de crear o cambiar un registro: te dice si ese nombre ya está ocupado y con qué valores.",
+    "Lists the DNS records of a domain whose zone MailMask manages, plus the zone status. Records with `managed: true` are created by MailMask for email and cannot be deleted.",
     { domainId }, (a) => sdk.dns.list(a.domainId));
 
   tool("create_dns_zone",
-    "Crea la zona DNS de MailMask para un dominio registrado fuera. Copia los registros que encuentre de tu proveedor actual y devuelve los nameservers que el dueño tiene que poner en su registrador; hasta que los cambie, nada de lo que edites tiene efecto. Enseña la lista `imported` al usuario antes de que los cambie: lo que no aparezca ahí dejará de funcionar.",
+    "Creates a MailMask-managed DNS zone for a domain registered elsewhere. Copies the records it finds at the current provider (returned as `imported`) and returns the nameservers to set at the registrar; edits take effect only after the nameservers change.",
     { domainId }, (a) => sdk.dns.createZone(a.domainId));
 
   tool("dns_delegation_status",
-    "Comprueba si el dominio ya apunta a los nameservers de MailMask. Devuelve los que se observan hoy y los que se esperan. Un cambio de nameservers tarda de 1 a 48 horas.",
+    "Checks whether the domain already uses MailMask's nameservers. Returns the nameservers observed now and the expected ones. Nameserver changes take 1 to 48 hours.",
     { domainId }, (a) => sdk.dns.delegation(a.domainId));
 
   tool("set_dns_record",
-    "Crea o reemplaza un registro DNS. Es idempotente: `values` sustituye por completo lo que hubiera en ese nombre y tipo, así que para AÑADIR un valor primero léelo con list_dns_records e incluye también los que ya estaban. `name` puede ser '@' para la raíz o un subdominio ('www'). En MX la prioridad va dentro del valor: '10 mail.ejemplo.com'. TTL por defecto 300.",
+    "Creates or replaces a DNS record set in a MailMask-managed zone. `values` fully replaces whatever existed for that name and type. `name` is '@' for the root or a subdomain ('www'). For MX the priority goes inside the value: '10 mail.example.com'. Default TTL 300.",
     {
       domainId,
-      name: z.string().describe("'@' para la raíz, o el subdominio ('www')"),
+      name: z.string().describe("'@' for the root, or the subdomain ('www')"),
       type: z.enum(["A", "AAAA", "CNAME", "TXT", "MX", "NS", "CAA", "SRV"]),
-      values: z.array(z.string()).describe("La lista COMPLETA de valores que debe quedar"),
-      ttl: z.number().optional().describe("Segundos, entre 60 y 172800. Por defecto 300."),
+      values: z.array(z.string()).describe("The complete list of values the record must have"),
+      ttl: z.number().optional().describe("Seconds, between 60 and 172800. Default 300."),
     },
     (a) => sdk.dns.upsert(a.domainId, { name: a.name, type: a.type, values: a.values, ttl: a.ttl }));
 
   tool("delete_dns_record",
-    "Borra un registro DNS completo, con todos sus valores. Los registros de correo de MailMask están protegidos y devuelven un error: no insistas, la única forma de quitarlos es eliminar el dominio de MailMask.",
+    "Deletes a whole DNS record set (all its values) from a MailMask-managed zone. MailMask's email records are protected and return an error.",
     { domainId, name: z.string(), type: z.enum(["A", "AAAA", "CNAME", "TXT", "MX", "NS", "CAA", "SRV"]) },
     (a) => sdk.dns.delete(a.domainId, a.name, a.type));
 
   tool("import_dns_records",
-    "Consulta el DNS público actual del dominio y devuelve lo que encuentra, sin escribir nada. Sirve para revisar qué habría que copiar antes de delegar. No garantiza ser exhaustivo.",
+    "Queries the domain's current public DNS and returns the records found, without writing anything. Not guaranteed to be exhaustive.",
     { domainId }, (a) => sdk.dns.import(a.domainId));
 
   tool("point_domain_to",
-    "Apunta el dominio (o un subdominio) a un servicio de hosting sin tener que saber qué registros hacen falta. Para 'vercel' el `target` es el dominio que da Vercel ('mi-proyecto.vercel.app'); para 'github-pages' es 'usuario.github.io'; para 'dmarc' es el correo donde recibir los informes. Sin `subdomain` apunta la raíz y www.",
+    "Points the domain (or a subdomain) to a hosting provider by writing the needed records in the MailMask-managed zone. For 'vercel' the `target` is the Vercel domain ('my-project.vercel.app'); for 'github-pages' it is 'user.github.io'; for 'dmarc' it is the email that receives reports. Without `subdomain` it points the root and www.",
     {
       domainId,
       provider: z.enum(["vercel", "netlify", "github-pages", "cloudflare-pages", "render", "fly", "redirect-a-www", "dmarc"]),
-      target: z.string().optional().describe("El destino que te dio el servicio"),
-      subdomain: z.string().optional().describe("Para apuntar sólo un subdominio, p. ej. 'app'"),
+      target: z.string().optional().describe("The target given by the hosting provider"),
+      subdomain: z.string().optional().describe("To point only a subdomain, e.g. 'app'"),
     },
     (a) => sdk.dns.preset(a.domainId, a.provider, a.target, a.subdomain));
 
   // --- Reglas ---
   const ruleShape = {
     field: z.enum(["to", "from", "subject"]),
-    match: z.enum(["contains", "equals", "regex"]).describe("Un regex peligroso (ReDoS) se rechaza con 400"),
+    match: z.enum(["contains", "equals", "regex"]).describe("A dangerous regex (ReDoS) is rejected with 400"),
     value: z.string(),
     action: z.enum(["forward", "webhook", "discard"]),
-    target: z.string().optional().describe("Correo destino para forward o URL para webhook"),
+    target: z.string().optional().describe("Destination email for forward, or URL for webhook"),
     priority: z.number().int().optional(),
     enabled: z.boolean().optional(),
   };
-  tool("list_rules", "Lista las reglas de enrutamiento del dominio.", { domainId }, (a) => sdk.rules.list(a.domainId));
-  tool("create_rule", "Crea una regla de enrutamiento (dominio activado).", { domainId, ...ruleShape }, ({ domainId: d, ...r }) => sdk.rules.create(d, r));
-  tool("update_rule", "Modifica una regla.", { domainId, ruleId: z.string(), ...Object.fromEntries(Object.entries(ruleShape).map(([k, v]) => [k, v.optional()])) as { [K in keyof typeof ruleShape]: z.ZodOptional<(typeof ruleShape)[K]> } },
+  tool("list_rules", "Lists the domain's routing rules.", { domainId }, (a) => sdk.rules.list(a.domainId));
+  tool("create_rule", "Creates a routing rule that matches incoming mail by to, from or subject and forwards, posts to a webhook or discards it (activated domains only).", { domainId, ...ruleShape }, ({ domainId: d, ...r }) => sdk.rules.create(d, r));
+  tool("update_rule", "Updates fields of a routing rule.", { domainId, ruleId: z.string(), ...Object.fromEntries(Object.entries(ruleShape).map(([k, v]) => [k, v.optional()])) as { [K in keyof typeof ruleShape]: z.ZodOptional<(typeof ruleShape)[K]> } },
     ({ domainId: d, ruleId, ...r }) => sdk.rules.update(d, ruleId, r));
-  tool("delete_rule", "Borra una regla.", { domainId, ruleId: z.string() }, (a) => sdk.rules.delete(a.domainId, a.ruleId));
+  tool("delete_rule", "Deletes a routing rule.", { domainId, ruleId: z.string() }, (a) => sdk.rules.delete(a.domainId, a.ruleId));
 
   // --- Webhooks ---
   const events = z.array(z.enum(["email.received", "email.sent", "email.delivered", "email.bounced", "email.complained"]));
-  tool("list_webhooks", "Lista los webhooks del dominio.", { domainId }, (a) => sdk.webhooks.list(a.domainId));
-  tool("create_webhook", "Crea un webhook (dominio activado, URL https pública, máx. 10). El secreto para verificar la firma se devuelve una sola vez.", { domainId, url: z.string().url(), events },
+  tool("list_webhooks", "Lists the domain's webhooks.", { domainId }, (a) => sdk.webhooks.list(a.domainId));
+  tool("create_webhook", "Creates a webhook for email events (activated domains only, public https URL, max 10 per domain). The signing secret is returned once.", { domainId, url: z.string().url(), events },
     (a) => sdk.webhooks.create(a.domainId, { url: a.url, events: a.events }));
-  tool("update_webhook", "Cambia URL, eventos o estado de un webhook.", { domainId, webhookId: z.string(), url: z.string().url().optional(), events: events.optional(), enabled: z.boolean().optional() },
+  tool("update_webhook", "Changes a webhook's URL, events or enabled state.", { domainId, webhookId: z.string(), url: z.string().url().optional(), events: events.optional(), enabled: z.boolean().optional() },
     ({ domainId: d, webhookId, ...r }) => sdk.webhooks.update(d, webhookId, r));
-  tool("delete_webhook", "Borra un webhook.", { domainId, webhookId: z.string() }, (a) => sdk.webhooks.delete(a.domainId, a.webhookId));
-  tool("test_webhook", "Encola un evento `ping` de prueba; se entrega en el siguiente minuto.", { domainId, webhookId: z.string() }, (a) => sdk.webhooks.test(a.domainId, a.webhookId));
-  tool("webhook_deliveries", "Últimas entregas de un webhook con código HTTP, intentos y error.", { domainId, webhookId: z.string() }, (a) => sdk.webhooks.deliveries(a.domainId, a.webhookId));
+  tool("delete_webhook", "Deletes a webhook.", { domainId, webhookId: z.string() }, (a) => sdk.webhooks.delete(a.domainId, a.webhookId));
+  tool("test_webhook", "Queues a test `ping` event for a webhook; it is delivered within the next minute.", { domainId, webhookId: z.string() }, (a) => sdk.webhooks.test(a.domainId, a.webhookId));
+  tool("webhook_deliveries", "Returns a webhook's latest deliveries with HTTP status, attempts and error.", { domainId, webhookId: z.string() }, (a) => sdk.webhooks.deliveries(a.domainId, a.webhookId));
 
   // --- Envío ---
   tool("send_email",
-    "⚠️ Confirma con el usuario antes de enviar. Envía un correo suelto desde el dominio (dominio activado: 50 al día) SIN dejar hilo en la Bandeja; para conversar con alguien y ver su respuesta usa inbox_send. `from` es la parte local de una máscara activa; sin él sale de noreply@. Cuerpo: `markdown` (lleva la firma del dominio), `html` o `body` (texto plano).",
+    "Sends a one-off email from the domain (activated domains: 50 per day) without creating a conversation in the shared Inbox. `from` is the local part of an active address; without it the email is sent from noreply@. Body: `markdown` (adds the domain signature), `html` or `body` (plain text). Returns the message id.",
     {
       domainId, to: z.string(), subject: z.string(),
       markdown: z.string().optional(), html: z.string().optional(), body: z.string().optional(),
@@ -375,21 +470,21 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
       cc: z.array(z.string()).max(20).optional(), bcc: z.array(z.string()).max(20).optional(),
       inReplyTo: z.string().optional(), references: z.string().optional(),
       attachments: attachmentsShape,
-      idempotencyKey: z.string().max(128).optional().describe("Reintentar con la misma clave no reenvía ni gasta cuota (24 h)"),
+      idempotencyKey: z.string().max(128).optional().describe("Retrying with the same key does not resend or use quota (24 h)"),
     },
     ({ domainId: d, idempotencyKey, ...input }) => sdk.send.send(d, input, { idempotencyKey }));
-  tool("bulk_send", "Envío masivo asíncrono a varios destinatarios; devuelve un jobId para bulk_status.", { domainId, recipients: z.array(z.string()), subject: z.string(), html: z.string(), from: z.string().optional() },
+  tool("bulk_send", "Starts an asynchronous bulk send to several recipients and returns a jobId.", { domainId, recipients: z.array(z.string()), subject: z.string(), html: z.string(), from: z.string().optional() },
     ({ domainId: d, ...input }) => sdk.send.bulkSend(d, input));
-  tool("bulk_status", "Estado de un envío masivo.", { domainId, jobId: z.string() }, (a) => sdk.send.bulkStatus(a.domainId, a.jobId));
+  tool("bulk_status", "Returns the status of a bulk send job.", { domainId, jobId: z.string() }, (a) => sdk.send.bulkStatus(a.domainId, a.jobId));
 
   // --- Operación ---
-  tool("list_logs", "Registro de reenvíos y envíos del dominio.", { domainId, limit: z.number().int().min(1).max(100).optional() }, (a) => sdk.logs.list(a.domainId, { limit: a.limit }));
-  tool("list_suppressions", "Direcciones a las que el dominio ya no envía (rebote permanente, queja o manual).", { domainId }, (a) => sdk.suppressions.list(a.domainId));
-  tool("add_suppression", "Deja de enviar a una dirección.", { domainId, email: z.string() }, (a) => sdk.suppressions.add(a.domainId, a.email));
-  tool("remove_suppression", "Vuelve a permitir envíos a una dirección.", { domainId, email: z.string() }, (a) => sdk.suppressions.remove(a.domainId, a.email));
-  tool("list_smtp_credentials", "Credenciales SMTP relay del dominio.", { domainId }, (a) => sdk.smtp.list(a.domainId));
-  tool("create_smtp_credential", "Crea una credencial SMTP relay (dominio activado). La contraseña se devuelve una sola vez.", { domainId, label: z.string() }, (a) => sdk.smtp.create(a.domainId, a.label));
-  tool("revoke_smtp_credential", "Revoca una credencial SMTP.", { domainId, credentialId: z.string() }, (a) => sdk.smtp.revoke(a.domainId, a.credentialId));
+  tool("list_logs", "Returns the domain's log of forwarded and sent emails.", { domainId, limit: z.number().int().min(1).max(100).optional() }, (a) => sdk.logs.list(a.domainId, { limit: a.limit }));
+  tool("list_suppressions", "Lists the addresses the domain no longer sends to (hard bounce, complaint or manual).", { domainId }, (a) => sdk.suppressions.list(a.domainId));
+  tool("add_suppression", "Stops sending from the domain to an email address.", { domainId, email: z.string() }, (a) => sdk.suppressions.add(a.domainId, a.email));
+  tool("remove_suppression", "Allows sending to a previously suppressed email address again.", { domainId, email: z.string() }, (a) => sdk.suppressions.remove(a.domainId, a.email));
+  tool("list_smtp_credentials", "Lists the domain's SMTP relay credentials (without passwords).", { domainId }, (a) => sdk.smtp.list(a.domainId));
+  tool("create_smtp_credential", "Creates an SMTP relay credential (activated domains only). The password is returned once.", { domainId, label: z.string() }, (a) => sdk.smtp.create(a.domainId, a.label));
+  tool("revoke_smtp_credential", "Revokes an SMTP relay credential.", { domainId, credentialId: z.string() }, (a) => sdk.smtp.revoke(a.domainId, a.credentialId));
 
   // --- Conectar, activar y cobrar ---
   //
@@ -397,45 +492,45 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
   // "bloqueado" y mandar la liga de pago. Un pago SIEMPRE lo hace el usuario en MercadoPago.
 
   tool("domain_dns_setup",
-    "Los registros exactos que el usuario debe pegar en el panel de su registrador (MX, TXT _amazonses, 3 CNAME de DKIM, SPF recomendado, DMARC opcional), con `name` relativo ('@', '_amazonses') y `fqdn`. Con live (por omisión) dice cuáles ya se ven en el DNS público (`ok`), sugiere el SPF fusionado si ya tenía uno y, en `registrarHint`, en qué panel y menú se pegan (Hostinger, GoDaddy, Cloudflare, Namecheap, Route 53).",
-    { domainId, live: z.boolean().optional().describe("Comparar con el DNS público (por omisión true)") },
+    "Returns the exact records to paste at the registrar to connect the domain (MX, TXT _amazonses, 3 DKIM CNAMEs, recommended SPF, optional DMARC), with relative `name` and `fqdn`. With `live` (default) it marks which are already visible in public DNS (`ok`), suggests a merged SPF if one exists and, in `registrarHint`, names the registrar panel and menu (Hostinger, GoDaddy, Cloudflare, Namecheap, Route 53).",
+    { domainId, live: z.boolean().optional().describe("Compare with public DNS (default true)") },
     (a) => sdk.domains.dnsSetup(a.domainId, { live: a.live ?? true }));
 
   tool("activation_link",
-    "Liga de pago de MercadoPago para activar un dominio ($99 MXN/mes): quita el bloqueo y da máscaras ilimitadas, equipo, envíos y buzones. Con `kind` compra un bloque extra para un dominio ya activado. El USUARIO abre la liga y paga; no digas que quedó activado hasta confirmarlo con list_addons o domain_health.",
+    "Returns a MercadoPago checkout link to activate a domain ($99 MXN/month or $999/year): unblocks it and enables unlimited addresses, team, sending and mailboxes. With `kind` it buys an extra block for an already activated domain. Nothing is charged until the user pays at the link; the response has `paid: false`.",
     {
       domainId,
-      kind: z.enum(["domain", "storage50", "sends100"]).optional().describe("domain = activar (por omisión); storage50 = +50 GB de buzón; sends100 = +100 envíos/día"),
-      payerEmail: z.string().optional().describe("Correo de la cuenta de MercadoPago del pagador, si no es el de MailMask"),
-      period: z.enum(["monthly", "annual"]).optional().describe("Sólo para activar: monthly ($99/mes, por omisión) o annual ($999 al año)"),
+      kind: z.enum(["domain", "storage50", "sends100"]).optional().describe("domain = activate (default); storage50 = +50 GB mailbox storage; sends100 = +100 sends/day"),
+      payerEmail: z.string().optional().describe("Payer's MercadoPago account email, if different from the MailMask one"),
+      period: z.enum(["monthly", "annual"]).optional().describe("Activation only: monthly ($99/month, default) or annual ($999/year)"),
     },
     async (a) => {
       const r = await sdk.billing.checkout(a.domainId, a.kind ?? "domain", { payerEmail: a.payerEmail, period: a.period });
       return { paymentUrl: r.init_point, addonId: r.addonId, paid: false, note: "Liga de pago para el usuario. No está pagado hasta que MercadoPago lo confirme." };
     });
 
-  tool("billing_status", "Suscripción de la cuenta (plan legado, si existe). Lo que se cobra hoy es por dominio: para eso usa list_addons.", {}, () => sdk.billing.status());
-  tool("list_addons", "Catálogo de add-ons con precio (centavos MXN) y los del usuario con su estado y dominio. Un add-on `domain` activo en un domainId = ese dominio está activado.", {}, () => sdk.billing.addons());
+  tool("billing_status", "Returns the account's legacy plan subscription, if any. Current billing is per domain add-on.", {}, () => sdk.billing.status());
+  tool("list_addons", "Returns the add-on catalog with prices (MXN cents) and the user's add-ons with status and domain. An active `domain` add-on on a domainId means that domain is activated.", {}, () => sdk.billing.addons());
 
   // --- Comprar y transferir dominios ---
 
-  tool("search_domains", "Busca si un dominio está disponible para comprar y su precio anual (centavos MXN). Incluye la extensión: 'miempresa.com'.", { domain: z.string() }, (a) => sdk.registrations.search(a.domain));
-  tool("domain_prices", "Extensiones que se pueden comprar con precio de alta, renovación y transferencia (centavos MXN por año).", {}, () => sdk.registrations.tlds());
+  tool("search_domains", "Checks whether a domain is available to buy and its yearly price (MXN cents). Include the extension: 'mycompany.com'.", { domain: z.string() }, (a) => sdk.registrations.search(a.domain));
+  tool("domain_prices", "Lists the extensions available to buy with registration, renewal and transfer prices (MXN cents per year).", {}, () => sdk.registrations.tlds());
   tool("register_domain",
-    "Compra un dominio: crea el registro pendiente y devuelve la liga de pago de MercadoPago (un año). El registro y el DNS de correo se configuran solos cuando el USUARIO paga. Confírmalo con search_domains antes.",
+    "Creates a pending domain registration and returns the MercadoPago checkout link (one year). Registration and email DNS are configured automatically once the user pays.",
     { domain: z.string() },
     async (a) => {
       const r = await sdk.registrations.register(a.domain);
       return { paymentUrl: r.initPoint, registrationId: r.registrationId, paid: false, note: "El usuario abre la liga y paga; sigue el avance con list_registrations." };
     });
-  tool("list_registrations", "Dominios comprados o transferidos por MailMask con su estado (`statusText`), vencimiento y renovación.", {},
+  tool("list_registrations", "Lists domains bought or transferred through MailMask with their status (`statusText`), expiration and renewal.", {},
     async () => (await sdk.registrations.list()).map((r) => ({ ...r, statusText: registrationStatusText(r) })));
 
   tool("transfer_check",
-    "Antes de transferir un dominio a MailMask: requisitos (antigüedad, candado, privacidad), precio (incluye 1 año) y los registros DNS que tiene hoy. No cobra ni crea nada.",
+    "Before transferring a domain to MailMask: returns requirements (age, lock, privacy), price (includes 1 year) and the domain's current DNS records. Charges and creates nothing.",
     { domain: z.string() }, (a) => sdk.transfers.check(a.domain));
   tool("transfer_start",
-    "Prepara la transferencia de un dominio a MailMask y devuelve `formUrl`: la liga al formulario seguro de la app donde el usuario pega el código EPP, sus datos WHOIS y paga. El código EPP NUNCA pasa por el chat: no lo pidas ni lo aceptes.",
+    "Prepares a domain transfer to MailMask and returns `formUrl`, a secure form in the MailMask app where the user enters the EPP code and WHOIS data and pays. The EPP code is never part of this tool's input or output.",
     { domain: z.string() },
     async (a) => {
       const c = await sdk.transfers.check(a.domain);
@@ -454,7 +549,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
           : "Manda al usuario a formUrl: ahí pega el código EPP y sus datos WHOIS y paga. No le pidas el código aquí.",
       };
     });
-  tool("transfer_status", "Estado de las transferencias de dominio del usuario (o de una), en palabras (`statusText`).",
+  tool("transfer_status", "Returns the status of the user's domain transfers (or one of them), described in words (`statusText`).",
     { domain: z.string().optional() },
     async (a) => (await sdk.registrations.list())
       .filter((r) => r.kind === "transfer" && (!a.domain || r.domainName === a.domain.toLowerCase().trim()))
@@ -462,27 +557,27 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
         registrationId: r.id, domain: r.domainName, status: r.status, statusText: registrationStatusText(r),
         dnsImportStatus: r.dnsImportStatus, eppHint: r.transferAuthCodeHint, createdAt: r.createdAt, lastError: r.lastError,
       })));
-  const registrationId = z.string().describe("ID de la registración (de list_registrations o transfer_status)");
-  tool("transfer_dns", "Inventario de DNS que el dominio va a usar al terminar la transferencia. Revísalo CON el usuario: lo que no esté aquí dejará de funcionar.", { registrationId }, (a) => sdk.transfers.dns(a.registrationId));
+  const registrationId = z.string().describe("Registration ID");
+  tool("transfer_dns", "Returns the DNS inventory the domain will use once the transfer completes. Records not in it will stop working.", { registrationId }, (a) => sdk.transfers.dns(a.registrationId));
   tool("update_transfer_dns",
-    "Reemplaza el inventario de DNS de una transferencia por la lista COMPLETA que mandes (lee transfer_dns primero). Queda otra vez pendiente de aprobar.",
+    "Replaces a transfer's DNS inventory with the complete list provided. The inventory goes back to pending approval.",
     { registrationId, records: z.array(z.object({ name: z.string(), type: z.string(), ttl: z.number().optional(), values: z.array(z.string()) })) },
     (a) => sdk.transfers.setDns(a.registrationId, a.records));
-  tool("approve_transfer_dns", "Aprueba el inventario de DNS; nada se mueve hasta esto. Sólo con el visto bueno explícito del usuario.", { registrationId }, (a) => sdk.transfers.approveDns(a.registrationId));
-  tool("resend_transfer_email", "Pide al registrador que reenvíe el correo de aprobación de la transferencia.", { registrationId }, (a) => sdk.transfers.resendEmail(a.registrationId));
+  tool("approve_transfer_dns", "Approves the transfer's DNS inventory; DNS is moved only after this approval.", { registrationId }, (a) => sdk.transfers.approveDns(a.registrationId));
+  tool("resend_transfer_email", "Asks the registrar to resend the transfer approval email.", { registrationId }, (a) => sdk.transfers.resendEmail(a.registrationId));
 
   tool("transfer_out",
-    "Inicia la salida de un dominio comprado en MailMask hacia otro registrador. Manda un correo al dueño para confirmar; el código EPP llega ahí, nunca en esta respuesta. Confirma con el usuario antes.",
+    "Starts moving a domain bought through MailMask to another registrar. The owner receives an email to confirm, and the EPP code is sent there, never in this response.",
     { registrationId }, (a) => sdk.registrations.transferOut(a.registrationId));
   tool("lock_domain_transfer",
-    "Pone el candado de transferencia de un dominio comprado en MailMask: nadie puede llevárselo a otro registrador. Quitarlo no se puede desde aquí; el usuario lo hace en el panel y lo confirma por correo.",
+    "Turns on the transfer lock of a domain bought through MailMask so it cannot be moved to another registrar. Unlocking is only possible from the MailMask dashboard with email confirmation.",
     { registrationId }, (a) => sdk.registrations.lock(a.registrationId));
-  tool("renewal_status", "Vencimiento y renovación anual de los dominios comprados en MailMask.",
+  tool("renewal_status", "Returns expiration and yearly renewal details of domains bought through MailMask.",
     { registrationId: registrationId.optional() },
     async (a) => (await sdk.registrations.list())
       .filter((r) => !a.registrationId || r.id === a.registrationId)
       .map((r) => ({ registrationId: r.id, domain: r.domainName, status: r.status, expiresAt: r.expiresAt, renewalStatus: r.renewalStatus, renewalPriceCents: r.renewalPriceCents, nextChargeAt: r.nextChargeAt, transferLock: r.transferLock, transferUnlockedUntil: r.transferUnlockedUntil })));
-  tool("renewal_link", "Liga de MercadoPago para la renovación anual automática de un dominio registrado. El usuario la abre y autoriza el cobro.",
+  tool("renewal_link", "Returns a MercadoPago link to authorize automatic yearly renewal of a registered domain. Nothing is charged until the user authorizes it.",
     { registrationId, payerEmail: z.string().optional() },
     async (a) => {
       const r = await sdk.registrations.renewal(a.registrationId, { payerEmail: a.payerEmail });
@@ -490,28 +585,28 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     });
 
   // --- Equipo ---
-  tool("list_members", "Personas con acceso a la Bandeja del dominio y las invitaciones pendientes.", { domainId }, (a) => sdk.members.list(a.domainId));
-  tool("invite_member", "Invita a una persona a la Bandeja del dominio (dominio activado). Le llega un correo con la liga para aceptar. role: agent (responde) o admin.",
+  tool("list_members", "Lists the people with access to the domain's shared Inbox and pending invitations.", { domainId }, (a) => sdk.members.list(a.domainId));
+  tool("invite_member", "Invites a person to the domain's shared Inbox (activated domains only); they receive an email with a link to accept. role: agent (answers) or admin.",
     { domainId, email: z.string(), name: z.string(), role: z.enum(["agent", "admin"]).optional() },
     (a) => sdk.members.invite(a.domainId, { email: a.email, name: a.name, role: a.role }));
-  tool("remove_member", "Quita a una persona del dominio (memberId de list_members). Confirma con el usuario antes.", { domainId, memberId: z.string() }, (a) => sdk.members.remove(a.domainId, a.memberId));
-  tool("cancel_invite", "Cancela una invitación pendiente (token de list_members).", { domainId, token: z.string() }, (a) => sdk.members.cancelInvite(a.domainId, a.token));
+  tool("remove_member", "Removes a person's access to the domain.", { domainId, memberId: z.string() }, (a) => sdk.members.remove(a.domainId, a.memberId));
+  tool("cancel_invite", "Cancels a pending team invitation.", { domainId, token: z.string() }, (a) => sdk.members.cancelInvite(a.domainId, a.token));
 
   // --- Bandeja ---
-  tool("get_signature", "Firma (markdown) que se añade a lo que se envía desde el dominio.", { domainId }, (a) => sdk.signature.get(a.domainId));
-  tool("set_signature", "Cambia la firma del dominio (markdown, máx. 2000 caracteres; vacía la borra). Sólo se aplica a correos escritos en markdown.",
+  tool("get_signature", "Returns the domain's email signature (markdown) added to outgoing markdown emails.", { domainId }, (a) => sdk.signature.get(a.domainId));
+  tool("set_signature", "Replaces the domain's email signature (markdown, max 2000 characters; empty removes it). Applies only to emails written in markdown.",
     { domainId, signature: z.string() }, (a) => sdk.signature.set(a.domainId, a.signature));
-  tool("list_canned_replies", "Respuestas guardadas de la Bandeja del dominio.", { domainId }, (a) => sdk.canned.list(a.domainId));
-  tool("create_canned_reply", "Guarda una respuesta reutilizable (título y cuerpo en markdown; máx. 50 por dominio).",
+  tool("list_canned_replies", "Lists the saved replies of the domain's shared Inbox.", { domainId }, (a) => sdk.canned.list(a.domainId));
+  tool("create_canned_reply", "Saves a reusable reply (title and markdown body; max 50 per domain).",
     { domainId, title: z.string(), body: z.string() }, (a) => sdk.canned.create(a.domainId, { title: a.title, body: a.body }));
-  tool("delete_canned_reply", "Borra una respuesta guardada.", { domainId, cannedId: z.string() }, (a) => sdk.canned.delete(a.domainId, a.cannedId));
+  tool("delete_canned_reply", "Deletes a saved reply.", { domainId, cannedId: z.string() }, (a) => sdk.canned.delete(a.domainId, a.cannedId));
 
   // --- Bandeja: el agente atiende el correo de su máscara ---
   //
   // Son las rutas de la app tal cual (vía SDK): mismos permisos por dominio y rol
   // (`requireBandeja`), mismo recorte de 7 días del dominio gratis y mismos topes de envío.
   // Lo único que se hace aquí es darle al modelo texto en vez de HTML.
-  const conversationId = z.string().describe("ID de la conversación (de inbox_list)");
+  const conversationId = z.string().describe("Conversation ID");
   const aDireccion = async (d: string, alias?: string) => {
     if (!alias) return undefined;
     if (alias.includes("@")) return alias.toLowerCase().trim();
@@ -531,14 +626,14 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
   };
 
   tool("inbox_list",
-    "Lista las conversaciones de la Bandeja de un dominio, de la más reciente a la más vieja. Filtra por `alias` (la máscara: 'soporte' o 'soporte@dominio.com'), `status` (open, snoozed, closed, unread = no leídas por ti, deleted = papelera) o `assignedTo`. Con `q` busca en asunto, remitente y cuerpo (tope 50, sin paginar). Para la siguiente página pasa `cursor` = nextCursor. En el dominio gratis sólo se ven los últimos 7 días.",
+    "Lists conversations in a domain's shared Inbox, newest first. Filters: `alias` (local part or full address), `status` (open, snoozed, closed, unread = unread by you, deleted = trash) and `assignedTo`. `q` searches subject, sender and body (max 50, no pagination). Pass `cursor` = nextCursor for the next page. Free domains show only the last 7 days.",
     {
       domainId,
-      alias: z.string().optional().describe("Máscara del hilo: parte local o dirección completa"),
+      alias: z.string().optional().describe("Thread address: local part or full address"),
       status: z.enum(["open", "snoozed", "closed", "unread", "deleted"]).optional(),
-      assignedTo: z.string().optional().describe("Correo de la persona asignada"),
-      q: z.string().optional().describe("Texto a buscar"),
-      limit: z.number().int().min(1).max(100).optional().describe("Por omisión 50"),
+      assignedTo: z.string().optional().describe("Email of the assigned person"),
+      q: z.string().optional().describe("Text to search"),
+      limit: z.number().int().min(1).max(100).optional().describe("Default 50"),
       cursor: z.string().optional(),
     },
     async (a) => {
@@ -556,8 +651,8 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     });
 
   tool("inbox_read",
-    "Abre una conversación: sus mensajes en texto plano (los 30 más recientes; para los anteriores pasa `before` = nextBefore), notas internas del equipo y adjuntos listados por mensaje. La marca como leída para ti. `direction` inbound = lo que escribió el contacto, outbound = lo que salió del dominio. Para el contenido de un adjunto usa inbox_attachment.",
-    { domainId, conversationId, before: z.string().optional().describe("nextBefore de una lectura anterior") },
+    "Opens a conversation and returns its messages as plain text (the 30 most recent; pass `before` = nextBefore for older ones), the team's internal notes and each message's attachments. Marks it as read for you. `direction` inbound = from the contact, outbound = sent from the domain.",
+    { domainId, conversationId, before: z.string().optional().describe("nextBefore from a previous read") },
     async (a) => {
       const c = await sdk.inbox.get(a.domainId, a.conversationId, { before: a.before });
       return {
@@ -576,7 +671,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     });
 
   tool("inbox_attachment",
-    "Lee un adjunto de un mensaje recibido (messageId e index de inbox_read). Texto, CSV, JSON y similares vuelven como texto; imágenes de hasta 2 MB como imagen; lo demás (PDF, Office, zip) sólo con nombre y tamaño.",
+    "Reads an attachment of a received message by messageId and index. Text, CSV, JSON and similar come back as text; images up to 2 MB as an image; other types (PDF, Office, zip) only with name and size.",
     { domainId, conversationId, messageId: z.string(), index: z.number().int().min(0) },
     async (a) => {
       const res = await sdk.inbox.attachment(a.domainId, a.conversationId, a.messageId, a.index);
@@ -592,11 +687,11 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     });
 
   tool("inbox_reply",
-    "⚠️ Confirma con el usuario el texto antes de enviar. Responde en el hilo, desde la máscara del hilo y al contacto, enhebrado (Re: asunto). Escribe en `markdown`: lleva la firma del dominio y cita el último mensaje recibido (quote: false para no citar). No gasta la cuota de envíos (tope de 200 respuestas por hora por dominio). Pide el DNS del dominio verificado.",
+    "Sends a reply in the conversation thread, from the thread's address to the contact (Re: subject). Write it in `markdown`: it adds the domain signature and quotes the last received message (`quote: false` to skip). Does not use the daily send quota (limit 200 replies per hour per domain). Requires the domain's DNS to be verified.",
     {
       domainId, conversationId,
-      markdown: z.string().optional().describe("Cuerpo en markdown (recomendado)"),
-      body: z.string().optional().describe("Texto plano, sin firma"),
+      markdown: z.string().optional().describe("Markdown body (recommended)"),
+      body: z.string().optional().describe("Plain text, without signature"),
       html: z.string().optional(),
       cc: z.array(z.string()).max(20).optional(), bcc: z.array(z.string()).max(20).optional(),
       quote: z.boolean().optional(),
@@ -605,12 +700,12 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     ({ domainId: d, conversationId: c, ...input }) => conPista(sdk.inbox.reply(d, c, input)));
 
   tool("inbox_send",
-    "⚠️ Confirma con el usuario destinatario, asunto y texto antes de enviar. Escribe un correo nuevo desde una máscara activa del dominio y abre un hilo en la Bandeja: la respuesta del contacto llega a esa misma conversación (síguela con inbox_list/inbox_read). Requiere dominio activado ($99 MXN/mes, si no: activation_link) y verificado; gasta 1 de los envíos del día.",
+    "Sends a new email from an active address of the domain and opens a conversation in the shared Inbox, so the contact's reply lands in the same thread. Requires an activated and verified domain; uses 1 of the day's sends.",
     {
       domainId,
-      fromAlias: z.string().describe("Parte local de la máscara que envía: 'ventas'"),
+      fromAlias: z.string().describe("Local part of the sending address: 'sales'"),
       to: z.string(), subject: z.string(),
-      markdown: z.string().optional().describe("Cuerpo en markdown (recomendado: lleva la firma)"),
+      markdown: z.string().optional().describe("Markdown body (recommended: adds the signature)"),
       body: z.string().optional(), html: z.string().optional(),
       cc: z.array(z.string()).max(20).optional(), bcc: z.array(z.string()).max(20).optional(),
       attachments: attachmentsShape,
@@ -618,14 +713,14 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     ({ domainId: d, ...input }) => conPista(sdk.inbox.compose(d, input)));
 
   tool("inbox_mark",
-    "Cambia el estado de una conversación: `read` true la marca leída para ti; `status` closed = archivarla/resolverla, open = reabrirla, snoozed = posponerla hasta `snoozedUntil` (ISO futura, máx. 90 días; un correo nuevo la despierta antes); `priority` normal o urgent; `tags` reemplaza las etiquetas.",
+    "Changes a conversation's state: `read` true marks it read for you; `status` closed = archive/resolve, open = reopen, snoozed = snooze until `snoozedUntil` (future ISO date, max 90 days; a new email wakes it earlier); `priority` normal or urgent; `tags` replaces the tags.",
     {
       domainId, conversationId,
       read: z.boolean().optional(),
       status: z.enum(["open", "snoozed", "closed"]).optional(),
       snoozedUntil: z.string().optional(),
       priority: z.enum(["normal", "urgent"]).optional(),
-      tags: z.array(z.string()).optional().describe("La lista COMPLETA de etiquetas"),
+      tags: z.array(z.string()).optional().describe("The complete list of tags"),
     },
     async ({ domainId: d, conversationId: c, read, ...cambios }) => {
       const hayCambios = Object.values(cambios).some((v) => v !== undefined);
@@ -635,25 +730,25 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
       return { ok: true, ...(conv ? { status: conv.status, priority: conv.priority, tags: conv.tags, snoozedUntil: conv.snoozedUntil ?? null } : {}), ...(leida ? { unreadCount: leida.unreadCount } : {}) };
     });
 
-  tool("inbox_assign", "Asigna una conversación a una persona del equipo (correo de list_members) o, sin `assignedTo`, la deja sin asignar. Pide permiso de dueño o admin.",
+  tool("inbox_assign", "Assigns a conversation to a team member by email or, without `assignedTo`, unassigns it. Requires owner or admin.",
     { domainId, conversationId, assignedTo: z.string().optional() }, (a) => sdk.inbox.assign(a.domainId, a.conversationId, a.assignedTo));
-  tool("inbox_note", "Agrega una nota interna a la conversación: la ve el equipo en la Bandeja, NUNCA el contacto.",
+  tool("inbox_note", "Adds an internal note to a conversation. The team sees it in the Inbox; the contact never does.",
     { domainId, conversationId, body: z.string() }, (a) => sdk.inbox.addNote(a.domainId, a.conversationId, a.body));
-  tool("inbox_delete", "Manda conversaciones a la papelera (se pueden recuperar con inbox_restore; se vacía a los 15 días). Máx. 200 por llamada; sólo dueño o admin. Confirma con el usuario antes.",
+  tool("inbox_delete", "Moves up to 200 conversations to the trash (restorable for 15 days, then permanently deleted). Owner or admin only.",
     { domainId, conversationIds: z.array(z.string()).min(1).max(200) }, (a) => sdk.inbox.delete(a.domainId, a.conversationIds));
-  tool("inbox_restore", "Saca una conversación de la papelera (las borradas salen en inbox_list con status deleted).",
+  tool("inbox_restore", "Takes a conversation out of the trash.",
     { domainId, conversationId }, (a) => sdk.inbox.restore(a.domainId, a.conversationId));
-  tool("inbox_metrics", "Métricas de la Bandeja: volumen, tiempos de primera respuesta, reparto por persona y por día.",
-    { domainId, days: z.number().int().min(1).max(365).optional().describe("Por omisión 30") }, (a) => sdk.inbox.metrics(a.domainId, { days: a.days }));
+  tool("inbox_metrics", "Returns shared Inbox metrics: volume, first-response times, breakdown per person and per day.",
+    { domainId, days: z.number().int().min(1).max(365).optional().describe("Default 30") }, (a) => sdk.inbox.metrics(a.domainId, { days: a.days }));
 
   tool("upload_attachment",
-    "Sube un archivo para adjuntarlo en inbox_send, inbox_reply o send_email; devuelve el objeto que va en `attachments`. Pasa `url` (un archivo que el usuario adjuntó en el chat del asistente de MailMask) o `contentBase64` con `filename`. Máx. 5 MB; ejecutables bloqueados. Vale hasta que se envía.",
+    "Uploads a file to attach to an outgoing email and returns the object that goes in `attachments`. Pass `url` (a file the user attached in the MailMask assistant chat) or `contentBase64` with `filename`. Max 5 MB; executables are blocked. Valid until sent.",
     {
       domainId,
-      url: z.string().optional().describe("URL del adjunto del chat (/api/asistente/files/...)"),
+      url: z.string().optional().describe("URL of the chat attachment (/api/asistente/files/...)"),
       contentBase64: z.string().optional(),
       filename: z.string().optional(),
-      contentType: z.string().optional().describe("Por omisión application/octet-stream"),
+      contentType: z.string().optional().describe("Default application/octet-stream"),
     },
     async (a) => {
       const r = a.url
@@ -665,43 +760,43 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     });
 
   tool("set_domain_logo",
-    "Pone el logo que acompaña la firma de los correos del dominio (PNG, JPG o WebP; máx. 500 KB). Pasa `url` de una imagen que el usuario adjuntó en el chat del asistente, o `contentBase64` con `contentType`.",
+    "Sets the logo shown with the domain's email signature (PNG, JPG or WebP; max 500 KB). Pass `url` of an image the user attached in the MailMask assistant chat, or `contentBase64` with `contentType`.",
     { domainId, url: z.string().optional(), contentBase64: z.string().optional(), contentType: z.enum(["image/png", "image/jpeg", "image/webp"]).optional() },
     async (a) => {
       if (a.url) return sdk.domains.setLogoFromUrl(a.domainId, a.url);
       if (!a.contentBase64 || !a.contentType) throw new Error("Pasa url, o contentBase64 con contentType.");
       return sdk.domains.setLogo(a.domainId, new Blob([Buffer.from(a.contentBase64, "base64")], { type: a.contentType }), "logo");
     });
-  tool("delete_domain_logo", "Quita el logo de la firma del dominio.", { domainId }, (a) => sdk.domains.removeLogo(a.domainId));
+  tool("delete_domain_logo", "Removes the logo from the domain's email signature.", { domainId }, (a) => sdk.domains.removeLogo(a.domainId));
 
   // --- Cuenta: cobros, cancelaciones y referidos ---
-  tool("list_orders", "Historial de cobros, cortesías y cancelaciones de la cuenta (folio, concepto, monto en centavos, periodo). Para factura (CFDI) la respuesta dice a dónde escribir.",
-    { limit: z.number().int().min(1).max(200).optional(), before: z.string().optional().describe("nextCursor de la página anterior") },
+  tool("list_orders", "Returns the account's charges, courtesies and cancellations (folio, concept, amount in cents, period). For invoices (CFDI) the response says where to write.",
+    { limit: z.number().int().min(1).max(200).optional(), before: z.string().optional().describe("nextCursor from the previous page") },
     (a) => sdk.billing.orders({ limit: a.limit, before: a.before }));
   tool("cancel_addon",
-    "Cancela la suscripción de un add-on (addonId de list_addons; p. ej. la activación de un dominio). Deja de cobrarse y lo incluido dura hasta el fin del periodo pagado. Las cortesías no se cancelan. Confirma con el usuario antes.",
+    "Cancels an add-on subscription (for example a domain activation). Billing stops and the included features last until the end of the paid period. Courtesy add-ons cannot be cancelled.",
     { addonId: z.string() }, (a) => sdk.billing.cancelAddon(a.addonId));
   tool("cancel_renewal",
-    "Cancela la renovación anual automática de un dominio comprado en MailMask (registrationId de list_registrations). El dominio sigue vigente hasta su vencimiento; después puede perderse. Confirma con el usuario antes; si quiere llevárselo, es transfer_out.",
+    "Cancels the automatic yearly renewal of a domain bought through MailMask. The domain stays valid until it expires and may be lost afterwards.",
     { registrationId }, (a) => sdk.registrations.cancelRenewal(a.registrationId));
-  tool("referral_status", "Programa de referidos de la cuenta: liga propia (slug), nombre que ven los invitados, referidos y créditos disponibles.", {}, () => sdk.referrals.get());
-  tool("set_referral_slug", "Cambia la liga de referidos (3-30 caracteres: minúsculas, números y guiones). 409 si ya está tomada.",
+  tool("referral_status", "Returns the account's referral program: own link (slug), name shown to invitees, referrals and available credits.", {}, () => sdk.referrals.get());
+  tool("set_referral_slug", "Changes the referral link slug (3-30 characters: lowercase letters, numbers and hyphens). Returns 409 if it is taken.",
     { slug: z.string() }, (a) => sdk.referrals.setSlug(a.slug));
-  tool("set_referral_name", "Nombre que ven las personas invitadas («Brenda te invitó»), 2-40 caracteres.",
+  tool("set_referral_name", "Sets the name invitees see (\"Brenda invited you\"), 2-40 characters.",
     { name: z.string() }, (a) => sdk.referrals.setName(a.name));
-  tool("export_link", "Liga para descargar un JSON con todos los dominios, máscaras, reglas y últimos registros de la cuenta. Se abre en el navegador con la sesión de MailMask iniciada (5 al día).",
+  tool("export_link", "Returns a link to download a JSON with all the account's domains, addresses, rules and latest logs. It opens in a browser signed in to MailMask (5 per day).",
     {}, async () => ({ url: appUrl("/api/export"), note: "Abrir en el navegador con sesión iniciada en MailMask." }));
 
   // --- Perfil de la cuenta ---
   //
   // Es el perfil del usuario de MailMask (cabecera de /app, Bandeja, dock), no el de una
   // máscara ni lo que ve quien recibe el correo.
-  tool("get_profile", "Perfil de la cuenta de MailMask del usuario: correo, nombre visible y foto (avatarUrl).", {}, () => sdk.account.getProfile());
-  tool("update_profile", "Cambia el nombre visible de la cuenta del usuario (máx. 60 caracteres; vacío lo borra). Es el nombre con el que lo ve su equipo en la Bandeja; no cambia el remitente de los correos.",
+  tool("get_profile", "Returns the user's MailMask account profile: email, display name and photo (avatarUrl).", {}, () => sdk.account.getProfile());
+  tool("update_profile", "Changes the account's display name (max 60 characters; empty removes it). It is the name the team sees in the Inbox; it does not change the email sender.",
     { displayName: z.string() }, (a) => sdk.account.updateProfile({ displayName: a.displayName }));
-  tool("set_profile_photo", "Pone la foto de perfil de la cuenta del usuario. SÓLO sirve con la URL de una imagen que el usuario adjuntó en este chat (PNG, JPG o WebP, máx. 2 MB); cualquier otra URL se rechaza. Si no ha adjuntado una, pídesela.",
-    { url: z.string().describe("URL del adjunto del chat (/api/asistente/files/...)") }, (a) => sdk.account.setAvatarFromUrl(a.url));
-  tool("delete_profile_photo", "Quita la foto de perfil de la cuenta del usuario.", {}, () => sdk.account.removeAvatar());
+  tool("set_profile_photo", "Sets the account's profile photo from the URL of an image the user attached in the MailMask assistant chat (PNG, JPG or WebP, max 2 MB); any other URL is rejected.",
+    { url: z.string().describe("URL of the chat attachment (/api/asistente/files/...)") }, (a) => sdk.account.setAvatarFromUrl(a.url));
+  tool("delete_profile_photo", "Removes the account's profile photo.", {}, () => sdk.account.removeAvatar());
 
   // --- Buzones: ligas para el navegador del usuario ---
   //
@@ -712,14 +807,14 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     if (!fila?.mailboxEnabled) throw new Error(`La máscara ${alias} no tiene buzón IMAP. Créalo con create_mailbox.`);
   };
   tool("apple_profile_link",
-    "Liga al perfil que configura el buzón IMAP de una máscara en Apple Mail (iPhone, iPad, Mac). El usuario la abre en Safari del dispositivo con su sesión de MailMask iniciada y lo instala en Ajustes; le pedirá la contraseña del buzón.",
+    "Returns a link to the configuration profile that sets up an address's IMAP mailbox in Apple Mail (iPhone, iPad, Mac). It opens in Safari on the device, signed in to MailMask, and asks for the mailbox password when installed.",
     { domainId, alias: aliasName },
     async (a) => {
       await requireMailbox(a.domainId, a.alias);
       return { url: appUrl(`/api/domains/${a.domainId}/apple-profile?alias=${encodeURIComponent(a.alias.toLowerCase())}`), note: "Abrir en Safari del dispositivo, con sesión iniciada en MailMask." };
     });
   tool("mailbox_export_link",
-    "Liga para descargar todo el correo del buzón de una máscara en formato .mbox (Thunderbird, Apple Mail). Se abre en el navegador con la sesión de MailMask iniciada; sólo dueño o admin.",
+    "Returns a link to download all the mail of an address's mailbox as .mbox (Thunderbird, Apple Mail). It opens in a browser signed in to MailMask; owner or admin only.",
     { domainId, alias: aliasName },
     async (a) => {
       await requireMailbox(a.domainId, a.alias);
@@ -727,7 +822,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch }
     });
 
   // Catálogo por búsqueda: para clientes que prefieren cargar pocas herramientas.
-  tool("search_tools", "Busca herramientas de MailMask por palabra clave y devuelve nombre y descripción.", { query: z.string() }, async (a) => {
+  tool("search_tools", "Searches MailMask's tools by keyword (English or Spanish) and returns their names and descriptions.", { query: z.string() }, async (a) => {
     // Sin acentos de los dos lados: "renovacion" tiene que encontrar "renovación".
     const plain = (x: string) => x.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const q = plain(a.query).split(/\s+/).filter(Boolean);
