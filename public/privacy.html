@@ -175,13 +175,15 @@
         </section>
 
         <section id="agentes">
-          <h2 class="text-lg font-semibold text-zinc-100 mb-3">9. Agentes de IA y conectores (MCP)</h2>
-          <p>Puedes conectar tu cuenta a un agente de inteligencia artificial (Claude, ChatGPT, Ghosty u otro cliente MCP) desde <code>https://www.mailmask.studio/mcp</code>, con OAuth o con una API key.</p>
+          <h2 class="text-lg font-semibold text-zinc-100 mb-3">9. Aplicaciones conectadas (Claude, ChatGPT y otros clientes MCP)</h2>
+          <p>Puedes conectar tu cuenta a un asistente de inteligencia artificial (Claude, ChatGPT, Ghosty u otro cliente MCP) desde <code>https://www.mailmask.studio/mcp</code> o <code>https://www.mailmask.studio/mcp/directory</code>, autorizándolo con OAuth o con una API key.</p>
           <ul class="list-disc list-inside space-y-2 mt-2">
-            <li><strong>Qué ve el agente:</strong> sólo lo que tú puedes ver y hacer en tu cuenta (dominios, direcciones, Bandeja, DNS, envíos), y sólo cuando se lo pides en una conversación. No le damos acceso a otras cuentas, a tus API keys ni a tu contraseña.</li>
-            <li><strong>Qué guardamos:</strong> el registro del cliente que se conectó (nombre y dirección de regreso), y el token de acceso como hash, que vence en una hora; el de renovación dura 60 días. No guardamos tus conversaciones con el agente: esas viven en el servicio del agente y se rigen por su propia política.</li>
-            <li><strong>Lo que el agente lee de tus correos</strong> sale de MailMask hacia el proveedor del agente (por ejemplo, Anthropic en el caso de Claude) para que pueda responderte. Nosotros no lo usamos para entrenar modelos.</li>
-            <li><strong>Cómo cortar el acceso:</strong> desconecta el conector desde el cliente, o cambia tu contraseña de MailMask para invalidar al instante todas las conexiones.</li>
+            <li><strong>Qué datos ve el conector:</strong> sólo los de la cuenta que autorizó la conexión, y sólo lo que esa cuenta puede ver y hacer (dominios, direcciones, Bandeja, DNS, envíos), cuando se lo pides en una conversación. No tiene acceso a otras cuentas, a tus API keys ni a tu contraseña.</li>
+            <li><strong>Qué guardamos:</strong> el registro del cliente que se conectó (nombre, sitio, direcciones de regreso y la IP desde la que se registró) y los tokens de la conexión, siempre como hash. No guardamos el contenido de tus conversaciones con el asistente ni de sus peticiones: esas viven en el servicio del asistente y se rigen por su propia política. Lo que el asistente haga en tu nombre queda igual que si lo hicieras desde el panel (por ejemplo, un correo enviado aparece en tus logs de email).</li>
+            <li><strong>Lo que el asistente lee de tus correos</strong> sale de MailMask hacia su proveedor (por ejemplo, Anthropic en el caso de Claude u OpenAI en el de ChatGPT) para que pueda responderte. Nosotros no lo usamos para entrenar modelos.</li>
+            <li><strong>Retención:</strong> el código de autorización vence en 10 minutos, el token de acceso en 1 hora y el de renovación en 60 días (se renueva y rota con cada uso); los vencidos se borran. Los logs de email que generen sus acciones siguen los plazos de la sección 5. Al eliminar tu cuenta borramos al instante sus tokens de conexión.</li>
+            <li><strong>Tus controles:</strong> desconecta el conector desde el asistente (el cliente revoca el token en <code>/oauth/revoke</code>); cambia tu contraseña de MailMask para invalidar al instante todas las conexiones; o pide la eliminación de tu cuenta y tus datos escribiendo a <span class="text-mask-400">soporte@mailmask.studio</span>.</li>
+            <li><strong>Contacto:</strong> dudas sobre conectores y privacidad a <span class="text-mask-400">soporte@mailmask.studio</span>.</li>
           </ul>
         </section>
 

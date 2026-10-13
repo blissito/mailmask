@@ -2021,6 +2021,9 @@ export function deleteUser(email: string): boolean {
   if (result.changes === 0) return false;
   // Clean up tokens related to this user
   sqlite.prepare(`DELETE FROM tokens WHERE kind IN ('verify', 'password') AND json_extract(value, '$.email') = ?`).run(email);
+  // Conexiones OAuth de agentes (Claude, ChatGPT…): sin cuenta no valen, y la política promete borrarlas
+  sqlite.prepare("DELETE FROM oauth_tokens WHERE user_email = ?").run(email);
+  sqlite.prepare("DELETE FROM oauth_codes WHERE user_email = ?").run(email);
   return true;
 }
 
