@@ -125,8 +125,12 @@ describe("Libro mayor: choque de folio", () => {
     // Dos folios iguales seguidos: el primero choca con la orden ya sembrada y el segundo
     // sale libre. Son 65 536 folios por mes, así que el choque cae solo de vez en cuando;
     // cuando caía, la orden se perdía en silencio porque el null se leía como duplicado.
-    const ocupado = [0x11, 0x22];
-    const libre = [0x33, 0x44];
+    // Pares al azar en cada corrida: `data/test.db` sobrevive entre corridas, y con pares
+    // fijos la segunda corrida del mes chocaba con los folios que dejó la primera.
+    const byte = () => Math.floor(Math.random() * 256);
+    const ocupado = [byte(), byte()];
+    let libre = [byte(), byte()];
+    while (libre[0] === ocupado[0] && libre[1] === ocupado[1]) libre = [byte(), byte()];
     let llamadas = 0;
     t.mock.method(globalThis.crypto, "getRandomValues", (buf: Uint8Array) => {
       const par = ++llamadas <= 2 ? ocupado : libre;
