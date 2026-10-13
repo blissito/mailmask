@@ -112,7 +112,7 @@
                 "name": "¿Puedo usar MailMask sin transferir mi dominio?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Sí. Cambia sólo sus nameservers por los de MailMask en tu registrador actual: el dominio sigue registrado y renovándose allá, y el DNS lo editas aquí. Antes copiamos los registros que ya tienes. Si no quieres delegar, te damos los registros para copiarlos en tu proveedor."
+                  "text": "Sí. Cambia sólo sus nameservers por los de MailMask en tu registrador actual: el dominio sigue registrado y renovándose allá, y el DNS lo editas aquí. Antes copiamos los registros que ya tienes. Si prefieres no cambiar los nameservers, deja tu DNS donde está y agrega tú los registros de correo (MX, SPF y DKIM) que te mostramos."
                 }
               },
               {
@@ -249,7 +249,8 @@
             <li>Se conserva la antigüedad: no arrancas de cero en los buscadores.</li>
           </ul>
         </div>
-        <div class="bg-bg-elev border border-line rounded-2xl p-6">
+        <div class="relative bg-bg-elev border-2 border-accent rounded-2xl p-6 shadow-[6px_6px_0_rgb(var(--accent))]">
+          <span class="absolute -top-3 right-5 bg-accent text-white text-xs font-semibold px-3 py-1 rounded-full">Lo más rápido</span>
           <p class="eyebrow mb-2">Sólo nameservers</p>
           <p class="font-semibold mb-2">El dominio se queda donde está</p>
           <p class="text-sm text-fg-muted leading-relaxed mb-4">
@@ -259,7 +260,7 @@
           <ul class="space-y-2 text-sm text-fg-muted leading-relaxed">
             <li>Sin código EPP ni espera de días: tarda lo que tarde el DNS en propagarse.</li>
             <li>Antes de darte los nameservers copiamos los registros que ya tienes; revisa la lista, porque desde fuera puede faltar alguno.</li>
-            <li>¿Prefieres no delegar? Te damos los registros para copiarlos en tu proveedor.</li>
+            <li>¿No quieres cambiar los nameservers? Deja tu DNS donde está y agrega tú los registros de correo (MX, SPF y DKIM) que te mostramos.</li>
           </ul>
         </div>
       </div>
@@ -390,7 +391,7 @@
         </div>
         <div>
           <dt class="font-semibold mb-2">¿Puedo usar MailMask sin transferir mi dominio?</dt>
-          <dd class="text-fg-muted leading-relaxed text-sm">Sí. Cambia sólo sus nameservers por los de MailMask en tu registrador actual: el dominio sigue registrado y renovándose allá, y el DNS lo editas aquí. Antes copiamos los registros que ya tienes. Si no quieres delegar, te damos los registros para copiarlos en tu proveedor.</dd>
+          <dd class="text-fg-muted leading-relaxed text-sm">Sí. Cambia sólo sus nameservers por los de MailMask en tu registrador actual: el dominio sigue registrado y renovándose allá, y el DNS lo editas aquí. Antes copiamos los registros que ya tienes. Si prefieres no cambiar los nameservers, deja tu DNS donde está y agrega tú los registros de correo (MX, SPF y DKIM) que te mostramos.</dd>
         </div>
         <div>
           <dt class="font-semibold mb-2">¿Por qué mi dominio aún no se puede transferir?</dt>
