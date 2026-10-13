@@ -10,6 +10,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
+import { leerHead } from "./seo-checks.ts";
+
 const leer = (ruta: string) => readFileSync(new URL(`./${ruta}`, import.meta.url), "utf8");
 
 /** Artículo del blog → su landing. Un artículo sin par aquí no lleva enlace a ninguna. */
@@ -30,9 +32,8 @@ const escapar = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const enlacesA = (html: string, landing: string) =>
   [...html.matchAll(new RegExp(`<a\\s[^>]*href=["']${escapar(landing)}["'][^>]*>([\\s\\S]*?)</a>`, "gi"))];
 
-/** El cuerpo: fuera el `<head>`, que trae sus propios `href` (canonical, fuentes) y el `@graph`. */
-const cuerpo = (html: string) => html.slice(html.indexOf("</head>"));
-const head = (html: string) => html.slice(0, html.indexOf("</head>"));
+/** El cuerpo: lo que sigue al `<head>`, que trae sus propios `href` (canonical, fuentes) y el `@graph`. */
+const cuerpo = (html: string) => html.slice(leerHead(html).length);
 const texto = (ancla: string) => ancla.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
 
 test("cada artículo enlaza su landing una sola vez, desde el cuerpo", () => {
@@ -40,7 +41,7 @@ test("cada artículo enlaza su landing una sola vez, desde el cuerpo", () => {
     const html = leer(articulo);
     const encontrados = enlacesA(cuerpo(html), landing);
     assert.equal(encontrados.length, 1, `${articulo} lleva ${encontrados.length} enlaces a ${landing} en el texto (debe ser exactamente uno)`);
-    assert.equal(enlacesA(head(html), landing).length, 0, `${articulo} metió el enlace a ${landing} en el <head>`);
+    assert.equal(enlacesA(leerHead(html), landing).length, 0, `${articulo} metió el enlace a ${landing} en el <head>`);
   }
 });
 
