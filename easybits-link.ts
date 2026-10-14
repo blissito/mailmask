@@ -14,13 +14,13 @@ import type { RRSet } from "./dns-records.js";
 export const EASYBITS_ORIGIN = (process.env.EASYBITS_ORIGIN ?? "https://www.easybits.cloud").replace(/\/+$/, "");
 
 /**
- * Lo que pide el panel de dominios de EasyBits (`app/routes/dash/developer/domains.tsx` y
- * `app/lib/fly_certs/edge_ips.ts` en el repo de EasyBits). Si cambian allá, cambian aquí.
+ * El borde de EasyBits desde que salió de Fly (8-oct-2026): la caja de sandbox-host, con TLS
+ * bajo demanda. El panel viejo de EasyBits pedía `easybits.fly.dev` / `66.241.125.82`, que ya
+ * no existen; si EasyBits vuelve a mudarse, cambia aquí.
  */
 export const EASYBITS_EDGE = {
-  v4: "66.241.125.82",
-  v6: "2a09:8280:1::5c:8bf9:0",
-  cnameTarget: "easybits.fly.dev",
+  v4: "54.38.94.14",
+  cnameTarget: "cname.sandboxes.easybits.cloud",
 } as const;
 
 // --- Cifrado de tokens (misma receta que el código EPP en domain-transfer.ts) ---
@@ -194,7 +194,6 @@ export function easybitsRecords(domain: string, txtToken: string, opts: { apex: 
   if (opts.apex) {
     out.push(
       { name: d, type: "A", ttl: 300, values: [EASYBITS_EDGE.v4] },
-      { name: d, type: "AAAA", ttl: 300, values: [EASYBITS_EDGE.v6] },
       { name: `www.${d}`, type: "CNAME", ttl: 300, values: [EASYBITS_EDGE.cnameTarget] },
     );
   }

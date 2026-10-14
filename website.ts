@@ -21,7 +21,7 @@ async function inBatches<T>(tasks: (() => Promise<T>)[], limit: number): Promise
 /** Qué se reconoce por su valor. Son datos: una IP nueva de una plataforma se agrega aquí. */
 export const PLATFORMS: { id: string; label: string; ips?: string[]; hosts?: RegExp }[] = [
   // Antes que Fly: EasyBits Sitios vive en Fly y su destino también termina en `.fly.dev`.
-  { id: "easybits-sites", label: "EasyBits Sitios", ips: ["66.241.125.82"], hosts: /^easybits\.fly\.dev$/ },
+  { id: "easybits-sites", label: "EasyBits (borde viejo de Fly: ya no existe)", ips: ["66.241.125.82"], hosts: /^easybits\.fly\.dev$/ },
   // 216.198.79.x es el pool nuevo de Vercel (2025); 76.76.21.21 sigue sirviendo.
   { id: "vercel", label: "Vercel", ips: ["76.76.21.21", "216.198.79.1", "216.198.79.65"], hosts: /(\.vercel-dns\.com|\.vercel\.app)$/ },
   { id: "netlify", label: "Netlify", ips: ["75.2.60.5"], hosts: /(\.netlify\.app|\.netlify\.com)$/ },
@@ -30,7 +30,7 @@ export const PLATFORMS: { id: string; label: string; ips?: string[]; hosts?: Reg
   { id: "render", label: "Render", ips: ["216.24.57.1"], hosts: /\.onrender\.com$/ },
   { id: "fly", label: "Fly.io", hosts: /\.fly\.dev$/ },
   { id: "railway", label: "Railway", hosts: /\.up\.railway\.app$/ },
-  { id: "easybits", label: "EasyBits Sandbox", hosts: /(^|\.)sandboxes\.easybits\.cloud$/ },
+  { id: "easybits", label: "EasyBits", ips: ["54.38.94.14"], hosts: /(^|\.)sandboxes\.easybits\.cloud$/ },
   { id: "shopify", label: "Shopify", ips: ["23.227.38.65"], hosts: /\.myshopify\.com$/ },
   { id: "wix", label: "Wix", ips: ["185.230.63.107", "185.230.63.171", "185.230.63.186"], hosts: /\.wixdns\.net$/ },
 ];
@@ -71,6 +71,7 @@ export function detectPlatform(records: WebsiteHost["records"]): WebsiteHost["pl
 /** Lo que una plataforma reporta como «Invalid Configuration», dicho en claro. */
 export function hostIssues(records: WebsiteHost["records"], platform: WebsiteHost["platform"]): string[] {
   const out: string[] = [];
+  if (platform?.id === "easybits-sites") out.push("Apunta al borde viejo de EasyBits en Fly, que ya no existe: vuelve a publicar el sitio desde «EasyBits» para moverlo.");
   const a = records.find((r) => r.type === "A");
   const aaaa = records.find((r) => r.type === "AAAA");
   // Fly (y EasyBits Sitios, que vive en Fly) sí publican IPv6: ahí el AAAA es correcto.
