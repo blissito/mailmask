@@ -1,5 +1,6 @@
 # CI de la Software Factory de Ghosty. Lo exige la protección de la rama principal.
-# Corre en la caja de CI del espacio business (runner JIT `ws-business`), no en las de GitHub.
+# Va en ubuntu-latest a propósito: el repo es público y ahí corre gratis y en paralelo (~3 min);
+# en la caja de CI del espacio (ws-business) tardaba ~26 min y gitleaks tronaba (13-oct).
 name: ci
 on:
   pull_request:
@@ -12,7 +13,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   verify:
-    runs-on: [self-hosted, ws-business]
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -35,7 +36,7 @@ jobs:
     # cli/ es su propio paquete (depende de @easybits.cloud/mailmask vía npm), no un workspace del
     # root: necesita su propio install. Antes de este job, el `npm test` del root ya se topaba con
     # cli/test/*.test.ts por el discovery recursivo de node:test y tronaba con ERR_MODULE_NOT_FOUND.
-    runs-on: [self-hosted, ws-business]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
       run:
@@ -56,7 +57,7 @@ jobs:
   verify-sdk:
     # sdk/ es su propio paquete (no es workspace del root) y es el único cuyo build emite tipos
     # con tsc: con TS 7 tsup ya no puede generarlos. Ver docs/agents/dependencias-ci.md.
-    runs-on: [self-hosted, ws-business]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
       run:
@@ -83,7 +84,7 @@ jobs:
   docker:
     # La misma imagen que despliega Fly (Dockerfile), construida sin push en cada PR
     if: github.event_name == 'pull_request'
-    runs-on: [self-hosted, ws-business]
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -98,7 +99,7 @@ jobs:
           cache-to: type=gha,mode=max
   security:
     if: github.event_name == 'pull_request'
-    runs-on: [self-hosted, ws-business]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
