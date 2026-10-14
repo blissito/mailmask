@@ -299,11 +299,11 @@ export async function ensureDomainInbound(domain: string): Promise<{ ruleCreated
     // Si no coinciden, cada cuerpo de entrante falla con NoSuchKey y en la
     // Bandeja se ve como "el correo ya no está disponible" — un síntoma que no
     // apunta para nada a su causa. Barato de descartar, caro de diagnosticar.
-    const bucketDeSes = desc.Rule?.Actions?.find((a: any) => a.S3Action)?.S3Action?.BucketName;
-    if (bucketDeSes && bucketDeSes !== S3_BUCKET) {
+    const sesBucket = desc.Rule?.Actions?.find((a: any) => a.S3Action)?.S3Action?.BucketName;
+    if (sesBucket && sesBucket !== S3_BUCKET) {
       log("error", "ses", "El bucket de la regla de recepción no es el que leemos", {
         domain,
-        bucketDeSes,
+        sesBucket,
         bucketConfigurado: S3_BUCKET,
       });
     }
@@ -475,11 +475,11 @@ export function degradedBodyState(code: S3ErrorCode, createdAt: string, hasIndex
 }
 
 /** Exportada para poder probarla: es la que decide qué ve el usuario. */
-export function clasificarErrorS3(err: any): S3ErrorCode {
+export function classifyS3Error(err: any): S3ErrorCode {
   const status = err?.$metadata?.httpStatusCode;
-  const nombre = String(err?.name ?? err?.Code ?? "");
-  if (status === 404 || nombre === "NoSuchKey" || nombre === "NotFound") return "NOT_FOUND";
-  if (status === 403 || nombre === "AccessDenied") return "DENIED";
+  const errorName = String(err?.name ?? err?.Code ?? "");
+  if (status === 404 || errorName === "NoSuchKey" || errorName === "NotFound") return "NOT_FOUND";
+  if (status === 403 || errorName === "AccessDenied") return "DENIED";
   return "OTHER";
 }
 
@@ -493,7 +493,7 @@ export async function fetchEmailFromS3(bucketName: string, objectKey: string): P
     // Sin reintentos: un 404 no mejora reintentando, y el SDK ya reintenta lo
     // que sí es transitorio. Sigue siendo un Error, así que los llamadores que
     // solo hacen try/catch no cambian.
-    throw new S3FetchError(clasificarErrorS3(err), bucketName, objectKey, err);
+    throw new S3FetchError(classifyS3Error(err), bucketName, objectKey, err);
   }
 }
 
