@@ -1714,7 +1714,7 @@ function renderAliases(aliases) {
 
   empty.classList.add("hidden");
   list.innerHTML = aliases.map(a => `
-    <div class="bg-bg-inset border border-line rounded-lg px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+    <div data-action="open-alias" data-alias="${esc(a.alias)}" class="cursor-pointer hover:border-fg-subtle transition-colors bg-bg-inset border border-line rounded-lg px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
       <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span class="font-mono text-sm break-all ${a.enabled ? 'text-fg' : 'text-fg-subtle line-through'}">${a.alias === '*' ? '*' : esc(a.alias)}@${esc(selectedDomain.domain)}</span>
@@ -1734,6 +1734,62 @@ function renderAliases(aliases) {
     </div>
   `).join("");
 }
+
+// --- Detalle de una dirección ---
+//
+// La ficha es la de las cajas de Ghosty (`public/js/direccion.tsx`, React), cargada al
+// abrir la primera: aquí sólo se arman los datos. Se pinta de inmediato y se repinta
+// cuando llega el historial de la dirección (log del dominio filtrado con `?alias=`).
+let fichaDireccion = null;
+async function abrirDireccion(alias) {
+  const a = aliasesActuales.find((x) => x.alias === alias);
+  if (!a || !selectedDomain) return;
+  const dom = selectedDomain;
+  const catchAll = alias === "*";
+  fichaDireccion ??= import("/js/direccion.js");
+  const { openAddress, closeAddress } = await fichaDireccion;
+  const actions = catchAll ? [] : [
+    { label: "Abrir la Bandeja", href: `/bandeja?domainId=${encodeURIComponent(dom.id)}` },
+    { label: a.mailboxEnabled ? "Configurar buzón" : "Crear buzón", onClick: () => { closeAddress(); abrirBuzon(alias, a.mailboxEnabled); } },
+  ];
+  const base = {
+    address: `${catchAll ? "*" : alias}@${dom.domain}`,
+    domain: dom.domain,
+    enabled: a.enabled,
+    catchAll,
+    destinations: a.destinations,
+    mailbox: Boolean(a.mailboxEnabled),
+    mailboxReadOnly: Boolean(a.mailboxGraceUntil),
+    forwardCount: a.forwardCount ?? 0,
+    lastFrom: a.lastFrom ?? undefined,
+    lastAgo: a.lastAt ? relativeTime(a.lastAt) : undefined,
+    actions,
+  };
+  playSound("click");
+  if (catchAll) { openAddress({ ...base, logs: [], logsNote: "El historial del comodín está en la pestaña Logs." }); return; }
+  openAddress({ ...base, logs: null });
+
+  const res = await fetch(`/api/domains/${dom.id}/logs?limit=20&alias=${encodeURIComponent(alias)}`).catch(() => null);
+  if (selectedDomain?.id !== dom.id) return;
+  if (!res?.ok) { openAddress({ ...base, logs: [], logsNote: "No se pudo cargar el historial." }); return; }
+  const logs = (await res.json()).map((l) => {
+    const outbound = OUTBOUND_STATUSES.has(l.status);
+    return {
+      key: l.id,
+      outbound,
+      who: outbound ? l.to : l.from,
+      subject: l.subject,
+      status: LOG_STATUS_LABEL[l.status] ?? l.status,
+      time: new Date(l.timestamp).toLocaleString("es-MX", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+    };
+  });
+  openAddress({ ...base, logs });
+}
+
+const LOG_STATUS_LABEL = {
+  forwarded: "reenviado", discarded: "descartado", failed: "falló", rule_matched: "regla",
+  sent: "enviado", delivered: "entregado", bounced: "rebotó", complained: "spam",
+};
 
 // --- Buzón IMAP ---
 //
@@ -3673,6 +3729,11 @@ function setupEventListeners() {
 
   // Event delegation: aliases list
   document.getElementById("aliases-list").addEventListener("click", (e) => {
+    // Clic en la fila, fuera de sus botones: abre el detalle de la dirección.
+    if (!e.target.closest("button")) {
+      const fila = e.target.closest("[data-action='open-alias']");
+      if (fila) { abrirDireccion(fila.dataset.alias); return; }
+    }
     const toggle = e.target.closest("[data-action='toggle-alias']");
     if (toggle) {
       toggleAlias(toggle.dataset.alias, toggle.dataset.enabled === "true");
