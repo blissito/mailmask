@@ -35,6 +35,7 @@ export const TABS: Record<string, string> = {
   rules: "Ver reglas",
   logs: "Ver logs",
   dns: "Ver DNS",
+  web: "Ver sitio web",
   members: "Ver miembros",
   smtp: "Ver SMTP",
   webhooks: "Ver webhooks",

@@ -412,8 +412,32 @@ export interface DnsChangeResult {
 }
 
 export type DnsPreset =
-  | "vercel" | "netlify" | "github-pages" | "cloudflare-pages" | "render" | "fly"
+  | "vercel" | "netlify" | "github-pages" | "cloudflare-pages" | "render" | "fly" | "easybits"
   | "redirect-a-www" | "dmarc";
+
+export interface DnsPresetPreview {
+  dryRun: true;
+  records: DnsRRSet[];
+  /** Lo que hay hoy en cada (nombre, tipo) de `records`, en el mismo orden; null = nada. */
+  current: (DnsRRSet | null)[];
+}
+
+export interface WebsiteHost {
+  name: string;
+  /** '@' para la raíz o el subdominio ('www', 'app'). */
+  label: string;
+  records: { type: "A" | "AAAA" | "CNAME"; values: string[] }[];
+  platform: { id: string; label: string } | null;
+  issues: string[];
+  https: { ok: boolean; status?: number; location?: string; certValidTo?: string; error?: string } | null;
+}
+
+export interface WebsiteStatus {
+  domain: string;
+  /** true si la zona es de MailMask y se puede editar desde aquí. */
+  editable: boolean;
+  hosts: WebsiteHost[];
+}
 
 // --- Registros a pegar en el registrador ---
 

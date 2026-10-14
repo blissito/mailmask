@@ -7805,6 +7805,37 @@ const app = new Elysia({ adapter: node() })
     detail: { tags: ["DNS", "SDK"], summary: "List DNS records and zone state", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
+  .get("/api/domains/:id/website", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 20, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+
+    const { getWebsiteStatus, hostsFromZone, hostsFromPublicDns } = await import("./website.js");
+    try {
+      let hosts;
+      if (d.hostedZoneId) {
+        const { listRecordSets } = await import("./route53.js");
+        const { registrosGestionados } = await import("./dns-records.js");
+        const managed = new Set(registrosGestionados({ domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens }).map((g) => g.name.toLowerCase()));
+        hosts = hostsFromZone(d.domain, (await listRecordSets(d.hostedZoneId)) as never, managed);
+      } else {
+        hosts = await hostsFromPublicDns(d.domain);
+      }
+      const status = await getWebsiteStatus(d.domain, hosts);
+      return Response.json({ domain: d.domain, editable: !!d.hostedZoneId, ...status });
+    } catch (err) {
+      log("error", "route53", "Website status failed", { domain: d.domain, error: String(err) });
+      return jsonErr("No se pudo revisar el sitio.", 502);
+    }
+  }, {
+    detail: { tags: ["DNS", "SDK"], summary: "Where the domain's website points (apex, www, subdomains), detected platform, issues and HTTPS", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
   .post("/api/domains/:id/dns/zone", async ({ request, params }) => {
     const user = await getAuthUser(request);
     if (!user) return jsonErr("No autenticado", 401);
@@ -8033,7 +8064,7 @@ const app = new Elysia({ adapter: node() })
     const guardado = { domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens };
 
     try {
-      const b = body as { preset: string; target?: string; subdomain?: string };
+      const b = body as { preset: string; target?: string; subdomain?: string; dryRun?: boolean };
       const crudos = expandirPreset(b.preset as never, d.domain, b.target, b.subdomain);
       const rrsets = crudos.map((r) => validarRRSet(r, d.domain));
 
@@ -8043,6 +8074,14 @@ const app = new Elysia({ adapter: node() })
         if (bloqueo) return jsonErr(bloqueo.message, 409);
         const choque = conflictoDeConvivencia(rrset, existentes as never);
         if (choque) return jsonErr(choque, 409);
+      }
+
+      // Vista previa: lo que entraría y lo que hay hoy en esos mismos (nombre, tipo).
+      if (b.dryRun) {
+        const current = rrsets
+          .map((r) => existentes.find((e) => e.name === r.name && e.type === r.type))
+          .map((e) => e ?? null);
+        return Response.json({ dryRun: true, records: rrsets, current });
       }
 
       // Todo en un solo cambio: o entra la plantilla completa, o no entra nada.
@@ -8063,6 +8102,7 @@ const app = new Elysia({ adapter: node() })
       preset: t.String(),
       target: t.Optional(t.String()),
       subdomain: t.Optional(t.String()),
+      dryRun: t.Optional(t.Boolean()),
     }),
     detail: { tags: ["DNS", "SDK"], summary: "Apply a hosting preset (Vercel, Netlify, …)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })

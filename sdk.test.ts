@@ -637,8 +637,20 @@ describe("SDK ↔ servidor: contrato", () => {
   });
 
   it("dns: preset, delegation e import", async () => {
+    const prev = await mm.dns.presetPreview(domainId, "vercel", "mi-proyecto.vercel.app");
+    assert.equal(prev.dryRun, true);
+    assert.equal(prev.records.length, 2);
+    assert.equal(prev.current.length, 2);
+    assert.ok(!zonaDns.has(`www.${dominio}|CNAME`), "la vista previa no escribe");
+
     const p = await mm.dns.preset(domainId, "vercel", "mi-proyecto.vercel.app");
     assert.equal(p.records!.length, 2);
+
+    const w = await mm.dns.website(domainId);
+    assert.equal(w.editable, true);
+    const www = w.hosts.find((h) => h.label === "www")!;
+    assert.equal(www.platform?.id, "vercel");
+    assert.equal(w.hosts.find((h) => h.label === "@")!.platform?.id, "vercel");
 
     const d = await mm.dns.delegation(domainId);
     assert.equal(d.delegated, false);

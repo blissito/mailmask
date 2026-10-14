@@ -70,7 +70,7 @@ transfer_out manda el código EPP por correo al dueño, nunca al chat. lock_doma
 Borrar dominio, máscara, buzón o registro DNS, sacar a un miembro, transferir fuera o cancelar un add-on o una renovación (cancel_addon, cancel_renewal) son irreversibles: confírmalo con el usuario antes. Algunas responden que necesitan confirmación: el usuario la aprueba en la app; no reintentes ni busques otra vía.
 
 ## DNS administrado por MailMask
-Con zona propia (create_dns_zone y cambiar los nameservers en el registrador) puedes editar registros; enseña la lista \`imported\` antes de que cambie los nameservers: list_dns_records antes de escribir; set_dns_record reemplaza el conjunto completo; point_domain_to para Vercel, Netlify y similares. Los registros de correo están protegidos.
+Con zona propia (create_dns_zone y cambiar los nameservers en el registrador) puedes editar registros; enseña la lista \`imported\` antes de que cambie los nameservers: list_dns_records antes de escribir; set_dns_record reemplaza el conjunto completo; point_domain_to para Vercel, Netlify y similares (website_status dice a dónde apunta hoy). Los registros de correo están protegidos.
 
 ## Bandeja: el correo de la máscara
 Cada máscara recibe en la Bandeja del dominio; desde ahí se lee y se contesta como esa máscara.
@@ -185,7 +185,7 @@ const KEYWORDS: Record<string, string> = {
 // revoca, cancela o reemplaza algo sin vuelta atrás desde aquí. `mcp.test.ts` exige que
 // toda herramienta caiga en una de las dos listas o sea escritura no destructiva a propósito.
 export const READ_ONLY_TOOLS = new Set([
-  "list_domains", "get_domain", "domain_health", "list_aliases", "list_dns_records", "dns_delegation_status",
+  "list_domains", "get_domain", "domain_health", "list_aliases", "list_dns_records", "dns_delegation_status", "website_status",
   "import_dns_records", "list_rules", "list_webhooks", "webhook_deliveries", "bulk_status", "list_logs",
   "list_suppressions", "list_smtp_credentials", "domain_dns_setup", "billing_status", "list_addons",
   "search_domains", "domain_prices", "list_registrations", "transfer_check", "transfer_status", "transfer_dns",
@@ -226,6 +226,7 @@ export const TOOL_TITLES: Record<string, string> = {
   delete_dns_record: "Delete DNS record",
   import_dns_records: "Read public DNS",
   point_domain_to: "Point domain to hosting",
+  website_status: "Check website status",
   list_rules: "List routing rules",
   create_rule: "Create routing rule",
   update_rule: "Update routing rule",
@@ -321,7 +322,7 @@ export const DIRECTORY_ALLOWLIST = new Set([
   "list_aliases", "create_alias", "update_alias", "delete_alias", "delete_mailbox",
   "apple_profile_link", "mailbox_export_link",
   // DNS
-  "domain_dns_setup", "list_dns_records", "create_dns_zone", "dns_delegation_status", "set_dns_record",
+  "domain_dns_setup", "list_dns_records", "website_status", "create_dns_zone", "dns_delegation_status", "set_dns_record",
   "delete_dns_record", "import_dns_records", "point_domain_to",
   // Reglas y webhooks (sin crear webhooks: devuelven su secreto de firma)
   "list_rules", "create_rule", "update_rule", "delete_rule",
@@ -371,7 +372,7 @@ Algunas funciones (máscaras ilimitadas, equipo, envío, reglas, webhooks) piden
 Borrar dominio, máscara, buzón o registro DNS y sacar a un miembro son irreversibles: confírmalo con el usuario antes. Algunas responden que necesitan confirmación: el usuario la aprueba en la app; no reintentes ni busques otra vía.
 
 ## DNS administrado por MailMask
-Con zona propia (create_dns_zone y cambiar los nameservers en el registrador) puedes editar registros; enseña la lista \`imported\` antes de que cambie los nameservers: list_dns_records antes de escribir; set_dns_record reemplaza el conjunto completo; point_domain_to para Vercel, Netlify y similares. Los registros de correo están protegidos.
+Con zona propia (create_dns_zone y cambiar los nameservers en el registrador) puedes editar registros; enseña la lista \`imported\` antes de que cambie los nameservers: list_dns_records antes de escribir; set_dns_record reemplaza el conjunto completo; point_domain_to para Vercel, Netlify y similares (website_status dice a dónde apunta hoy). Los registros de correo están protegidos.
 
 ## Bandeja: el correo de la máscara
 Cada máscara recibe en la Bandeja del dominio; desde ahí se lee y se contesta como esa máscara.
@@ -522,14 +523,21 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
     { domainId }, (a) => sdk.dns.import(a.domainId));
 
   tool("point_domain_to",
-    "Points the domain (or a subdomain) to a hosting provider by writing the needed records in the MailMask-managed zone. For 'vercel' the `target` is the Vercel domain ('my-project.vercel.app'); for 'github-pages' it is 'user.github.io'; for 'dmarc' it is the email that receives reports. Without `subdomain` it points the root and www.",
+    "Points the domain (or a subdomain) to a hosting provider by writing the needed records in the MailMask-managed zone. For 'vercel' the `target` is the Vercel domain ('my-project.vercel.app'); for 'github-pages' it is 'user.github.io'; for 'dmarc' it is the email that receives reports; 'easybits' needs no target. Without `subdomain` it points the root and www. With `dryRun` it returns the records it would write and the current ones, without writing.",
     {
       domainId,
-      provider: z.enum(["vercel", "netlify", "github-pages", "cloudflare-pages", "render", "fly", "redirect-a-www", "dmarc"]),
+      provider: z.enum(["vercel", "netlify", "github-pages", "cloudflare-pages", "render", "fly", "easybits", "redirect-a-www", "dmarc"]),
       target: z.string().optional().describe("The target given by the hosting provider"),
       subdomain: z.string().optional().describe("To point only a subdomain, e.g. 'app'"),
+      dryRun: z.boolean().optional().describe("Preview only: return what would change"),
     },
-    (a) => sdk.dns.preset(a.domainId, a.provider, a.target, a.subdomain));
+    (a) => a.dryRun
+      ? sdk.dns.presetPreview(a.domainId, a.provider, a.target, a.subdomain)
+      : sdk.dns.preset(a.domainId, a.provider, a.target, a.subdomain));
+
+  tool("website_status",
+    "Returns where the domain's website points: for the root, www and each web subdomain, its A/AAAA/CNAME records, the detected hosting platform, configuration issues and an HTTPS check (status code, redirect and certificate expiry).",
+    { domainId }, (a) => sdk.dns.website(a.domainId));
 
   // --- Reglas ---
   const ruleShape = {

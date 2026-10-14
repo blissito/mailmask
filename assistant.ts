@@ -136,7 +136,7 @@ export function isOwnUpload(url: string, email: string): boolean {
 const TAB_ALLOWLIST = new Set([
   "aliases", "mascaras", "rules", "reglas", "logs", "dns", "send", "envios", "webhooks",
   "smtp", "members", "equipo", "settings", "ajustes", "activation", "health", "salud",
-  "billing", "domains", "transfer", "mailboxes", "buzones",
+  "billing", "domains", "transfer", "mailboxes", "buzones", "web",
 ]);
 
 /**

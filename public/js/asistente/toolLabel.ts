@@ -64,6 +64,7 @@ const EXACT: Record<string, string> = {
   delete_dns_record: "Borrando un registro DNS",
   import_dns_records: "Importando los registros DNS",
   point_domain_to: "Apuntando el dominio",
+  website_status: "Revisando el sitio web",
   // Reglas y webhooks.
   list_rules: "Consultando las reglas",
   create_rule: "Creando la regla",

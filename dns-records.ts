@@ -368,7 +368,7 @@ export function fusionarSpfValores(existentes: string[]): string[] {
 // --- Plantillas ---
 
 export type Preset =
-  | "vercel" | "netlify" | "github-pages" | "cloudflare-pages" | "render" | "fly"
+  | "vercel" | "netlify" | "github-pages" | "cloudflare-pages" | "render" | "fly" | "easybits"
   | "redirect-a-www" | "dmarc";
 
 export interface DefinicionPreset {
@@ -417,12 +417,21 @@ export const PRESETS: Record<Preset, DefinicionPreset> = {
   "render": {
     label: "Render",
     pide: "El dominio que te dio Render, por ejemplo mi-app.onrender.com",
-    expandir: (d, t, sub) => [cname(`${sub && sub !== "@" ? sub : "www"}.${d}`, t)],
+    // Render publica una IP para la raíz (docs oct-2026); el CNAME va en www.
+    expandir: (d, t, sub) => sub && sub !== "@"
+      ? [cname(`${sub}.${d}`, t)]
+      : [{ name: d, type: "A", ttl: 300, values: ["216.24.57.1"] }, cname(`www.${d}`, t)],
   },
   "fly": {
     label: "Fly.io",
     pide: "El dominio que te dio Fly, por ejemplo mi-app.fly.dev",
     expandir: (d, t, sub) => [cname(`${sub && sub !== "@" ? sub : "www"}.${d}`, t)],
+  },
+  "easybits": {
+    label: "EasyBits",
+    // Un sandbox no tiene IP fija: sólo CNAME, así que nunca en la raíz.
+    pide: null,
+    expandir: (d, t, sub) => [cname(`${sub && sub !== "@" ? sub : "www"}.${d}`, t || "cname.sandboxes.easybits.cloud")],
   },
   "redirect-a-www": {
     label: "Mandar la raíz a www",

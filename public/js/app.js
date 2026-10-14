@@ -2470,6 +2470,187 @@ async function dnsComprobarDelegacion() {
     : "Todavía no vemos el cambio. Puede tardar hasta 48 horas.";
 }
 
+// --- Sitio web: a dónde apunta cada host y conectar a un hosting con plantilla ---
+// Patrón Vercel/Render: por host, lo que hay contra lo que debería haber. Las plantillas
+// son las de `PRESETS` (dns-records.ts) y siempre pasan por vista previa antes de escribir.
+
+const WEB_PLATFORMS = [
+  { id: "vercel", label: "Vercel", pide: "mi-proyecto.vercel.app o cname.vercel-dns.com" },
+  { id: "netlify", label: "Netlify", pide: "mi-sitio.netlify.app" },
+  { id: "github-pages", label: "GitHub Pages", pide: "usuario.github.io" },
+  { id: "render", label: "Render", pide: "mi-app.onrender.com" },
+  { id: "fly", label: "Fly.io", pide: "mi-app.fly.dev", soloSub: true },
+  { id: "cloudflare-pages", label: "Cloudflare Pages", pide: "mi-sitio.pages.dev", soloSub: true },
+  { id: "easybits", label: "EasyBits", pide: null, soloSub: true },
+  { id: "otro", label: "Otro (CNAME)", pide: "destino.ejemplo.com", soloSub: true },
+];
+let _webEstado = null;
+
+async function loadWebsite() {
+  const cont = document.getElementById("web-hosts");
+  if (!selectedDomain) return;
+  document.getElementById("web-ask").innerHTML = askAssistantButton(`Conecta ${selectedDomain.domain} a mi hosting`);
+  renderWebPlatforms();
+  cont.innerHTML = `<div class="text-sm text-fg-muted">Revisando a dónde apunta ${esc(selectedDomain.domain)}…</div>`;
+  try {
+    const res = await fetch(`/api/domains/${selectedDomain.id}/website`);
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "no se pudo revisar");
+    _webEstado = await res.json();
+  } catch (err) {
+    cont.innerHTML = `<div class="text-sm text-red-500">${esc(err.message)}</div>`;
+    return;
+  }
+  cont.innerHTML = _webEstado.hosts.map(renderWebHost).join("") + (_webEstado.editable ? "" : `
+    <div class="card border border-line rounded-xl p-4 bg-bg-elev text-sm text-fg-muted">
+      El DNS de este dominio vive en otro proveedor: lo de arriba es lo que ve internet.
+      Para conectarlo desde aquí, activa el editor en la pestaña <button type="button" class="underline text-fg" data-web-go-dns>DNS</button>.
+    </div>`);
+  cont.querySelector("[data-web-go-dns]")?.addEventListener("click", () => switchTab("dns"));
+}
+
+function renderWebHost(h) {
+  const nombre = h.label === "@" ? `${esc(h.name)} <span class="text-fg-subtle font-normal">(raíz)</span>` : esc(h.name);
+  let chip;
+  if (!h.records.length) chip = `<span class="text-xs px-2 py-0.5 rounded bg-bg-inset text-fg-muted">Sin apuntar</span>`;
+  else if (h.issues.length || (h.https && !h.https.ok)) chip = `<span class="text-xs px-2 py-0.5 rounded bg-amber-500/15 text-amber-600">Revisar</span>`;
+  else chip = `<span class="text-xs px-2 py-0.5 rounded bg-mask-500/15 text-mask-600">En línea</span>`;
+  const valores = h.records.map(r => `<div class="font-mono text-xs text-fg-muted"><span class="text-fg">${r.type}</span> ${r.values.map(esc).join(", ")}</div>`).join("");
+  let https = "";
+  if (h.https) {
+    if (h.https.ok) {
+      const red = h.https.location ? ` → ${esc(h.https.location)}` : "";
+      const cert = h.https.certValidTo ? ` · certificado hasta ${new Date(h.https.certValidTo).toLocaleDateString("es-MX")}` : "";
+      https = `<div class="text-xs text-fg-muted mt-1">HTTPS ${h.https.status}${red}${cert}</div>`;
+    } else {
+      https = `<div class="text-xs text-red-500 mt-1">HTTPS: ${esc(h.https.error || `responde ${h.https.status}`)}</div>`;
+    }
+  }
+  const issues = h.issues.map(i => `<div class="text-xs text-amber-600 mt-1">${esc(i)}</div>`).join("");
+  return `
+    <div class="border border-line rounded-xl p-4 bg-bg-elev">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+        <div class="font-semibold text-fg">${nombre}</div>
+        <div class="flex items-center gap-2">
+          ${h.platform ? `<span class="text-xs font-medium text-fg-muted">${esc(h.platform.label)}</span>` : ""}
+          ${chip}
+        </div>
+      </div>
+      ${valores || `<div class="text-xs text-fg-subtle">No tiene registros de sitio.</div>`}
+      ${https}${issues}
+    </div>`;
+}
+
+function renderWebPlatforms() {
+  const cont = document.getElementById("web-platforms");
+  cont.innerHTML = WEB_PLATFORMS.map(p => `
+    <button type="button" data-web-platform="${p.id}" class="border border-line rounded-xl p-3 bg-bg-elev text-sm font-semibold text-fg hover:border-accent transition-colors text-left">
+      ${esc(p.label)}
+    </button>`).join("");
+  cont.querySelectorAll("[data-web-platform]").forEach(b => b.addEventListener("click", () => {
+    if (_webEstado && !_webEstado.editable) { showToast("Primero activa el editor de DNS (pestaña DNS).", true); switchTab("dns"); return; }
+    webConectar(WEB_PLATFORMS.find(p => p.id === b.dataset.webPlatform));
+  }));
+}
+
+function webConectar(p) {
+  const dlg = document.createElement("div");
+  dlg.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4";
+  const d = selectedDomain.domain;
+  dlg.innerHTML = `
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-lg p-5">
+      <h3 class="font-semibold text-fg mb-4">Conectar a ${esc(p.label)}</h3>
+      <div class="space-y-3">
+        ${p.pide ? `<div>
+          <label class="block text-xs text-fg-muted mb-1">Destino que te dio ${esc(p.label)}</label>
+          <input id="web-f-target" placeholder="${esc(p.pide)}" class="w-full bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg font-mono">
+        </div>` : ""}
+        <div>
+          <label class="block text-xs text-fg-muted mb-1">Subdominio ${p.soloSub ? "(vacío = www)" : "(vacío = raíz y www)"}</label>
+          <div class="flex items-center gap-2">
+            <input id="web-f-sub" placeholder="${p.soloSub ? "www" : "app"}" class="flex-1 bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg font-mono">
+            <span class="text-sm text-fg-muted font-mono">.${esc(d)}</span>
+          </div>
+        </div>
+        <div id="web-f-preview" class="text-sm"></div>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button type="button" data-web-cancel class="px-3 py-1.5 text-sm text-fg-muted hover:text-fg">Cancelar</button>
+        <button type="button" data-web-preview class="px-3 py-1.5 text-sm font-semibold rounded-lg border border-line text-fg hover:border-accent">Ver cambios</button>
+        <button type="button" data-web-apply disabled class="px-3 py-1.5 text-sm font-semibold rounded-lg bg-accent text-white disabled:opacity-40">Aplicar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg);
+  const cerrar = () => dlg.remove();
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) cerrar(); });
+  dlg.querySelector("[data-web-cancel]").addEventListener("click", cerrar);
+  const preview = dlg.querySelector("#web-f-preview");
+  const aplicar = dlg.querySelector("[data-web-apply]");
+
+  const leer = () => {
+    const target = dlg.querySelector("#web-f-target")?.value.trim() || undefined;
+    const sub = dlg.querySelector("#web-f-sub").value.trim().replace(/\.$/, "") || undefined;
+    return { target, sub };
+  };
+  // Cambiar algo invalida la vista previa: no se aplica lo que no se vio.
+  dlg.querySelectorAll("input").forEach(i => i.addEventListener("input", () => { aplicar.disabled = true; preview.innerHTML = ""; }));
+
+  const enviar = async (dryRun) => {
+    const { target, sub } = leer();
+    if (p.id === "otro") {
+      if (!target) throw new Error("Falta el destino.");
+      const name = sub || "www";
+      if (dryRun) {
+        const actual = (_webEstado?.hosts || []).find(h => h.name === `${name}.${d}`);
+        return { records: [{ name: `${name}.${d}`, type: "CNAME", values: [target] }], current: [actual?.records.find(r => r.type === "CNAME") || null] };
+      }
+      const res = await fetch(`/api/domains/${selectedDomain.id}/dns/records`, {
+        method: "PUT", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, type: "CNAME", values: [target] }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo guardar");
+      return data;
+    }
+    const res = await fetch(`/api/domains/${selectedDomain.id}/dns/preset`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ preset: p.id, target, subdomain: sub, dryRun }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "No se pudo aplicar");
+    return data;
+  };
+
+  dlg.querySelector("[data-web-preview]").addEventListener("click", async () => {
+    preview.innerHTML = `<span class="text-fg-muted">Calculando…</span>`;
+    try {
+      const r = await enviar(true);
+      preview.innerHTML = `<div class="border border-line rounded-lg divide-y divide-line">` + r.records.map((rec, i) => {
+        const antes = r.current[i];
+        return `<div class="p-2 font-mono text-xs">
+          <div class="text-fg">${rec.type} ${esc(rec.name)}</div>
+          <div class="text-fg-subtle">antes: ${antes ? antes.values.map(esc).join(", ") : "nada"}</div>
+          <div class="text-mask-600">después: ${rec.values.map(esc).join(", ")}</div>
+        </div>`;
+      }).join("") + `</div><p class="text-xs text-fg-subtle mt-2">Sólo cambian estos registros; el correo no se toca.</p>`;
+      aplicar.disabled = false;
+    } catch (err) {
+      preview.innerHTML = `<span class="text-red-500">${esc(err.message)}</span>`;
+    }
+  });
+
+  aplicar.addEventListener("click", async () => {
+    aplicar.disabled = true;
+    try {
+      await enviar(false);
+      cerrar();
+      showToast(`Listo: apuntado a ${p.label}. Suele propagar en menos de un minuto.`);
+      loadWebsite();
+    } catch (err) {
+      preview.innerHTML = `<span class="text-red-500">${esc(err.message)}</span>`;
+    }
+  });
+}
+
 function renderDnsTabla(cont) {
   cont.innerHTML = `
     <div class="p-4">
@@ -2988,6 +3169,7 @@ function switchTab(tab) {
   else if (tab === "rules") loadRules();
   else if (tab === "logs") loadLogs();
   else if (tab === "dns") { loadDns(); renderHealthPanel(); }
+  else if (tab === "web") loadWebsite();
   else if (tab === "members") loadMembers();
   else if (tab === "smtp") loadSmtpCredentials();
   else if (tab === "webhooks") loadWebhooks();
