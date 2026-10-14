@@ -162,3 +162,22 @@ el proceso. Tres trampas:
 Y el doble del built-in, con `mock.module`: `defaultExport` con el real esparcido, pero los
 `namedExports` **sin** la llave `default` — el módulo sintético no compila y truena con
 «Unexpected token 'default'».
+
+## `reconcilePendingAddons` barre TODOS los pendientes, y su `emails.ts` va doblado
+
+`addon-sync.test.ts` fija la red de seguridad del webhook (el add-on que MP sí autorizó y nunca
+notificó). Tres cosas que no se ven en el código:
+
+- **El barrido es de la tabla entera**, no de «los tuyos» —el mismo caso que `deliverPending`—:
+  levanta todo add-on `pending` con `mp_preapproval_id`. En un archivo con varios casos, lo que
+  deja `pending` el caso anterior se vuelve a consultar en el siguiente, así que el `beforeEach` los
+  apaga (`UPDATE addons SET status = 'expired' WHERE status = 'pending' AND mp_preapproval_id IS NOT NULL`)
+  y las afirmaciones se filtran por id y por correo, nunca por el total de llamadas.
+- **`./emails.ts` va doblado, con el módulo real esparcido**: el `sendTemplate` de verdad manda por
+  SES (en pruebas `AWS_ENDPOINT_URL=http://localhost:1`) y eso arrastra `sendAlert`. El doble sólo
+  cuenta los envíos. El `fetch` falso es una tabla `preapprovalId → respuesta`; el camino de error
+  HTTP contesta `new Response(…, { status: 500 })` **en vez de lanzar**, porque lanzar ejercería el
+  `catch` externo de la corrida, que es otro camino.
+- El fin de periodo se calcula con `setDate(+35)` en **hora local**: se afirma por rango medido
+  alrededor de la llamada con ±1 h de margen, no con el reloj congelado (`mock.method(Date, "now")`
+  no frena `new Date()`).
