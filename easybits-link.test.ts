@@ -142,3 +142,131 @@ describe("easybits-link: publicar un sitio", () => {
     assert.ok(!calls.some((c) => c.method === "DELETE"));
   });
 });
+
+describe("easybits-link: quitar un sitio (bitácora y restauración)", () => {
+  const DOMAIN_ID = "dom-eb-unpub";
+  // Zona en memoria, llaveada por `nombre|tipo`, con las mismas reglas que Route 53.
+  let zona: Map<string, RRSet>;
+  const k = (n: string, t: string) => `${n}|${t}`;
+  const cambios: { action: string; rrset: RRSet }[][] = [];
+  const ops = {
+    current: (name: string, type: string) => zona.get(k(name, type)) ?? null,
+    async apply(records: RRSet[]) { for (const r of records) zona.set(k(r.name, r.type), r); return records; },
+  };
+  const restoreOps = {
+    current: (name: string, type: string) => zona.get(k(name, type)) ?? null,
+    async apply(changes: { action: "UPSERT" | "DELETE"; rrset: RRSet }[]) {
+      cambios.push(changes);
+      for (const c of changes) {
+        if (c.action === "UPSERT") zona.set(k(c.rrset.name, c.rrset.type), c.rrset);
+        else zona.delete(k(c.rrset.name, c.rrset.type));
+      }
+    },
+  };
+
+  async function connected(domains: unknown[] = []) {
+    route("POST", "/oauth/token", () => json({ access_token: "at", refresh_token: "rt", expires_in: 3600 }));
+    await eb.exchangeCode(EMAIL, REDIRECT, "code", "ver");
+    route("GET", "/websites", () => json({ items: [
+      { id: "w1", name: "Contador", slug: "contador", status: "ACTIVE", url: "x" },
+      { id: "w2", name: "Blog", slug: "blog", status: "ACTIVE", url: "y" },
+    ] }));
+    route("GET", "/domains", () => json({ domains }));
+    route("POST", "/domains", () => json({ domain: { id: "d9", domain: "ej.com", txtToken: "tok", verified: false } }, 201));
+    route("POST", "/domains/d9/verify", () => json({ domain: { id: "d9", verified: true } }));
+    route("POST", "/domains/d9/apex", () => json({ domain: {} }));
+    route("DELETE", "/domains", () => json({ ok: true }));
+  }
+  const publish = (placement: "apex" | "subdomain", websiteId = "w1") =>
+    eb.publishSite({ email: EMAIL, redirectUri: REDIRECT, domain: "ej.com", domainId: DOMAIN_ID, websiteId, placement, verifyDelays: [0] }, ops);
+
+  beforeEach(() => {
+    sqlite.prepare("DELETE FROM easybits_publications").run();
+    cambios.length = 0;
+    zona = new Map([
+      // Lo que el usuario tenía antes: raíz y www en Vercel, y su correo.
+      [k("ej.com", "A"), { name: "ej.com", type: "A", ttl: 300, values: ["76.76.21.21"] }],
+      [k("www.ej.com", "CNAME"), { name: "www.ej.com", type: "CNAME", ttl: 300, values: ["cname.vercel-dns.com"] }],
+      [k("ej.com", "MX"), { name: "ej.com", type: "MX", ttl: 300, values: ["10 inbound-smtp.us-east-1.amazonaws.com"] }],
+    ]);
+  });
+
+  it("publicar anota lo de antes; quitar restaura www y la raíz y borra lo que no existía", async () => {
+    await connected();
+    await publish("apex");
+    const pub = eb.getPublication(DOMAIN_ID)!;
+    assert.equal(pub.ebDomainCreated, true);
+    assert.deepEqual(pub.previous["www.ej.com|CNAME"]?.values, ["cname.vercel-dns.com"]);
+    assert.deepEqual(pub.previous["ej.com|A"]?.values, ["76.76.21.21"]);
+    assert.equal(pub.previous["*.ej.com|CNAME"], null);
+    assert.deepEqual(zona.get(k("ej.com", "A"))!.values, [eb.EASYBITS_EDGE.v4]);
+
+    calls = [];
+    const r = await eb.unpublishSite(DOMAIN_ID, REDIRECT, restoreOps);
+    assert.equal(cambios.length, 1, "un solo cambio de Route 53");
+    assert.deepEqual(zona.get(k("ej.com", "A"))!.values, ["76.76.21.21"]);
+    assert.deepEqual(zona.get(k("www.ej.com", "CNAME"))!.values, ["cname.vercel-dns.com"]);
+    assert.ok(!zona.has(k("*.ej.com", "CNAME")) && !zona.has(k("_easybits-verify.ej.com", "TXT")), "lo que no existía se borra");
+    assert.ok(zona.has(k("ej.com", "MX")), "el correo ni se toca");
+    assert.ok(!cambios[0].some((c) => c.rrset.type === "MX"));
+    assert.equal(r.restored.length, 4);
+    assert.equal(r.skipped.length, 0);
+    // EasyBits: se suelta la raíz y se borra el dominio que dimos de alta.
+    const apex = calls.find((c) => c.url.endsWith("/domains/d9/apex"))!;
+    assert.equal(JSON.parse(apex.body).websiteId, null);
+    assert.ok(calls.some((c) => c.method === "DELETE" && JSON.parse(c.body).domainId === "d9"));
+    assert.deepEqual(r.easybits, { apexCleared: true, domainDeleted: true });
+    assert.equal(eb.getPublication(DOMAIN_ID), null);
+
+    // Idempotente.
+    const otra = await eb.unpublishSite(DOMAIN_ID, REDIRECT, restoreOps);
+    assert.equal(otra.nothing, true);
+  });
+
+  it("re-publicar conserva el `previous` original y no olvida la raíz al pasar a subdominio", async () => {
+    await connected();
+    await publish("apex");
+    await publish("subdomain", "w2");
+    const pub = eb.getPublication(DOMAIN_ID)!;
+    assert.deepEqual(pub.previous["ej.com|A"]?.values, ["76.76.21.21"], "no se pisa con lo nuestro");
+    assert.equal(pub.previous["blog.ej.com|CNAME"], null);
+    assert.ok(pub.records.some((r) => r.name === "ej.com" && r.type === "A"), "la raíz sigue anotada");
+    assert.equal(pub.placement, "subdomain");
+
+    await eb.unpublishSite(DOMAIN_ID, REDIRECT, restoreOps);
+    assert.deepEqual(zona.get(k("ej.com", "A"))!.values, ["76.76.21.21"]);
+    assert.ok(!zona.has(k("blog.ej.com", "CNAME")));
+  });
+
+  it("un registro que el usuario cambió después se deja y sale en `skipped`", async () => {
+    await connected();
+    await publish("apex");
+    zona.set(k("www.ej.com", "CNAME"), { name: "www.ej.com", type: "CNAME", ttl: 300, values: ["mi-nuevo.netlify.app"] });
+    const r = await eb.unpublishSite(DOMAIN_ID, REDIRECT, restoreOps);
+    assert.deepEqual(zona.get(k("www.ej.com", "CNAME"))!.values, ["mi-nuevo.netlify.app"], "no se pisa");
+    assert.deepEqual(r.skipped.map((x) => x.name), ["www.ej.com"]);
+    assert.deepEqual(zona.get(k("ej.com", "A"))!.values, ["76.76.21.21"], "lo demás sí vuelve");
+  });
+
+  it("un dominio que ya existía en EasyBits no se borra al quitar", async () => {
+    await connected([{ id: "d9", domain: "ej.com", txtToken: "tok", verified: true }]);
+    await publish("subdomain");
+    calls = [];
+    const r = await eb.unpublishSite(DOMAIN_ID, REDIRECT, restoreOps);
+    assert.ok(!calls.some((c) => c.method === "DELETE"));
+    assert.deepEqual(r.easybits, { apexCleared: false, domainDeleted: false });
+  });
+
+  it("si EasyBits falla, el DNS ya volvió y la fila se queda para reintentar", async () => {
+    await connected();
+    await publish("apex");
+    route("POST", "/domains/d9/apex", () => json({ error: "boom" }, 500));
+    await assert.rejects(() => eb.unpublishSite(DOMAIN_ID, REDIRECT, restoreOps), /DNS ya volvió/);
+    assert.deepEqual(zona.get(k("ej.com", "A"))!.values, ["76.76.21.21"]);
+    assert.ok(eb.getPublication(DOMAIN_ID));
+    route("POST", "/domains/d9/apex", () => json({ domain: {} }));
+    const r = await eb.unpublishSite(DOMAIN_ID, REDIRECT, restoreOps);
+    assert.equal(r.skipped.length, 0, "lo ya restaurado cuenta como restaurado");
+    assert.equal(eb.getPublication(DOMAIN_ID), null);
+  });
+});

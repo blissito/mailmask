@@ -65,6 +65,9 @@ const EXACT: Record<string, string> = {
   import_dns_records: "Importando los registros DNS",
   point_domain_to: "Apuntando el dominio",
   website_status: "Revisando el sitio web",
+  publish_easybits_site: "Publicando el sitio de EasyBits",
+  unpublish_easybits_site: "Quitando el sitio de EasyBits",
+  easybits_site_status: "Revisando el sitio de EasyBits",
   // Reglas y webhooks.
   list_rules: "Consultando las reglas",
   create_rule: "Creando la regla",

@@ -201,7 +201,7 @@ Forma 1 (recomendada) — OAuth, sólo con la URL:
 - Claude Code: claude mcp add --transport http mailmask https://www.mailmask.studio/mcp y luego /mcp → mailmask → Authenticate.
 - Cualquier cliente que implemente la autorización del spec MCP: sólo la URL.
 Qué pasa: el cliente abre MailMask en el navegador; si no hay sesión pide entrar (correo o Google) y luego muestra una pantalla con el nombre del cliente y los botones Permitir y Cancelar. Al permitir, queda conectado.
-Qué puede hacer la conexión OAuth: lo mismo que una API key mk_ (las 95 herramientas, 60 peticiones por minuto), salvo crear o listar API keys, entrar al admin y crear o listar credenciales SMTP.
+Qué puede hacer la conexión OAuth: lo mismo que una API key mk_ (las 100 herramientas, 60 peticiones por minuto), salvo crear o listar API keys, entrar al admin y crear o listar credenciales SMTP.
 Tokens: acceso mo_ de 1 hora y renovación mr_ de 60 días que rota en cada uso; el cliente los renueva solo. Para dejar de usarla se desconecta desde el cliente (los que implementan revocación llaman a POST /oauth/revoke); para cortar todas las conexiones al instante, se cambia la contraseña de MailMask.
 Detalles técnicos: /mcp sin credencial responde 401 con WWW-Authenticate: Bearer resource_metadata="https://www.mailmask.studio/.well-known/oauth-protected-resource". Metadata en /.well-known/oauth-authorization-server, registro dinámico público en POST /oauth/register, /oauth/authorize con PKCE S256, POST /oauth/token (code y refresh_token) y POST /oauth/revoke.
 
@@ -223,7 +223,7 @@ Configuración con llave para Cursor y otros (mcp.json):
   }
 }
 
-Son 95 herramientas que cubren lo mismo que el panel (cada una es un método del SDK, con las mismas reglas y límites). Al conectarse, el cliente recibe además una guía con el orden para conectar un dominio, qué significa gratis/activado/bloqueado y cómo funcionan los pagos.
+Son 100 herramientas que cubren lo mismo que el panel (cada una es un método del SDK, con las mismas reglas y límites). Al conectarse, el cliente recibe además una guía con el orden para conectar un dominio, qué significa gratis/activado/bloqueado y cómo funcionan los pagos.
 - Dominios: list_domains, get_domain, create_domain (devuelve los registros DNS: MX, TXT de verificación, CNAME de DKIM, SPF), domain_dns_setup (los registros exactos para pegar en el registrador, cuáles ya se ven en el DNS público y en qué panel van: Hostinger, GoDaddy, Cloudflare, Namecheap, Route 53), verify_domain, domain_health, delete_domain. El estado de un dominio (MX, verificación) se confirma con domain_health, que revisa en vivo el DNS y SES; list_domains es inventario: sus banderas mxConfigured y verified traen la fecha de la última revisión (checkedAt) y, si tiene más de 24 horas o nunca se hizo, salen como unknown (null en el MCP). Un agente no debe decir que el MX o la verificación fallan sin haber llamado domain_health.
 - Direcciones (máscaras) y buzones: list_aliases, create_alias (con mailbox: true crea también el buzón IMAP y devuelve la contraseña una sola vez), update_alias, delete_alias, create_mailbox, delete_mailbox, reset_mailbox_password (genera una contraseña nueva para el buzón y la devuelve una sola vez), apple_profile_link (liga al perfil que configura el buzón en iPhone, iPad o Mac), mailbox_export_link (liga para descargar el buzón en .mbox).
 - Activación y cobro: activation_link (liga de MercadoPago para activar un dominio a $99 MXN/mes, o sumarle +50 GB o +100 envíos/día), list_addons, billing_status.
@@ -237,6 +237,7 @@ Son 95 herramientas que cubren lo mismo que el panel (cada una es un método del
 - Reglas: list_rules, create_rule, update_rule, delete_rule.
 - Webhooks: list_webhooks, create_webhook, update_webhook, delete_webhook, test_webhook, webhook_deliveries.
 - DNS: list_dns_records, create_dns_zone, dns_delegation_status, set_dns_record, delete_dns_record, import_dns_records, point_domain_to (apunta el dominio a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render, Fly o EasyBits sin saber qué registros hacen falta; con dryRun sólo muestra el cambio), website_status (a dónde apunta hoy la raíz, www y cada subdominio, la plataforma detectada y si responde por HTTPS).
+- Sitio de EasyBits (con la cuenta de EasyBits conectada en la pestaña Sitio web): easybits_site_status (qué sitio está publicado y los sitios de la cuenta), publish_easybits_site (da de alta el dominio en EasyBits, escribe sus registros sin tocar el correo, verifica y asigna la raíz; con dryRun sólo muestra el cambio), unpublish_easybits_site (deja el DNS como estaba antes de publicar, sin tocar lo que el usuario cambió después, y limpia EasyBits). Sin cuenta conectada responden 409 con la liga /app?domain=<dominio>&easybits=1.
 - Envío: send_email (acepta idempotencyKey), bulk_send, bulk_status.
 - Operación: list_logs, list_suppressions, add_suppression, remove_suppression, list_smtp_credentials, create_smtp_credential, revoke_smtp_credential.
 - search_tools: busca herramientas por palabra clave (sin acentos: "renovacion" encuentra renewal_link).

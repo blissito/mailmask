@@ -1,7 +1,9 @@
 // Después de entrar: de vuelta al consentimiento OAuth de un cliente MCP si de ahí venía
 // o a un recibo (sólo esas dos rutas, nada de redirecciones abiertas), o al panel.
 const RECEIPT_PATH = /^\/recibo\/[A-Za-z0-9-]{1,40}$/;
-const safeNext = (next) => next && (next.startsWith("/oauth/authorize?") || RECEIPT_PATH.test(next) || next === "/app#pagos") ? next : null;
+// La liga que da el agente para publicar en EasyBits (`/app?domain=…&easybits=1`) sobrevive al login.
+const EASYBITS_DEEP_LINK = /^\/app\?domain=[a-z0-9.-]{1,253}&easybits=1$/i;
+const safeNext = (next) => next && (next.startsWith("/oauth/authorize?") || RECEIPT_PATH.test(next) || EASYBITS_DEEP_LINK.test(next) || next === "/app#pagos") ? next : null;
 
 function afterLogin() {
   const params = new URLSearchParams(location.search);

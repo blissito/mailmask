@@ -212,8 +212,11 @@ export async function ensureEasyBitsDomain(email: string, redirectUri: string, d
 // --- Publicar un sitio en el dominio ---
 
 export type DnsOps = {
-  /** Valida y aplica todos los RRSets en un solo cambio (UPSERT). Lanza con mensaje para el usuario. */
-  apply(records: RRSet[]): Promise<void>;
+  /**
+   * Valida y aplica todos los RRSets en un solo cambio (UPSERT). Lanza con mensaje para el
+   * usuario. Devuelve lo que de verdad escribió (ya validado), que es lo que se anota.
+   */
+  apply(records: RRSet[]): Promise<RRSet[] | void>;
   /** Lo que hay hoy en ese (nombre, tipo), o null. */
   current(name: string, type: string): RRSet | null;
 };
@@ -224,6 +227,8 @@ export type PublishInput = {
   domain: string;
   websiteId: string;
   placement: "apex" | "subdomain";
+  /** Dominio de MailMask: con él se anota la publicación para poder quitarla. */
+  domainId?: string;
   dryRun?: boolean;
   /** Esperas entre intentos de verificación (ms); en pruebas, 0. */
   verifyDelays?: number[];
@@ -244,8 +249,11 @@ export async function publishSite(input: PublishInput, dns: DnsOps) {
 
   const { domain: ebDomain, created } = await ensureEasyBitsDomain(email, redirectUri, domain);
   const records = easybitsRecords(domain, ebDomain.txtToken, { apex: placement === "apex", slug: site.slug });
+  // Lo que había ANTES, tomado antes de escribir: es lo que restaura `unpublishSite`.
+  const before = records.map((r) => dns.current(r.name, r.type));
+  let written: RRSet[];
   try {
-    await dns.apply(records);
+    written = (await dns.apply(records)) || records;
   } catch (err) {
     // Sin medias conexiones: si lo dimos de alta nosotros y el DNS no entró, se quita.
     if (created) {
@@ -266,10 +274,165 @@ export async function publishSite(input: PublishInput, dns: DnsOps) {
     }
   }
 
+  if (input.domainId) {
+    savePublication({
+      domainId: input.domainId, ownerEmail: email, ebDomainId: ebDomain.id, ebDomainCreated: created,
+      websiteId: site.id, placement, url, written, before,
+    });
+  }
+
   if (verified && placement === "apex") {
     await ebFetch(email, redirectUri, `/domains/${ebDomain.id}/apex`, { method: "POST", body: JSON.stringify({ websiteId: site.id }) });
   }
   return { dryRun: false as const, url, site, records, verified, easybitsDomainId: ebDomain.id };
+}
+
+// --- Bitácora de publicaciones (para deshacer) ---
+
+export type Publication = {
+  domainId: string;
+  ownerEmail: string;
+  ebDomainId: string;
+  ebDomainCreated: boolean;
+  websiteId: string;
+  placement: "apex" | "subdomain";
+  url: string;
+  /** Lo que escribimos, por (nombre, tipo). */
+  records: RRSet[];
+  /** Lo que había antes en cada `nombre|tipo` de `records`; null = nada. */
+  previous: Record<string, RRSet | null>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const keyOf = (r: { name: string; type: string }) => `${r.name.toLowerCase()}|${r.type.toUpperCase()}`;
+
+type PubRow = {
+  domain_id: string; owner_email: string; eb_domain_id: string; eb_domain_created: number; website_id: string;
+  placement: string; url: string; records: string; previous: string; created_at: string; updated_at: string;
+};
+
+export function getPublication(domainId: string): Publication | null {
+  const r = sqlite.prepare(`SELECT * FROM easybits_publications WHERE domain_id = ?`).get(domainId) as PubRow | undefined;
+  if (!r) return null;
+  return {
+    domainId: r.domain_id, ownerEmail: r.owner_email, ebDomainId: r.eb_domain_id, ebDomainCreated: !!r.eb_domain_created,
+    websiteId: r.website_id, placement: r.placement === "apex" ? "apex" : "subdomain", url: r.url,
+    records: JSON.parse(r.records), previous: JSON.parse(r.previous), createdAt: r.created_at, updatedAt: r.updated_at,
+  };
+}
+
+/**
+ * Anota la publicación. Al re-publicar se conserva el `previous` ORIGINAL de cada nombre ya
+ * anotado (lo de hoy ahí ya es nuestro) y los registros viejos que esta vez no se tocaron
+ * (p. ej. la raíz al pasar de raíz a subdominio) siguen en la lista, porque siguen escritos.
+ */
+function savePublication(p: {
+  domainId: string; ownerEmail: string; ebDomainId: string; ebDomainCreated: boolean; websiteId: string;
+  placement: "apex" | "subdomain"; url: string; written: RRSet[]; before: (RRSet | null)[];
+}) {
+  const old = getPublication(p.domainId);
+  const records = new Map<string, RRSet>((old?.records ?? []).map((r) => [keyOf(r), r]));
+  const previous: Record<string, RRSet | null> = { ...(old?.previous ?? {}) };
+  p.written.forEach((r, i) => {
+    const k = keyOf(r);
+    records.set(k, r);
+    if (!(k in previous)) previous[k] = p.before[i] ?? null;
+  });
+  const now = new Date().toISOString();
+  // Si el dominio de EasyBits ya lo habíamos creado nosotros en la primera, sigue siendo nuestro.
+  const created = old && old.ebDomainId === p.ebDomainId ? old.ebDomainCreated : p.ebDomainCreated;
+  sqlite.prepare(`
+    INSERT INTO easybits_publications (domain_id, owner_email, eb_domain_id, eb_domain_created, website_id, placement, url, records, previous, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (domain_id) DO UPDATE SET owner_email = excluded.owner_email, eb_domain_id = excluded.eb_domain_id,
+      eb_domain_created = excluded.eb_domain_created, website_id = excluded.website_id, placement = excluded.placement,
+      url = excluded.url, records = excluded.records, previous = excluded.previous, updated_at = excluded.updated_at
+  `).run(p.domainId, p.ownerEmail, p.ebDomainId, created ? 1 : 0, p.websiteId, p.placement, p.url,
+    JSON.stringify([...records.values()]), JSON.stringify(previous), old?.createdAt ?? now, now);
+}
+
+/** Mismo RRSet para fines de "¿sigue siendo el nuestro?": tipo y valores, sin TTL ni punto final. */
+function sameRecord(a: RRSet | null, b: RRSet | null): boolean {
+  if (!a || !b) return a === b;
+  const norm = (r: RRSet) => r.values.map((v) => v.trim().toLowerCase().replace(/\.$/, "")).sort().join("\n");
+  return a.type.toUpperCase() === b.type.toUpperCase() && norm(a) === norm(b);
+}
+
+export type DnsRestoreOps = {
+  current(name: string, type: string): RRSet | null;
+  /** Aplica todos los cambios en UN solo lote de Route 53. Lanza con mensaje para el usuario. */
+  apply(changes: { action: "UPSERT" | "DELETE"; rrset: RRSet }[]): Promise<void>;
+};
+
+export type UnpublishResult = {
+  ok: true;
+  nothing?: true;
+  /** Volvió a lo que había antes (o ya estaba así). */
+  restored: { name: string; type: string; to: RRSet | null }[];
+  /** No era ya lo que escribimos: el usuario lo cambió después y se deja como está. */
+  skipped: { name: string; type: string; current: RRSet | null }[];
+  easybits: { apexCleared: boolean; domainDeleted: boolean; error?: string };
+};
+
+/**
+ * Deshace `publishSite`: restaura el DNS anotado en un solo cambio y limpia EasyBits (quita
+ * la raíz y, si el dominio lo dimos de alta nosotros, lo borra). Idempotente: sin fila,
+ * no hay nada que hacer. Si EasyBits falla (no por desconexión), la fila se queda para
+ * reintentar; el DNS ya restaurado sale como `restored` la segunda vez.
+ */
+export async function unpublishSite(domainId: string, redirectUri: string, dns: DnsRestoreOps): Promise<UnpublishResult> {
+  const pub = getPublication(domainId);
+  const easybits: UnpublishResult["easybits"] = { apexCleared: false, domainDeleted: false };
+  if (!pub) return { ok: true, nothing: true, restored: [], skipped: [], easybits };
+
+  const restored: UnpublishResult["restored"] = [];
+  const skipped: UnpublishResult["skipped"] = [];
+  const changes: { action: "UPSERT" | "DELETE"; rrset: RRSet }[] = [];
+  for (const ours of pub.records) {
+    const prev = pub.previous[keyOf(ours)] ?? null;
+    const cur = dns.current(ours.name, ours.type);
+    if (sameRecord(cur, ours)) {
+      // DELETE exige el RRSet exacto que hay hoy (TTL incluido).
+      changes.push(prev ? { action: "UPSERT", rrset: prev } : { action: "DELETE", rrset: cur! });
+      restored.push({ name: ours.name, type: ours.type, to: prev });
+    } else if (sameRecord(cur, prev)) {
+      restored.push({ name: ours.name, type: ours.type, to: prev });
+    } else {
+      skipped.push({ name: ours.name, type: ours.type, current: cur });
+    }
+  }
+  if (changes.length) await dns.apply(changes);
+
+  const ebErrors: string[] = [];
+  try {
+    if (pub.placement === "apex") {
+      await ebFetch(pub.ownerEmail, redirectUri, `/domains/${pub.ebDomainId}/apex`, { method: "POST", body: JSON.stringify({ websiteId: null }) })
+        .then(() => { easybits.apexCleared = true; })
+        .catch((e) => { if (e instanceof EasyBitsDisconnected) throw e; ebErrors.push(String(e instanceof Error ? e.message : e)); });
+    }
+    if (pub.ebDomainCreated) {
+      await ebFetch(pub.ownerEmail, redirectUri, "/domains", { method: "DELETE", body: JSON.stringify({ domainId: pub.ebDomainId }) })
+        .then(() => { easybits.domainDeleted = true; })
+        .catch((e) => {
+          if (e instanceof EasyBitsDisconnected) throw e;
+          // Ya no existe: lo que queríamos.
+          if (/not found|no encontrado|404/i.test(String(e))) easybits.domainDeleted = true;
+          else ebErrors.push(String(e instanceof Error ? e.message : e));
+        });
+    }
+  } catch (e) {
+    // Sin conexión no hay forma de limpiar EasyBits; el DNS ya volvió, que es lo que sirve
+    // el dominio. Se reporta y se cierra la fila.
+    easybits.error = e instanceof Error ? e.message : String(e);
+    log("warn", "easybits", "Sitio quitado sin limpiar EasyBits (desconectado)", { domainId, error: easybits.error });
+  }
+  if (ebErrors.length) {
+    log("warn", "easybits", "No se pudo limpiar EasyBits al quitar el sitio", { domainId, errors: ebErrors });
+    throw new Error(`El DNS ya volvió a como estaba, pero EasyBits no respondió: ${ebErrors.join("; ")}. Intenta de nuevo.`);
+  }
+  sqlite.prepare(`DELETE FROM easybits_publications WHERE domain_id = ?`).run(domainId);
+  return { ok: true, restored, skipped, easybits };
 }
 
 /** Reintento manual desde la UI: verifica y, si es raíz, asigna el sitio. */

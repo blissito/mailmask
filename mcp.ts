@@ -54,11 +54,11 @@ El MX y la verificación se confirman con domain_health (revisa en vivo). list_d
 ## Gratis, activado y bloqueado
 - El dominio más antiguo de la cuenta es gratis: reenvía, 5 máscaras, Bandeja de 1 persona, sin envío de correo nuevo.
 - Activado ($99 MXN/mes por dominio): máscaras ilimitadas, equipo, 50 envíos/día, buzones IMAP, reglas, webhooks, SMTP.
-- Bloqueado = el 2.º dominio en adelante sin activar: el correo se GUARDA en la Bandeja pero NO se reenvía. No es una falla técnica; se arregla activándolo. Explícalo así, nunca como "error".
+- Bloqueado = el 2.º dominio en adelante sin activar: el correo se GUARDA en la Bandeja pero NO se reenvía. No es una falla técnica; se arregla activándolo.
 - Un 403 que menciona $99 significa "eso pide dominio activado": ofrece activation_link.
 
 ## Pagos
-Todo cobro es una liga de MercadoPago que el USUARIO abre y paga (activation_link, register_domain, renewal_link, el formulario de transferencia). Nunca digas que algo quedó pagado o activado por haber dado la liga: confírmalo después con list_addons, list_registrations o domain_health.
+Todo cobro es una liga de MercadoPago que el USUARIO abre y paga (activation_link, register_domain, renewal_link, el formulario de transferencia). No digas que quedó pagado por dar la liga: confírmalo con list_addons, list_registrations o domain_health.
 
 ## Transferir un dominio a MailMask
 transfer_check (requisitos, precio, DNS actual) → transfer_start devuelve formUrl, un formulario de la app donde el usuario pega el código EPP y sus datos WHOIS, y paga. NUNCA pidas ni aceptes el código EPP (auth code) en el chat: si te lo pegan, dile que no lo comparta y que lo ponga en el formulario. Después, transfer_status. Cuando toque aprobar el DNS: transfer_dns para revisar el inventario con el usuario (lo que falte dejará de funcionar), update_transfer_dns si hay que corregir, y approve_transfer_dns sólo con su visto bueno. Si el registrador anterior no la suelta: resend_transfer_email, y que lo pida en el chat de su registrador. Que no pida otro EPP: invalida el que se mandó.
@@ -70,7 +70,7 @@ transfer_out manda el código EPP por correo al dueño, nunca al chat. lock_doma
 Borrar dominio, máscara, buzón o registro DNS, sacar a un miembro, transferir fuera o cancelar un add-on o una renovación (cancel_addon, cancel_renewal) son irreversibles: confírmalo con el usuario antes. Algunas responden que necesitan confirmación: el usuario la aprueba en la app; no reintentes ni busques otra vía.
 
 ## DNS administrado por MailMask
-Con zona propia (create_dns_zone y cambiar los nameservers en el registrador) puedes editar registros; enseña la lista \`imported\` antes de que cambie los nameservers: list_dns_records antes de escribir; set_dns_record reemplaza el conjunto completo; point_domain_to para Vercel, Netlify y similares (website_status dice a dónde apunta hoy). Los registros de correo están protegidos.
+Con zona propia (create_dns_zone + nameservers en el registrador) puedes editar registros; enseña \`imported\` antes de que cambie los nameservers. list_dns_records antes de escribir; set_dns_record reemplaza el conjunto; point_domain_to para Vercel, Netlify y similares (website_status: a dónde apunta hoy). EasyBits: easybits_site_status → publish_easybits_site (dryRun primero); unpublish_easybits_site lo revierte. Los registros de correo están protegidos.
 
 ## Bandeja: el correo de la máscara
 Cada máscara recibe en la Bandeja del dominio; desde ahí se lee y se contesta como esa máscara.
@@ -173,6 +173,9 @@ const KEYWORDS: Record<string, string> = {
   list_orders: "pagos cobros historial facturas recibos cfdi",
   cancel_addon: "cancelar suscripción desactivar dominio pago addon",
   cancel_renewal: "cancelar renovación dominio",
+  publish_easybits_site: "sitio web página publicar easybits hosting dominio",
+  unpublish_easybits_site: "sitio web quitar despublicar easybits restaurar dns",
+  easybits_site_status: "sitio web easybits publicado estado conectar",
   referral_status: "referidos invitar liga créditos recomendar",
   set_referral_slug: "referidos liga slug",
   set_referral_name: "referidos nombre",
@@ -186,6 +189,7 @@ const KEYWORDS: Record<string, string> = {
 // toda herramienta caiga en una de las dos listas o sea escritura no destructiva a propósito.
 export const READ_ONLY_TOOLS = new Set([
   "list_domains", "get_domain", "domain_health", "list_aliases", "list_dns_records", "dns_delegation_status", "website_status",
+  "easybits_site_status",
   "import_dns_records", "list_rules", "list_webhooks", "webhook_deliveries", "bulk_status", "list_logs",
   "list_suppressions", "list_smtp_credentials", "domain_dns_setup", "billing_status", "list_addons",
   "search_domains", "domain_prices", "list_registrations", "transfer_check", "transfer_status", "transfer_dns",
@@ -197,12 +201,13 @@ export const DESTRUCTIVE_TOOLS = new Set([
   "delete_domain", "delete_alias", "delete_mailbox", "reset_mailbox_password", "set_dns_record", "delete_dns_record",
   "delete_rule", "delete_webhook", "remove_suppression", "revoke_smtp_credential", "approve_transfer_dns",
   "transfer_out", "remove_member", "cancel_invite", "delete_canned_reply", "inbox_delete", "delete_domain_logo",
-  "cancel_addon", "cancel_renewal", "delete_profile_photo",
+  "cancel_addon", "cancel_renewal", "delete_profile_photo", "unpublish_easybits_site",
 ]);
 // Las que tocan el mundo fuera de la cuenta: mandan correo, publican DNS o llaman a un webhook.
 const OPEN_WORLD_TOOLS = new Set([
   "send_email", "bulk_send", "inbox_reply", "inbox_send", "invite_member", "test_webhook", "set_dns_record",
   "delete_dns_record", "point_domain_to", "transfer_out", "transfer_start", "register_domain", "approve_transfer_dns",
+  "publish_easybits_site", "unpublish_easybits_site",
 ]);
 // Título legible que el directorio muestra junto a cada herramienta.
 export const TOOL_TITLES: Record<string, string> = {
@@ -227,6 +232,9 @@ export const TOOL_TITLES: Record<string, string> = {
   import_dns_records: "Read public DNS",
   point_domain_to: "Point domain to hosting",
   website_status: "Check website status",
+  publish_easybits_site: "Publish EasyBits site",
+  unpublish_easybits_site: "Remove EasyBits site",
+  easybits_site_status: "Check EasyBits site",
   list_rules: "List routing rules",
   create_rule: "Create routing rule",
   update_rule: "Update routing rule",
@@ -523,17 +531,40 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
     { domainId }, (a) => sdk.dns.import(a.domainId));
 
   tool("point_domain_to",
-    "Points the domain (or a subdomain) to a hosting provider by writing the needed records in the MailMask-managed zone. For 'vercel' the `target` is the Vercel domain ('my-project.vercel.app'); for 'github-pages' it is 'user.github.io'; for 'dmarc' it is the email that receives reports; 'easybits' needs no target. Without `subdomain` it points the root and www. With `dryRun` it returns the records it would write and the current ones, without writing.",
+    "Points the domain (or a subdomain) to a hosting provider by writing the needed records in the MailMask-managed zone. For 'vercel' the `target` is the Vercel domain ('my-project.vercel.app'); for 'github-pages' it is 'user.github.io'; for 'dmarc' it is the email that receives reports. 'easybits' publishes a site of the user's connected EasyBits account and needs `websiteId` (without it, the error lists the sites; without a connected account, it returns the link to connect it). Without `subdomain` it points the root and www. With `dryRun` it returns the records it would write and the current ones, without writing.",
     {
       domainId,
       provider: z.enum(["vercel", "netlify", "github-pages", "cloudflare-pages", "render", "fly", "easybits", "redirect-a-www", "dmarc"]),
       target: z.string().optional().describe("The target given by the hosting provider"),
       subdomain: z.string().optional().describe("To point only a subdomain, e.g. 'app'"),
+      websiteId: z.string().optional().describe("Only for 'easybits': the EasyBits site to publish"),
+      placement: z.enum(["apex", "subdomain"]).optional().describe("Only for 'easybits': 'apex' (root and www) or 'subdomain' (<site slug>.<domain>)"),
       dryRun: z.boolean().optional().describe("Preview only: return what would change"),
     },
-    (a) => a.dryRun
-      ? sdk.dns.presetPreview(a.domainId, a.provider, a.target, a.subdomain)
-      : sdk.dns.preset(a.domainId, a.provider, a.target, a.subdomain));
+    (a) => {
+      const opts = a.provider === "easybits" ? { websiteId: a.websiteId, placement: a.placement } : undefined;
+      return a.dryRun
+        ? sdk.dns.presetPreview(a.domainId, a.provider, a.target, a.subdomain, opts)
+        : sdk.dns.preset(a.domainId, a.provider, a.target, a.subdomain, opts);
+    });
+
+  tool("publish_easybits_site",
+    "Publishes a site of the user's connected EasyBits account on the domain: registers the domain in EasyBits, writes its records in the MailMask-managed zone (email records untouched), verifies it and, for 'apex', assigns the root. Returns the URL, the records and whether EasyBits already verified it. With `dryRun` it returns the records it would write and the current ones, without writing. Without a connected EasyBits account it returns the link to connect it in the browser.",
+    {
+      domainId,
+      websiteId: z.string().describe("The EasyBits site id"),
+      placement: z.enum(["apex", "subdomain"]).describe("'apex' = root and www; 'subdomain' = <site slug>.<domain>"),
+      dryRun: z.boolean().optional().describe("Preview only: return what would change"),
+    },
+    (a) => sdk.domains.publishEasyBitsSite(a.domainId, { websiteId: a.websiteId, placement: a.placement, dryRun: a.dryRun }));
+
+  tool("unpublish_easybits_site",
+    "Removes the EasyBits site published on the domain: restores the DNS records that existed before publishing, in one change (records the user edited afterwards are left as they are and returned as `skipped`), and cleans up EasyBits. Returns `restored`, `skipped` and the EasyBits cleanup; `nothing: true` if no site was published.",
+    { domainId }, (a) => sdk.domains.unpublishEasyBitsSite(a.domainId));
+
+  tool("easybits_site_status",
+    "Returns whether an EasyBits site is published on the domain (URL, placement and the records written), whether the user's EasyBits account is connected, and the sites of that account.",
+    { domainId }, (a) => sdk.domains.easyBitsSiteStatus(a.domainId));
 
   tool("website_status",
     "Returns where the domain's website points: for the root, www and each web subdomain, its A/AAAA/CNAME records, the detected hosting platform, configuration issues and an HTTPS check (status code, redirect and certificate expiry).",
