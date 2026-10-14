@@ -144,9 +144,17 @@ const TAB_ALLOWLIST = new Set([
  * Nada del cliente se copia al prompt tal cual: el dominio se carga por id y sólo si el
  * usuario tiene acceso, y la pestaña pasa por una lista cerrada.
  */
+/** «En la lista de dominios» con los nombres, para que sepa de cuáles se puede hablar. */
+function domainListLine(email: string): string {
+  const names = listUserDomains(email).map((d) => d.domain);
+  const shown = names.slice(0, 15).join(", ") + (names.length > 15 ? `, y ${names.length - 15} más` : "");
+  return `En pantalla: la lista de dominios (ninguno abierto). ${names.length ? `Sus dominios: ${shown}.` : "No tiene dominios todavía."}`;
+}
+
 export function buildScreenContext(email: string, screen: unknown): string | null {
   if (!screen || typeof screen !== "object") return null;
-  const s = screen as { domainId?: unknown; tab?: unknown };
+  const s = screen as { page?: unknown; domainId?: unknown; tab?: unknown };
+  if (s.page === "domains" && !s.domainId) return domainListLine(email);
   const lines: string[] = [];
   if (typeof s.domainId === "string" && /^[A-Za-z0-9-]{1,64}$/.test(s.domainId)) {
     const domain = getDomain(s.domainId);
@@ -175,7 +183,8 @@ export function buildScreenContext(email: string, screen: unknown): string | nul
  */
 export function buildScreenReminder(email: string, screen: unknown): string | null {
   if (!screen || typeof screen !== "object") return null;
-  const s = screen as { domainId?: unknown; tab?: unknown };
+  const s = screen as { page?: unknown; domainId?: unknown; tab?: unknown };
+  if (s.page === "domains" && !s.domainId) return domainListLine(email);
   if (typeof s.domainId !== "string" || !/^[A-Za-z0-9-]{1,64}$/.test(s.domainId)) return null;
   const domain = getDomain(s.domainId);
   if (!domain || (domain.ownerEmail !== email && !getAgentByEmail(domain.id, email))) return null;
@@ -376,5 +385,5 @@ export const ASSISTANT_BASE_PROMPT = [
   "Opera su cuenta con las herramientas del MCP `mailmask`; nunca le pidas su API key.",
   "Las acciones destructivas (borrar dominio, máscara, buzón o registro DNS, trasladar el dominio, quitar a una persona) piden confirmación: si una herramienta responde que necesita confirmación, dile que apruebe la tarjeta y no reintentes.",
   "El pago siempre lo hace el usuario: comparte el enlace, nunca digas que ya quedó pagado.",
-  "Cada mensaje puede traer la pantalla abierta (`<contexto-de-pantalla>`). Si el usuario no nombra un dominio, actúa sobre el que está en pantalla, aunque la conversación viniera de otro.",
+  "Cada mensaje puede traer la pantalla abierta (`<contexto-de-pantalla>`). Si el usuario no nombra un dominio, actúa sobre el que está en pantalla, aunque la conversación viniera de otro. En la lista de dominios no hay ninguno en pantalla: si tiene varios y no nombra uno, pregunta cuál; si tiene uno, es ése.",
 ].join("\n");
