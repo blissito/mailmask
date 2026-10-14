@@ -970,3 +970,29 @@ describe("MIME parsing", () => {
     assert.equal(extractPlainBody(qp), "Hello ácento y línea");
   });
 });
+
+describe("decodificación de partes: charset", () => {
+  const mime = (ct: string, b64: string) => [
+    "MIME-Version: 1.0",
+    'Content-Type: multipart/alternative; boundary="b"',
+    "",
+    "--b",
+    `Content-Type: ${ct}`,
+    "Content-Transfer-Encoding: base64",
+    "",
+    b64,
+    "--b--",
+    "",
+  ].join("\r\n");
+
+  it("base64 en UTF-8 sale con acentos, no como «QuiÃ©n»", () => {
+    const texto = "Quién envió correo · 5 de octubre – 12 de octubre";
+    const raw = mime("text/html; charset=UTF-8", Buffer.from(`<p>${texto}</p>`, "utf8").toString("base64"));
+    assert.equal(extractHtmlBody(raw), `<p>${texto}</p>`);
+  });
+
+  it("respeta un charset distinto de UTF-8", () => {
+    const raw = mime('text/plain; charset="ISO-8859-1"', Buffer.from("señal", "latin1").toString("base64"));
+    assert.equal(extractPlainBody(raw), "señal");
+  });
+});
