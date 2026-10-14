@@ -2504,6 +2504,7 @@ const WEB_PLATFORMS = [
   { id: "otro", label: "Otro (CNAME)", pide: "destino.ejemplo.com", soloSub: true },
 ];
 let _webEstado = null;
+let _webSitios = {};
 
 async function loadWebsite() {
   const cont = document.getElementById("web-hosts");
@@ -2515,6 +2516,12 @@ async function loadWebsite() {
     const res = await fetch(`/api/domains/${selectedDomain.id}/website`);
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "no se pudo revisar");
     _webEstado = await res.json();
+    // Con EasyBits conectado, cada host `<slug>.dominio` que sea un sitio tuyo se puede editar.
+    _webSitios = {};
+    if (_webEstado.hosts.some(h => h.platform?.id === "easybits")) {
+      const eb = await fetch("/api/integrations/easybits").then(r => r.ok ? r.json() : null).catch(() => null);
+      for (const x of eb?.sites || []) _webSitios[x.slug] = x.id;
+    }
   } catch (err) {
     cont.innerHTML = `<div class="text-sm text-red-500">${esc(err.message)}</div>`;
     return;
@@ -2548,7 +2555,8 @@ function renderWebHost(h) {
   return `
     <div class="border border-line rounded-xl p-4 bg-bg-elev">
       <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
-        <div class="font-semibold text-fg flex items-center gap-2">${nombre}${h.records.length && h.https?.ok ? `
+        <div class="font-semibold text-fg flex items-center gap-2">${nombre}${_webSitios[h.label] ? `
+          <a href="${EASYBITS_ORIGIN}/dash/sitios/${encodeURIComponent(_webSitios[h.label])}" target="_blank" rel="noopener" class="text-xs font-medium text-fg-muted hover:text-accent-text">Editar en EasyBits ↗</a>` : ""}${h.records.length && h.https?.ok ? `
           <a href="https://${esc(h.name)}" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-fg-muted hover:text-accent-text inline-flex items-center gap-1">Abrir
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></a>` : ""}</div>
         <div class="flex items-center gap-2">
@@ -2584,7 +2592,8 @@ function renderWebPlatforms() {
 }
 
 // --- EasyBits Sitios por OAuth: conectar la cuenta y publicar un sitio en este dominio ---
-const EASYBITS_NEW_SITE = "https://www.easybits.cloud/dash/sitios/new";
+const EASYBITS_ORIGIN = "https://www.easybits.cloud";
+const EASYBITS_NEW_SITE = `${EASYBITS_ORIGIN}/dash/sitios/new`;
 
 async function easybitsModal() {
   if (!selectedDomain) return;
