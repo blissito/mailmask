@@ -324,7 +324,7 @@ if (debeArrancarEfectos(isServer, esPreview())) {
 schedule("*/10 * * * *", async () => {
   try {
     if (pendingBackfillCount() === 0) return;
-    await runBackfill({ maxMensajes: 500 });
+    await runBackfill({ maxMessages: 500 });
   } catch (err) {
     log("error", "search", "Backfill periódico falló", { error: String(err) });
   }

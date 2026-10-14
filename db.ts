@@ -2787,7 +2787,7 @@ export function deleteFtsForConversation(conversationId: string): void {
   sqlite.prepare(`DELETE FROM messages_fts WHERE conversation_id = ?`).run(conversationId);
 }
 
-export interface MensajeSinIndexar {
+export interface UnindexedMessage {
   id: string;
   conversationId: string;
   domainId: string;
@@ -2799,7 +2799,7 @@ export interface MensajeSinIndexar {
 }
 
 /** Mensajes que aún no pasaron por el índice. El progreso vive en tabla, así que es reanudable. */
-export function listUnindexedMessages(limit: number): MensajeSinIndexar[] {
+export function listUnindexedMessages(limit: number): UnindexedMessage[] {
   if (!ftsDisponible) return [];
   const rows = sqlite.prepare(`
     SELECT m.id, m.conversation_id, c.domain_id, m."from" AS sender, c.subject,
@@ -2823,7 +2823,7 @@ export function listUnindexedMessages(limit: number): MensajeSinIndexar[] {
   }));
 }
 
-export function contarSinIndexar(): number {
+export function countUnindexedMessages(): number {
   if (!ftsDisponible) return 0;
   const row = sqlite.prepare(`
     SELECT COUNT(*) AS n FROM messages m

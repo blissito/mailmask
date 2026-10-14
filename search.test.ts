@@ -12,7 +12,7 @@ import {
   listConversationAliases,
   listMessages,
   countMessages,
-  contarSinIndexar,
+  countUnindexedMessages,
   deleteFtsForConversation,
   createCourtesyAddon,
 } from "./db.ts";
@@ -152,10 +152,10 @@ describe("Búsqueda en el cuerpo de los correos", () => {
 
   it("lo indexado no queda contado como pendiente de backfill", async (t) => {
     if (!ftsDisponible) return t.skip("sin FTS5");
-    const antes = contarSinIndexar();
+    const antes = countUnindexedMessages();
     const dom = await dominioNuevo();
     await conversacionCon(dom.id, "Ya indexada", "cuerpo cualquiera");
-    assert.equal(contarSinIndexar(), antes, "indexar en vivo no deja deuda para el backfill");
+    assert.equal(countUnindexedMessages(), antes, "indexar en vivo no deja deuda para el backfill");
   });
 });
 

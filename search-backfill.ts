@@ -9,7 +9,7 @@
 // Por qué no perezoso (indexar al abrir el hilo): la búsqueda tiene que encontrar
 // hilos que nadie ha abierto. Ese es exactamente el caso de uso.
 
-import { listUnindexedMessages, indexMessage, markIndexState, contarSinIndexar } from "./db.js";
+import { listUnindexedMessages, indexMessage, markIndexState, countUnindexedMessages } from "./db.js";
 import { fetchEmailFromS3 } from "./ses.js";
 import { extractPlainBody } from "./forwarding.js";
 import { log } from "./logger.js";
@@ -20,15 +20,15 @@ const PAUSE_MS = 2000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function pendingBackfillCount(): number {
-  return contarSinIndexar();
+  return countUnindexedMessages();
 }
 
 let running = false;
 
 export interface BackfillResult {
-  indexados: number;
-  errores: number;
-  restantes: number;
+  indexed: number;
+  errors: number;
+  remaining: number;
 }
 
 /**
@@ -39,40 +39,40 @@ export interface BackfillResult {
  * mensaje que falla se marca como "error" para no reintentarlo en bucle infinito.
  */
 export async function runBackfill(opts?: {
-  lote?: number;
-  pausaMs?: number;
-  maxMensajes?: number;
+  batchSize?: number;
+  pauseMs?: number;
+  maxMessages?: number;
 }): Promise<BackfillResult> {
-  if (running) return { indexados: 0, errores: 0, restantes: pendingBackfillCount() };
+  if (running) return { indexed: 0, errors: 0, remaining: pendingBackfillCount() };
   running = true;
 
-  const lote = opts?.lote ?? BATCH_SIZE;
-  const pausaMs = opts?.pausaMs ?? PAUSE_MS;
-  const maxMensajes = opts?.maxMensajes ?? Infinity;
+  const batchSize = opts?.batchSize ?? BATCH_SIZE;
+  const pauseMs = opts?.pauseMs ?? PAUSE_MS;
+  const maxMessages = opts?.maxMessages ?? Infinity;
 
-  let indexados = 0;
-  let errores = 0;
+  let indexed = 0;
+  let errors = 0;
 
   try {
-    while (indexados + errores < maxMensajes) {
-      const pendientes = listUnindexedMessages(Math.min(lote, maxMensajes - indexados - errores));
-      if (pendientes.length === 0) break;
+    while (indexed + errors < maxMessages) {
+      const pending = listUnindexedMessages(Math.min(batchSize, maxMessages - indexed - errors));
+      if (pending.length === 0) break;
 
-      for (const m of pendientes) {
+      for (const m of pending) {
         try {
           // Los salientes ya traen el cuerpo en la base: sale gratis.
           // Los entrantes hay que bajarlos de S3, que es lo caro.
-          let texto = m.body ?? "";
-          if (!texto && m.s3Bucket && m.s3Key) {
+          let text = m.body ?? "";
+          if (!text && m.s3Bucket && m.s3Key) {
             const raw = await fetchEmailFromS3(m.s3Bucket, m.s3Key);
-            texto = raw ? extractPlainBody(raw) : "";
+            text = raw ? extractPlainBody(raw) : "";
           }
 
-          if (!texto) {
+          if (!text) {
             // Sin cuerpo recuperable. Se marca para no volver a intentarlo cada
             // vuelta; si algún día se quiere reintentar, se borra la fila.
             markIndexState(m.id, "skipped", "sin cuerpo recuperable");
-            indexados++;
+            indexed++;
             continue;
           }
 
@@ -82,26 +82,26 @@ export async function runBackfill(opts?: {
             domainId: m.domainId,
             from: m.from,
             subject: m.subject,
-            text: texto,
+            text,
           });
-          indexados++;
+          indexed++;
         } catch (err) {
           markIndexState(m.id, "error", String(err).slice(0, 500));
-          errores++;
+          errors++;
         }
       }
 
       // Pausa entre lotes para no saturar S3 ni acaparar el event loop: esto
       // corre en el mismo proceso que atiende el correo entrante.
-      await sleep(pausaMs);
+      await sleep(pauseMs);
     }
   } finally {
     running = false;
   }
 
-  const restantes = pendingBackfillCount();
-  if (indexados || errores) {
-    log("info", "search", "Backfill del índice", { indexados, errores, restantes });
+  const remaining = pendingBackfillCount();
+  if (indexed || errors) {
+    log("info", "search", "Backfill del índice", { indexados: indexed, errores: errors, restantes: remaining });
   }
-  return { indexados, errores, restantes };
+  return { indexed, errors, remaining };
 }
