@@ -142,23 +142,21 @@ lo único falso es el SDK.
   guarda de `enLaCuenta?.size` no esté: el escenario fiel es unas credenciales apuntando a OTRA
   cuenta (lista vacía *y* `DomainNotFound`). Se comprueba con el mutante `if (enLaCuenta && …)`.
 
-## Probar que un proceso TERMINA SOLO (y que la prueba lo notaría)
+## `reconcilePendingAddons` barre TODOS los pendientes, y su `emails.ts` va doblado
 
-`scheduler.test.ts` vigila que importar `cron.ts` y `forwarding.ts` ni agende un cron ni deje vivo
-el proceso. Tres trampas:
+`addon-sync.test.ts` fija la red de seguridad del webhook (el add-on que MP sí autorizó y nunca
+notificó). Tres cosas que no se ven en el código:
 
-- **El hijo va con `-e`, no con un archivo.** `node --import tsx --input-type=module -e "await import('./cron.ts')"`:
-  sin `argv[1]`, `isServer` —que compara `process.argv[1]` contra `main.ts`— vale `false`, igual que
-  dentro de la suite. Lanzar `main.ts` haría que el hijo agendara los crons y la prueba no probaría nada.
-- **El control es obligatorio.** Un hijo que hace `cron.schedule("* * * * *", …)` directo tiene que
-  seguir vivo tras unos segundos de reloj real; sin él, la prueba podría estar pasando porque un hijo
-  lanzado con `-e` termina siempre, agende o no.
-- **El hijo hereda `NODE_OPTIONS`** —o sea `test-setup.mjs`, con su `unref` de los timers de más de un
-  minuto—, que es el mismo entorno que una prueba real. Se le quita `PREVIEW` para que no pase por
-  `esPreview()` en vez de por `isServer`, lleva `DATABASE_PATH` en un `mkdtemp` porque importar
-  `cron.ts` abre la base, y el tope se cierra con `SIGKILL` en el `finally`: un hijo colgado no se
-  queda a vivir con el runner.
-
-Y el doble del built-in, con `mock.module`: `defaultExport` con el real esparcido, pero los
-`namedExports` **sin** la llave `default` — el módulo sintético no compila y truena con
-«Unexpected token 'default'».
+- **El barrido es de la tabla entera**, no de «los tuyos» —el mismo caso que `deliverPending`—:
+  levanta todo add-on `pending` con `mp_preapproval_id`. En un archivo con varios casos, lo que
+  deja `pending` el caso anterior se vuelve a consultar en el siguiente, así que el `beforeEach` los
+  apaga (`UPDATE addons SET status = 'expired' WHERE status = 'pending' AND mp_preapproval_id IS NOT NULL`)
+  y las afirmaciones se filtran por id y por correo, nunca por el total de llamadas.
+- **`./emails.ts` va doblado, con el módulo real esparcido**: el `sendTemplate` de verdad manda por
+  SES (en pruebas `AWS_ENDPOINT_URL=http://localhost:1`) y eso arrastra `sendAlert`. El doble sólo
+  cuenta los envíos. El `fetch` falso es una tabla `preapprovalId → respuesta`; el camino de error
+  HTTP contesta `new Response(…, { status: 500 })` **en vez de lanzar**, porque lanzar ejercería el
+  `catch` externo de la corrida, que es otro camino.
+- El fin de periodo se calcula con `setDate(+35)` en **hora local**: se afirma por rango medido
+  alrededor de la llamada con ±1 h de margen, no con el reloj congelado (`mock.method(Date, "now")`
+  no frena `new Date()`).
