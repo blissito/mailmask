@@ -88,7 +88,7 @@ export function hostIssues(records: WebsiteHost["records"], platform: WebsiteHos
 }
 
 /** HEAD por HTTPS sin seguir redirecciones, más la caducidad del certificado. */
-export async function probeHttps(host: string, timeoutMs = 5000): Promise<HttpsCheck> {
+export async function probeHttps(host: string, timeoutMs = 10_000): Promise<HttpsCheck> {
   const cert = new Promise<{ validTo?: string; error?: string }>((resolve) => {
     const sock = tlsConnect({ host, port: 443, servername: host, timeout: timeoutMs }, () => {
       const c = sock.getPeerCertificate();
@@ -108,6 +108,9 @@ export async function probeHttps(host: string, timeoutMs = 5000): Promise<HttpsC
     http = { error: (e as Error).cause ? String((e as { cause?: { message?: string } }).cause?.message ?? e) : (e as Error).message };
     // Un registro recién escrito tarda en verse: «ENOTFOUND» asusta y casi siempre es eso.
     if (/ENOTFOUND|EAI_AGAIN/.test(http.error ?? "")) http.error = "todavía no resuelve (si lo acabas de crear, espera un par de minutos)";
+    // En el borde de EasyBits (y cualquier TLS bajo demanda) la primera visita emite el
+    // certificado y puede pasar del tope: no es una caída.
+    else if (/abort|timeout/i.test(http.error ?? "")) http.error = "tardó en responder; si es nuevo, puede estar emitiendo su certificado: vuelve a revisar en un minuto";
   }
   const c = await cert;
   const error = c.error ?? http.error;
