@@ -5,6 +5,7 @@ import { app } from "./main.ts";
 import { recordOrder, type Order } from "./db.ts";
 import { sqlite } from "./pg.ts";
 import { signJwt } from "./auth.ts";
+import { breakdownFromNote } from "./receipt.ts";
 
 const get = (path: string, cookie?: string) =>
   app.fetch(new Request(`http://localhost${path}`, { headers: cookie ? { cookie } : {} }));
@@ -69,5 +70,20 @@ describe("/recibo/:folio", () => {
     const cookie = `token=${await signJwt({ email: stranger })}`;
     assert.equal((await get(`/recibo/${order.number}`, cookie)).status, 404);
     assert.equal((await get(`/recibo/MM-0000-NOPE`, cookie)).status, 404);
+  });
+});
+
+describe("breakdownFromNote", () => {
+  it("parte la nota en renglones cuando los importes suman el total", () => {
+    assert.deepEqual(
+      breakdownFromNote("Incluye activación anual de MailMask ($999 MXN) y renovación del dominio por un año ($589 MXN).", 158800),
+      [{ concept: "Activación anual de MailMask", cents: 99900 }, { concept: "Renovación del dominio por un año", cents: 58900 }],
+    );
+  });
+
+  it("si no cuadra con el total, un solo renglón", () => {
+    assert.equal(breakdownFromNote("Algo ($999 MXN) y otra cosa ($1 MXN)", 158800), null);
+    assert.equal(breakdownFromNote("Cortesía de arranque", 0), null);
+    assert.equal(breakdownFromNote(undefined, 100), null);
   });
 });
