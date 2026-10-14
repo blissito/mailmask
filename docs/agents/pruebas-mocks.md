@@ -108,3 +108,36 @@ no vacía ANTES de comparar, la prueba falla —en vez de pasar vacía— si la 
 `foreign_keys`, así que archivar una acción (`requireConfirmation` con `via: "turn"`) truena con
 `FOREIGN KEY constraint failed` si ese email no existe. En `agent-actions.test.ts` cada prueba se
 lleva su propio usuario: `createUser(email, "x")` de `db.ts` antes de tocar el módulo.
+
+## Doblar el cliente de AWS (no `route53.ts`)
+
+`domain-renewal.test.ts` y `transfer-lock.test.ts` doblan `./route53.ts` entero, así que nunca pasan
+por la forma en que AWS contesta. `domain-sync.test.ts` hace lo contrario: `route53.ts` corre REAL y
+lo único falso es el SDK.
+
+- **Se sustituye sólo `Route53DomainsClient`, con el módulo esparcido.** Los `ListDomainsCommand`,
+  `GetDomainDetailCommand` y `EnableDomainTransferLockCommand` que recibe el cliente falso son los
+  de verdad, así que `cmd.constructor.name` trae el nombre bueno y el despacho es un `switch` por ese
+  nombre. Registrar cada comando en una lista es lo que permite afirmar que se LLEGÓ a la segunda
+  página: dos `ListDomainsCommand` = siguió el `NextPageMarker`.
+- **Fidelidad o la prueba miente.** `ListDomains` contesta `{ Domains: [{ DomainName, Expiry, AutoRenew }], NextPageMarker? }`
+  con `Expiry` como **`Date`** y no como texto (`route53.ts` hace `new Date(res.Expiry).toISOString()`);
+  `GetDomainDetail` manda `ExpirationDate` como `Date`, `StatusList` —la ÚNICA fuente del candado— y
+  `Nameservers: [{ Name }]`; y un dominio que no está en la cuenta lanza un error con
+  **`name: "DomainNotFound"`**, que es lo que algún día distinguirá «no está» de «no pude preguntar».
+  Un error de otra clase (throttling) se dobla también por `name` para poder probar ese camino.
+- **El cliente se cachea por proceso.** `route53.ts` guarda el cliente en `_route53Domains`, así que
+  el doble se declara ANTES de importar cualquier cosa que lo llame (el `await import("./domain-sync.ts")`
+  va en `before()`, como en las demás pruebas del repo). Cada archivo corre en su propio proceso: el
+  doble no ensucia a los otros.
+- **El cliente falso lleva estado.** Al recibir `EnableDomainTransferLockCommand` marca el dominio como
+  protegido, y el `GetDomainDetail` que `lockTransfer` pide justo después ya lo ve: así se fija que se
+  guarda lo que AWS reporta, no lo que pedimos. Sin estado, la prueba del candado vencido pasaría sin
+  probar nada.
+- **`PREVIEW` no puede estar en `1`** en el proceso de pruebas: `getRoute53Domains()` llama
+  `assertNoPreview` y truena antes de llegar al doble.
+
+- **Una prueba de la lista vacía sólo prueba algo si el detalle TAMBIÉN falla.** Con
+  `GetDomainDetail` contestando, la segunda opinión salva al dominio y la prueba pasa aunque la
+  guarda de `enLaCuenta?.size` no esté: el escenario fiel es unas credenciales apuntando a OTRA
+  cuenta (lista vacía *y* `DomainNotFound`). Se comprueba con el mutante `if (enLaCuenta && …)`.

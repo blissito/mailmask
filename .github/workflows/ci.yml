@@ -109,6 +109,13 @@ jobs:
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # gitleaks-action sube un artifact SARIF con rootDirectory fijo en /home/runner. En un
+          # runner self-hosted el workspace es /opt/actions-runner/_work/... y esa subida truena con
+          # "The rootDirectory: /home/runner is not a parent directory of the file: .../results.sarif",
+          # DESPUÉS de que el scan ya reportó "no leaks found" (log del job security del run
+          # 38471228363). El scan y su exit-code no cambian: sólo se salta el artifact, que este
+          # workflow no consume (no hay paso de upload-sarif), donde de todos modos no puede subirse.
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "${{ runner.environment == 'self-hosted' && 'false' || 'true' }}"
       # Requiere 'Dependency graph' activado en Settings → Code security del repo;
       # mientras no se active, dependency-review-action falla con un error de configuración,
       # no por una dependencia riesgosa. continue-on-error hasta que se active.
