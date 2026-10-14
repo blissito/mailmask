@@ -14,8 +14,9 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
-import { EMAIL_STYLES, wrapEmailHtml } from "./email-template.js";
+import { ALERT_TONOS, EMAIL_STYLES, PALETA, wrapEmailHtml } from "./email-template.js";
 import { MAX_EMAIL_HTML_BYTES, appendSignature, renderEmailHtml, sanitizeEmailHtml } from "./email-html.js";
 
 // Tope NUESTRO, no de Gmail: el shell vacío midió 4.7 KB el 13-oct-2026 (1.0 KB ya
@@ -225,6 +226,50 @@ describe("la cadena real (sanitizeEmailHtml): wrap + juice", () => {
 
   it("el contenido del usuario cae dentro de la celda del cuerpo", () => {
     assert.match(html, /<td class="email-body"[^>]*>[\s\S]*?<p[^>]*>Hola<\/p>/);
+  });
+});
+
+describe("las cajas de color: un tono por tipo", () => {
+  // Por el camino completo (markdown → HTML → juice), que es como salen en el correo:
+  // el `> [!TIPO]` de GitHub se convierte en la tabla con la celda y el título del tipo.
+  const { html } = renderEmailHtml(
+    Object.keys(ALERT_TONOS)
+      .map((tipo) => `> [!${tipo.toUpperCase()}]\n> Contenido de la caja ${tipo}.`)
+      .join("\n\n"),
+  );
+
+  it("la caja de nota va en azul: su borde ya no es el rojo de los enlaces", () => {
+    const celda = etiquetaCon(html, /<td class="alert-cell alert-cell-note"[^>]*>/);
+    assert.ok(celda, "no encontré la celda de la caja de nota en el correo");
+    // El borde estaba en el mismo rojo que los enlaces sobre un fondo y un título azules:
+    // la caja informativa se leía como error. El azul del borde es el de su propia familia.
+    assert.match(celda, /border-left-color:\s*#2563eb/i, "el borde de la nota no es el azul de su tono");
+    assert.doesNotMatch(celda, /border-left-color:\s*#b31f33/i, "el borde de la nota volvió al rojo de los enlaces");
+  });
+
+  it("cada tipo de ALERT_TONOS pinta su borde, su fondo y su título", () => {
+    for (const [tipo, tono] of Object.entries(ALERT_TONOS)) {
+      // En el `style=` de la celda conviven la base (`.alert-cell`) y el tono del tipo: si la
+      // regla del tipo se pierde, la celda se queda con el gris de la base y esto lo caza.
+      const celda = etiquetaCon(html, new RegExp(`<td class="alert-cell alert-cell-${tipo}"[^>]*>`));
+      const titulo = etiquetaCon(html, new RegExp(`<p class="alert-title alert-title-${tipo}"[^>]*>`));
+      assert.ok(celda && titulo, `${tipo}: no encontré la celda o el título de la caja`);
+      assert.match(celda, new RegExp(`border-left-color:\\s*${tono.borde}`, "i"), `${tipo}: la celda perdió el borde del tipo`);
+      assert.match(celda, new RegExp(`background-color:\\s*${tono.fondo}`, "i"), `${tipo}: la celda perdió el fondo del tipo`);
+      assert.match(titulo, new RegExp(`color:\\s*${tono.titulo}`, "i"), `${tipo}: el título perdió el color del tipo`);
+    }
+  });
+
+  it("cada color de las tablas vive en un solo lugar del archivo", () => {
+    // `PALETA` y `ALERT_TONOS` existen para eso: cambiar un color es cambiarlo una vez. Y de
+    // paso, un tono que copia el color de otro —el borde de la nota copiaba el rojo de los
+    // enlaces— aparece dos veces y sale aquí.
+    const fuente = readFileSync(new URL("./email-template.ts", import.meta.url), "utf8");
+    const colores = [...Object.values(PALETA), ...Object.values(ALERT_TONOS).flatMap((tono) => Object.values(tono))];
+    for (const color of colores) {
+      const veces = fuente.split(color).length - 1;
+      assert.equal(veces, 1, `${color} aparece ${veces} veces en email-template.ts y debería vivir en un solo lugar`);
+    }
   });
 });
 

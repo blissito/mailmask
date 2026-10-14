@@ -37,7 +37,7 @@ export const PALETA = {
  * que mantiene juntas la regla de la celda y la del título.
  */
 export const ALERT_TONOS = {
-  note: { borde: "#b31f33", fondo: "#eff6ff", titulo: "#1d4ed8" },
+  note: { borde: "#2563eb", fondo: "#eff6ff", titulo: "#1d4ed8" },
   tip: { borde: "#16a34a", fondo: "#f0fdf4", titulo: "#15803d" },
   important: { borde: "#7c3aed", fondo: "#faf5ff", titulo: "#6d28d9" },
   warning: { borde: "#d97706", fondo: "#fffbeb", titulo: "#b45309" },
