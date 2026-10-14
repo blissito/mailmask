@@ -1394,18 +1394,22 @@ async function deleteConversation() {
     document.getElementById("detail-loaded").classList.add("mesa-hidden");
     await loadConversations();
     toastDeshacer("Conversación eliminada", async () => {
-      const r = await fetch(`/api/bandeja/conversations/${id}/restore`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ domainId }),
-      });
-      if (!r.ok) {
-        const err = await r.json().catch(() => ({}));
-        toast(err.error || "No se pudo restaurar");
-        return;
+      try {
+        const r = await fetch(`/api/bandeja/conversations/${id}/restore`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ domainId }),
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          toast(err.error || "No se pudo restaurar");
+          return;
+        }
+        toast("Conversación restaurada");
+        await loadConversations();
+      } catch {
+        toast("No se pudo restaurar");
       }
-      toast("Conversación restaurada");
-      await loadConversations();
     });
   } else {
     const err = await res.json().catch(() => ({}));

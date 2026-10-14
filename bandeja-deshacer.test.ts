@@ -2,7 +2,7 @@
 // «Deshacer» lo regresa con un clic. Ficha: docs/agents/bandeja-deshacer.md
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 const leer = (ruta: string) => readFileSync(new URL(`./${ruta}`, import.meta.url), "utf8");
 const JS = leer("public/js/bandeja.js");
@@ -25,6 +25,13 @@ test("borrar la conversación abierta deshace con /restore", () => {
   assert.match(cuerpo("deleteConversation"), /\/restore/);
 });
 
+test("si «Deshacer» falla por red, avisa en vez de tirar un error sin atrapar", () => {
+  assert.match(
+    cuerpo("deleteConversation"),
+    /try\s*\{[\s\S]*\/restore[\s\S]*\}\s*catch[\s\S]*No se pudo restaurar/,
+  );
+});
+
 test("borrar en lote deshace con /restore, sólo de los ids que estaban vivos", () => {
   const f = cuerpo("borrarSeleccionadas");
   assert.match(f, /\/restore/);
@@ -44,4 +51,20 @@ test("un toast normal limpia el «Deshacer» previo", () => {
 
 test("sólo el aviso con botón recibe clics", () => {
   assert.match(CSS, /\.mesa-toast\.con-accion\s*\{[^}]*pointer-events:\s*auto/);
+});
+
+test("AGENTS.md enlaza cada ficha de docs/agents", () => {
+  const indice = leer("AGENTS.md");
+  const sinEnlace = readdirSync(new URL("./docs/agents", import.meta.url))
+    .filter((f) => f.endsWith(".md"))
+    .filter((f) => !indice.includes(`docs/agents/${f}`));
+  assert.deepEqual(sinEnlace, [], "fichas sin renglón en AGENTS.md");
+});
+
+test("AGENTS.md conserva la entrada de diálogos y pone la de Bandeja debajo", () => {
+  const indice = leer("AGENTS.md");
+  const dialogos = indice.indexOf("docs/agents/dialogos-app.md");
+  const bandeja = indice.indexOf("docs/agents/bandeja-deshacer.md");
+  assert.ok(dialogos >= 0, "se perdió el renglón de dialogos-app.md");
+  assert.ok(bandeja > dialogos, "el renglón de Bandeja debe ir después del de diálogos");
 });
