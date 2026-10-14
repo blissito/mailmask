@@ -365,6 +365,12 @@ function domainPreferenceBody(opts: {
 
 // En desarrollo Google redirige a localhost; en producción, al dominio principal. Las
 // dos URIs tienen que estar dadas de alta en la consola de Google Cloud.
+function easybitsRedirectUri(request: Request): string {
+  const host = new URL(request.url).host;
+  const origin = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) ? `http://${host}` : getMainDomainUrl();
+  return `${origin}/api/integrations/easybits/callback`;
+}
+
 function googleRedirectUri(request: Request): string {
   const host = new URL(request.url).host;
   const origin = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) ? `http://${host}` : getMainDomainUrl();
@@ -7803,6 +7809,136 @@ const app = new Elysia({ adapter: node() })
     });
   }, {
     detail: { tags: ["DNS", "SDK"], summary: "List DNS records and zone state", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  // --- EasyBits (Sitios) por OAuth: conectar la cuenta y publicar un sitio en el dominio ---
+  // Sólo con sesión de navegador: un agente no conecta cuentas ajenas.
+  .get("/api/integrations/easybits/start", async ({ request, query }) => {
+    const user = await getAuthUser(request);
+    if (!user || user.via !== "session") return new Response(null, { status: 302, headers: { location: "/login?next=%2Fapp" } });
+    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    if (limited) return limited;
+    const { getOAuthClient, authorizeUrl, pkcePair } = await import("./easybits-link.js");
+    const redirectUri = easybitsRedirectUri(request);
+    try {
+      const client = await getOAuthClient(redirectUri);
+      const { verifier, challenge } = pkcePair();
+      const state = crypto.randomUUID();
+      const domainId = typeof query.domainId === "string" ? query.domainId.slice(0, 64) : undefined;
+      await db.insert(tokensTable).values({
+        token: state,
+        kind: "easybits-state",
+        value: { email: user.email, verifier, domainId },
+        expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+      });
+      return new Response(null, { status: 302, headers: { location: authorizeUrl(client, redirectUri, state, challenge) } });
+    } catch (err) {
+      log("error", "easybits", "No se pudo iniciar OAuth con EasyBits", { error: String(err) });
+      return new Response(null, { status: 302, headers: { location: "/app?easybits_error=start" } });
+    }
+  }, { detail: { tags: ["Website"], summary: "Start the EasyBits OAuth connection" } })
+
+  .get("/api/integrations/easybits/callback", async ({ request, query }) => {
+    const back = (q: string) => new Response(null, { status: 302, headers: { location: `/app?${q}` } });
+    const user = await getAuthUser(request);
+    if (!user || user.via !== "session") return back("easybits_error=session");
+    const state = typeof query.state === "string" ? query.state : "";
+    const code = typeof query.code === "string" ? query.code : "";
+    const row = state ? db.select().from(tokensTable).where(eq(tokensTable.token, state)).get() : undefined;
+    if (!row || row.kind !== "easybits-state" || row.expiresAt < new Date().toISOString()) return back("easybits_error=state");
+    db.delete(tokensTable).where(eq(tokensTable.token, state)).run();
+    const carried = (row.value ?? {}) as { email?: string; verifier?: string; domainId?: string };
+    // El state está atado a quien lo pidió: otra sesión no puede terminar su conexión.
+    if (carried.email !== user.email || !carried.verifier) return back("easybits_error=state");
+    if (!code) return back("easybits_error=cancelled");
+    try {
+      const { exchangeCode } = await import("./easybits-link.js");
+      await exchangeCode(user.email, easybitsRedirectUri(request), code, carried.verifier);
+    } catch (err) {
+      log("error", "easybits", "Canje del code de EasyBits falló", { email: user.email, error: String(err) });
+      return back("easybits_error=token");
+    }
+    return back(`easybits=${encodeURIComponent(carried.domainId ?? "1")}`);
+  }, { detail: { tags: ["Website"], summary: "EasyBits OAuth callback" } })
+
+  .get("/api/integrations/easybits", async ({ request }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const { isConnected, listSites, EasyBitsDisconnected } = await import("./easybits-link.js");
+    if (!isConnected(user.email)) return Response.json({ connected: false, sites: [] });
+    try {
+      return Response.json({ connected: true, sites: await listSites(user.email, easybitsRedirectUri(request)) });
+    } catch (err) {
+      if (err instanceof EasyBitsDisconnected) return Response.json({ connected: false, sites: [] });
+      log("warn", "easybits", "No se pudieron listar los sitios", { email: user.email, error: String(err) });
+      return jsonErr("EasyBits no respondió; intenta de nuevo.", 502);
+    }
+  }, { detail: { tags: ["Website"], summary: "EasyBits connection state and the user's sites" } })
+
+  .delete("/api/integrations/easybits", async ({ request }) => {
+    const user = await getAuthUser(request);
+    if (!user || user.via !== "session") return jsonErr("No autenticado", 401);
+    const { disconnect } = await import("./easybits-link.js");
+    disconnect(user.email);
+    return Response.json({ ok: true });
+  }, { detail: { tags: ["Website"], summary: "Disconnect EasyBits" } })
+
+  .post("/api/domains/:id/website/easybits", async ({ request, params, body }) => {
+    const user = await getAuthUser(request);
+    if (!user || user.via !== "session") return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    if (limited) return limited;
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+    if (!d.hostedZoneId) return jsonErr("Activa primero el editor de DNS de este dominio (pestaña DNS).", 409);
+    const b = body as { websiteId: string; placement: "apex" | "subdomain"; dryRun?: boolean; retryVerify?: boolean };
+
+    const { publishSite, retryVerify, EasyBitsDisconnected } = await import("./easybits-link.js");
+    const { validarRRSet, aplicarGuardian, conflictoDeConvivencia, ErrorDns } = await import("./dns-records.js");
+    const { listRecordSets, applyRecordChanges } = await import("./route53.js");
+    const guardado = { domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens };
+    const zona = d.hostedZoneId;
+    try {
+      if (b.retryVerify) {
+        return Response.json(await retryVerify(user.email, easybitsRedirectUri(request), d.domain, b.placement === "apex" ? b.websiteId : undefined));
+      }
+      const existentes = await listRecordSets(zona);
+      const result = await publishSite({
+        email: user.email,
+        redirectUri: easybitsRedirectUri(request),
+        domain: d.domain,
+        websiteId: b.websiteId,
+        placement: b.placement === "apex" ? "apex" : "subdomain",
+        dryRun: b.dryRun,
+      }, {
+        current: (name, type) => (existentes.find((e) => e.name === name && e.type === type) as never) ?? null,
+        async apply(records) {
+          const rrsets = records.map((r) => validarRRSet(r, d.domain));
+          for (const rrset of rrsets) {
+            const bloqueo = aplicarGuardian("upsert", rrset, guardado);
+            if (bloqueo) throw new ErrorDns(bloqueo.message);
+            const choque = conflictoDeConvivencia(rrset, existentes as never);
+            if (choque) throw new ErrorDns(choque);
+          }
+          await applyRecordChanges(zona, rrsets.map((rrset) => ({ action: "UPSERT" as const, rrset })), `Sitio de EasyBits publicado por ${user.email}`);
+        },
+      });
+      return Response.json(result);
+    } catch (err) {
+      if (err instanceof EasyBitsDisconnected) return jsonErr(err.message, 401);
+      if (err instanceof ErrorDns) return jsonErr(err.message, 409);
+      log("error", "easybits", "No se pudo publicar el sitio", { domain: d.domain, error: String(err) });
+      return jsonErr(err instanceof Error ? err.message : "No se pudo publicar el sitio.", 502);
+    }
+  }, {
+    body: t.Object({
+      websiteId: t.String(),
+      placement: t.String(),
+      dryRun: t.Optional(t.Boolean()),
+      retryVerify: t.Optional(t.Boolean()),
+    }),
+    detail: { tags: ["Website"], summary: "Publish an EasyBits site on this domain (connects DNS and EasyBits)" },
   })
 
   .get("/api/domains/:id/website", async ({ request, params }) => {

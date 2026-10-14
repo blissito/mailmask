@@ -28,7 +28,8 @@ export const PLATFORMS: { id: string; label: string; ips?: string[]; hosts?: Reg
   { id: "render", label: "Render", ips: ["216.24.57.1"], hosts: /\.onrender\.com$/ },
   { id: "fly", label: "Fly.io", hosts: /\.fly\.dev$/ },
   { id: "railway", label: "Railway", hosts: /\.up\.railway\.app$/ },
-  { id: "easybits", label: "EasyBits", hosts: /(^|\.)sandboxes\.easybits\.cloud$/ },
+  { id: "easybits-sites", label: "EasyBits Sitios", ips: ["66.241.125.82"], hosts: /^easybits\.fly\.dev$/ },
+  { id: "easybits", label: "EasyBits Sandbox", hosts: /(^|\.)sandboxes\.easybits\.cloud$/ },
   { id: "shopify", label: "Shopify", ips: ["23.227.38.65"], hosts: /\.myshopify\.com$/ },
   { id: "wix", label: "Wix", ips: ["185.230.63.107", "185.230.63.171", "185.230.63.186"], hosts: /\.wixdns\.net$/ },
 ];
@@ -71,7 +72,8 @@ export function hostIssues(records: WebsiteHost["records"], platform: WebsiteHos
   const out: string[] = [];
   const a = records.find((r) => r.type === "A");
   const aaaa = records.find((r) => r.type === "AAAA");
-  if (platform && a && aaaa && platform.id !== "fly") {
+  // Fly (y EasyBits Sitios, que vive en Fly) sí publican IPv6: ahí el AAAA es correcto.
+  if (platform && a && aaaa && platform.id !== "fly" && platform.id !== "easybits-sites") {
     // Vercel, Netlify y Render no publican IPv6: un AAAA viejo manda a parte de las visitas a otro lado.
     out.push(`Hay un AAAA (${aaaa.values.join(", ")}) que no es de ${platform.label}: bórralo o parte de las visitas irá a otro servidor.`);
   }
@@ -172,7 +174,8 @@ export async function getWebsiteStatus(
       records,
       platform,
       issues,
-      https: records.length ? await probe(name) : null,
+      // Un comodín no es un host al que se pueda llamar.
+      https: records.length && !name.startsWith("*.") ? await probe(name) : null,
     };
   }), 6);
   return { hosts: out };
