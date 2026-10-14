@@ -48,7 +48,7 @@ comprueba "no es 404" ya vale: eso solo habría atrapado 6 de los 10 bugs.
 `WebStandardStreamableHTTPServerTransport`, `enableJsonResponse`), autenticado sólo con
 `Authorization: Bearer mk_…` (la API key normal) o `Bearer mt_…` (turn token del asistente,
 ver "Asistente Mask"); sin ellas 401, y `/mcp` está exento de CSRF porque nunca acepta cookie.
-96 herramientas desde el 5-oct-2026 (`lock_domain_transfer`), con paridad con el panel (cobro por liga, compra/transferencia/renovación de
+97 herramientas desde el 14-oct-2026 (`website_status`), con paridad con el panel (cobro por liga, compra/transferencia/renovación de
 dominios, equipo, firma y logo, respuestas guardadas, `domain_dns_setup`, perfil, pedidos, referidos y la **Bandeja**: `inbox_*`) y `MCP_INSTRUCTIONS`
 (≤6000 caracteres, lo fija `mcp.test.ts`): es todo lo que un agente partner sabe del producto. **Cada herramienta es el SDK real** (`sdk/src`, que sí viaja
 en la imagen) hablando con la app en proceso vía `app.fetch` — el mismo truco de
@@ -670,7 +670,7 @@ La clave del sitio es pública y vive en el HTML; la secreta es `TURNSTILE_SECRE
   (`esServidor`→`isServer`, `programar`→`schedule`), `search-backfill.ts` (`ejecutarBackfill`→`runBackfill`,
   `backfillPendiente`→`pendingBackfillCount`, `ResultadoBackfill`→`BackfillResult`, `LOTE`/`PAUSA_MS`/
   `dormir`/`corriendo`) y `domain-sync.ts` (`avisarRenovaciones`→`notifyRenewals`, `cobranzaDominios`→
-  `chargeDomainRenewals`, `cerrarTransferOut`→`closeTransferOut`, `DIA`/`dias`/`HITOS_*`). Queda el resto
+  `chargeDomainRenewals`, `cerrarTransferOut`→`closeTransferOut`, `DIA`/`dias`/`HITOS_*`). `ses.ts` (pedido #82, 14-oct-2026): `clasificarErrorS3`→`classifyS3Error` (y su test en `firma-logo.test.ts`), `bucketDeSes`→`sesBucket`, `nombre`→`errorName` (local), `respondio`→`responded` (retorno de `checkDomainStatus`, también en `main.ts`, `domain-flags.ts` y sus pruebas), `bucketConfigurado`→`configuredBucket` y las llaves de log `esperado`/`encontrados`→`expected`/`found`. Queda el resto
   del legado —`preview.ts` incluido, que sigue con `esServidor` como parámetro de `debeProgramar`— y todo
   lo demás de la lista. La llave JSON `backfillPendiente` NO se toca: la lee `public/js/bandeja.js`.
   **Sprint #10 (ticket B, `search-backfill.test.ts`)**: en `db.ts` `contarSinIndexar`→`countUnindexedMessages` y

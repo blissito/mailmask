@@ -7,6 +7,8 @@ import { useEffect, useState } from "react"
  * vez que cambia el dominio seleccionado o la pestaña.
  */
 export type ScreenContext = {
+  /** `domains` = la lista (ningún dominio abierto); `domain` = el detalle. */
+  page?: "domains" | "domain"
   domainId?: string | null
   tab?: string | null
 }
@@ -26,8 +28,9 @@ declare global {
 
 const read = (): ScreenContext | null => {
   const s = typeof window !== "undefined" ? window.mailmaskScreen : undefined
-  if (!s?.domainId) return null
-  return { domainId: s.domainId, tab: s.tab ?? null }
+  // Sin dominio abierto también es contexto: estás en la lista.
+  if (!s?.domainId) return { page: "domains" }
+  return { page: "domain", domainId: s.domainId, tab: s.tab ?? null }
 }
 
 export function useCurrentScreen(): ScreenContext | null {

@@ -6,7 +6,7 @@ import { app } from "./main.ts";
 import { createUser, createDomain, createConversation, addMessage, indexMessage, getIndexedBody } from "./db.ts";
 import { signJwt, generateCsrfToken } from "./auth.ts";
 import { ftsDisponible } from "./pg.ts";
-import { clasificarErrorS3, degradedBodyState } from "./ses.ts";
+import { classifyS3Error, degradedBodyState } from "./ses.ts";
 
 const sufijo = () => Math.random().toString(36).slice(2, 10);
 let ipN = 0;
@@ -168,12 +168,12 @@ describe("Clasificación de errores de S3", () => {
   it("separa 'ya no existe' de 'no tenemos permiso'", () => {
     // Los tres desenlaces llegan al usuario como mensajes distintos: uno es
     // definitivo, otro se reintenta. Antes los tres decían "error".
-    assert.equal(clasificarErrorS3({ name: "NoSuchKey", $metadata: { httpStatusCode: 404 } }), "NOT_FOUND");
-    assert.equal(clasificarErrorS3({ $metadata: { httpStatusCode: 404 } }), "NOT_FOUND");
-    assert.equal(clasificarErrorS3({ name: "NotFound" }), "NOT_FOUND");
-    assert.equal(clasificarErrorS3({ name: "AccessDenied", $metadata: { httpStatusCode: 403 } }), "DENIED");
-    assert.equal(clasificarErrorS3({ name: "TimeoutError" }), "OTHER");
-    assert.equal(clasificarErrorS3(new Error("red caída")), "OTHER");
+    assert.equal(classifyS3Error({ name: "NoSuchKey", $metadata: { httpStatusCode: 404 } }), "NOT_FOUND");
+    assert.equal(classifyS3Error({ $metadata: { httpStatusCode: 404 } }), "NOT_FOUND");
+    assert.equal(classifyS3Error({ name: "NotFound" }), "NOT_FOUND");
+    assert.equal(classifyS3Error({ name: "AccessDenied", $metadata: { httpStatusCode: 403 } }), "DENIED");
+    assert.equal(classifyS3Error({ name: "TimeoutError" }), "OTHER");
+    assert.equal(classifyS3Error(new Error("red caída")), "OTHER");
   });
 
   it("un NOT_FOUND pasada la retención de 90 días es 'expired', antes es una pérdida", () => {

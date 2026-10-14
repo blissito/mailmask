@@ -1013,6 +1013,20 @@ async function loadDomains() {
     switchTab("apikeys");
   }
 
+  // Regreso del OAuth de EasyBits: `/app?easybits=<domainId>` reabre el dominio, la pestaña
+  // Sitio web y el modal para elegir el sitio.
+  const ebParams = new URLSearchParams(location.search);
+  if (ebParams.has("easybits") || ebParams.has("easybits_error")) {
+    history.replaceState(null, "", "/app");
+    const ebDomain = ebParams.get("easybits");
+    if (ebParams.has("easybits_error")) showToast("No se pudo conectar con EasyBits; intenta de nuevo.", true);
+    else if (ebDomain && domains.some(x => x.id === ebDomain)) {
+      await selectDomain(ebDomain);
+      switchTab("web");
+      easybitsModal();
+    }
+  }
+
   // `/app#transfer=dominio.com` (liga que da el asistente con `transfer_start`): abre el
   // formulario de transferencia, que es donde se pega el código EPP — nunca en el chat.
   const transferHash = window.location.hash.match(/^#transfer=([a-z0-9.-]+\.[a-z0-9-]+)$/i);
@@ -2470,6 +2484,345 @@ async function dnsComprobarDelegacion() {
     : "Todavía no vemos el cambio. Puede tardar hasta 48 horas.";
 }
 
+// --- Sitio web: a dónde apunta cada host y conectar a un hosting con plantilla ---
+// Patrón Vercel/Render: por host, lo que hay contra lo que debería haber. Las plantillas
+// son las de `PRESETS` (dns-records.ts) y siempre pasan por vista previa antes de escribir.
+
+const WEB_PLATFORMS = [
+  { id: "vercel", label: "Vercel", pide: "mi-proyecto.vercel.app o cname.vercel-dns.com" },
+  { id: "netlify", label: "Netlify", pide: "mi-sitio.netlify.app" },
+  { id: "github-pages", label: "GitHub Pages", pide: "usuario.github.io" },
+  { id: "render", label: "Render", pide: "mi-app.onrender.com" },
+  { id: "fly", label: "Fly.io", pide: "mi-app.fly.dev", soloSub: true },
+  { id: "cloudflare-pages", label: "Cloudflare Pages", pide: "mi-sitio.pages.dev", soloSub: true },
+  { id: "easybits", label: "Sandbox de EasyBits", pide: null, soloSub: true },
+  { id: "otro", label: "Otro (CNAME)", pide: "destino.ejemplo.com", soloSub: true },
+];
+let _webEstado = null;
+
+async function loadWebsite() {
+  const cont = document.getElementById("web-hosts");
+  if (!selectedDomain) return;
+  document.getElementById("web-ask").innerHTML = askAssistantButton(`Conecta ${selectedDomain.domain} a mi hosting`);
+  renderWebPlatforms();
+  cont.innerHTML = `<div class="text-sm text-fg-muted">Revisando a dónde apunta ${esc(selectedDomain.domain)}…</div>`;
+  try {
+    const res = await fetch(`/api/domains/${selectedDomain.id}/website`);
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "no se pudo revisar");
+    _webEstado = await res.json();
+  } catch (err) {
+    cont.innerHTML = `<div class="text-sm text-red-500">${esc(err.message)}</div>`;
+    return;
+  }
+  cont.innerHTML = _webEstado.hosts.map(renderWebHost).join("") + (_webEstado.editable ? "" : `
+    <div class="card border border-line rounded-xl p-4 bg-bg-elev text-sm text-fg-muted">
+      El DNS de este dominio vive en otro proveedor: lo de arriba es lo que ve internet.
+      Para conectarlo desde aquí, activa el editor en la pestaña <button type="button" class="underline text-fg" data-web-go-dns>DNS</button>.
+    </div>`);
+  cont.querySelector("[data-web-go-dns]")?.addEventListener("click", () => switchTab("dns"));
+}
+
+function renderWebHost(h) {
+  const nombre = h.label === "@" ? `${esc(h.name)} <span class="text-fg-subtle font-normal">(raíz)</span>` : esc(h.name);
+  let chip;
+  if (!h.records.length) chip = `<span class="text-xs px-2 py-0.5 rounded bg-bg-inset text-fg-muted">Sin apuntar</span>`;
+  else if (h.issues.length || (h.https && !h.https.ok)) chip = `<span class="text-xs px-2 py-0.5 rounded bg-amber-500/15 text-amber-600">Revisar</span>`;
+  else chip = `<span class="text-xs px-2 py-0.5 rounded bg-mask-500/15 text-mask-600">En línea</span>`;
+  const valores = h.records.map(r => `<div class="font-mono text-xs text-fg-muted"><span class="text-fg">${r.type}</span> ${r.values.map(esc).join(", ")}</div>`).join("");
+  let https = "";
+  if (h.https) {
+    if (h.https.ok) {
+      const red = h.https.location ? ` → ${esc(h.https.location)}` : "";
+      const cert = h.https.certValidTo ? ` · certificado hasta ${new Date(h.https.certValidTo).toLocaleDateString("es-MX")}` : "";
+      https = `<div class="text-xs text-fg-muted mt-1">HTTPS ${h.https.status}${red}${cert}</div>`;
+    } else {
+      https = `<div class="text-xs text-red-500 mt-1">HTTPS: ${esc(h.https.error || `responde ${h.https.status}`)}</div>`;
+    }
+  }
+  const issues = h.issues.map(i => `<div class="text-xs text-amber-600 mt-1">${esc(i)}</div>`).join("");
+  return `
+    <div class="border border-line rounded-xl p-4 bg-bg-elev">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+        <div class="font-semibold text-fg flex items-center gap-2">${nombre}${h.records.length && h.https?.ok ? `
+          <a href="https://${esc(h.name)}" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-fg-muted hover:text-accent-text inline-flex items-center gap-1">Abrir
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></a>` : ""}</div>
+        <div class="flex items-center gap-2">
+          ${h.platform ? `<span class="text-xs font-medium text-fg-muted">${esc(h.platform.label)}</span>` : ""}
+          ${chip}
+        </div>
+      </div>
+      ${valores || `<div class="text-xs text-fg-subtle">No tiene registros de sitio.</div>`}
+      ${https}${issues}
+    </div>`;
+}
+
+function renderWebPlatforms() {
+  const cont = document.getElementById("web-platforms");
+  // EasyBits Sitios va primero y a lo ancho: es la casa y la campaña. Se conecta por OAuth.
+  const destacado = `
+    <button type="button" data-web-easybits class="col-span-2 sm:col-span-4 border-2 border-accent rounded-xl p-4 bg-bg-elev hover:bg-bg-inset transition-colors text-left">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="font-semibold text-fg">EasyBits</div>
+        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-mask-500/15 text-mask-600">Recomendado</span>
+      </div>
+      <p class="text-sm text-fg-muted mt-1">Describe tu sitio y un agente lo construye. Conéctalo a tu dominio con un clic: HTTPS incluido y sin copiar registros.</p>
+    </button>`;
+  cont.innerHTML = destacado + WEB_PLATFORMS.map(p => `
+    <button type="button" data-web-platform="${p.id}" class="border border-line rounded-xl p-3 bg-bg-elev text-sm font-semibold text-fg hover:border-accent transition-colors text-left">
+      ${esc(p.label)}
+    </button>`).join("");
+  cont.querySelector("[data-web-easybits]").addEventListener("click", () => easybitsModal());
+  cont.querySelectorAll("[data-web-platform]").forEach(b => b.addEventListener("click", () => {
+    if (_webEstado && !_webEstado.editable) { showToast("Primero activa el editor de DNS (pestaña DNS).", true); switchTab("dns"); return; }
+    webConectar(WEB_PLATFORMS.find(p => p.id === b.dataset.webPlatform));
+  }));
+}
+
+// --- EasyBits Sitios por OAuth: conectar la cuenta y publicar un sitio en este dominio ---
+const EASYBITS_NEW_SITE = "https://www.easybits.cloud/dash/sitios/new";
+
+async function easybitsModal() {
+  if (!selectedDomain) return;
+  const d = selectedDomain.domain;
+  const dlg = document.createElement("div");
+  dlg.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4";
+  dlg.innerHTML = `<div class="bg-bg-elev border border-line rounded-xl w-full max-w-lg p-5" data-eb-body><p class="text-sm text-fg-muted">Revisando tu cuenta de EasyBits…</p></div>`;
+  document.body.appendChild(dlg);
+  const cerrar = () => dlg.remove();
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) cerrar(); });
+  const body = dlg.querySelector("[data-eb-body]");
+
+  let estado;
+  try {
+    const res = await fetch("/api/integrations/easybits");
+    estado = await res.json();
+    if (!res.ok) throw new Error(estado.error || "EasyBits no respondió");
+  } catch (err) {
+    body.innerHTML = `<p class="text-sm text-red-500">${esc(err.message)}</p>`;
+    return;
+  }
+
+  if (!estado.connected) {
+    body.innerHTML = `
+      <h3 class="font-semibold text-fg mb-2">Publica tu sitio de EasyBits en ${esc(d)}</h3>
+      <p class="text-sm text-fg-muted mb-4">Describe tu sitio y un agente lo construye. Conecta tu cuenta una vez y MailMask lo pone en tu dominio: registros, verificación y HTTPS.</p>
+      <div class="flex flex-wrap justify-end gap-2">
+        <button type="button" data-eb-cancel class="px-3 py-1.5 text-sm text-fg-muted hover:text-fg">Cancelar</button>
+        <a href="/api/integrations/easybits/start?domainId=${encodeURIComponent(selectedDomain.id)}" class="px-3 py-1.5 text-sm font-semibold rounded-lg bg-accent text-white">Conectar con EasyBits</a>
+      </div>
+      <p class="text-xs text-fg-subtle mt-3">¿Aún no tienes sitio? <a href="${EASYBITS_NEW_SITE}" target="_blank" rel="noopener" class="underline">Créalo en EasyBits</a>.</p>`;
+    body.querySelector("[data-eb-cancel]").addEventListener("click", cerrar);
+    return;
+  }
+
+  if (!estado.sites.length) {
+    body.innerHTML = `
+      <h3 class="font-semibold text-fg mb-2">Todavía no tienes sitios en EasyBits</h3>
+      <p class="text-sm text-fg-muted mb-4">Crea uno (describe lo que quieres y un agente lo construye) y vuelve aquí para ponerlo en ${esc(d)}.</p>
+      <div class="flex justify-end gap-2">
+        <button type="button" data-eb-cancel class="px-3 py-1.5 text-sm text-fg-muted hover:text-fg">Cerrar</button>
+        <a href="${EASYBITS_NEW_SITE}" target="_blank" rel="noopener" class="px-3 py-1.5 text-sm font-semibold rounded-lg bg-accent text-white">Crear un sitio</a>
+      </div>`;
+    body.querySelector("[data-eb-cancel]").addEventListener("click", cerrar);
+    return;
+  }
+
+  body.innerHTML = `
+    <h3 class="font-semibold text-fg mb-4">Publicar un sitio de EasyBits</h3>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs text-fg-muted mb-1">Sitio</label>
+        <select data-eb-site class="w-full bg-bg-inset border border-line rounded-lg px-2 py-2 text-sm text-fg">
+          ${estado.sites.map(x => `<option value="${esc(x.id)}" data-slug="${esc(x.slug)}">${esc(x.name)} (${esc(x.slug)})</option>`).join("")}
+        </select>
+      </div>
+      <div class="space-y-1 text-sm text-fg">
+        <label class="flex items-center gap-2"><input type="radio" name="eb-place" value="subdomain" checked> <span>En <span class="font-mono" data-eb-sub></span></span></label>
+        <label class="flex items-center gap-2"><input type="radio" name="eb-place" value="apex"> <span>En la raíz: <span class="font-mono">${esc(d)}</span> y www</span></label>
+      </div>
+      <div data-eb-preview class="text-sm"></div>
+    </div>
+    <div class="flex flex-wrap items-center justify-between gap-2 mt-5">
+      <button type="button" data-eb-disconnect class="text-xs text-fg-subtle hover:text-red-500">Desconectar EasyBits</button>
+      <div class="flex gap-2">
+        <button type="button" data-eb-cancel class="px-3 py-1.5 text-sm text-fg-muted hover:text-fg">Cancelar</button>
+        <button type="button" data-eb-ver class="px-3 py-1.5 text-sm font-semibold rounded-lg border border-line text-fg hover:border-accent">Ver cambios</button>
+        <button type="button" data-eb-apply disabled class="px-3 py-1.5 text-sm font-semibold rounded-lg bg-accent text-white disabled:opacity-40">Publicar</button>
+      </div>
+    </div>`;
+  const sel = body.querySelector("[data-eb-site]");
+  const preview = body.querySelector("[data-eb-preview]");
+  const aplicar = body.querySelector("[data-eb-apply]");
+  const subLabel = () => { body.querySelector("[data-eb-sub]").textContent = `${sel.selectedOptions[0].dataset.slug}.${d}`; };
+  subLabel();
+  const invalidar = () => { aplicar.disabled = true; preview.innerHTML = ""; };
+  sel.addEventListener("change", () => { subLabel(); invalidar(); });
+  body.querySelectorAll('input[name="eb-place"]').forEach(r => r.addEventListener("change", invalidar));
+  body.querySelector("[data-eb-cancel]").addEventListener("click", cerrar);
+  body.querySelector("[data-eb-disconnect]").addEventListener("click", async () => {
+    await fetch("/api/integrations/easybits", { method: "DELETE" });
+    cerrar();
+    showToast("EasyBits desconectado.");
+  });
+
+  const pedir = async (extra) => {
+    const placement = body.querySelector('input[name="eb-place"]:checked').value;
+    const res = await fetch(`/api/domains/${selectedDomain.id}/website/easybits`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ websiteId: sel.value, placement, ...extra }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "No se pudo");
+    return { ...data, placement };
+  };
+
+  body.querySelector("[data-eb-ver]").addEventListener("click", async () => {
+    preview.innerHTML = `<span class="text-fg-muted">Calculando…</span>`;
+    try {
+      const r = await pedir({ dryRun: true });
+      preview.innerHTML = `<div class="border border-line rounded-lg divide-y divide-line">` + r.records.map((rec, i) => {
+        const antes = r.current[i];
+        return `<div class="p-2 font-mono text-xs">
+          <div class="text-fg">${rec.type} ${esc(rec.name)}</div>
+          <div class="text-fg-subtle">antes: ${antes ? antes.values.map(esc).join(", ") : "nada"}</div>
+          <div class="text-mask-600">después: ${rec.values.map(esc).join(", ")}</div>
+        </div>`;
+      }).join("") + `</div><p class="text-xs text-fg-subtle mt-2">Quedará en <span class="font-mono">${esc(r.url)}</span>. El correo no se toca.</p>`;
+      aplicar.disabled = false;
+    } catch (err) {
+      preview.innerHTML = `<span class="text-red-500">${esc(err.message)}</span>`;
+    }
+  });
+
+  aplicar.addEventListener("click", async () => {
+    aplicar.disabled = true;
+    preview.innerHTML = `<span class="text-fg-muted">Publicando y verificando con EasyBits…</span>`;
+    try {
+      const r = await pedir({});
+      if (r.verified) {
+        cerrar();
+        showToast(`Listo: tu sitio queda en ${r.url}. El certificado tarda un par de minutos.`);
+        loadWebsite();
+        return;
+      }
+      // El DNS ya está; EasyBits todavía no ve el TXT. Se reintenta a mano.
+      preview.innerHTML = `
+        <p class="text-amber-600">Registros escritos. EasyBits aún no ve la verificación; suele tardar unos minutos.</p>
+        <button type="button" data-eb-retry class="mt-2 px-3 py-1.5 text-sm font-semibold rounded-lg border border-line text-fg hover:border-accent">Verificar de nuevo</button>`;
+      preview.querySelector("[data-eb-retry]").addEventListener("click", async (e) => {
+        e.target.disabled = true;
+        try {
+          const v = await pedir({ retryVerify: true });
+          if (v.verified) { cerrar(); showToast(`Listo: tu sitio queda en ${r.url}.`); loadWebsite(); }
+          else { e.target.disabled = false; showToast("Todavía no; intenta en un minuto.", true); }
+        } catch (err) { e.target.disabled = false; showToast(err.message, true); }
+      });
+      loadWebsite();
+    } catch (err) {
+      preview.innerHTML = `<span class="text-red-500">${esc(err.message)}</span>`;
+    }
+  });
+}
+
+function webConectar(p) {
+  const dlg = document.createElement("div");
+  dlg.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4";
+  const d = selectedDomain.domain;
+  dlg.innerHTML = `
+    <div class="bg-bg-elev border border-line rounded-xl w-full max-w-lg p-5">
+      <h3 class="font-semibold text-fg mb-4">Conectar a ${esc(p.label)}</h3>
+      <div class="space-y-3">
+        ${p.pide ? `<div>
+          <label class="block text-xs text-fg-muted mb-1">Destino que te dio ${esc(p.label)}</label>
+          <input id="web-f-target" placeholder="${esc(p.pide)}" class="w-full bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg font-mono">
+        </div>` : ""}
+        <div>
+          <label class="block text-xs text-fg-muted mb-1">Subdominio ${p.soloSub ? "(vacío = www)" : "(vacío = raíz y www)"}</label>
+          <div class="flex items-center gap-2">
+            <input id="web-f-sub" placeholder="${p.soloSub ? "www" : "app"}" class="flex-1 bg-bg-inset border border-line rounded-lg px-3 py-2 text-sm text-fg font-mono">
+            <span class="text-sm text-fg-muted font-mono">.${esc(d)}</span>
+          </div>
+        </div>
+        <div id="web-f-preview" class="text-sm"></div>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button type="button" data-web-cancel class="px-3 py-1.5 text-sm text-fg-muted hover:text-fg">Cancelar</button>
+        <button type="button" data-web-preview class="px-3 py-1.5 text-sm font-semibold rounded-lg border border-line text-fg hover:border-accent">Ver cambios</button>
+        <button type="button" data-web-apply disabled class="px-3 py-1.5 text-sm font-semibold rounded-lg bg-accent text-white disabled:opacity-40">Aplicar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg);
+  const cerrar = () => dlg.remove();
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) cerrar(); });
+  dlg.querySelector("[data-web-cancel]").addEventListener("click", cerrar);
+  const preview = dlg.querySelector("#web-f-preview");
+  const aplicar = dlg.querySelector("[data-web-apply]");
+
+  const leer = () => {
+    const target = dlg.querySelector("#web-f-target")?.value.trim() || undefined;
+    const sub = dlg.querySelector("#web-f-sub").value.trim().replace(/\.$/, "") || undefined;
+    return { target, sub };
+  };
+  // Cambiar algo invalida la vista previa: no se aplica lo que no se vio.
+  dlg.querySelectorAll("input").forEach(i => i.addEventListener("input", () => { aplicar.disabled = true; preview.innerHTML = ""; }));
+
+  const enviar = async (dryRun) => {
+    const { target, sub } = leer();
+    if (p.id === "otro") {
+      if (!target) throw new Error("Falta el destino.");
+      const name = sub || "www";
+      if (dryRun) {
+        const actual = (_webEstado?.hosts || []).find(h => h.name === `${name}.${d}`);
+        return { records: [{ name: `${name}.${d}`, type: "CNAME", values: [target] }], current: [actual?.records.find(r => r.type === "CNAME") || null] };
+      }
+      const res = await fetch(`/api/domains/${selectedDomain.id}/dns/records`, {
+        method: "PUT", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, type: "CNAME", values: [target] }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo guardar");
+      return data;
+    }
+    const res = await fetch(`/api/domains/${selectedDomain.id}/dns/preset`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ preset: p.id, target, subdomain: sub, dryRun }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "No se pudo aplicar");
+    return data;
+  };
+
+  dlg.querySelector("[data-web-preview]").addEventListener("click", async () => {
+    preview.innerHTML = `<span class="text-fg-muted">Calculando…</span>`;
+    try {
+      const r = await enviar(true);
+      preview.innerHTML = `<div class="border border-line rounded-lg divide-y divide-line">` + r.records.map((rec, i) => {
+        const antes = r.current[i];
+        return `<div class="p-2 font-mono text-xs">
+          <div class="text-fg">${rec.type} ${esc(rec.name)}</div>
+          <div class="text-fg-subtle">antes: ${antes ? antes.values.map(esc).join(", ") : "nada"}</div>
+          <div class="text-mask-600">después: ${rec.values.map(esc).join(", ")}</div>
+        </div>`;
+      }).join("") + `</div><p class="text-xs text-fg-subtle mt-2">Sólo cambian estos registros; el correo no se toca.</p>`;
+      aplicar.disabled = false;
+    } catch (err) {
+      preview.innerHTML = `<span class="text-red-500">${esc(err.message)}</span>`;
+    }
+  });
+
+  aplicar.addEventListener("click", async () => {
+    aplicar.disabled = true;
+    try {
+      await enviar(false);
+      cerrar();
+      showToast(`Listo: apuntado a ${p.label}. Suele propagar en menos de un minuto.`);
+      loadWebsite();
+    } catch (err) {
+      preview.innerHTML = `<span class="text-red-500">${esc(err.message)}</span>`;
+    }
+  });
+}
+
 function renderDnsTabla(cont) {
   cont.innerHTML = `
     <div class="p-4">
@@ -2988,6 +3341,7 @@ function switchTab(tab) {
   else if (tab === "rules") loadRules();
   else if (tab === "logs") loadLogs();
   else if (tab === "dns") { loadDns(); renderHealthPanel(); }
+  else if (tab === "web") loadWebsite();
   else if (tab === "members") loadMembers();
   else if (tab === "smtp") loadSmtpCredentials();
   else if (tab === "webhooks") loadWebhooks();

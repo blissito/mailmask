@@ -236,7 +236,7 @@ Son 95 herramientas que cubren lo mismo que el panel (cada una es un método del
 - Perfil de la cuenta (el usuario de MailMask, no una máscara ni lo que ve quien recibe el correo): get_profile, update_profile (nombre visible, máx. 60 caracteres), set_profile_photo (sólo con una imagen que el usuario adjuntó en el chat del asistente; PNG, JPG o WebP de hasta 2 MB). En la app se edita desde "Tu perfil", haciendo clic en tu nombre arriba a la derecha.
 - Reglas: list_rules, create_rule, update_rule, delete_rule.
 - Webhooks: list_webhooks, create_webhook, update_webhook, delete_webhook, test_webhook, webhook_deliveries.
-- DNS: list_dns_records, create_dns_zone, dns_delegation_status, set_dns_record, delete_dns_record, import_dns_records, point_domain_to (apunta el dominio a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render o Fly sin saber qué registros hacen falta).
+- DNS: list_dns_records, create_dns_zone, dns_delegation_status, set_dns_record, delete_dns_record, import_dns_records, point_domain_to (apunta el dominio a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render, Fly o EasyBits sin saber qué registros hacen falta; con dryRun sólo muestra el cambio), website_status (a dónde apunta hoy la raíz, www y cada subdominio, la plataforma detectada y si responde por HTTPS).
 - Envío: send_email (acepta idempotencyKey), bulk_send, bulk_status.
 - Operación: list_logs, list_suppressions, add_suppression, remove_suppression, list_smtp_credentials, create_smtp_credential, revoke_smtp_credential.
 - search_tools: busca herramientas por palabra clave (sin acentos: "renovacion" encuentra renewal_link).

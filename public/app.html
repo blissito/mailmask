@@ -111,6 +111,7 @@
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="rules">Reglas</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="logs">Logs</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="dns">DNS</button>
+        <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="web">Sitio web</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="members">Miembros</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="smtp">SMTP</button>
         <button class="tab-btn px-4 py-2 text-sm font-semibold text-fg-subtle" data-tab="webhooks">Webhooks</button>
@@ -174,6 +175,17 @@
       </div>
 
       <!-- Tab: DNS -->
+      <div id="tab-web" class="tab-content hidden">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <p class="text-sm text-fg-muted">A dónde apunta tu dominio y si tu sitio responde. Conéctalo a tu hosting sin tocar el correo.</p>
+          <div id="web-ask"></div>
+        </div>
+        <div id="web-hosts" class="space-y-3"></div>
+        <h3 class="font-semibold text-fg mt-8 mb-3">Conectar a…</h3>
+        <div id="web-platforms" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+        <p class="text-xs text-fg-subtle mt-4">Redirecciones (raíz → www, reenviar a otra URL): próximamente.</p>
+      </div>
+
       <div id="tab-dns" class="tab-content hidden">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
           <p class="text-sm text-fg-muted">Agrega estos registros en tu proveedor de DNS. Los tres primeros tipos son necesarios; SPF y DMARC mejoran la entrega.</p>

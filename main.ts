@@ -365,6 +365,12 @@ function domainPreferenceBody(opts: {
 
 // En desarrollo Google redirige a localhost; en producción, al dominio principal. Las
 // dos URIs tienen que estar dadas de alta en la consola de Google Cloud.
+function easybitsRedirectUri(request: Request): string {
+  const host = new URL(request.url).host;
+  const origin = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) ? `http://${host}` : getMainDomainUrl();
+  return `${origin}/api/integrations/easybits/callback`;
+}
+
 function googleRedirectUri(request: Request): string {
   const host = new URL(request.url).host;
   const origin = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) ? `http://${host}` : getMainDomainUrl();
@@ -2456,7 +2462,7 @@ const app = new Elysia({ adapter: node() })
     // exactamente cómo un dominio borrado de la cuenta pasó meses reportándose
     // sano mientras no podía enviar ni recibir.
     const estadoSes = await checkDomainStatus(d);
-    if (!estadoSes.respondio) {
+    if (!estadoSes.responded) {
       checks.verified = {
         ok: domain.verified,
         detail: "No se pudo consultar SES; este es el último estado conocido.",
@@ -2476,7 +2482,7 @@ const app = new Elysia({ adapter: node() })
     // Lo medido se guarda: `list_domains` lee estas banderas. Antes `mxConfigured`
     // sólo se escribía al comprar el dominio y la lista mentía (7-oct-2026).
     saveDomainFlags(domain, {
-      verified: estadoSes.respondio ? estadoSes.verified : null,
+      verified: estadoSes.responded ? estadoSes.verified : null,
       mxConfigured: mx.resolved ? mx.ok : null,
     });
 
@@ -2599,16 +2605,16 @@ const app = new Elysia({ adapter: node() })
     // ni recibir, sin una sola señal.
     //
     // Ahora siempre se pregunta, y el resguardo vive donde corresponde: la
-    // bandera sólo baja si SES respondió de verdad (`respondio`), no si la
+    // bandera sólo baja si SES respondió de verdad (`responded`), no si la
     // consulta falló.
     const [status, mx] = await Promise.all([checkDomainStatus(domain.domain), checkInboundMx(domain.domain)]);
 
     // Se guardan las dos banderas con su fecha, igual que en health (domain-flags.ts).
     saveDomainFlags(domain, {
-      verified: status.respondio ? status.verified : null,
+      verified: status.responded ? status.verified : null,
       mxConfigured: mx.resolved ? mx.ok : null,
     });
-    if (status.respondio && status.verified !== domain.verified) {
+    if (status.responded && status.verified !== domain.verified) {
       if (!status.verified) {
         log("warn", "ses", "El dominio dejó de estar verificado en SES", {
           domain: domain.domain,
@@ -2619,7 +2625,7 @@ const app = new Elysia({ adapter: node() })
 
     // Identidad verificada no implica recepción: la regla del rule set es
     // otro recurso y puede faltar (brendago.design, sep-2026). Se repara aquí.
-    if (status.respondio && status.verified) {
+    if (status.responded && status.verified) {
       try {
         await ensureDomainInbound(domain.domain);
       } catch (err) {
@@ -2629,7 +2635,7 @@ const app = new Elysia({ adapter: node() })
 
     // Si no se pudo consultar, se reporta lo último que se sabía en vez de
     // inventar un "no verificado" que alarme sin motivo.
-    if (!status.respondio) {
+    if (!status.responded) {
       return new Response(
         JSON.stringify({
           domain: domain.domain,
@@ -7805,6 +7811,169 @@ const app = new Elysia({ adapter: node() })
     detail: { tags: ["DNS", "SDK"], summary: "List DNS records and zone state", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
+  // --- EasyBits (Sitios) por OAuth: conectar la cuenta y publicar un sitio en el dominio ---
+  // Sólo con sesión de navegador: un agente no conecta cuentas ajenas.
+  .get("/api/integrations/easybits/start", async ({ request, query }) => {
+    const user = await getAuthUser(request);
+    if (!user || user.via !== "session") return new Response(null, { status: 302, headers: { location: "/login?next=%2Fapp" } });
+    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    if (limited) return limited;
+    const { getOAuthClient, authorizeUrl, pkcePair } = await import("./easybits-link.js");
+    const redirectUri = easybitsRedirectUri(request);
+    try {
+      const client = await getOAuthClient(redirectUri);
+      const { verifier, challenge } = pkcePair();
+      const state = crypto.randomUUID();
+      const domainId = typeof query.domainId === "string" ? query.domainId.slice(0, 64) : undefined;
+      await db.insert(tokensTable).values({
+        token: state,
+        kind: "easybits-state",
+        value: { email: user.email, verifier, domainId },
+        expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+      });
+      return new Response(null, { status: 302, headers: { location: authorizeUrl(client, redirectUri, state, challenge) } });
+    } catch (err) {
+      log("error", "easybits", "No se pudo iniciar OAuth con EasyBits", { error: String(err) });
+      return new Response(null, { status: 302, headers: { location: "/app?easybits_error=start" } });
+    }
+  }, { detail: { tags: ["Website"], summary: "Start the EasyBits OAuth connection" } })
+
+  .get("/api/integrations/easybits/callback", async ({ request, query }) => {
+    const back = (q: string) => new Response(null, { status: 302, headers: { location: `/app?${q}` } });
+    // Aquí NO hay sesión: la cookie es SameSite=Strict y esta petición viene de easybits.cloud.
+    // Quién conecta lo dice el `state` (un uso, 10 min, emitido a una sesión) y el verificador
+    // PKCE nunca salió del servidor. Lo peor que logra un tercero es conectar SU cuenta a SU cuenta.
+    const limited = await rateLimitGuard(getIp(request), 20, 60_000);
+    if (limited) return limited;
+    const state = typeof query.state === "string" ? query.state : "";
+    const code = typeof query.code === "string" ? query.code : "";
+    const row = state ? db.select().from(tokensTable).where(eq(tokensTable.token, state)).get() : undefined;
+    if (!row || row.kind !== "easybits-state" || row.expiresAt < new Date().toISOString()) return back("easybits_error=state");
+    db.delete(tokensTable).where(eq(tokensTable.token, state)).run();
+    const carried = (row.value ?? {}) as { email?: string; verifier?: string; domainId?: string };
+    if (!carried.email || !carried.verifier) return back("easybits_error=state");
+    if (!code) return back("easybits_error=cancelled");
+    try {
+      const { exchangeCode } = await import("./easybits-link.js");
+      await exchangeCode(carried.email, easybitsRedirectUri(request), code, carried.verifier);
+    } catch (err) {
+      log("error", "easybits", "Canje del code de EasyBits falló", { email: carried.email, error: String(err) });
+      return back("easybits_error=token");
+    }
+    return back(`easybits=${encodeURIComponent(carried.domainId ?? "1")}`);
+  }, { detail: { tags: ["Website"], summary: "EasyBits OAuth callback" } })
+
+  .get("/api/integrations/easybits", async ({ request }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const { isConnected, listSites, EasyBitsDisconnected } = await import("./easybits-link.js");
+    if (!isConnected(user.email)) return Response.json({ connected: false, sites: [] });
+    try {
+      return Response.json({ connected: true, sites: await listSites(user.email, easybitsRedirectUri(request)) });
+    } catch (err) {
+      if (err instanceof EasyBitsDisconnected) return Response.json({ connected: false, sites: [] });
+      log("warn", "easybits", "No se pudieron listar los sitios", { email: user.email, error: String(err) });
+      return jsonErr("EasyBits no respondió; intenta de nuevo.", 502);
+    }
+  }, { detail: { tags: ["Website"], summary: "EasyBits connection state and the user's sites" } })
+
+  .delete("/api/integrations/easybits", async ({ request }) => {
+    const user = await getAuthUser(request);
+    if (!user || user.via !== "session") return jsonErr("No autenticado", 401);
+    const { disconnect } = await import("./easybits-link.js");
+    disconnect(user.email);
+    return Response.json({ ok: true });
+  }, { detail: { tags: ["Website"], summary: "Disconnect EasyBits" } })
+
+  .post("/api/domains/:id/website/easybits", async ({ request, params, body }) => {
+    const user = await getAuthUser(request);
+    if (!user || user.via !== "session") return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    if (limited) return limited;
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+    if (!d.hostedZoneId) return jsonErr("Activa primero el editor de DNS de este dominio (pestaña DNS).", 409);
+    const b = body as { websiteId: string; placement: "apex" | "subdomain"; dryRun?: boolean; retryVerify?: boolean };
+
+    const { publishSite, retryVerify, EasyBitsDisconnected } = await import("./easybits-link.js");
+    const { validarRRSet, aplicarGuardian, conflictoDeConvivencia, ErrorDns } = await import("./dns-records.js");
+    const { listRecordSets, applyRecordChanges } = await import("./route53.js");
+    const guardado = { domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens };
+    const zona = d.hostedZoneId;
+    try {
+      if (b.retryVerify) {
+        return Response.json(await retryVerify(user.email, easybitsRedirectUri(request), d.domain, b.placement === "apex" ? b.websiteId : undefined));
+      }
+      const existentes = await listRecordSets(zona);
+      const result = await publishSite({
+        email: user.email,
+        redirectUri: easybitsRedirectUri(request),
+        domain: d.domain,
+        websiteId: b.websiteId,
+        placement: b.placement === "apex" ? "apex" : "subdomain",
+        dryRun: b.dryRun,
+      }, {
+        current: (name, type) => (existentes.find((e) => e.name === name && e.type === type) as never) ?? null,
+        async apply(records) {
+          const rrsets = records.map((r) => validarRRSet(r, d.domain));
+          for (const rrset of rrsets) {
+            const bloqueo = aplicarGuardian("upsert", rrset, guardado);
+            if (bloqueo) throw new ErrorDns(bloqueo.message);
+            const choque = conflictoDeConvivencia(rrset, existentes as never);
+            if (choque) throw new ErrorDns(choque);
+          }
+          await applyRecordChanges(zona, rrsets.map((rrset) => ({ action: "UPSERT" as const, rrset })), `Sitio de EasyBits publicado por ${user.email}`);
+        },
+      });
+      return Response.json(result);
+    } catch (err) {
+      if (err instanceof EasyBitsDisconnected) return jsonErr(err.message, 401);
+      if (err instanceof ErrorDns) return jsonErr(err.message, 409);
+      log("error", "easybits", "No se pudo publicar el sitio", { domain: d.domain, error: String(err) });
+      return jsonErr(err instanceof Error ? err.message : "No se pudo publicar el sitio.", 502);
+    }
+  }, {
+    body: t.Object({
+      websiteId: t.String(),
+      placement: t.String(),
+      dryRun: t.Optional(t.Boolean()),
+      retryVerify: t.Optional(t.Boolean()),
+    }),
+    detail: { tags: ["Website"], summary: "Publish an EasyBits site on this domain (connects DNS and EasyBits)" },
+  })
+
+  .get("/api/domains/:id/website", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 20, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+
+    const { getWebsiteStatus, hostsFromZone, hostsFromPublicDns } = await import("./website.js");
+    try {
+      let hosts;
+      if (d.hostedZoneId) {
+        const { listRecordSets } = await import("./route53.js");
+        const { registrosGestionados } = await import("./dns-records.js");
+        const managed = new Set(registrosGestionados({ domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens }).map((g) => g.name.toLowerCase()));
+        hosts = hostsFromZone(d.domain, (await listRecordSets(d.hostedZoneId)) as never, managed);
+      } else {
+        hosts = await hostsFromPublicDns(d.domain);
+      }
+      const status = await getWebsiteStatus(d.domain, hosts);
+      return Response.json({ domain: d.domain, editable: !!d.hostedZoneId, ...status });
+    } catch (err) {
+      log("error", "route53", "Website status failed", { domain: d.domain, error: String(err) });
+      return jsonErr("No se pudo revisar el sitio.", 502);
+    }
+  }, {
+    detail: { tags: ["DNS", "SDK"], summary: "Where the domain's website points (apex, www, subdomains), detected platform, issues and HTTPS", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
   .post("/api/domains/:id/dns/zone", async ({ request, params }) => {
     const user = await getAuthUser(request);
     if (!user) return jsonErr("No autenticado", 401);
@@ -8033,7 +8202,7 @@ const app = new Elysia({ adapter: node() })
     const guardado = { domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens };
 
     try {
-      const b = body as { preset: string; target?: string; subdomain?: string };
+      const b = body as { preset: string; target?: string; subdomain?: string; dryRun?: boolean };
       const crudos = expandirPreset(b.preset as never, d.domain, b.target, b.subdomain);
       const rrsets = crudos.map((r) => validarRRSet(r, d.domain));
 
@@ -8043,6 +8212,14 @@ const app = new Elysia({ adapter: node() })
         if (bloqueo) return jsonErr(bloqueo.message, 409);
         const choque = conflictoDeConvivencia(rrset, existentes as never);
         if (choque) return jsonErr(choque, 409);
+      }
+
+      // Vista previa: lo que entraría y lo que hay hoy en esos mismos (nombre, tipo).
+      if (b.dryRun) {
+        const current = rrsets
+          .map((r) => existentes.find((e) => e.name === r.name && e.type === r.type))
+          .map((e) => e ?? null);
+        return Response.json({ dryRun: true, records: rrsets, current });
       }
 
       // Todo en un solo cambio: o entra la plantilla completa, o no entra nada.
@@ -8063,6 +8240,7 @@ const app = new Elysia({ adapter: node() })
       preset: t.String(),
       target: t.Optional(t.String()),
       subdomain: t.Optional(t.String()),
+      dryRun: t.Optional(t.Boolean()),
     }),
     detail: { tags: ["DNS", "SDK"], summary: "Apply a hosting preset (Vercel, Netlify, …)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })

@@ -23,7 +23,7 @@ const zonaDns = new Map<string, { name: string; type: string; ttl: number; value
 
 // Estado que "SES" reporta. Los tests lo mueven para simular que la identidad
 // desapareció de la cuenta, que es lo que le pasó a brendago.design.
-const ses = { verified: true, dkimVerified: true, respondio: true };
+const ses = { verified: true, dkimVerified: true, responded: true };
 
 describe("SDK ↔ servidor: contrato", () => {
   // deno-lint-ignore no-explicit-any
@@ -290,7 +290,7 @@ describe("SDK ↔ servidor: contrato", () => {
   });
 
   it("si no se puede consultar a SES, no se desverifica nada", async () => {
-    ses.respondio = false;
+    ses.responded = false;
     ses.verified = false;
     try {
       const res = await mm.domains.verify(domainId);
@@ -298,7 +298,7 @@ describe("SDK ↔ servidor: contrato", () => {
       assert.equal(res.verified, true, "bajó la bandera por una consulta fallida");
       assert.equal((await mm.domains.get(domainId)).verified, true);
     } finally {
-      ses.respondio = true;
+      ses.responded = true;
       ses.verified = true;
     }
   });
@@ -637,8 +637,20 @@ describe("SDK ↔ servidor: contrato", () => {
   });
 
   it("dns: preset, delegation e import", async () => {
+    const prev = await mm.dns.presetPreview(domainId, "vercel", "mi-proyecto.vercel.app");
+    assert.equal(prev.dryRun, true);
+    assert.equal(prev.records.length, 2);
+    assert.equal(prev.current.length, 2);
+    assert.ok(!zonaDns.has(`www.${dominio}|CNAME`), "la vista previa no escribe");
+
     const p = await mm.dns.preset(domainId, "vercel", "mi-proyecto.vercel.app");
     assert.equal(p.records!.length, 2);
+
+    const w = await mm.dns.website(domainId);
+    assert.equal(w.editable, true);
+    const www = w.hosts.find((h) => h.label === "www")!;
+    assert.equal(www.platform?.id, "vercel");
+    assert.equal(w.hosts.find((h) => h.label === "@")!.platform?.id, "vercel");
 
     const d = await mm.dns.delegation(domainId);
     assert.equal(d.delegated, false);

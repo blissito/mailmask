@@ -68,7 +68,7 @@ describe("Asistente: Ghosty, turn token y confirmaciones", () => {
       deleteReceiptRule: async () => undefined,
       deleteConfigurationSet: async () => undefined,
       deleteDomainIdentity: async () => undefined,
-      checkDomainStatus: async () => ({ verified: true, dkimVerified: true, respondio: true }),
+      checkDomainStatus: async () => ({ verified: true, dkimVerified: true, responded: true }),
       putAssistantUploadToS3: async (k: string, body: Uint8Array, contentType: string) => { uploads.set(k, { body, contentType }); },
       getAssistantUploadFromS3: async (k: string) => uploads.get(k) ?? null,
     } });
@@ -152,6 +152,16 @@ describe("Asistente: Ghosty, turn token y confirmaciones", () => {
     const body = JSON.parse(lastCall!.raw);
     assert.match(body.text, new RegExp(`En pantalla: ${domainName.replace(/\./g, "\\.")} \\(domainId ${domainId}\\), pestaña dns`));
     assert.match(body.text, /subdominio contador$/);
+  });
+
+  it("stream: en la lista de dominios lo dice y nombra sus dominios", async () => {
+    sseFrames = [`data: ${JSON.stringify({ type: "done", value: "ok" })}\n\n`];
+    const res = await postJson("/api/asistente/stream", { text: "¿dónde estoy?", attachments: [], screen: { page: "domains" }, screenChanged: false }, withSession());
+    assert.equal(res.status, 200);
+    await res.text();
+    const body = JSON.parse(lastCall!.raw);
+    assert.match(body.text, /En pantalla: la lista de dominios/);
+    assert.ok(body.text.includes(domainName), "nombra el dominio de la cuenta");
   });
 
   it("stream (partner): /partner/turns con tenant opaco, token y adjuntos como links", async () => {

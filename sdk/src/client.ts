@@ -5,7 +5,7 @@ import type {
   ApiKey, SendOptions, UploadAttachmentInput, UploadedAttachment, Suppression,
   Webhook, WebhookCreated, CreateWebhookInput, UpdateWebhookInput, WebhookDelivery,
   DnsRecordType, DnsRRSet, DnsListResponse, DnsZoneCreated, DnsDelegation, DnsImportResult,
-  DnsChangeResult, DnsPreset, DnsSetup,
+  DnsChangeResult, DnsPreset, DnsPresetPreview, DnsSetup, WebsiteStatus,
   BillingStatus, AddonsResponse, CheckoutLink, DomainSearchResult, TldPrice, DomainRegistrationCreated,
   DomainRegistration, TransferCheck, TransferDnsInventory, RenewalLink, DomainMember, DomainInvite, CannedReply,
   AccountProfile, AccountMe, AccountExport, InboxPage, InboxListOptions, InboxConversation, InboxConversationDetail, InboxComposeInput,
@@ -149,6 +149,12 @@ class DnsResource {
   preset(domainId: string, preset: DnsPreset, target?: string, subdomain?: string) {
     return this.req<DnsChangeResult>(`/api/domains/${domainId}/dns/preset`, { method: "POST", body: JSON.stringify({ preset, target, subdomain }) });
   }
+  /** Vista previa de una plantilla: lo que escribiría y lo que hay hoy, sin tocar nada. */
+  presetPreview(domainId: string, preset: DnsPreset, target?: string, subdomain?: string) {
+    return this.req<DnsPresetPreview>(`/api/domains/${domainId}/dns/preset`, { method: "POST", body: JSON.stringify({ preset, target, subdomain, dryRun: true }) });
+  }
+  /** A dónde apunta el sitio (raíz, www y subdominios), qué plataforma es, qué está mal y si responde por HTTPS. */
+  website(domainId: string) { return this.req<WebsiteStatus>(`/api/domains/${domainId}/website`); }
 }
 
 class AliasesResource {
