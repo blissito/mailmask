@@ -767,6 +767,19 @@ body {
   pointer-events: none;
 }
 .mesa-toast.show { opacity: 1; }
+/* Sólo el aviso con «Deshacer» recibe clics; un toast normal sigue dejando pasar el puntero. */
+.mesa-toast.con-accion { pointer-events: auto; display: flex; align-items: center; gap: 12px; }
+.mesa-toast-accion {
+  border: 0;
+  background: none;
+  color: var(--mesa-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.mesa-toast-accion:focus-visible { outline: 2px solid var(--mesa-accent); outline-offset: 2px; }
 
 /* --- New item indicator --- */
 .mesa-conv.is-new {
