@@ -48,7 +48,7 @@ comprueba "no es 404" ya vale: eso solo habría atrapado 6 de los 10 bugs.
 `WebStandardStreamableHTTPServerTransport`, `enableJsonResponse`), autenticado sólo con
 `Authorization: Bearer mk_…` (la API key normal) o `Bearer mt_…` (turn token del asistente,
 ver "Asistente Mask"); sin ellas 401, y `/mcp` está exento de CSRF porque nunca acepta cookie.
-97 herramientas desde el 14-oct-2026 (`website_status`), con paridad con el panel (cobro por liga, compra/transferencia/renovación de
+100 herramientas desde el 14-oct-2026 (`publish_easybits_site`, `unpublish_easybits_site`, `easybits_site_status`), con paridad con el panel (cobro por liga, compra/transferencia/renovación de
 dominios, equipo, firma y logo, respuestas guardadas, `domain_dns_setup`, perfil, pedidos, referidos y la **Bandeja**: `inbox_*`) y `MCP_INSTRUCTIONS`
 (≤6000 caracteres, lo fija `mcp.test.ts`): es todo lo que un agente partner sabe del producto. **Cada herramienta es el SDK real** (`sdk/src`, que sí viaja
 en la imagen) hablando con la app en proceso vía `app.fetch` — el mismo truco de
@@ -175,6 +175,19 @@ exponen `period`.
 cobradora** (1-oct-2026, insightslab con la Visa 8439): misma familia que "Payer and collector
 cannot be the same user". Hay que pagar con otra tarjeta u otra cuenta de MP, nunca con la
 guardada en la cuenta que cobra.
+
+## Sitio de EasyBits en el dominio (`easybits-link.ts`, 14-oct-2026)
+
+Con la cuenta de EasyBits del usuario (OAuth, se conecta sólo en navegador) MailMask publica un sitio
+en el dominio: alta del dominio en EasyBits, registros en NUESTRA zona, verify y raíz. Cada publicación
+queda en `easybits_publications` (migración 0031, una fila por dominio): `records` = lo que escribimos y
+`previous` = lo que había antes en cada `nombre|tipo` (null = nada). Re-publicar conserva el `previous`
+original. Quitar (`DELETE /api/domains/:id/website/easybits`) restaura en UN cambio sólo donde el
+registro sigue siendo el nuestro; lo que el usuario cambió después sale en `skipped` y no se toca. Si
+EasyBits falla al limpiar, la fila se queda para reintentar (el DNS ya restaurado cuenta como `restored`).
+Las tres rutas aceptan cualquier credencial; el DELETE con `mt_` pide confirmación. Sin cuenta
+conectada: 409 `code: "easybits_not_linked"` con `linkUrl` = `/app?domain=<d>&easybits=1` (abre el
+modal y, sin conexión, manda a conectarla y regresa). `point_domain_to` con `easybits` delega aquí.
 
 ## Dominios: registro, renovación, transferencias y DNS (7-sep-2026)
 

@@ -91,7 +91,7 @@ respectivamente. Quien solo reenvía nunca toca el límite de envíos.
      API Keys (empieza con `mk_`, se muestra una sola vez, da acceso a toda la cuenta y no
      se crea por API ni por MCP) y va en `Authorization: Bearer mk_…`:
      `claude mcp add --transport http mailmask https://www.mailmask.studio/mcp --header
-     "Authorization: Bearer mk_…"`. 95 herramientas, lo mismo que el panel: `create_domain`
+     "Authorization: Bearer mk_…"`. 100 herramientas, lo mismo que el panel: `create_domain`
      (devuelve los registros DNS), `create_alias` (con `mailbox: true` crea el buzón IMAP), DNS,
      reglas, webhooks, `send_email`, cobro, dominios, equipo, perfil, referidos y `search_tools`.
      El estado de un dominio (MX, verificación) se confirma con `domain_health`, que revisa en

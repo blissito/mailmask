@@ -450,6 +450,24 @@ describe("MCP: agentes contra la app", () => {
     assert.equal((await call("cancel_addon", { addonId: addon.id })).json.result.structuredContent.ok, true);
   });
 
+  it("con el turn token, quitar el sitio de EasyBits pide confirmación y no toca nada", async () => {
+    const { issueTurnToken } = await import("./auth.ts");
+    const mt = await issueTurnToken(email);
+    const dom = dbmod.createDomain(email, `mcp-eb-${suffix}.com`, ["dk"], "vf");
+    sqlite.prepare("UPDATE domains SET hosted_zone_id = 'ZEB' WHERE id = ?").run(dom.id);
+    const now = new Date().toISOString();
+    sqlite.prepare(`INSERT INTO easybits_publications (domain_id, owner_email, eb_domain_id, eb_domain_created, website_id, placement, url, records, previous, created_at, updated_at)
+      VALUES (?, ?, 'd1', 1, 'w1', 'apex', ?, '[]', '{}', ?, ?)`).run(dom.id, email, `https://mcp-eb-${suffix}.com`, now, now);
+    const r = await call("unpublish_easybits_site", { domainId: dom.id }, mt);
+    assert.equal(r.json.result.structuredContent.needsConfirmation, true);
+    assert.match(r.json.result.structuredContent.title, /^Quitar el sitio de EasyBits/);
+    assert.ok(sqlite.prepare("SELECT 1 FROM easybits_publications WHERE domain_id = ?").get(dom.id), "sigue publicado");
+    // Sin cuenta de EasyBits conectada, publicar devuelve la liga para conectarla.
+    const p = await call("publish_easybits_site", { domainId: dom.id, websiteId: "w1", placement: "apex" });
+    assert.equal(p.json.result.isError, true);
+    assert.match(p.json.result.content[0].text, /HTTP 409: .*easybits=1/);
+  });
+
   it("el catálogo cubre la app: Bandeja, cuenta y logo, y search_tools los encuentra", async () => {
     const nombres = (await rpc("tools/list")).json.result.tools.map((t: { name: string }) => t.name);
     for (const n of ["inbox_list", "inbox_read", "inbox_attachment", "inbox_reply", "inbox_send", "inbox_mark", "inbox_assign", "inbox_note",

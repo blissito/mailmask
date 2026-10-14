@@ -6,6 +6,7 @@ import type {
   Webhook, WebhookCreated, CreateWebhookInput, UpdateWebhookInput, WebhookDelivery,
   DnsRecordType, DnsRRSet, DnsListResponse, DnsZoneCreated, DnsDelegation, DnsImportResult,
   DnsChangeResult, DnsPreset, DnsPresetPreview, DnsSetup, WebsiteStatus,
+  PublishEasyBitsSiteInput, EasyBitsPublishResult, EasyBitsSiteStatus, EasyBitsUnpublishResult,
   BillingStatus, AddonsResponse, CheckoutLink, DomainSearchResult, TldPrice, DomainRegistrationCreated,
   DomainRegistration, TransferCheck, TransferDnsInventory, RenewalLink, DomainMember, DomainInvite, CannedReply,
   AccountProfile, AccountMe, AccountExport, InboxPage, InboxListOptions, InboxConversation, InboxConversationDetail, InboxComposeInput,
@@ -125,6 +126,20 @@ class DomainsResource {
     return this.req<{ ok: boolean; logoUrl: string }>(`/api/domains/${id}/logo`, { method: "POST", body: JSON.stringify({ fromUrl: url }) });
   }
   removeLogo(id: string) { return this.req<{ ok: boolean }>(`/api/domains/${id}/logo`, { method: "DELETE" }); }
+  /**
+   * Publica un sitio de EasyBits en el dominio: lo da de alta en EasyBits, escribe sus
+   * registros (sin tocar el correo), verifica y, en la raíz, lo asigna. Requiere la cuenta
+   * de EasyBits conectada en el navegador; sin ella, 409 con la liga para conectarla.
+   */
+  publishEasyBitsSite(id: string, input: PublishEasyBitsSiteInput) {
+    return this.req<EasyBitsPublishResult>(`/api/domains/${id}/website/easybits`, { method: "POST", body: JSON.stringify(input) });
+  }
+  /** Quita el sitio: el DNS vuelve a como estaba (lo que cambiaste después no se toca) y se limpia EasyBits. */
+  unpublishEasyBitsSite(id: string) {
+    return this.req<EasyBitsUnpublishResult>(`/api/domains/${id}/website/easybits`, { method: "DELETE" });
+  }
+  /** Qué sitio de EasyBits está publicado en el dominio, si alguno, y si la cuenta está conectada. */
+  easyBitsSiteStatus(id: string) { return this.req<EasyBitsSiteStatus>(`/api/domains/${id}/website/easybits`); }
   /** Imagen para incrustar en un correo saliente (PNG, JPG, GIF o WebP; máx. 2 MB). Efímera: se borra tras enviarse o por el barrido diario. */
   uploadImage(id: string, file: Blob, filename = "imagen") {
     const form = new FormData();
@@ -146,12 +161,13 @@ class DnsResource {
   delete(domainId: string, name: string, type: DnsRecordType) {
     return this.req<{ ok: boolean; changeId: string }>(`/api/domains/${domainId}/dns/records`, { method: "DELETE", body: JSON.stringify({ name, type }) });
   }
-  preset(domainId: string, preset: DnsPreset, target?: string, subdomain?: string) {
-    return this.req<DnsChangeResult>(`/api/domains/${domainId}/dns/preset`, { method: "POST", body: JSON.stringify({ preset, target, subdomain }) });
+  /** Con 'easybits' publica un sitio de la cuenta conectada (`opts.websiteId`), igual que `domains.publishEasyBitsSite`. */
+  preset(domainId: string, preset: DnsPreset, target?: string, subdomain?: string, opts?: { websiteId?: string; placement?: "apex" | "subdomain" }) {
+    return this.req<DnsChangeResult>(`/api/domains/${domainId}/dns/preset`, { method: "POST", body: JSON.stringify({ preset, target, subdomain, ...opts }) });
   }
   /** Vista previa de una plantilla: lo que escribiría y lo que hay hoy, sin tocar nada. */
-  presetPreview(domainId: string, preset: DnsPreset, target?: string, subdomain?: string) {
-    return this.req<DnsPresetPreview>(`/api/domains/${domainId}/dns/preset`, { method: "POST", body: JSON.stringify({ preset, target, subdomain, dryRun: true }) });
+  presetPreview(domainId: string, preset: DnsPreset, target?: string, subdomain?: string, opts?: { websiteId?: string; placement?: "apex" | "subdomain" }) {
+    return this.req<DnsPresetPreview>(`/api/domains/${domainId}/dns/preset`, { method: "POST", body: JSON.stringify({ preset, target, subdomain, ...opts, dryRun: true }) });
   }
   /** A dónde apunta el sitio (raíz, www y subdominios), qué plataforma es, qué está mal y si responde por HTTPS. */
   website(domainId: string) { return this.req<WebsiteStatus>(`/api/domains/${domainId}/website`); }

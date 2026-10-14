@@ -1,11 +1,11 @@
 ---
 name: mailmask-dns
-description: Point a domain or subdomain hosted on MailMask DNS to Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render or Fly, add DMARC, redirect apex to www, or edit any DNS record set — without breaking the domain's email. Use when the user's domain has its DNS on mailmask.studio (or wants to move it there) and asks to connect a site, add a TXT verification, or change records.
+description: Point a domain or subdomain hosted on MailMask DNS to Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render, Fly or an EasyBits site, add DMARC, redirect apex to www, or edit any DNS record set — without breaking the domain's email. Use when the user's domain has its DNS on mailmask.studio (or wants to move it there) and asks to connect a site, add a TXT verification, or change records.
 license: MIT
 compatibility: The MailMask MCP server (preferred) or curl with the account's API key. Network access to https://www.mailmask.studio.
 metadata:
   author: mailmask
-  version: "1.0"
+  version: "1.1"
 ---
 
 # DNS on MailMask
@@ -41,8 +41,24 @@ Without `subdomain` it sets the apex **and** `www`; with `subdomain: "app"` only
 | `cloudflare-pages` | the `*.pages.dev` name |
 | `render` | the `*.onrender.com` name |
 | `fly` | the `*.fly.dev` name |
+| `easybits` | none — pass `websiteId` (and `placement`); see below |
 | `redirect-a-www` | none |
 | `dmarc` | the mailbox that receives reports (`rua`) |
+
+## An EasyBits site
+
+EasyBits is not a template: the domain has to be registered and verified on EasyBits too, so
+it goes through the user's connected EasyBits account (OAuth, connected once in the browser).
+
+1. `easybits_site_status` → `linked`, `sites` (pick `websiteId`), and what is published now.
+   Not linked → give the user `/app?domain=<domain>&easybits=1` (`linkUrl` in the `409`).
+2. `publish_easybits_site { websiteId, placement: "apex" | "subdomain", dryRun: true }`, show
+   the before/after, then without `dryRun`. `verified: false` = records are in, EasyBits sees
+   them in minutes.
+3. `unpublish_easybits_site` undoes it in one change: records go back to what was there before
+   publishing; any record the user changed afterwards is left alone and returned in `skipped`.
+
+REST: `GET|POST|DELETE /api/domains/:id/website/easybits`.
 
 Providers know which record they expect at the apex (A vs ALIAS/CNAME flattening) and the tool
 encodes that: prefer it over hand-written `set_dns_record`, which is where agents confuse apex
