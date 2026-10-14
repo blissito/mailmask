@@ -24,6 +24,9 @@ export function renderScreenshots(text: string): string {
   )
 }
 
+/** Navegaciones automáticas ya hechas (`${messageKey}:${to}`). */
+const autoNavigated = new Set<string>()
+
 export /**
  * Cuerpo de un mensaje del asistente. Mismo criterio que el ChatWidget público:
  * markdown vía streamdown para que negritas, listas y links se rendericen en vez
@@ -35,6 +38,7 @@ function AssistantText({
   onNavigate,
   onSurface = "light",
   allowNav = true,
+  messageKey,
 }: {
   text: string
   /** Mientras es true, cada bloque nuevo entra animado y se muestra el cursor. */
@@ -63,6 +67,8 @@ function AssistantText({
    * trabajo.
    */
   allowNav?: boolean
+  /** Id del mensaje: la navegación automática ocurre una sola vez por mensaje y destino. */
+  messageKey?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -97,7 +103,7 @@ function AssistantText({
   // enseñarse crudos.
   const plain = allowNav
     ? text
-    : text.replace(/\[\[ir:[^\]\s]+\]\]/g, "").trim()
+    : text.replace(/\[\[ir!?:[^\]\s]+\]\]/g, "").trim()
 
   // Las capturas de `screenshot_url` llegan como URL PELADA en el texto, así que
   // se veían como un link azul que hay que abrir en otra pestaña — justo cuando
@@ -108,6 +114,19 @@ function AssistantText({
   // caja no tienen ninguna (`…/AAN0XaQkExyz`), así que un `/\.(png|jpe?g)$/`
   // no habría cazado ni una sola.
   const withImages = renderScreenshots(plain)
+
+  /* `[[ir!:…]]` navega solo, pero SÓLO mientras llega la respuesta: al rehidratar
+     el historial o recargar la página no debe moverte de donde estás. */
+  useEffect(() => {
+    if (!streaming || !parts || !messageKey) return
+    for (const p of parts) {
+      if (p.type !== "nav" || !p.auto) continue
+      const key = `${messageKey}:${p.to}`
+      if (autoNavigated.has(key)) continue
+      autoNavigated.add(key)
+      window.mailmaskNav?.(p.to)
+    }
+  }, [streaming, text, messageKey])
 
   return (
     <div

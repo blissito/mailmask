@@ -144,6 +144,16 @@ describe("Asistente: Ghosty, turn token y confirmaciones", () => {
     assert.equal(last2[1].status, "ok");
   });
 
+  it("stream: sin cambio de pantalla igual viaja una línea con el dominio en pantalla", async () => {
+    sseFrames = [`data: ${JSON.stringify({ type: "done", value: "ok" })}\n\n`];
+    const res = await postJson("/api/asistente/stream", { text: "subdominio contador", attachments: [], screen: { domainId, tab: "dns" }, screenChanged: false }, withSession());
+    assert.equal(res.status, 200);
+    await res.text();
+    const body = JSON.parse(lastCall!.raw);
+    assert.match(body.text, new RegExp(`En pantalla: ${domainName.replace(/\./g, "\\.")} \\(domainId ${domainId}\\), pestaña dns`));
+    assert.match(body.text, /subdominio contador$/);
+  });
+
   it("stream (partner): /partner/turns con tenant opaco, token y adjuntos como links", async () => {
     process.env.GHOSTY_RUNTIME = "partner";
     sseFrames = [`data: ${JSON.stringify({ type: "chunk", value: "ok" })}\n\n`, `data: ${JSON.stringify({ type: "error", message: "capacidad" })}\n\n`];

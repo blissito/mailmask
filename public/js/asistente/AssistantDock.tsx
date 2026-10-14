@@ -575,6 +575,7 @@ function DockChat({
                         text={m.content}
                         streaming={streaming && i === messages.length - 1}
                         onNavigate={closeIfMobile}
+                        messageKey={m.id}
                       />
                       {!!m.content && (
                         <div className="mt-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
