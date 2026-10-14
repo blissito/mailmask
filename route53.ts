@@ -228,12 +228,12 @@ export async function disableAutoRenew(domain: string): Promise<void> {
 // --- Hosted zones ---
 
 /** Escapes octales de Route 53 (`\052` = `*`) a texto normal. */
-export function desescaparNombre(nombre: string): string {
-  return nombre.replace(/\\(\d{3})/g, (_, oct) => String.fromCharCode(parseInt(oct, 8)));
+export function unescapeRecordName(name: string): string {
+  return name.replace(/\\(\d{3})/g, (_, oct) => String.fromCharCode(parseInt(oct, 8)));
 }
 
-function normalizarZona(nombre: string): string {
-  return desescaparNombre(nombre).replace(/\.$/, "").toLowerCase();
+export function normalizeZoneName(name: string): string {
+  return unescapeRecordName(name).replace(/\.$/, "").toLowerCase();
 }
 
 /** Busca una hosted zone pública por nombre. Evita crear una segunda para el mismo dominio. */
@@ -244,7 +244,7 @@ export async function findHostedZoneByName(domain: string): Promise<string | nul
   const res: any = await client.send(new ListHostedZonesByNameCommand({ DNSName: domain, MaxItems: 10 }));
   for (const z of res.HostedZones ?? []) {
     if (z.Config?.PrivateZone) continue;
-    if (normalizarZona(z.Name ?? "") === domain.toLowerCase()) {
+    if (normalizeZoneName(z.Name ?? "") === domain.toLowerCase()) {
       return String(z.Id ?? "").replace("/hostedzone/", "");
     }
   }
@@ -340,7 +340,7 @@ export async function listRecordSets(hostedZoneId: string): Promise<RRSet[]> {
       // Los ALIAS no tienen ResourceRecords; se ignoran (fuera del alcance de la v1).
       if (!r.ResourceRecords?.length) continue;
       salida.push({
-        name: normalizarZona(r.Name ?? ""),
+        name: normalizeZoneName(r.Name ?? ""),
         type: String(r.Type ?? ""),
         ttl: Number(r.TTL ?? 300),
         values: r.ResourceRecords.map((v: any) => String(v.Value ?? "")),
