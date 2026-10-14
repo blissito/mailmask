@@ -703,12 +703,15 @@ function renderBarraSeleccion() {
 async function borrarSeleccionadas() {
   const ids = [...seleccionadas];
   if (ids.length === 0) return;
-  if (!confirm(`¿Eliminar ${ids.length} conversación${ids.length === 1 ? "" : "es"}? Se mueven a la papelera por 15 días.`)) return;
+  const domainId = selectedDomainId;
+  // Sólo se deshace lo que este borrado manda a la papelera. Un id que ya estaba borrado
+  // (la lista lo muestra como «eliminado») no se restaura: el servidor responde 404.
+  const vivas = ids.filter((id) => !conversations.find((c) => c.id === id)?.deletedAt);
 
   const res = await fetch("/api/bandeja/conversations/bulk-delete", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ domainId: selectedDomainId, ids }),
+    body: JSON.stringify({ domainId, ids }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -724,7 +727,27 @@ async function borrarSeleccionadas() {
   seleccionadas.clear();
   ultimaMarcada = -1;
   renderBarraSeleccion();
-  toast(`${data.deleted} eliminada${data.deleted === 1 ? "" : "s"}`);
+  const msg = `${data.deleted} eliminada${data.deleted === 1 ? "" : "s"}`;
+  if (vivas.length === 0) {
+    toast(msg);
+  } else {
+    toastDeshacer(msg, async () => {
+      // Un lote se restaura id por id: bulk-delete sólo devuelve el conteo, no qué ids borró.
+      const resultados = await Promise.allSettled(vivas.map(async (id) => {
+        const r = await fetch(`/api/bandeja/conversations/${id}/restore`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ domainId }),
+        });
+        if (!r.ok) throw new Error(`restore ${id}`);
+      }));
+      const restauradas = resultados.filter((r) => r.status === "fulfilled").length;
+      const fallidas = resultados.length - restauradas;
+      const texto = `${restauradas} restaurada${restauradas === 1 ? "" : "s"}`;
+      toast(fallidas ? `${texto}, ${fallidas} no se pudieron restaurar` : texto);
+      await loadConversations();
+    });
+  }
   await loadConversations();
 }
 
@@ -1358,16 +1381,36 @@ async function closeConversation() {
 
 async function deleteConversation() {
   if (!activeConv || !canDoActions) return;
-  if (!confirm("¿Eliminar esta conversación? Se moverá a la papelera por 15 días.")) return;
-  const res = await fetch(`/api/bandeja/conversations/${activeConv.id}?domainId=${selectedDomainId}`, {
+  // Se capturan antes de limpiar activeConv: «Deshacer» restaura este id en este dominio,
+  // aunque la persona cambie de dominio o de conversación mientras dura el aviso.
+  const id = activeConv.id;
+  const domainId = selectedDomainId;
+  const res = await fetch(`/api/bandeja/conversations/${id}?domainId=${domainId}`, {
     method: "DELETE",
   });
   if (res.ok) {
-    toast("Conversación eliminada");
     activeConv = null;
     document.getElementById("detail-empty").classList.remove("mesa-hidden");
     document.getElementById("detail-loaded").classList.add("mesa-hidden");
     await loadConversations();
+    toastDeshacer("Conversación eliminada", async () => {
+      try {
+        const r = await fetch(`/api/bandeja/conversations/${id}/restore`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ domainId }),
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          toast(err.error || "No se pudo restaurar");
+          return;
+        }
+        toast("Conversación restaurada");
+        await loadConversations();
+      } catch {
+        toast("No se pudo restaurar");
+      }
+    });
   } else {
     const err = await res.json().catch(() => ({}));
     toast(err.error || "Error al eliminar");
@@ -1850,11 +1893,49 @@ function formatTime(iso) {
   return d.toLocaleDateString("es-MX", { month: "short", day: "numeric" });
 }
 
+let toastTimer = null;
+let deshacerTimer = null;
+
+// Quita el «Deshacer» de un aviso anterior: su botón y su timer. Sin esto, un toast normal
+// heredaría el botón o lo apagaría antes de los 6 s.
+function limpiarDeshacer(el) {
+  clearTimeout(deshacerTimer);
+  deshacerTimer = null;
+  el.classList.remove("con-accion");
+  el.querySelector(".mesa-toast-accion")?.remove();
+}
+
 function toast(msg) {
   const el = document.getElementById("toast");
+  limpiarDeshacer(el);
+  clearTimeout(toastTimer);
   el.textContent = msg;
   el.classList.add("show");
-  setTimeout(() => el.classList.remove("show"), 2500);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 2500);
+}
+
+// Aviso con botón «Deshacer» que dura 6 s. Un aviso nuevo cancela el anterior.
+function toastDeshacer(msg, onUndo) {
+  const el = document.getElementById("toast");
+  limpiarDeshacer(el);
+  clearTimeout(toastTimer);
+  const texto = document.createElement("span");
+  texto.textContent = msg;
+  const boton = document.createElement("button");
+  boton.type = "button";
+  boton.className = "mesa-toast-accion";
+  boton.textContent = "Deshacer";
+  boton.addEventListener("click", () => {
+    limpiarDeshacer(el);
+    el.classList.remove("show");
+    onUndo();
+  });
+  el.replaceChildren(texto, boton);
+  el.classList.add("con-accion", "show");
+  deshacerTimer = setTimeout(() => {
+    limpiarDeshacer(el);
+    el.classList.remove("show");
+  }, 6000);
 }
 
 function updateTitle() {
