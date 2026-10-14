@@ -210,6 +210,71 @@ export function conflictoDeConvivencia(nuevo: RRSet, existentes: RRSet[]): strin
   return null;
 }
 
+// --- Lote atómico ---
+
+export type CambioLote = { action: "UPSERT" | "DELETE"; name: string; type: string; ttl?: number; values?: string[] };
+export type PasoLote = { action: "UPSERT" | "DELETE"; name: string; type: string; before: RRSet | null; after: RRSet | null };
+export const LOTE_MAX = 50;
+
+/**
+ * Valida un lote como si fueran PUT/DELETE sueltos (mismo `validarRRSet`, mismo guardián), pero
+ * la convivencia del CNAME se mide contra la zona YA con el lote aplicado: borrar el A y poner
+ * el CNAME en el mismo lote es válido. Devuelve los cambios para Route 53 (DELETE con el RRSet
+ * exacto de hoy) y, por paso, lo que había antes y lo que queda, para que el cliente deshaga.
+ */
+export function planearLote(
+  cambios: CambioLote[],
+  existentes: RRSet[],
+  d: DominioGestionado,
+): { route53: { action: "UPSERT" | "DELETE"; rrset: RRSet }[]; pasos: PasoLote[] } {
+  if (!Array.isArray(cambios) || !cambios.length) throw new ErrorDns("El lote necesita al menos un cambio.");
+  if (cambios.length > LOTE_MAX) throw new ErrorDns(`Un lote admite hasta ${LOTE_MAX} cambios.`);
+  const clave = (r: { name: string; type: string }) => `${r.name}|${r.type}`;
+  const zona = new Map(existentes.map((r) => [clave(r), r]));
+  const vistos = new Set<string>();
+  const route53: { action: "UPSERT" | "DELETE"; rrset: RRSet }[] = [];
+  const pasos: PasoLote[] = [];
+
+  cambios.forEach((c, i) => {
+    const donde = `Cambio ${i + 1}: `;
+    try {
+      const action = String(c.action).toUpperCase();
+      if (action !== "UPSERT" && action !== "DELETE") throw new ErrorDns(`action debe ser UPSERT o DELETE.`);
+      const name = normalizarNombre(c.name, d.domain);
+      const type = String(c.type ?? "").toUpperCase();
+      const k = `${name}|${type}`;
+      if (vistos.has(k)) throw new ErrorDns(`${type} ${name} viene dos veces en el lote.`);
+      vistos.add(k);
+      const before = zona.get(k) ?? null;
+      if (action === "UPSERT") {
+        const rrset = validarRRSet({ name, type: type as RRSetTipo, ttl: c.ttl ?? 300, values: c.values ?? [] }, d.domain);
+        const bloqueo = aplicarGuardian("upsert", rrset, d);
+        if (bloqueo) throw bloqueo;
+        zona.set(k, rrset);
+        route53.push({ action: "UPSERT", rrset });
+        pasos.push({ action: "UPSERT", name, type, before, after: rrset });
+      } else {
+        if (!before) throw new ErrorDns(`No hay ningún registro ${type} en ${name}.`);
+        const bloqueo = aplicarGuardian("delete", before, d);
+        if (bloqueo) throw bloqueo;
+        zona.delete(k);
+        route53.push({ action: "DELETE", rrset: before });
+        pasos.push({ action: "DELETE", name, type, before, after: null });
+      }
+    } catch (err) {
+      if (err instanceof ErrorDns) throw new ErrorDns(donde + err.message, err.suggestedValues);
+      throw err;
+    }
+  });
+
+  const final = [...zona.values()];
+  for (const { rrset } of route53.filter((x) => x.action === "UPSERT")) {
+    const choque = conflictoDeConvivencia(rrset, final);
+    if (choque) throw new ErrorDns(choque);
+  }
+  return { route53, pasos };
+}
+
 // --- Guardián de los registros de MailMask ---
 
 export interface DominioGestionado {

@@ -93,7 +93,17 @@ credenciales SMTP. La cookie es SameSite=Strict: llegando desde otro sitio `/oau
 y manda a `/login?next=…`, que detecta la sesión con un fetch y regresa (sólo acepta `next` que empiece
 con `/oauth/authorize?`; Google lo carga en el `state`). El POST del consentimiento está exento del CSRF
 global: lo protege un ticket de un solo uso (tabla `tokens`, kind `oauth-consent`) atado a sesión y
-parámetros. El issuer es `MAIN_DOMAIN` en Fly y el origen de la petición en local. Pruebas:
+parámetros. El issuer es `MAIN_DOMAIN` en Fly y el origen de la petición en local.
+**Scope `dns` (14-oct-2026)**: `scopes_supported` = `mailmask dns`; sin `scope` se concede `mailmask`
+(cuenta completa), y un token que trae `mailmask` vale la cuenta aunque traiga `dns`. Con `dns` a secas
+(lo pide EasyBits para escribir los registros de sus dominios) `dnsScopeAllows` en `main.ts` es lista
+BLANCA: `GET /api/domains`, `GET /api/domains/:id`, `GET /api/domains/:id/dns-setup` y todo
+`/api/domains/:id/dns/*`; lo demás 403 `insufficient_scope` y `/mcp` lo rechaza con
+`WWW-Authenticate: …insufficient_scope`. Una ruta nueva queda fuera hasta agregarla ahí. El consentimiento
+cambia de texto según el scope y enseña el `logo_uri` del cliente. Para ese cliente existe
+`POST /api/domains/:id/dns/batch` (`planearLote` en `dns-records.ts`): hasta 50 cambios en UN cambio de
+Route 53, mismas reglas que PUT/DELETE, y cada paso devuelve `before`/`after` para deshacer.
+Pruebas: `oauth-dns-scope.test.ts`. Pruebas:
 `oauth.test.ts`; e2e contra un servidor vivo: `scripts/oauth-e2e.ts` (instrucciones en su cabecera).
 
 ## MCP Registry oficial (`studio.mailmask/mailmask`, 19-sep-2026)

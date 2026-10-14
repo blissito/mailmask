@@ -259,7 +259,7 @@ import { atenderMcp } from "./mcp.js";
 import { sandboxSendResponse } from "./sandbox.js";
 import {
   protectedResourceMetadata, authorizationServerMetadata, protectedResourceMetadataUrl, resourceFor, type McpResourcePath,
-  registerClient, authorizeGet, authorizePost, tokenEndpoint, revokeEndpoint, verifyOAuthAccessToken,
+  registerClient, authorizeGet, authorizePost, tokenEndpoint, revokeEndpoint, verifyOAuthAccessToken, isDnsOnlyScope,
 } from "./oauth.js";
 import { logOutbound, handleInternalOutbound } from "./outbound-relay.js";
 import { copyToSentFolder } from "./imap-store.js";
@@ -1393,6 +1393,9 @@ async function handleMcp(request: Request, path: McpResourcePath): Promise<Respo
     : bearer.startsWith("mo_") ? oauthUserFor(bearer, resourceFor(request, path))
     : await getUserByApiKey(bearer);
   if (!user) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 401, headers: { "content-type": "application/json", "www-authenticate": challenge(', error="invalid_token"') } });
+  if (bearer.startsWith("mo_") && isDnsOnlyScope((user as { scope?: string }).scope)) {
+    return new Response(JSON.stringify({ error: "Esta conexión sólo tiene permiso para el DNS (scope dns); el MCP pide el scope mailmask." }), { status: 403, headers: { "content-type": "application/json", "www-authenticate": challenge(', error="insufficient_scope", scope="mailmask"') } });
+  }
   // Las llamadas internas llevan la IP del cliente: sin ella todos los agentes caían en
   // el mismo cubo "unknown" de los topes por IP (responder, redactar, adjuntos).
   const clientIp = getIp(request);
@@ -1404,6 +1407,12 @@ async function handleMcp(request: Request, path: McpResourcePath): Promise<Respo
   const res = await atenderMcp(request, { apiKey: auth.slice("Bearer ".length), fetchLocal, profile: path === "/mcp/directory" ? "directory" : "full" });
   res.headers.set("access-control-allow-origin", "*");
   return res;
+}
+
+/** Lo único que alcanza un `mo_` con scope `dns`: listar dominios, ver uno, su DNS y sus registros a pegar. */
+function dnsScopeAllows(method: string, path: string): boolean {
+  if (method === "GET" && (path === "/api/domains" || /^\/api\/domains\/[^/]+$/.test(path) || /^\/api\/domains\/[^/]+\/dns-setup$/.test(path))) return true;
+  return /^\/api\/domains\/[^/]+\/dns(\/.*)?$/.test(path);
 }
 
 /** Un `mo_` vale sólo en el recurso para el que se emitió (RFC 8707). */
@@ -1544,6 +1553,16 @@ const app = new Elysia({ adapter: node() })
       (/^\/api\/domains\/[^/]+\/smtp-credentials$/.test(path) && (request.method === "GET" || request.method === "POST")))) {
       return jsonErr("Una conexión OAuth no puede crear ni listar credenciales; hazlo tú desde el panel.", 403);
     }
+    // Un `mo_` con scope `dns` a secas sólo ve los dominios y su DNS: ni correo, ni buzones, ni
+    // cuenta. Lista blanca, no lista negra: una ruta nueva queda fuera hasta que se agregue aquí.
+    if (authHeader.startsWith("Bearer mo_")) {
+      const t = verifyOAuthAccessToken(authHeader.slice(7));
+      // `/mcp` contesta él mismo, con el `WWW-Authenticate: insufficient_scope` que pide el spec.
+      if (t && isDnsOnlyScope(t.scope) && !path.startsWith("/mcp") && !dnsScopeAllows(request.method, path)) {
+        return Response.json({ error: "Esta conexión sólo tiene permiso para el DNS de tus dominios.", code: "insufficient_scope" }, { status: 403 });
+      }
+      return;
+    }
     if (!authHeader.startsWith("Bearer mt_")) return;
     const forbidden =
       path.startsWith("/api/api-keys") ||
@@ -1577,7 +1596,9 @@ const app = new Elysia({ adapter: node() })
       // En /bandeja el correo entrante se pinta en un <iframe sandbox srcdoc>, que
       // hereda esta CSP: sin `https:` en img-src los logos y botones de cada
       // correo salen rotos. Sólo imágenes, sólo ahí; scripts siguen bloqueados.
-      const imgSrc = new URL(request.url).pathname === "/bandeja" ? "img-src 'self' data: https:" : "img-src 'self' data: https://www.googletagmanager.com https://www.clarity.ms";
+      // El consentimiento OAuth enseña el `logo_uri` del cliente (https, lo valida el registro).
+      const imgPath = new URL(request.url).pathname;
+      const imgSrc = imgPath === "/bandeja" || imgPath === "/oauth/authorize" ? "img-src 'self' data: https:" : "img-src 'self' data: https://www.googletagmanager.com https://www.clarity.ms";
       response.headers.set(
         "content-security-policy",
         `default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; ${imgSrc}; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms https://challenges.cloudflare.com; connect-src 'self' https://www.formmy.app https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms; frame-src 'self' https://www.googletagmanager.com https://www.youtube-nocookie.com https://challenges.cloudflare.com`,
@@ -8290,6 +8311,53 @@ const app = new Elysia({ adapter: node() })
   }, {
     body: t.Object({ name: t.String(), type: t.String() }),
     detail: { tags: ["DNS", "SDK"], summary: "Delete a DNS record set", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  // Varios cambios en UN solo cambio de Route 53: o entran todos o ninguno. Mismas reglas que
+  // PUT/DELETE de /dns/records (validación, guardián del correo, CNAME sin compañía, medida con
+  // el lote ya aplicado). Cada paso trae `before`, para que el cliente pueda deshacer.
+  .post("/api/domains/:id/dns/batch", async ({ request, params, body }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+    if (!d.hostedZoneId) return jsonErr("Este dominio todavía no tiene zona DNS en MailMask.", 409);
+
+    const { planearLote, ErrorDns } = await import("./dns-records.js");
+    const { listRecordSets, applyRecordChanges } = await import("./route53.js");
+    const b = body as { changes: { action: "UPSERT" | "DELETE"; name: string; type: string; ttl?: number; values?: string[] }[]; dryRun?: boolean };
+    try {
+      const existentes = await listRecordSets(d.hostedZoneId);
+      const { route53, pasos } = planearLote(b.changes, existentes as never, {
+        domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens,
+      });
+      if (b.dryRun) return Response.json({ dryRun: true, changes: pasos });
+      const { changeId } = await applyRecordChanges(d.hostedZoneId, route53, `Lote de ${route53.length} cambio(s) de ${user.email}`);
+      log("info", "route53", "DNS batch applied", { domain: d.domain, count: route53.length, actor: user.email, changeId });
+      return Response.json({ dryRun: false, changes: pasos, changeId, propagacion: "Suele tardar menos de un minuto." });
+    } catch (err) {
+      if (err instanceof ErrorDns) {
+        return Response.json({ error: err.message, ...(err.suggestedValues ? { suggestedValues: err.suggestedValues } : {}) }, { status: 409 });
+      }
+      log("error", "route53", "DNS batch failed", { domain: d.domain, error: String(err) });
+      return jsonErr("No se pudo aplicar el lote en el DNS; no se cambió nada.", 502);
+    }
+  }, {
+    body: t.Object({
+      changes: t.Array(t.Object({
+        action: t.Union([t.Literal("UPSERT"), t.Literal("DELETE")]),
+        name: t.String(),
+        type: t.String(),
+        ttl: t.Optional(t.Number()),
+        values: t.Optional(t.Array(t.String())),
+      }), { minItems: 1, maxItems: 50 }),
+      dryRun: t.Optional(t.Boolean()),
+    }),
+    detail: { tags: ["DNS", "SDK"], summary: "Apply several DNS changes atomically (one Route 53 change)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
   .post("/api/domains/:id/dns/preset", async ({ request, params, body }) => {
