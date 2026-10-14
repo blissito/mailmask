@@ -663,7 +663,8 @@ La clave del sitio es pública y vive en el HTML; la secreta es `TURNSTILE_SECRE
   `grep -rnoE "(function|const|let) [a-z]+[áéíóúñ]?[A-Za-z]*(ar|er|ir|ado|ida|ion|os|as)\b"` y revisar a mano.
   **Avance (sprint #8, 12-oct-2026) — módulos del sprint renombrados**: `plans.ts` (`DOMINIO_ACTIVADO`→
   `DOMAIN_ACTIVATED`, `DOMINIO_GRATIS`→`DOMAIN_FREE`), `sse-hub.ts` (`notifyBandeja`→`notifyInbox`,
-  `presencias`→`presences`), `dns-import.ts` (`enTandas`→`inBatches`, `consultar`→`queryRecord`,
+  `presencias`→`presences`; y en el sprint #10 de cobertura, sus locales de presencia
+  `expira`→`expiresAt`, `ahora`→`now`, `vivos`→`alive`), `dns-import.ts` (`enTandas`→`inBatches`, `consultar`→`queryRecord`,
   `nameserversActuales`→`currentNameservers`, `Inventario`→`DnsInventory`, `EstadoDelegacion`→
   `DelegationStatus`, `delegacionActiva`→`getDelegationStatus` y sus constantes), `scheduler.ts`
   (`esServidor`→`isServer`, `programar`→`schedule`), `search-backfill.ts` (`ejecutarBackfill`→`runBackfill`,

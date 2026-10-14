@@ -59,7 +59,7 @@ export interface Presence {
   name: string;
   conversationId: string | null;
   state: "viewing" | "typing";
-  expira: number;
+  expiresAt: number;
 }
 
 // El typing muere rápido a propósito: si dejaste de teclear, el aviso debe irse
@@ -83,7 +83,7 @@ export function setPresence(
     name,
     conversationId,
     state,
-    expira: Date.now() + (state === "typing" ? TTL_TYPING : TTL_VIEWING),
+    expiresAt: Date.now() + (state === "typing" ? TTL_TYPING : TTL_VIEWING),
   });
 }
 
@@ -97,14 +97,14 @@ export function clearPresence(domainId: string, email: string): void {
 export function listPresence(domainId: string): Presence[] {
   const m = presences.get(domainId);
   if (!m) return [];
-  const ahora = Date.now();
-  const vivos: Presence[] = [];
+  const now = Date.now();
+  const alive: Presence[] = [];
   for (const [email, p] of m) {
-    if (p.expira <= ahora) m.delete(email);
-    else vivos.push(p);
+    if (p.expiresAt <= now) m.delete(email);
+    else alive.push(p);
   }
   if (m.size === 0) presences.delete(domainId);
-  return vivos;
+  return alive;
 }
 
 // Se manda el snapshot completo, no deltas: con cinco agentes son cinco objetos y
