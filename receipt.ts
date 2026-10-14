@@ -51,9 +51,21 @@ export function renderReceipt(order: Order): string {
   .mono { font-family: ui-monospace, "JetBrains Mono", monospace; font-size: 13px; }
   footer { margin-top: 28px; font-size: 12px; color: #78716c; }
   .actions { max-width: 640px; margin: 0 auto 32px; text-align: right; }
+  .hint { font-size: 12px; color: #78716c; margin-top: 6px; }
   button { font: inherit; padding: 8px 18px; border-radius: 8px; border: 1px solid #1c1917; background: #1c1917; color: #fff; cursor: pointer; }
   @media (max-width: 680px) { main { margin: 0; border-radius: 0; border: 0; padding: 24px 16px; } .actions { padding: 0 16px; } }
-  @media print { body { background: #fff; } main { margin: 0; border: 0; padding: 0; } .actions { display: none; } }
+  /* Carta vertical: el diálogo de impresión la toma como diseño por defecto. */
+  @page { size: letter portrait; margin: 18mm 20mm; }
+  @media print {
+    body { background: #fff; font-size: 12pt; }
+    main { max-width: none; margin: 0; border: 0; padding: 0; }
+    header img { height: 40px; }
+    h1 { font-size: 18pt; margin-top: 32px; }
+    .total { font-size: 30pt; margin-bottom: 32px; }
+    th, td { padding: 12px 0; }
+    footer { font-size: 10pt; margin-top: 40px; }
+    .actions { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -75,7 +87,7 @@ export function renderReceipt(order: Order): string {
   </table>
   <footer>Este recibo es un comprobante de pago, no una factura. ¿Necesitas CFDI? Escríbenos a ${escHtml(SUPPORT_EMAIL)} con tu RFC, razón social, régimen fiscal, código postal, uso de CFDI y el folio ${escHtml(order.number)}.</footer>
 </main>
-<div class="actions"><button id="print">Imprimir o guardar PDF</button></div>
+<div class="actions"><button id="print">Imprimir o guardar PDF</button><div class="hint">Tamaño carta, vertical.</div></div>
 <script src="/js/recibo.js"></script>
 </body>
 </html>`;
