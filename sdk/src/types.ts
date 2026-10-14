@@ -439,6 +439,59 @@ export interface WebsiteStatus {
   hosts: WebsiteHost[];
 }
 
+// --- Sitio de EasyBits publicado en el dominio ---
+
+export interface EasyBitsSite { id: string; name: string; slug: string; status: string; url: string; subdomainUrl?: string | null }
+
+export interface PublishEasyBitsSiteInput {
+  /** El sitio de EasyBits: los de la cuenta salen en `easyBitsSiteStatus().sites`. */
+  websiteId: string;
+  /** 'apex' = raíz y www; 'subdomain' = `<slug>.<dominio>`. */
+  placement: "apex" | "subdomain";
+  /** Vista previa: lo que escribiría y lo que hay hoy, sin tocar EasyBits ni el DNS. */
+  dryRun?: boolean;
+}
+
+export interface EasyBitsPublishResult {
+  dryRun: boolean;
+  url: string;
+  site: EasyBitsSite;
+  records: DnsRRSet[];
+  /** Sólo en vista previa: lo que hay hoy en cada (nombre, tipo), null = nada. */
+  current?: (DnsRRSet | null)[];
+  /** EasyBits ya vio el TXT; si es false, el DNS ya está y la verificación llega en minutos. */
+  verified?: boolean;
+  easybitsDomainId?: string;
+}
+
+export interface EasyBitsSiteStatus {
+  /** Si quien pregunta tiene su cuenta de EasyBits conectada (se conecta en el navegador). */
+  linked: boolean;
+  /** Los sitios de la cuenta de EasyBits conectada (vacío sin conexión o si EasyBits no respondió). */
+  sites: EasyBitsSite[];
+  published: boolean;
+  publication: {
+    websiteId: string;
+    placement: "apex" | "subdomain";
+    url: string;
+    publishedBy: string;
+    records: DnsRRSet[];
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+}
+
+export interface EasyBitsUnpublishResult {
+  ok: true;
+  /** No había nada publicado. */
+  nothing?: true;
+  /** Registros que volvieron a como estaban antes de publicar (`to: null` = se borró). */
+  restored: { name: string; type: string; to: DnsRRSet | null }[];
+  /** Registros que el usuario cambió después de publicar: se dejaron como están. */
+  skipped: { name: string; type: string; current: DnsRRSet | null }[];
+  easybits: { apexCleared: boolean; domainDeleted: boolean; error?: string };
+}
+
 // --- Registros a pegar en el registrador ---
 
 export interface DnsSetupRecord {

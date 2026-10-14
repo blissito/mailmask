@@ -247,7 +247,10 @@ async function checkAuth() {
   const res = await fetch("/api/auth/me");
   if (!res.ok) {
     // `/app#pagos` sobrevive al login: el hash no llega al servidor, así que viaja en `next`.
-    window.location.href = window.location.hash === "#pagos" ? "/login?next=%2Fapp%23pagos" : "/login";
+    // Igual la liga de EasyBits que da el agente (`/app?domain=…&easybits=1`).
+    const ebLink = /^\?domain=[a-z0-9.-]+&easybits=1$/i.test(location.search) ? `/app${location.search}` : null;
+    window.location.href = window.location.hash === "#pagos" ? "/login?next=%2Fapp%23pagos"
+      : ebLink ? `/login?next=${encodeURIComponent(ebLink)}` : "/login";
     return;
   }
   currentUser = await res.json();
@@ -1014,12 +1017,15 @@ async function loadDomains() {
   }
 
   // Regreso del OAuth de EasyBits: `/app?easybits=<domainId>` reabre el dominio, la pestaña
-  // Sitio web y el modal para elegir el sitio.
+  // Sitio web y el modal para elegir el sitio. La liga del agente es `/app?domain=<dominio>&easybits=1`:
+  // mismo modal, que sin cuenta conectada manda a conectarla y regresa aquí.
   const ebParams = new URLSearchParams(location.search);
   if (ebParams.has("easybits") || ebParams.has("easybits_error")) {
     history.replaceState(null, "", "/app");
-    const ebDomain = ebParams.get("easybits");
+    const porNombre = ebParams.get("domain") && domains.find(x => x.domain === ebParams.get("domain").toLowerCase());
+    const ebDomain = porNombre ? porNombre.id : ebParams.get("easybits");
     if (ebParams.has("easybits_error")) showToast("No se pudo conectar con EasyBits; intenta de nuevo.", true);
+    else if (ebParams.get("domain") && !porNombre) showToast(`No encontramos ${ebParams.get("domain")} en tu cuenta.`, true);
     else if (ebDomain && domains.some(x => x.id === ebDomain)) {
       await selectDomain(ebDomain);
       switchTab("web");
@@ -2495,7 +2501,6 @@ const WEB_PLATFORMS = [
   { id: "render", label: "Render", pide: "mi-app.onrender.com" },
   { id: "fly", label: "Fly.io", pide: "mi-app.fly.dev", soloSub: true },
   { id: "cloudflare-pages", label: "Cloudflare Pages", pide: "mi-sitio.pages.dev", soloSub: true },
-  { id: "easybits", label: "Sandbox de EasyBits", pide: null, soloSub: true },
   { id: "otro", label: "Otro (CNAME)", pide: "destino.ejemplo.com", soloSub: true },
 ];
 let _webEstado = null;
@@ -2562,10 +2567,10 @@ function renderWebPlatforms() {
   const destacado = `
     <button type="button" data-web-easybits class="col-span-2 sm:col-span-4 border-2 border-accent rounded-xl p-4 bg-bg-elev hover:bg-bg-inset transition-colors text-left">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <div class="font-semibold text-fg">EasyBits</div>
+        <div class="font-semibold text-fg">Crea un nuevo sitio o app con EasyBits</div>
         <span class="text-xs font-semibold px-2 py-0.5 rounded bg-mask-500/15 text-mask-600">Recomendado</span>
       </div>
-      <p class="text-sm text-fg-muted mt-1">Describe tu sitio y un agente lo construye. Conéctalo a tu dominio con un clic: HTTPS incluido y sin copiar registros.</p>
+      <p class="text-sm text-fg-muted mt-1">Descríbelo y un agente lo construye. Queda en tu dominio con un clic: HTTPS incluido y sin copiar registros.</p>
     </button>`;
   cont.innerHTML = destacado + WEB_PLATFORMS.map(p => `
     <button type="button" data-web-platform="${p.id}" class="border border-line rounded-xl p-3 bg-bg-elev text-sm font-semibold text-fg hover:border-accent transition-colors text-left">
@@ -2593,18 +2598,52 @@ async function easybitsModal() {
   const body = dlg.querySelector("[data-eb-body]");
 
   let estado;
+  let publicado = null;
   try {
-    const res = await fetch("/api/integrations/easybits");
+    const [res, pub] = await Promise.all([
+      fetch("/api/integrations/easybits"),
+      fetch(`/api/domains/${selectedDomain.id}/website/easybits`).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]);
     estado = await res.json();
     if (!res.ok) throw new Error(estado.error || "EasyBits no respondió");
+    publicado = pub?.published ? pub.publication : null;
   } catch (err) {
     body.innerHTML = `<p class="text-sm text-red-500">${esc(err.message)}</p>`;
     return;
   }
 
+  // Lo publicado se puede quitar aunque la cuenta ya no esté conectada: el DNS es nuestro.
+  const bannerPublicado = publicado ? `
+    <div class="border border-line rounded-lg p-3 mb-4 text-sm flex flex-wrap items-center justify-between gap-2">
+      <div class="text-fg">Publicado en <a href="${esc(publicado.url)}" target="_blank" rel="noopener" class="font-mono underline">${esc(publicado.url)}</a></div>
+      <button type="button" data-eb-unpublish class="px-3 py-1.5 text-sm font-semibold rounded-lg border border-line text-red-600 hover:border-red-500">Quitar de EasyBits</button>
+    </div>` : "";
+  const conectarQuitar = () => body.querySelector("[data-eb-unpublish]")?.addEventListener("click", async (e) => {
+    const ok = await confirmar({
+      titulo: "Quitar el sitio de EasyBits",
+      mensaje: `${publicado.url} deja de verse. Los registros DNS vuelven a como estaban antes de publicar; lo que hayas cambiado a mano después se queda como está.`,
+      accion: "Quitar",
+    });
+    if (!ok) return;
+    e.target.disabled = true;
+    try {
+      const res = await fetch(`/api/domains/${selectedDomain.id}/website/easybits`, { method: "DELETE" });
+      const r = await res.json();
+      if (!res.ok) throw new Error(r.error || "No se pudo quitar");
+      cerrar();
+      const avisos = r.skipped?.length ? ` ${r.skipped.length} registro(s) ya los habías cambiado y se dejaron como están.` : "";
+      showToast(`Sitio quitado; el DNS volvió a como estaba.${avisos}`);
+      loadWebsite();
+    } catch (err) {
+      e.target.disabled = false;
+      showToast(err.message, true);
+    }
+  });
+
   if (!estado.connected) {
     body.innerHTML = `
       <h3 class="font-semibold text-fg mb-2">Publica tu sitio de EasyBits en ${esc(d)}</h3>
+      ${bannerPublicado}
       <p class="text-sm text-fg-muted mb-4">Describe tu sitio y un agente lo construye. Conecta tu cuenta una vez y MailMask lo pone en tu dominio: registros, verificación y HTTPS.</p>
       <div class="flex flex-wrap justify-end gap-2">
         <button type="button" data-eb-cancel class="px-3 py-1.5 text-sm text-fg-muted hover:text-fg">Cancelar</button>
@@ -2612,11 +2651,13 @@ async function easybitsModal() {
       </div>
       <p class="text-xs text-fg-subtle mt-3">¿Aún no tienes sitio? <a href="${EASYBITS_NEW_SITE}" target="_blank" rel="noopener" class="underline">Créalo en EasyBits</a>.</p>`;
     body.querySelector("[data-eb-cancel]").addEventListener("click", cerrar);
+    conectarQuitar();
     return;
   }
 
   if (!estado.sites.length) {
     body.innerHTML = `
+      ${bannerPublicado}
       <h3 class="font-semibold text-fg mb-2">Todavía no tienes sitios en EasyBits</h3>
       <p class="text-sm text-fg-muted mb-4">Crea uno (describe lo que quieres y un agente lo construye) y vuelve aquí para ponerlo en ${esc(d)}.</p>
       <div class="flex justify-end gap-2">
@@ -2624,11 +2665,13 @@ async function easybitsModal() {
         <a href="${EASYBITS_NEW_SITE}" target="_blank" rel="noopener" class="px-3 py-1.5 text-sm font-semibold rounded-lg bg-accent text-white">Crear un sitio</a>
       </div>`;
     body.querySelector("[data-eb-cancel]").addEventListener("click", cerrar);
+    conectarQuitar();
     return;
   }
 
   body.innerHTML = `
     <h3 class="font-semibold text-fg mb-4">Publicar un sitio de EasyBits</h3>
+    ${bannerPublicado}
     <div class="space-y-3">
       <div>
         <label class="block text-xs text-fg-muted mb-1">Sitio</label>
@@ -2659,6 +2702,7 @@ async function easybitsModal() {
   sel.addEventListener("change", () => { subLabel(); invalidar(); });
   body.querySelectorAll('input[name="eb-place"]').forEach(r => r.addEventListener("change", invalidar));
   body.querySelector("[data-eb-cancel]").addEventListener("click", cerrar);
+  conectarQuitar();
   body.querySelector("[data-eb-disconnect]").addEventListener("click", async () => {
     await fetch("/api/integrations/easybits", { method: "DELETE" });
     cerrar();

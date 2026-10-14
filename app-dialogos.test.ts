@@ -37,8 +37,8 @@ test("confirmar() existe y devuelve una promesa de booleano por su firma", () =>
   assert.match(appJs, /function confirmar\(\{\s*titulo,\s*mensaje,\s*accion,\s*peligro = true\s*\}\)/);
 });
 
-test("las 11 confirmaciones llaman a confirmar() con await", () => {
-  assert.equal(appJs.match(/await confirmar\(\{/g)?.length ?? 0, 11);
+test("las 12 confirmaciones llaman a confirmar() con await", () => {
+  assert.equal(appJs.match(/await confirmar\(\{/g)?.length ?? 0, 12);
 });
 
 test("cada confirmación usa el verbo exacto de su acción", () => {

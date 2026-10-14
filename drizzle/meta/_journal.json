@@ -218,6 +218,13 @@
       "when": 1788901200000,
       "tag": "0030_easybits_links",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1788901300000,
+      "tag": "0031_easybits_publications",
+      "breakpoints": true
     }
   ]
 }

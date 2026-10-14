@@ -660,6 +660,27 @@ describe("SDK ↔ servidor: contrato", () => {
     assert.ok(i.warning);
   });
 
+  it("domains: sitio de EasyBits (estado, publicar sin cuenta conectada, quitar sin nada publicado)", async () => {
+    const st = await mm.domains.easyBitsSiteStatus(domainId);
+    assert.equal(st.linked, false);
+    assert.equal(st.published, false);
+    assert.deepEqual(st.sites, []);
+
+    await assert.rejects(
+      () => mm.domains.publishEasyBitsSite(domainId, { websiteId: "w1", placement: "apex", dryRun: true }),
+      (e: MailMaskError) => e.status === 409 && /EasyBits conectado/.test(e.message) && /easybits=1/.test(e.message),
+    );
+    // point_domain_to con 'easybits' ya no escribe un CNAME suelto: pasa por la misma publicación.
+    await assert.rejects(
+      () => mm.dns.preset(domainId, "easybits", undefined, undefined, { websiteId: "w1" }),
+      (e: MailMaskError) => e.status === 409 && /EasyBits conectado/.test(e.message),
+    );
+
+    const u = await mm.domains.unpublishEasyBitsSite(domainId);
+    assert.equal(u.ok, true);
+    assert.equal(u.nothing, true);
+  });
+
   it("dns: un TTL inválido vuelve como 400 con el mensaje del servidor", async () => {
     await assert.rejects(
       () => mm.dns.upsert(domainId, { name: "x", type: "A", values: ["1.2.3.4"], ttl: 5 }),

@@ -151,7 +151,8 @@ export async function verifyTurnToken(token: string): Promise<string | null> {
  * destructivas lo detienen y piden confirmación al usuario (`agent-actions.ts`).
  */
 export type AuthVia = "session" | "apikey" | "turn";
-export type AuthUser = { email: string; via: AuthVia };
+/** `oauthScope`: sólo con un `mo_`; con `dns` a secas, `main.ts` le deja ver dominios y su DNS y nada más. */
+export type AuthUser = { email: string; via: AuthVia; oauthScope?: string };
 
 export async function getAuthUser(request: Request): Promise<AuthUser | null> {
   const authHeader = request.headers.get("authorization");
@@ -170,7 +171,7 @@ export async function getAuthUser(request: Request): Promise<AuthUser | null> {
     if (!t) return null;
     const rl = checkRateLimit(`oauth:${t.tokenId}`, 60, 60_000);
     if (!rl.allowed) return null;
-    return { email: t.email, via: "apikey" };
+    return { email: t.email, via: "apikey", oauthScope: t.scope };
   }
   // Try Bearer token (API key) first
   if (authHeader?.startsWith("Bearer mk_")) {

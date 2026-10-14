@@ -10,8 +10,10 @@
 // - Tokens OPACOS y guardados con SHA-256 (como `api_keys`): `mo_` acceso 1 h, `mr_` refresh 60 días.
 // - Refresh con ROTACIÓN: cada uso invalida el anterior; presentar uno ya rotado (= robado o
 //   duplicado) revoca toda la familia (todo lo que nació del mismo permiso).
-// - Un `mo_` vale lo mismo que una `mk_` (no hay scopes finos todavía), salvo fabricar llaves o
-//   entrar al admin (lo bloquea `main.ts`): revocar el permiso tiene que bastar para cortar el acceso.
+// - Scope `mailmask`: un `mo_` vale lo mismo que una `mk_`, salvo fabricar llaves o entrar al admin
+//   (lo bloquea `main.ts`): revocar el permiso tiene que bastar para cortar el acceso.
+// - Scope `dns` (sin `mailmask`): sólo ver los dominios y su DNS (lista blanca en `main.ts`); ni
+//   correo ni buzones ni `/mcp`. Lo pide EasyBits para escribir los registros de sus dominios.
 // - La cookie de sesión es SameSite=Strict, así que al llegar desde otro sitio /oauth/authorize no
 //   la ve: se manda a `/login?next=…`, que detecta la sesión con un fetch y vuelve ya en mismo sitio.
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
@@ -19,7 +21,15 @@ import { sqlite } from "./pg.js";
 import { getUser } from "./db.js";
 import { checkRateLimit } from "./rate-limit.js";
 
-export const OAUTH_SCOPES = ["mailmask"];
+export const OAUTH_SCOPES = ["mailmask", "dns"];
+/** Sin `scope` en la petición se concede la cuenta completa, como antes de existir `dns`. */
+const DEFAULT_SCOPE = "mailmask";
+
+/** Un token que sólo trae `dns` (con `mailmask` vale la cuenta completa). */
+export function isDnsOnlyScope(scope: string | undefined | null): boolean {
+  const parts = (scope ?? "").split(/\s+/).filter(Boolean);
+  return parts.includes("dns") && !parts.includes("mailmask");
+}
 const ACCESS_TTL_S = 3600;
 const REFRESH_TTL_S = 60 * 86400;
 const CODE_TTL_S = 600;
@@ -97,7 +107,7 @@ export function validRedirectUri(raw: unknown): boolean {
 
 function parseScope(raw: unknown): string | null {
   const s = str(raw);
-  if (!s) return OAUTH_SCOPES.join(" ");
+  if (!s) return DEFAULT_SCOPE;
   const parts = s.split(/\s+/).filter(Boolean);
   if (!parts.length || parts.some((p) => !OAUTH_SCOPES.includes(p))) return null;
   return [...new Set(parts)].join(" ");
@@ -140,7 +150,7 @@ export function authorizationServerMetadata(request: Request): Response {
 // --- Clientes (DCR) ---
 
 type ClientRow = {
-  client_id: string; client_secret_hash: string | null; client_name: string; client_uri: string | null;
+  client_id: string; client_secret_hash: string | null; client_name: string; client_uri: string | null; logo_uri: string | null;
   redirect_uris: string; token_endpoint_auth_method: string;
 };
 
@@ -278,14 +288,24 @@ export function authorizeGet(request: Request, query: Record<string, unknown>, u
     client_id: c.p.clientId, redirect_uri: c.p.redirectUri, state: c.p.state ?? "", code_challenge: c.p.codeChallenge,
     code_challenge_method: "S256", scope: c.p.scope, resource: c.p.resource, response_type: "code", ticket,
   }).map(([k, v]) => `<input type="hidden" name="${k}" value="${esc(v)}">`).join("");
-  return page("Conectar con MailMask", `
-    <p class="text-fg-muted leading-relaxed"><strong class="text-fg">${esc(c.client.client_name)}</strong> quiere usar tu cuenta de MailMask (<span class="break-all">${esc(userEmail)}</span>).</p>
-    <p class="text-sm text-fg-muted mt-4 mb-2">Podrá, en tu nombre:</p>
-    <ul class="list-disc pl-5 space-y-1 text-sm text-fg-muted">
+  const soloDns = isDnsOnlyScope(c.p.scope);
+  const permisos = soloDns
+    ? `<ul class="list-disc pl-5 space-y-1 text-sm text-fg-muted">
+      <li>Ver tus dominios y crear o borrar registros DNS.</li>
+    </ul>
+    <p class="text-sm text-fg-muted mt-3">No podrá leer tu correo ni tus buzones.</p>`
+    : `<ul class="list-disc pl-5 space-y-1 text-sm text-fg-muted">
       <li>Ver y administrar tus dominios, máscaras, buzones y reglas.</li>
       <li>Enviar correo desde tus dominios.</li>
       <li>Revisar el DNS y generar ligas de pago que tú abres.</li>
-    </ul>
+    </ul>`;
+  const logo = c.client.logo_uri
+    ? `<img src="${esc(c.client.logo_uri)}" alt="" width="48" height="48" class="w-12 h-12 rounded-lg mb-4 object-contain" referrerpolicy="no-referrer">`
+    : "";
+  return page("Conectar con MailMask", `${logo}
+    <p class="text-fg-muted leading-relaxed"><strong class="text-fg">${esc(c.client.client_name)}</strong> quiere usar tu cuenta de MailMask (<span class="break-all">${esc(userEmail)}</span>).</p>
+    <p class="text-sm text-fg-muted mt-4 mb-2">Podrá, en tu nombre:</p>
+    ${permisos}
     <p class="text-xs text-fg-subtle mt-4">No podrá crear llaves de API. Al permitir te regresamos a <span class="break-all">${esc(host)}</span>. Puedes cortar el acceso cuando quieras desde la aplicación.</p>
     <form method="post" action="/oauth/authorize" class="mt-6 space-y-3">${hidden}
       <button type="submit" name="decision" value="allow" class="btn-primary w-full">Permitir</button>
@@ -422,13 +442,13 @@ export function revokeEndpoint(request: Request, body: unknown, ip: string): Res
 }
 
 /** Valida un `mo_…` sin gastar rate limit. Devuelve el correo y el id del token, o null. */
-export function verifyOAuthAccessToken(token: string): { email: string; tokenId: string; resource: string } | null {
+export function verifyOAuthAccessToken(token: string): { email: string; tokenId: string; resource: string; scope: string } | null {
   if (!token.startsWith("mo_")) return null;
-  const row = sqlite.prepare("SELECT id, user_email, resource, expires_at, revoked_at, created_at FROM oauth_tokens WHERE token_hash = ? AND kind = 'access'").get(sha256(token)) as
-    { id: string; user_email: string; resource: string; expires_at: string; revoked_at: string | null; created_at: string } | undefined;
+  const row = sqlite.prepare("SELECT id, user_email, scope, resource, expires_at, revoked_at, created_at FROM oauth_tokens WHERE token_hash = ? AND kind = 'access'").get(sha256(token)) as
+    { id: string; user_email: string; scope: string; resource: string; expires_at: string; revoked_at: string | null; created_at: string } | undefined;
   if (!row || row.revoked_at || row.expires_at < nowIso()) return null;
   if (staleForUser(row.user_email, row.created_at)) return null;
-  return { email: row.user_email, tokenId: row.id, resource: row.resource };
+  return { email: row.user_email, tokenId: row.id, resource: row.resource, scope: row.scope };
 }
 
 // --- HTML ---

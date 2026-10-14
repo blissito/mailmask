@@ -1,11 +1,11 @@
 ---
 name: mailmask-mcp
-description: Connect an MCP client (Claude Code, Claude Desktop, Cursor, any Streamable HTTP client) to the MailMask MCP server at https://www.mailmask.studio/mcp and use its 95 tools to manage domains, masks, IMAP mailboxes, the inbox (read and answer mail as a mask), DNS, rules, webhooks, team, payment links, domain purchases and transfers with OAuth (just the URL) or one API key. Use when the user wants their agent wired to MailMask, asks to "add the MailMask MCP", or when a tool named list_domains, create_alias or point_domain_to is available.
+description: Connect an MCP client (Claude Code, Claude Desktop, Cursor, any Streamable HTTP client) to the MailMask MCP server at https://www.mailmask.studio/mcp and use its 100 tools to manage domains, masks, IMAP mailboxes, the inbox (read and answer mail as a mask), DNS, rules, webhooks, team, payment links, domain purchases and transfers with OAuth (just the URL) or one API key. Use when the user wants their agent wired to MailMask, asks to "add the MailMask MCP", or when a tool named list_domains, create_alias or point_domain_to is available.
 license: MIT
 compatibility: An MCP client with Streamable HTTP transport (OAuth-capable, or with custom headers for an API key), or curl for the raw JSON-RPC.
 metadata:
   author: mailmask
-  version: "1.5"
+  version: "1.6"
 ---
 
 # MailMask over MCP
@@ -105,7 +105,11 @@ rules. Names, grouped:
   `referral_status`, `set_referral_slug`, `set_referral_name`, `export_link`.
 - **DNS**: `list_dns_records`, `create_dns_zone`, `dns_delegation_status`, `set_dns_record`,
   `delete_dns_record`, `import_dns_records`, `point_domain_to` (Vercel, Netlify, GitHub Pages,
-  Cloudflare Pages, Render, Fly, redirect to www, DMARC).
+  Cloudflare Pages, Render, Fly, EasyBits, redirect to www, DMARC).
+- **EasyBits site**: `easybits_site_status` (published site + the sites of the connected
+  EasyBits account), `publish_easybits_site` (`dryRun` first), `unpublish_easybits_site`
+  (restores the DNS that existed before; records edited later are `skipped`). Not connected →
+  `409` with the link the user opens: `/app?domain=<domain>&easybits=1`.
 - **Rules**: `list_rules`, `create_rule`, `update_rule`, `delete_rule`.
 - **Webhooks**: `list_webhooks`, `create_webhook` (secret shown once), `update_webhook`,
   `delete_webhook`, `test_webhook`, `webhook_deliveries`.

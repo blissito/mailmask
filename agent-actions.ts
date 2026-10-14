@@ -25,7 +25,8 @@ export type AgentIntent =
   | "transfer_out"
   | "remove_member"
   | "cancel_addon"
-  | "cancel_renewal";
+  | "cancel_renewal"
+  | "unpublish_easybits_site";
 
 export type ActionSummary = { title: string; lines: string[]; effects: string[]; destructive: boolean };
 type StoredPayload = { method: string; path: string; body?: unknown };
