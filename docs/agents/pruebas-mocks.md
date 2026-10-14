@@ -142,6 +142,27 @@ lo único falso es el SDK.
   guarda de `enLaCuenta?.size` no esté: el escenario fiel es unas credenciales apuntando a OTRA
   cuenta (lista vacía *y* `DomainNotFound`). Se comprueba con el mutante `if (enLaCuenta && …)`.
 
+## Probar que un proceso TERMINA SOLO (y que la prueba lo notaría)
+
+`scheduler.test.ts` vigila que importar `cron.ts` y `forwarding.ts` ni agende un cron ni deje vivo
+el proceso. Tres trampas:
+
+- **El hijo va con `-e`, no con un archivo.** `node --import tsx --input-type=module -e "await import('./cron.ts')"`:
+  sin `argv[1]`, `isServer` —que compara `process.argv[1]` contra `main.ts`— vale `false`, igual que
+  dentro de la suite. Lanzar `main.ts` haría que el hijo agendara los crons y la prueba no probaría nada.
+- **El control es obligatorio.** Un hijo que hace `cron.schedule("* * * * *", …)` directo tiene que
+  seguir vivo tras unos segundos de reloj real; sin él, la prueba podría estar pasando porque un hijo
+  lanzado con `-e` termina siempre, agende o no.
+- **El hijo hereda `NODE_OPTIONS`** —o sea `test-setup.mjs`, con su `unref` de los timers de más de un
+  minuto—, que es el mismo entorno que una prueba real. Se le quita `PREVIEW` para que no pase por
+  `esPreview()` en vez de por `isServer`, lleva `DATABASE_PATH` en un `mkdtemp` porque importar
+  `cron.ts` abre la base, y el tope se cierra con `SIGKILL` en el `finally`: un hijo colgado no se
+  queda a vivir con el runner.
+
+Y el doble del built-in, con `mock.module`: `defaultExport` con el real esparcido, pero los
+`namedExports` **sin** la llave `default` — el módulo sintético no compila y truena con
+«Unexpected token 'default'».
+
 ## `reconcilePendingAddons` barre TODOS los pendientes, y su `emails.ts` va doblado
 
 `addon-sync.test.ts` fija la red de seguridad del webhook (el add-on que MP sí autorizó y nunca
