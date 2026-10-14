@@ -62,8 +62,8 @@ describe("repairReceiptRules", () => {
           async send(cmd: any) {
             sentCommands.push(cmd.kind);
             if (cmd.kind === "Describe") {
-              // Copia: la función muta la regla in situ y el estado del doble no debe cambiar con ella.
               // Sin Rules: el caso 'no trae Rules' necesita que la respuesta venga sin la llave.
+              // Copia: la función muta la regla in situ y el estado del doble no debe cambiar con ella.
               return sesRules === undefined ? {} : { Rules: structuredClone(sesRules) };
             }
             updatesReceived.push(structuredClone(cmd.input));
@@ -110,7 +110,7 @@ describe("repairReceiptRules", () => {
   });
 
   it("el conteo coincide con las reglas reparadas, contando cada regla una sola vez", async () => {
-    const dosS3 = {
+    const twoS3Rule = {
       Name: "dos-s3",
       Enabled: true,
       Recipients: ["dos-s3@example.com"],
@@ -119,16 +119,16 @@ describe("repairReceiptRules", () => {
         { S3Action: { BucketName: "mailmask-inbound", ObjectKeyPrefix: "b/", TopicArn: "arn:aws:sns:us-east-1:1:otro" } },
       ],
     };
-    const tresS3 = {
-          Name: "tres-s3",
-          Enabled: true,
-          Recipients: ["tres-s3@example.com"],
-          Actions: [
-            { S3Action: { BucketName: "mailmask-inbound", ObjectKeyPrefix: "c/" } },
-            { S3Action: { BucketName: "mailmask-inbound", ObjectKeyPrefix: "d/" } },
-          ],
-        };
-        reset([brokenRule("a"), fixedRule("b"), dosS3, tresS3]);
+    const threeS3Rule = {
+      Name: "tres-s3",
+      Enabled: true,
+      Recipients: ["tres-s3@example.com"],
+      Actions: [
+        { S3Action: { BucketName: "mailmask-inbound", ObjectKeyPrefix: "c/" } },
+        { S3Action: { BucketName: "mailmask-inbound", ObjectKeyPrefix: "d/" } },
+      ],
+    };
+    reset([brokenRule("a"), fixedRule("b"), twoS3Rule, threeS3Rule]);
     const n = await repairReceiptRules();
     assert.equal(n, 3);
     assert.deepEqual(updatesReceived.map((u) => u.Rule.Name), ["a", "dos-s3", "tres-s3"]);
@@ -140,13 +140,13 @@ describe("repairReceiptRules", () => {
   });
 
   it("no toca una regla sin S3Action (sólo Lambda)", async () => {
-    const soloLambda = {
+    const lambdaOnlyRule = {
       Name: "solo-lambda",
       Enabled: true,
       Recipients: ["solo-lambda@example.com"],
       Actions: [{ LambdaAction: { FunctionArn: "arn:aws:lambda:us-east-1:1:function:x", InvocationType: "Event" } }],
     };
-    reset([soloLambda]);
+    reset([lambdaOnlyRule]);
     const n = await repairReceiptRules();
     assert.equal(n, 0);
     assert.equal(updatesReceived.length, 0);
