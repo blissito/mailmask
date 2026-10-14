@@ -673,6 +673,11 @@ La clave del sitio es pública y vive en el HTML; la secreta es `TURNSTILE_SECRE
   `chargeDomainRenewals`, `cerrarTransferOut`→`closeTransferOut`, `DIA`/`dias`/`HITOS_*`). `ses.ts` (pedido #82, 14-oct-2026): `clasificarErrorS3`→`classifyS3Error` (y su test en `firma-logo.test.ts`), `bucketDeSes`→`sesBucket`, `nombre`→`errorName` (local), `respondio`→`responded` (retorno de `checkDomainStatus`, también en `main.ts`, `domain-flags.ts` y sus pruebas), `bucketConfigurado`→`configuredBucket` y las llaves de log `esperado`/`encontrados`→`expected`/`found`. Queda el resto
   del legado —`preview.ts` incluido, que sigue con `esServidor` como parámetro de `debeProgramar`— y todo
   lo demás de la lista. La llave JSON `backfillPendiente` NO se toca: la lee `public/js/bandeja.js`.
+  **Sprint #10 (ticket B, `search-backfill.test.ts`)**: en `db.ts` `contarSinIndexar`→`countUnindexedMessages` y
+  `MensajeSinIndexar`→`UnindexedMessage` (con sus usos en `search.test.ts`); en `search-backfill.ts` las opciones
+  `lote`/`pausaMs`/`maxMensajes`→`batchSize`/`pauseMs`/`maxMessages` (y `cron.ts` a `{ maxMessages: 500 }`), los
+  locales a inglés y `BackfillResult` a `indexed`/`errors`/`remaining`. Las llaves del log (`indexados`, `errores`,
+  `restantes`) se CONSERVARON a propósito: cambiarlas rompe lo que busca en el log, y el shorthand las habría renombrado en silencio.
   Ojo: `porDominio`/`derechos` viajan en el JSON de `/api/auth/me` y los lee el front — renombrar los dos
   lados en el mismo commit, y el MCP/SDK si exponen alguno. Sin cambiar comportamiento; `npm test` en verde.
   Al renombrar una llave del JSON que come el front, grep primero en `public/js/*.js`: están minificados y

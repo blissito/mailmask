@@ -7840,22 +7840,24 @@ const app = new Elysia({ adapter: node() })
 
   .get("/api/integrations/easybits/callback", async ({ request, query }) => {
     const back = (q: string) => new Response(null, { status: 302, headers: { location: `/app?${q}` } });
-    const user = await getAuthUser(request);
-    if (!user || user.via !== "session") return back("easybits_error=session");
+    // Aquí NO hay sesión: la cookie es SameSite=Strict y esta petición viene de easybits.cloud.
+    // Quién conecta lo dice el `state` (un uso, 10 min, emitido a una sesión) y el verificador
+    // PKCE nunca salió del servidor. Lo peor que logra un tercero es conectar SU cuenta a SU cuenta.
+    const limited = await rateLimitGuard(getIp(request), 20, 60_000);
+    if (limited) return limited;
     const state = typeof query.state === "string" ? query.state : "";
     const code = typeof query.code === "string" ? query.code : "";
     const row = state ? db.select().from(tokensTable).where(eq(tokensTable.token, state)).get() : undefined;
     if (!row || row.kind !== "easybits-state" || row.expiresAt < new Date().toISOString()) return back("easybits_error=state");
     db.delete(tokensTable).where(eq(tokensTable.token, state)).run();
     const carried = (row.value ?? {}) as { email?: string; verifier?: string; domainId?: string };
-    // El state está atado a quien lo pidió: otra sesión no puede terminar su conexión.
-    if (carried.email !== user.email || !carried.verifier) return back("easybits_error=state");
+    if (!carried.email || !carried.verifier) return back("easybits_error=state");
     if (!code) return back("easybits_error=cancelled");
     try {
       const { exchangeCode } = await import("./easybits-link.js");
-      await exchangeCode(user.email, easybitsRedirectUri(request), code, carried.verifier);
+      await exchangeCode(carried.email, easybitsRedirectUri(request), code, carried.verifier);
     } catch (err) {
-      log("error", "easybits", "Canje del code de EasyBits falló", { email: user.email, error: String(err) });
+      log("error", "easybits", "Canje del code de EasyBits falló", { email: carried.email, error: String(err) });
       return back("easybits_error=token");
     }
     return back(`easybits=${encodeURIComponent(carried.domainId ?? "1")}`);
