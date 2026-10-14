@@ -1052,7 +1052,9 @@ function renderDomains() {
   const aliasCount = (id) => (currentUser?.usage?.aliasesPerDomain ?? []).find(a => a.domainId === id)?.current;
   list.innerHTML = `<div class="dom-list">${domains.map(d => {
     const verified = d.verified;
-    const fwds = d.monthlyForwards ?? 0;
+    // `d.monthlyForwards` es el acumulado histórico de las direcciones; el del mes
+    // (el que cuenta contra el tope) viene en `porDominio().uso.forwards`.
+    const fwds = porDominio(d.id)?.uso?.forwards?.current ?? 0;
     const n = aliasCount(d.id);
     const estado = estadoDominio(d.id);
     const chip = estado === "activado" ? `<span class="tag">Activado</span>` : estado === "bloqueado" ? `<span class="tag !bg-amber-500/15 !text-amber-600">Sin activar</span>` : `<span class="tag">Gratis</span>`;
@@ -1067,7 +1069,7 @@ function renderDomains() {
         <div class="sub">${detalle}</div>
       </div>
       <div class="k num">${verified
-        ? `<b>${fwds.toLocaleString("es-MX")}</b><span>este mes</span>`
+        ? `<b>${fwds.toLocaleString("es-MX")}</b><span>reenvíos del mes</span>`
         : `<span class="app-link" style="font-size:13px;text-transform:none;letter-spacing:0">Ver DNS</span>`}</div>
       <span class="chev">›</span>
     </div>`;
@@ -1139,6 +1141,33 @@ function barraAlmacenamiento(r) {
     </div>`;
 }
 
+// Reenvíos del mes contra el tope del dominio. Sin esta barra el número de la lista
+// no aparecía en ningún otro lado y nadie sabía contra qué se medía.
+function barraReenvios() {
+  const f = porDominio(selectedDomain.id)?.uso?.forwards;
+  if (!f?.limit) return "";
+  const pct = Math.min(100, Math.round((f.current / f.limit) * 1000) / 10);
+  const apretado = pct >= 80;
+  const color = pct >= 95 ? "bg-red-500" : apretado ? "bg-amber-500" : "bg-accent";
+  const n = (x) => x.toLocaleString("es-MX");
+  return `
+    <div class="bg-bg-elev border border-line rounded-xl px-4 py-3 mt-2">
+      <div class="flex items-baseline gap-2 mb-2">
+        <span class="text-sm font-semibold text-fg">Reenvíos este mes</span>
+        <span class="text-xs text-fg-muted">${n(f.current)} de ${n(f.limit)}</span>
+        <span class="ml-auto text-xs ${apretado ? "text-amber-600 font-semibold" : "text-fg-muted"}">${pct}%</span>
+      </div>
+      <div class="h-2 rounded-full bg-bg-inset overflow-hidden">
+        <div class="h-full ${color} rounded-full transition-all" style="width:${Math.max(pct, 1)}%"></div>
+      </div>
+      <p class="text-xs text-fg-muted mt-2">
+        ${apretado
+          ? "Al llegar al tope el correo se sigue guardando en la Bandeja, pero ya no se reenvía hasta el día 1."
+          : "Correos que llegaron a tus direcciones y se reenviaron a otro buzón. El contador vuelve a cero el día 1."}
+      </p>
+    </div>`;
+}
+
 // Banda de activación bajo la cabecera del dominio: gratis, sin activar, o activado.
 function renderActivacion() {
   const el = document.getElementById("detail-activation");
@@ -1155,6 +1184,7 @@ function renderActivacion() {
         <span class="text-xs text-fg-muted">personas ilimitadas · buzones IMAP · ${r.sends} correos nuevos al día · ${Math.round((r.mailboxBytes ?? 0) / GB)} GB</span>
         <span class="ml-auto flex flex-wrap gap-2">${pedir}${btn("+50 GB · +100 envíos", false)}</span>
       </div>
+      ${barraReenvios()}
       ${barraAlmacenamiento(r)}`;
   } else if (r.bloqueado) {
     el.innerHTML = `
@@ -1169,7 +1199,8 @@ function renderActivacion() {
         <span class="text-sm text-fg font-semibold">Dominio gratis</span>
         <span class="text-xs text-fg-muted">${r.aliases} direcciones · la Bandeja muestra 7 días · sin correo nuevo ni equipo</span>
         <span class="ml-auto flex flex-wrap gap-2">${pedir}${btn("Activar · $99/mes")}</span>
-      </div>`;
+      </div>
+      ${barraReenvios()}`;
   }
 }
 
