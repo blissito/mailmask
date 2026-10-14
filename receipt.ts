@@ -67,15 +67,19 @@ export function renderReceipt(order: Order, opts: { domain?: string | null; doma
   button { font: inherit; padding: 8px 18px; border-radius: 8px; border: 1px solid #1c1917; background: #1c1917; color: #fff; cursor: pointer; }
   @media (max-width: 680px) { main { margin: 0; border-radius: 0; border: 0; padding: 24px 16px; } .actions { padding: 0 16px; } }
   /* Carta vertical: el diálogo de impresión la toma como diseño por defecto. */
-  @page { size: letter portrait; margin: 18mm 20mm; }
+  /* Una sola hoja: tipografía y espacios compactos al imprimir. */
+  @page { size: letter portrait; margin: 15mm 18mm; }
   @media print {
-    body { background: #fff; font-size: 12pt; }
+    body { background: #fff; font-size: 10.5pt; }
     main { max-width: none; margin: 0; border: 0; padding: 0; }
-    header img { height: 40px; }
-    h1 { font-size: 18pt; margin-top: 32px; }
-    .total { font-size: 30pt; margin-bottom: 32px; }
-    th, td { padding: 12px 0; }
-    footer { font-size: 10pt; margin-top: 40px; }
+    header { padding-bottom: 14px; }
+    header img { height: 30px; }
+    h1 { font-size: 15pt; margin: 18px 0 2px; }
+    .total { font-size: 24pt; margin: 4px 0 16px; }
+    .items { margin-bottom: 14px; }
+    th, td { padding: 6px 0; }
+    footer { font-size: 8.5pt; margin-top: 18px; }
+    main, table, tr { break-inside: avoid; }
     .actions { display: none; }
   }
 </style>
@@ -91,7 +95,7 @@ export function renderReceipt(order: Order, opts: { domain?: string | null; doma
   <table class="items">
     <thead><tr><th>Concepto</th><th class="num">Importe</th></tr></thead>
     <tbody><tr>
-      <td>${escHtml(order.description)}${domain ? `<div class="sub">Dominio: ${domain}</div>` : ""}${period ? `<div class="sub">Periodo: ${period}</div>` : ""}${order.note ? `<div class="sub">${escHtml(order.note)}</div>` : ""}</td>
+      <td>${escHtml(order.description)}${order.note ? `<div class="sub">${escHtml(order.note)}</div>` : ""}</td>
       <td class="num">${fmtMoney(order.amountCents, order.currency)}</td>
     </tr></tbody>
     <tfoot><tr><th>Total</th><td class="num"><strong>${fmtMoney(order.amountCents, order.currency)}</strong></td></tr></tfoot>
