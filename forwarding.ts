@@ -151,10 +151,26 @@ function flattenMimeParts(raw: string): MimePart[] {
   return [{ headers: topHeaders, contentType, body, encoding: encMatch?.[1]?.trim().toLowerCase() }];
 }
 
+// Los bytes de la parte se leen con el `charset` que ella declara. Antes el base64 pasaba
+// por `atob`, que devuelve un byte por carácter (Latin-1): todo correo en UTF-8 con base64
+// —el nuestro incluido— salía como «QuiÃ©n enviÃ³» en la Bandeja.
+function partCharset(part: MimePart): string {
+  const m = part.contentType.match(/charset\s*=\s*"?([^";\s]+)/i);
+  return m?.[1]?.toLowerCase() ?? "utf-8";
+}
+
+function decodeBytes(bytes: Uint8Array, charset: string): string {
+  try {
+    return new TextDecoder(charset).decode(bytes);
+  } catch {
+    // Charset que el runtime no conoce: UTF-8 es la apuesta menos mala.
+    return new TextDecoder("utf-8").decode(bytes);
+  }
+}
+
 function decodePartBody(part: MimePart): string {
   if (part.encoding === "quoted-printable") {
     const decoded = part.body.replace(/=\r?\n/g, "");
-    // Convert hex-encoded bytes to a Uint8Array, then decode as UTF-8
     const bytes: number[] = [];
     for (let i = 0; i < decoded.length; i++) {
       if (decoded[i] === "=" && /^[0-9A-Fa-f]{2}$/.test(decoded.slice(i + 1, i + 3))) {
@@ -164,10 +180,10 @@ function decodePartBody(part: MimePart): string {
         bytes.push(decoded.charCodeAt(i));
       }
     }
-    return new TextDecoder("utf-8").decode(new Uint8Array(bytes));
+    return decodeBytes(new Uint8Array(bytes), partCharset(part));
   }
   if (part.encoding === "base64") {
-    try { return atob(part.body.replace(/\s/g, "")); } catch { return part.body; }
+    try { return decodeBytes(Buffer.from(part.body.replace(/\s/g, ""), "base64"), partCharset(part)); } catch { return part.body; }
   }
   return part.body;
 }
