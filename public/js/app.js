@@ -2544,7 +2544,16 @@ function renderWebHost(h) {
 
 function renderWebPlatforms() {
   const cont = document.getElementById("web-platforms");
-  cont.innerHTML = WEB_PLATFORMS.map(p => `
+  // EasyBits va primero y a lo ancho: es la casa, y el único que no pide destino.
+  const destacado = `
+    <button type="button" data-web-platform="easybits" class="col-span-2 sm:col-span-4 border-2 border-accent rounded-xl p-4 bg-bg-elev hover:bg-bg-inset transition-colors text-left">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="font-semibold text-fg">EasyBits</div>
+        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-mask-500/15 text-mask-600">Recomendado</span>
+      </div>
+      <p class="text-sm text-fg-muted mt-1">Tu sitio o tu app en un sandbox de EasyBits, con HTTPS y en tu propio dominio. Un clic: no hay IPs ni destinos que copiar, y queda en línea en menos de un minuto.</p>
+    </button>`;
+  cont.innerHTML = destacado + WEB_PLATFORMS.filter(p => p.id !== "easybits").map(p => `
     <button type="button" data-web-platform="${p.id}" class="border border-line rounded-xl p-3 bg-bg-elev text-sm font-semibold text-fg hover:border-accent transition-colors text-left">
       ${esc(p.label)}
     </button>`).join("");
