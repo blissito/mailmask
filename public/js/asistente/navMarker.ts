@@ -44,11 +44,16 @@ export const TABS: Record<string, string> = {
 /** Destinos: `dominio/<id>` y `dominio/<id>/<pestaña>`. El id es opaco (uuid/slug). */
 const TARGET = /^dominio\/([A-Za-z0-9_-]{1,64})(?:\/([a-z]+))?$/
 
-const MARKER = /\[\[ir:([^\]\s]+)\]\]/g
+/**
+ * `[[ir:…]]` pinta un botón; `[[ir!:…]]` además navega solo en cuanto termina de
+ * llegar (el usuario pidió ir, o el agente cambió algo en otra pantalla). Mismo
+ * destino y misma lista blanca: el `!` sólo decide si hace falta el clic.
+ */
+const MARKER = /\[\[ir(!?):([^\]\s]+)\]\]/g
 
 export type NavPart =
   | { type: "text"; value: string }
-  | { type: "nav"; to: string; label: string }
+  | { type: "nav"; to: string; label: string; auto: boolean }
 
 /**
  * Valida un destino y devuelve su etiqueta, o `null` si no está permitido.
@@ -92,11 +97,11 @@ export function parseNavParts(text: string, streaming = false): NavPart[] {
   MARKER.lastIndex = 0
   let m: RegExpExecArray | null
   while ((m = MARKER.exec(src)) !== null) {
-    const target = resolveNavTarget(m[1])
+    const target = resolveNavTarget(m[2])
     if (!target) continue // marcador inválido: se queda dentro del texto
     if (m.index > last)
       parts.push({ type: "text", value: src.slice(last, m.index) })
-    parts.push({ type: "nav", ...target })
+    parts.push({ type: "nav", ...target, auto: m[1] === "!" })
     last = m.index + m[0].length
   }
   if (last < src.length) parts.push({ type: "text", value: src.slice(last) })

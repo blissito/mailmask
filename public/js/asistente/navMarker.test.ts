@@ -57,6 +57,12 @@ describe("parseNavParts", () => {
     assert.equal((parts[0] as { value: string }).value, "Listo. ")
   })
 
+  it("`ir!` navega solo; `ir` es sólo botón; mismo filtro de destinos", () => {
+    const parts = parseNavParts("Listo [[ir!:dominio/a/dns]] o [[ir:dominio/b]] [[ir!:https://evil.com]]")
+    const navs = parts.filter((p) => p.type === "nav") as { to: string; auto: boolean }[]
+    assert.deepStrictEqual(navs.map((n) => [n.to, n.auto]), [["dominio/a/dns", true], ["dominio/b", false]])
+  })
+
   it("soporta varios marcadores", () => {
     const parts = parseNavParts("[[ir:dominio/a/dns]] y [[ir:dominio/b]]")
     assert.equal(parts.filter((p) => p.type === "nav").length, 2)
