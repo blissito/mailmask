@@ -663,7 +663,7 @@ async function buyAddon(kind, domainId) {
 }
 
 async function cancelAddon(id) {
-  if (!confirm("¿Cancelar este add-on? Lo conservas hasta que termine el periodo que ya pagaste.")) return;
+  if (!(await confirmar({ titulo: "Cancelar add-on", mensaje: "¿Cancelar este add-on? Lo conservas hasta que termine el periodo que ya pagaste.", accion: "Cancelar add-on" }))) return;
   const err = document.getElementById("addons-error");
   err.classList.add("hidden");
   const res = await fetch(`/api/addons/${id}/cancel`, { method: "POST" });
@@ -899,7 +899,7 @@ function askMpEmail() {
 }
 
 async function cancelSubscription() {
-  if (!confirm("¿Cancelar tu plan anterior? Al terminar el periodo pagado, tu primer dominio sigue gratis y los demás necesitarán activarse ($99/mes cada uno).")) return;
+  if (!(await confirmar({ titulo: "Cancelar plan", mensaje: "¿Cancelar tu plan anterior? Al terminar el periodo pagado, tu primer dominio sigue gratis y los demás necesitarán activarse ($99/mes cada uno).", accion: "Cancelar plan" }))) return;
   try {
     const res = await fetch("/api/billing/cancel", { method: "POST" });
     const data = await res.json();
@@ -1011,20 +1011,6 @@ async function loadDomains() {
   if (window.location.hash === "#apikeys" && domains[0]) {
     await selectDomain(domains[0].id);
     switchTab("apikeys");
-  }
-
-  // Regreso del OAuth de EasyBits: `/app?easybits=<domainId>` reabre el dominio, la pestaña
-  // Sitio web y el modal para elegir el sitio.
-  const ebParams = new URLSearchParams(location.search);
-  if (ebParams.has("easybits") || ebParams.has("easybits_error")) {
-    history.replaceState(null, "", "/app");
-    const ebDomain = ebParams.get("easybits");
-    if (ebParams.has("easybits_error")) showToast("No se pudo conectar con EasyBits; intenta de nuevo.", true);
-    else if (ebDomain && domains.some(x => x.id === ebDomain)) {
-      await selectDomain(ebDomain);
-      switchTab("web");
-      easybitsModal();
-    }
   }
 
   // `/app#transfer=dominio.com` (liga que da el asistente con `transfer_start`): abre el
@@ -1233,11 +1219,11 @@ function goBack() {
 
 async function deleteDomain() {
   if (!selectedDomain) return;
-  if (!confirm(`¿Eliminar dominio ${selectedDomain.domain}? Se borrarán todas las direcciones y reglas.`)) return;
+  if (!(await confirmar({ titulo: "Eliminar dominio", mensaje: `¿Eliminar dominio ${selectedDomain.domain}? Se borrarán todas las direcciones y reglas.`, accion: "Eliminar dominio" }))) return;
   const res = await fetch(`/api/domains/${selectedDomain.id}`, { method: "DELETE" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    alert(data.error || "Error al eliminar dominio");
+    showToast(data.error || "Error al eliminar dominio", true);
     return;
   }
   goBack();
@@ -1884,7 +1870,7 @@ async function toggleAlias(alias, enabled) {
 }
 
 async function removeAlias(alias) {
-  if (!confirm(`¿Eliminar la dirección ${alias}@${selectedDomain.domain}?`)) return;
+  if (!(await confirmar({ titulo: "Eliminar dirección", mensaje: `¿Eliminar la dirección ${alias}@${selectedDomain.domain}?`, accion: "Eliminar dirección" }))) return;
   await fetch(`/api/domains/${selectedDomain.id}/alias/${alias}`, { method: "DELETE" });
   await loadAliases();
   await refreshUsage();
@@ -1932,7 +1918,7 @@ function renderRules(rules) {
 }
 
 async function removeRule(ruleId) {
-  if (!confirm("¿Eliminar esta regla?")) return;
+  if (!(await confirmar({ titulo: "Eliminar regla", mensaje: "¿Eliminar esta regla?", accion: "Eliminar regla" }))) return;
   await fetch(`/api/domains/${selectedDomain.id}/rules/${ruleId}`, { method: "DELETE" });
   await loadRules();
 }
@@ -2048,7 +2034,7 @@ async function inviteMember(name, email, role) {
 }
 
 async function removeMember(agentId, name) {
-  if (!confirm(`¿Eliminar a ${name} de este dominio?`)) return;
+  if (!(await confirmar({ titulo: "Quitar del dominio", mensaje: `¿Eliminar a ${name} de este dominio?`, accion: "Quitar del dominio" }))) return;
   const res = await fetch(`/api/domains/${selectedDomain.id}/agents/${agentId}`, { method: "DELETE" });
   if (res.ok) {
     showToast("Miembro eliminado");
@@ -2418,7 +2404,7 @@ async function dnsCrearZona() {
   if (!res.ok) {
     btn.disabled = false;
     btn.textContent = "Activar el editor de DNS";
-    alert(data.error || "No se pudo crear la zona.");
+    showToast(data.error || "No se pudo crear la zona.", true);
     return;
   }
   playSound("success");
@@ -2495,7 +2481,7 @@ const WEB_PLATFORMS = [
   { id: "render", label: "Render", pide: "mi-app.onrender.com" },
   { id: "fly", label: "Fly.io", pide: "mi-app.fly.dev", soloSub: true },
   { id: "cloudflare-pages", label: "Cloudflare Pages", pide: "mi-sitio.pages.dev", soloSub: true },
-  { id: "easybits", label: "Sandbox de EasyBits", pide: null, soloSub: true },
+  { id: "easybits", label: "EasyBits", pide: null, soloSub: true },
   { id: "otro", label: "Otro (CNAME)", pide: "destino.ejemplo.com", soloSub: true },
 ];
 let _webEstado = null;
@@ -2558,170 +2544,23 @@ function renderWebHost(h) {
 
 function renderWebPlatforms() {
   const cont = document.getElementById("web-platforms");
-  // EasyBits Sitios va primero y a lo ancho: es la casa y la campaña. Se conecta por OAuth.
+  // EasyBits va primero y a lo ancho: es la casa, y el único que no pide destino.
   const destacado = `
-    <button type="button" data-web-easybits class="col-span-2 sm:col-span-4 border-2 border-accent rounded-xl p-4 bg-bg-elev hover:bg-bg-inset transition-colors text-left">
+    <button type="button" data-web-platform="easybits" class="col-span-2 sm:col-span-4 border-2 border-accent rounded-xl p-4 bg-bg-elev hover:bg-bg-inset transition-colors text-left">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="font-semibold text-fg">EasyBits</div>
         <span class="text-xs font-semibold px-2 py-0.5 rounded bg-mask-500/15 text-mask-600">Recomendado</span>
       </div>
-      <p class="text-sm text-fg-muted mt-1">Describe tu sitio y un agente lo construye. Conéctalo a tu dominio con un clic: HTTPS incluido y sin copiar registros.</p>
+      <p class="text-sm text-fg-muted mt-1">Tu sitio o tu app en un sandbox de EasyBits, con HTTPS y en tu propio dominio. Un clic: no hay IPs ni destinos que copiar, y queda en línea en menos de un minuto.</p>
     </button>`;
-  cont.innerHTML = destacado + WEB_PLATFORMS.map(p => `
+  cont.innerHTML = destacado + WEB_PLATFORMS.filter(p => p.id !== "easybits").map(p => `
     <button type="button" data-web-platform="${p.id}" class="border border-line rounded-xl p-3 bg-bg-elev text-sm font-semibold text-fg hover:border-accent transition-colors text-left">
       ${esc(p.label)}
     </button>`).join("");
-  cont.querySelector("[data-web-easybits]").addEventListener("click", () => easybitsModal());
   cont.querySelectorAll("[data-web-platform]").forEach(b => b.addEventListener("click", () => {
     if (_webEstado && !_webEstado.editable) { showToast("Primero activa el editor de DNS (pestaña DNS).", true); switchTab("dns"); return; }
     webConectar(WEB_PLATFORMS.find(p => p.id === b.dataset.webPlatform));
   }));
-}
-
-// --- EasyBits Sitios por OAuth: conectar la cuenta y publicar un sitio en este dominio ---
-const EASYBITS_NEW_SITE = "https://www.easybits.cloud/dash/sitios/new";
-
-async function easybitsModal() {
-  if (!selectedDomain) return;
-  const d = selectedDomain.domain;
-  const dlg = document.createElement("div");
-  dlg.className = "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4";
-  dlg.innerHTML = `<div class="bg-bg-elev border border-line rounded-xl w-full max-w-lg p-5" data-eb-body><p class="text-sm text-fg-muted">Revisando tu cuenta de EasyBits…</p></div>`;
-  document.body.appendChild(dlg);
-  const cerrar = () => dlg.remove();
-  dlg.addEventListener("click", (e) => { if (e.target === dlg) cerrar(); });
-  const body = dlg.querySelector("[data-eb-body]");
-
-  let estado;
-  try {
-    const res = await fetch("/api/integrations/easybits");
-    estado = await res.json();
-    if (!res.ok) throw new Error(estado.error || "EasyBits no respondió");
-  } catch (err) {
-    body.innerHTML = `<p class="text-sm text-red-500">${esc(err.message)}</p>`;
-    return;
-  }
-
-  if (!estado.connected) {
-    body.innerHTML = `
-      <h3 class="font-semibold text-fg mb-2">Publica tu sitio de EasyBits en ${esc(d)}</h3>
-      <p class="text-sm text-fg-muted mb-4">Describe tu sitio y un agente lo construye. Conecta tu cuenta una vez y MailMask lo pone en tu dominio: registros, verificación y HTTPS.</p>
-      <div class="flex flex-wrap justify-end gap-2">
-        <button type="button" data-eb-cancel class="px-3 py-1.5 text-sm text-fg-muted hover:text-fg">Cancelar</button>
-        <a href="/api/integrations/easybits/start?domainId=${encodeURIComponent(selectedDomain.id)}" class="px-3 py-1.5 text-sm font-semibold rounded-lg bg-accent text-white">Conectar con EasyBits</a>
-      </div>
-      <p class="text-xs text-fg-subtle mt-3">¿Aún no tienes sitio? <a href="${EASYBITS_NEW_SITE}" target="_blank" rel="noopener" class="underline">Créalo en EasyBits</a>.</p>`;
-    body.querySelector("[data-eb-cancel]").addEventListener("click", cerrar);
-    return;
-  }
-
-  if (!estado.sites.length) {
-    body.innerHTML = `
-      <h3 class="font-semibold text-fg mb-2">Todavía no tienes sitios en EasyBits</h3>
-      <p class="text-sm text-fg-muted mb-4">Crea uno (describe lo que quieres y un agente lo construye) y vuelve aquí para ponerlo en ${esc(d)}.</p>
-      <div class="flex justify-end gap-2">
-        <button type="button" data-eb-cancel class="px-3 py-1.5 text-sm text-fg-muted hover:text-fg">Cerrar</button>
-        <a href="${EASYBITS_NEW_SITE}" target="_blank" rel="noopener" class="px-3 py-1.5 text-sm font-semibold rounded-lg bg-accent text-white">Crear un sitio</a>
-      </div>`;
-    body.querySelector("[data-eb-cancel]").addEventListener("click", cerrar);
-    return;
-  }
-
-  body.innerHTML = `
-    <h3 class="font-semibold text-fg mb-4">Publicar un sitio de EasyBits</h3>
-    <div class="space-y-3">
-      <div>
-        <label class="block text-xs text-fg-muted mb-1">Sitio</label>
-        <select data-eb-site class="w-full bg-bg-inset border border-line rounded-lg px-2 py-2 text-sm text-fg">
-          ${estado.sites.map(x => `<option value="${esc(x.id)}" data-slug="${esc(x.slug)}">${esc(x.name)} (${esc(x.slug)})</option>`).join("")}
-        </select>
-      </div>
-      <div class="space-y-1 text-sm text-fg">
-        <label class="flex items-center gap-2"><input type="radio" name="eb-place" value="subdomain" checked> <span>En <span class="font-mono" data-eb-sub></span></span></label>
-        <label class="flex items-center gap-2"><input type="radio" name="eb-place" value="apex"> <span>En la raíz: <span class="font-mono">${esc(d)}</span> y www</span></label>
-      </div>
-      <div data-eb-preview class="text-sm"></div>
-    </div>
-    <div class="flex flex-wrap items-center justify-between gap-2 mt-5">
-      <button type="button" data-eb-disconnect class="text-xs text-fg-subtle hover:text-red-500">Desconectar EasyBits</button>
-      <div class="flex gap-2">
-        <button type="button" data-eb-cancel class="px-3 py-1.5 text-sm text-fg-muted hover:text-fg">Cancelar</button>
-        <button type="button" data-eb-ver class="px-3 py-1.5 text-sm font-semibold rounded-lg border border-line text-fg hover:border-accent">Ver cambios</button>
-        <button type="button" data-eb-apply disabled class="px-3 py-1.5 text-sm font-semibold rounded-lg bg-accent text-white disabled:opacity-40">Publicar</button>
-      </div>
-    </div>`;
-  const sel = body.querySelector("[data-eb-site]");
-  const preview = body.querySelector("[data-eb-preview]");
-  const aplicar = body.querySelector("[data-eb-apply]");
-  const subLabel = () => { body.querySelector("[data-eb-sub]").textContent = `${sel.selectedOptions[0].dataset.slug}.${d}`; };
-  subLabel();
-  const invalidar = () => { aplicar.disabled = true; preview.innerHTML = ""; };
-  sel.addEventListener("change", () => { subLabel(); invalidar(); });
-  body.querySelectorAll('input[name="eb-place"]').forEach(r => r.addEventListener("change", invalidar));
-  body.querySelector("[data-eb-cancel]").addEventListener("click", cerrar);
-  body.querySelector("[data-eb-disconnect]").addEventListener("click", async () => {
-    await fetch("/api/integrations/easybits", { method: "DELETE" });
-    cerrar();
-    showToast("EasyBits desconectado.");
-  });
-
-  const pedir = async (extra) => {
-    const placement = body.querySelector('input[name="eb-place"]:checked').value;
-    const res = await fetch(`/api/domains/${selectedDomain.id}/website/easybits`, {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ websiteId: sel.value, placement, ...extra }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "No se pudo");
-    return { ...data, placement };
-  };
-
-  body.querySelector("[data-eb-ver]").addEventListener("click", async () => {
-    preview.innerHTML = `<span class="text-fg-muted">Calculando…</span>`;
-    try {
-      const r = await pedir({ dryRun: true });
-      preview.innerHTML = `<div class="border border-line rounded-lg divide-y divide-line">` + r.records.map((rec, i) => {
-        const antes = r.current[i];
-        return `<div class="p-2 font-mono text-xs">
-          <div class="text-fg">${rec.type} ${esc(rec.name)}</div>
-          <div class="text-fg-subtle">antes: ${antes ? antes.values.map(esc).join(", ") : "nada"}</div>
-          <div class="text-mask-600">después: ${rec.values.map(esc).join(", ")}</div>
-        </div>`;
-      }).join("") + `</div><p class="text-xs text-fg-subtle mt-2">Quedará en <span class="font-mono">${esc(r.url)}</span>. El correo no se toca.</p>`;
-      aplicar.disabled = false;
-    } catch (err) {
-      preview.innerHTML = `<span class="text-red-500">${esc(err.message)}</span>`;
-    }
-  });
-
-  aplicar.addEventListener("click", async () => {
-    aplicar.disabled = true;
-    preview.innerHTML = `<span class="text-fg-muted">Publicando y verificando con EasyBits…</span>`;
-    try {
-      const r = await pedir({});
-      if (r.verified) {
-        cerrar();
-        showToast(`Listo: tu sitio queda en ${r.url}. El certificado tarda un par de minutos.`);
-        loadWebsite();
-        return;
-      }
-      // El DNS ya está; EasyBits todavía no ve el TXT. Se reintenta a mano.
-      preview.innerHTML = `
-        <p class="text-amber-600">Registros escritos. EasyBits aún no ve la verificación; suele tardar unos minutos.</p>
-        <button type="button" data-eb-retry class="mt-2 px-3 py-1.5 text-sm font-semibold rounded-lg border border-line text-fg hover:border-accent">Verificar de nuevo</button>`;
-      preview.querySelector("[data-eb-retry]").addEventListener("click", async (e) => {
-        e.target.disabled = true;
-        try {
-          const v = await pedir({ retryVerify: true });
-          if (v.verified) { cerrar(); showToast(`Listo: tu sitio queda en ${r.url}.`); loadWebsite(); }
-          else { e.target.disabled = false; showToast("Todavía no; intenta en un minuto.", true); }
-        } catch (err) { e.target.disabled = false; showToast(err.message, true); }
-      });
-      loadWebsite();
-    } catch (err) {
-      preview.innerHTML = `<span class="text-red-500">${esc(err.message)}</span>`;
-    }
-  });
 }
 
 function webConectar(p) {
@@ -2998,7 +2837,7 @@ function dnsFormulario(registro) {
 }
 
 async function dnsBorrar(registro) {
-  if (!confirm(`¿Borrar el registro ${registro.type} de ${registro.name}? Esto puede tumbar lo que dependa de él.`)) return;
+  if (!(await confirmar({ titulo: "Borrar registro", mensaje: `¿Borrar el registro ${registro.type} de ${registro.name}? Esto puede tumbar lo que dependa de él.`, accion: "Borrar registro" }))) return;
 
   const res = await fetch(`/api/domains/${selectedDomain.id}/dns/records`, {
     method: "DELETE",
@@ -3006,7 +2845,7 @@ async function dnsBorrar(registro) {
     body: JSON.stringify({ name: registro.name, type: registro.type }),
   });
   const data = await res.json();
-  if (!res.ok) { alert(data.error || "No se pudo borrar."); return; }
+  if (!res.ok) { showToast(data.error || "No se pudo borrar.", true); return; }
   playSound("pop");
   loadDns();
 }
@@ -3216,11 +3055,11 @@ async function createSmtpCredentialUI(label) {
 
 async function revokeSmtpCredentialUI(credId) {
   if (!selectedDomain) return;
-  if (!confirm("¿Revocar esta credencial SMTP? Tu aplicación dejará de poder enviar emails.")) return;
+  if (!(await confirmar({ titulo: "Revocar credencial", mensaje: "¿Revocar esta credencial SMTP? Tu aplicación dejará de poder enviar emails.", accion: "Revocar credencial" }))) return;
   const res = await fetch(`/api/domains/${selectedDomain.id}/smtp-credentials/${credId}`, { method: "DELETE" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    alert(data.error || "Error al revocar credencial");
+    showToast(data.error || "Error al revocar credencial", true);
     return;
   }
   await loadSmtpCredentials();
@@ -3313,7 +3152,7 @@ function renderApiKeys(keys) {
 }
 
 async function revokeApiKeyUI(id) {
-  if (!confirm("¿Revocar esta API key?")) return;
+  if (!(await confirmar({ titulo: "Revocar API key", mensaje: "¿Revocar esta API key?", accion: "Revocar API key" }))) return;
   const res = await fetch(`/api/api-keys/${id}`, { method: "DELETE" });
   if (res.ok) {
     playSound("delete");
@@ -3677,6 +3516,42 @@ function hideModal(id) {
   if (!el || el.classList.contains("hidden")) return; // ya estaba cerrado
   el.classList.add("hidden");
   unlockBodyScroll();
+}
+
+// Diálogo de confirmación con la marca de la app; reemplaza al diálogo nativo del navegador.
+// Resuelve true sólo si la persona pulsa el botón de acción. Escape, «Cancelar» y el clic
+// fuera del cuadro resuelven false. El evento close es el único que libera el scroll.
+function confirmar({ titulo, mensaje, accion, peligro = true }) {
+  const dialog = document.getElementById("confirm-dialog");
+  const btnAccion = document.getElementById("confirm-accion");
+  const btnCancelar = document.getElementById("confirm-cancelar");
+  if (!dialog.dataset.listo) {
+    dialog.dataset.listo = "1";
+    btnAccion.addEventListener("click", () => dialog.close("ok"));
+    btnCancelar.addEventListener("click", () => dialog.close(""));
+    // El <dialog> no tiene padding: el clic que cae en él mismo es el fondo.
+    dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(""); });
+  }
+  document.getElementById("confirm-titulo").textContent = titulo;
+  document.getElementById("confirm-mensaje").textContent = mensaje;
+  btnAccion.textContent = accion;
+  btnAccion.className = peligro
+    ? "px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-500 text-white"
+    : "px-4 py-2 text-sm font-semibold rounded-lg bg-accent hover:bg-accent/90 text-white";
+  const origen = document.activeElement;
+  return new Promise((resolve) => {
+    const alCerrar = () => {
+      dialog.removeEventListener("close", alCerrar);
+      unlockBodyScroll();
+      origen?.focus?.();
+      resolve(dialog.returnValue === "ok");
+    };
+    dialog.addEventListener("close", alCerrar);
+    lockBodyScroll();
+    dialog.returnValue = "";
+    dialog.showModal();
+    btnCancelar.focus();
+  });
 }
 
 // Los precios los manda el servidor: esta lista estaba duplicada a mano y se quedó
@@ -4138,7 +4013,7 @@ function setupEventListeners() {
       return;
     }
     if (b.dataset.mailbox === "password") {
-      if (!confirm("Se generará una contraseña nueva y la actual dejará de servir en todos tus dispositivos. ¿Seguir?")) return;
+      if (!(await confirmar({ titulo: "Generar contraseña nueva", mensaje: "Se generará una contraseña nueva y la actual dejará de servir en todos tus dispositivos. ¿Seguir?", accion: "Generar contraseña nueva", peligro: false }))) return;
       const res = await fetch(`${base}/password`, { method: "POST" });
       const data = await res.json();
       document.getElementById("mailbox-body").innerHTML = res.ok
@@ -4148,7 +4023,7 @@ function setupEventListeners() {
     }
     if (b.dataset.mailbox === "delete") {
       // Esto borra correo y no se puede deshacer, así que se ofrece la descarga antes.
-      if (!confirm("Se borrará el buzón Y TODO SU CORREO, sin vuelta atrás. Descárgalo antes si lo necesitas. ¿Seguir?")) return;
+      if (!(await confirmar({ titulo: "Borrar buzón", mensaje: "Se borrará el buzón Y TODO SU CORREO, sin vuelta atrás. Descárgalo antes si lo necesitas. ¿Seguir?", accion: "Borrar buzón" }))) return;
       const res = await fetch(base, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) {
@@ -4214,7 +4089,7 @@ function setupEventListeners() {
 
   // ESC to close modals
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
+    if (e.key === "Escape" && !document.getElementById("confirm-dialog")?.open) {
       document.querySelectorAll("[id^='modal-']:not(.hidden)").forEach(m => hideModal(m.id));
     }
   });
