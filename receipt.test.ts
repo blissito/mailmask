@@ -47,6 +47,23 @@ describe("/recibo/:folio", () => {
     assert.ok(!html.includes("<b>kandey"));
   });
 
+  it("muestra el dominio del add-on y el periodo completo", async () => {
+    const domainId = crypto.randomUUID();
+    const addonId = crypto.randomUUID();
+    sqlite.prepare("INSERT INTO domains (id, domain, owner_email, verified, verification_token, created_at) VALUES (?,?,?,0,?,?)")
+      .run(domainId, `recibo-${domainId.slice(0, 8)}.mx`, owner, "tok", new Date().toISOString());
+    sqlite.prepare("INSERT INTO addons (id, user_email, kind, status, price_cents, created_at, domain_id) VALUES (?,?,?,?,?,?,?)")
+      .run(addonId, owner, "domain", "active", 9900, new Date().toISOString(), domainId);
+    const o = recordOrder({
+      userEmail: owner, kind: "charge", subject: "addon", subjectId: addonId, subjectKey: "domain",
+      description: "Dominio activado", amountCents: 9900, eventKey: `recibo:${crypto.randomUUID()}`,
+      occurredAt: "2026-10-05T12:00:00.000Z", periodEnd: "2027-10-10T12:00:00.000Z",
+    })!;
+    const html = await (await get(`/recibo/${o.number}`, `token=${await signJwt({ email: owner })}`)).text();
+    assert.ok(html.includes(`recibo-${domainId.slice(0, 8)}.mx`));
+    assert.ok(html.includes("5 de octubre de 2026 – 10 de octubre de 2027"));
+  });
+
   it("otra cuenta recibe 404, igual que un folio inexistente", async () => {
     const cookie = `token=${await signJwt({ email: stranger })}`;
     assert.equal((await get(`/recibo/${order.number}`, cookie)).status, 404);

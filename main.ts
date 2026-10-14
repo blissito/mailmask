@@ -1590,7 +1590,14 @@ const app = new Elysia({ adapter: node() })
     const order = getOrderByNumber(params.number);
     // Mismo 404 para ajeno e inexistente: no se confirma que un folio exista.
     if (!order || (order.userEmail !== auth.email && !isAdmin(auth.email))) return html("Recibo no encontrado", 404);
-    return html(renderReceipt(order), 200);
+    let domain: string | null = null;
+    if (order.subject === "addon" && order.subjectId) {
+      const domainId = getAddonById(order.subjectId)?.domainId;
+      domain = domainId ? getDomain(domainId)?.domain ?? null : null;
+    } else if (order.subject === "domain_registration" && order.subjectId) {
+      domain = getDomainRegistration(order.subjectId)?.domainName ?? null;
+    }
+    return html(renderReceipt(order, { domain }), 200);
   })
   // Página de prueba del compositor. Sólo en desarrollo: no es parte del producto.
   .get("/composer-demo", () => process.env.NODE_ENV === "production"

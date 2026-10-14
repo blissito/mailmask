@@ -19,10 +19,15 @@ const fmtDate = (iso: string) =>
 const fmtMoney = (cents: number, currency: string) =>
   `$${(cents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 
-export function renderReceipt(order: Order): string {
-  const period = order.periodStart && order.periodEnd
-    ? `${fmtDate(order.periodStart)} – ${fmtDate(order.periodEnd)}`
+// `domain`: el dominio al que pertenece el cargo, resuelto por la ruta (el libro sólo
+// guarda el id del add-on o de la registración).
+export function renderReceipt(order: Order, opts: { domain?: string | null } = {}): string {
+  // Sin `periodStart` el periodo arranca el día del cargo: así lo da el webhook.
+  const start = order.periodStart ?? (order.kind === "charge" ? order.occurredAt : undefined);
+  const period = start && order.periodEnd
+    ? `${fmtDate(start)} – ${fmtDate(order.periodEnd)}`
     : order.periodEnd ? `hasta el ${fmtDate(order.periodEnd)}` : "";
+  const domain = opts.domain ? escHtml(opts.domain) : "";
   const reference = order.mpPaymentId ?? order.mpAuthorizedPaymentId ?? order.mpPreapprovalId;
   const row = (label: string, value: string) =>
     `<tr><th>${label}</th><td>${value}</td></tr>`;
@@ -48,6 +53,12 @@ export function renderReceipt(order: Order): string {
   th, td { text-align: left; padding: 10px 0; border-bottom: 1px solid #f0ece4; vertical-align: top; }
   th { width: 38%; font-weight: 500; color: #57534e; }
   td { word-break: break-word; }
+  .items { margin-bottom: 24px; }
+  .items thead th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid #e7e2d8; }
+  .items th, .items td { width: auto; }
+  .items .num { text-align: right; white-space: nowrap; width: 1%; padding-left: 16px; }
+  .items tfoot th, .items tfoot td { border-bottom: 0; border-top: 1px solid #1c1917; color: #1c1917; }
+  .sub { font-size: 13px; color: #57534e; margin-top: 2px; }
   .mono { font-family: ui-monospace, "JetBrains Mono", monospace; font-size: 13px; }
   footer { margin-top: 28px; font-size: 12px; color: #78716c; }
   .actions { max-width: 640px; margin: 0 auto 32px; text-align: right; }
@@ -74,15 +85,22 @@ export function renderReceipt(order: Order): string {
     <img src="/img/brand/wordmark.svg" alt="MailMask">
     <div class="folio">Recibo<strong>${escHtml(order.number)}</strong></div>
   </header>
-  <h1>${escHtml(order.description)}</h1>
+  <h1>${escHtml(order.description)}${domain ? ` · ${domain}` : ""}</h1>
   <div class="total">${fmtMoney(order.amountCents, order.currency)}</div>
+  <table class="items">
+    <thead><tr><th>Concepto</th><th class="num">Importe</th></tr></thead>
+    <tbody><tr>
+      <td>${escHtml(order.description)}${domain ? `<div class="sub">Dominio: ${domain}</div>` : ""}${period ? `<div class="sub">Periodo: ${period}</div>` : ""}${order.note ? `<div class="sub">${escHtml(order.note)}</div>` : ""}</td>
+      <td class="num">${fmtMoney(order.amountCents, order.currency)}</td>
+    </tr></tbody>
+    <tfoot><tr><th>Total</th><td class="num"><strong>${fmtMoney(order.amountCents, order.currency)}</strong></td></tr></tfoot>
+  </table>
   <table>
     ${row("Estado", KIND_LABEL[order.kind] ?? escHtml(order.kind))}
-    ${row("Fecha", fmtDate(order.occurredAt))}
-    ${period ? row("Periodo", period) : ""}
+    ${row("Fecha de pago", fmtDate(order.occurredAt))}
+    ${domain ? row("Dominio", domain) : ""}
     ${row("Cliente", escHtml(order.userEmail))}
     ${reference ? row("Referencia de pago", `<span class="mono">MercadoPago ${escHtml(reference)}</span>`) : ""}
-    ${order.note ? row("Nota", escHtml(order.note)) : ""}
     ${row("Emitido por", "MailMask · www.mailmask.studio")}
   </table>
   <footer>Este recibo es un comprobante de pago, no una factura. ¿Necesitas CFDI? Escríbenos a ${escHtml(SUPPORT_EMAIL)} con tu RFC, razón social, régimen fiscal, código postal, uso de CFDI y el folio ${escHtml(order.number)}.</footer>
