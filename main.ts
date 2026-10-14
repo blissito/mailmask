@@ -1597,7 +1597,8 @@ const app = new Elysia({ adapter: node() })
     } else if (order.subject === "domain_registration" && order.subjectId) {
       domain = getDomainRegistration(order.subjectId)?.domainName ?? null;
     }
-    return html(renderReceipt(order, { domain }), 200);
+    const domainExpiresAt = domain ? getDomainRegistrationByDomainName(domain)?.expiresAt ?? null : null;
+    return html(renderReceipt(order, { domain, domainExpiresAt }), 200);
   })
   // Página de prueba del compositor. Sólo en desarrollo: no es parte del producto.
   .get("/composer-demo", () => process.env.NODE_ENV === "production"

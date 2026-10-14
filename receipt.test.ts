@@ -62,6 +62,7 @@ describe("/recibo/:folio", () => {
     const html = await (await get(`/recibo/${o.number}`, `token=${await signJwt({ email: owner })}`)).text();
     assert.ok(html.includes(`recibo-${domainId.slice(0, 8)}.mx`));
     assert.ok(html.includes("5 de octubre de 2026 – 10 de octubre de 2027"));
+    assert.ok(html.includes("Vigencia del servicio"));
   });
 
   it("otra cuenta recibe 404, igual que un folio inexistente", async () => {

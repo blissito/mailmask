@@ -21,7 +21,8 @@ const fmtMoney = (cents: number, currency: string) =>
 
 // `domain`: el dominio al que pertenece el cargo, resuelto por la ruta (el libro sólo
 // guarda el id del add-on o de la registración).
-export function renderReceipt(order: Order, opts: { domain?: string | null } = {}): string {
+// `domainExpiresAt`: vencimiento del registro del dominio, cuando lo registramos nosotros.
+export function renderReceipt(order: Order, opts: { domain?: string | null; domainExpiresAt?: string | null } = {}): string {
   // Sin `periodStart` el periodo arranca el día del cargo: así lo da el webhook.
   const start = order.periodStart ?? (order.kind === "charge" ? order.occurredAt : undefined);
   const period = start && order.periodEnd
@@ -98,7 +99,9 @@ export function renderReceipt(order: Order, opts: { domain?: string | null } = {
   <table>
     ${row("Estado", KIND_LABEL[order.kind] ?? escHtml(order.kind))}
     ${row("Fecha de pago", fmtDate(order.occurredAt))}
+    ${period ? row("Vigencia del servicio", period) : ""}
     ${domain ? row("Dominio", domain) : ""}
+    ${opts.domainExpiresAt ? row("Registro del dominio vigente hasta", fmtDate(opts.domainExpiresAt)) : ""}
     ${row("Cliente", escHtml(order.userEmail))}
     ${reference ? row("Referencia de pago", `<span class="mono">MercadoPago ${escHtml(reference)}</span>`) : ""}
     ${row("Emitido por", "MailMask · www.mailmask.studio")}
