@@ -135,6 +135,15 @@ describe("easybits-link: publicar un sitio", () => {
     assert.ok(calls.some((c) => c.method === "DELETE" && c.url.endsWith("/domains")));
   });
 
+  it("ya verificado: igual se llama verify (registra el host en el borde)", async () => {
+    await connected();
+    route("GET", "/domains", () => json({ domains: [{ id: "d4", domain: "ej.com", txtToken: "t", verified: true }] }));
+    route("POST", "/domains/d4/verify", () => json({ domain: { id: "d4", verified: true } }));
+    const r = await eb.publishSite({ email: EMAIL, redirectUri: REDIRECT, domain: "ej.com", websiteId: "w1", placement: "subdomain", verifyDelays: [0] }, dnsMock().ops);
+    assert.equal(r.verified, true);
+    assert.ok(calls.some((c) => c.url.endsWith("/domains/d4/verify")));
+  });
+
   it("un dominio que ya existía en EasyBits no se borra al fallar", async () => {
     await connected();
     route("GET", "/domains", () => json({ domains: [{ id: "d3", domain: "ej.com", txtToken: "t", verified: true }] }));

@@ -2501,7 +2501,6 @@ const WEB_PLATFORMS = [
   { id: "render", label: "Render", pide: "mi-app.onrender.com" },
   { id: "fly", label: "Fly.io", pide: "mi-app.fly.dev", soloSub: true },
   { id: "cloudflare-pages", label: "Cloudflare Pages", pide: "mi-sitio.pages.dev", soloSub: true },
-  { id: "easybits", label: "Sandbox de EasyBits", pide: null, soloSub: true },
   { id: "otro", label: "Otro (CNAME)", pide: "destino.ejemplo.com", soloSub: true },
 ];
 let _webEstado = null;
@@ -2568,10 +2567,10 @@ function renderWebPlatforms() {
   const destacado = `
     <button type="button" data-web-easybits class="col-span-2 sm:col-span-4 border-2 border-accent rounded-xl p-4 bg-bg-elev hover:bg-bg-inset transition-colors text-left">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <div class="font-semibold text-fg">EasyBits</div>
+        <div class="font-semibold text-fg">Crea un nuevo sitio o app con EasyBits</div>
         <span class="text-xs font-semibold px-2 py-0.5 rounded bg-mask-500/15 text-mask-600">Recomendado</span>
       </div>
-      <p class="text-sm text-fg-muted mt-1">Describe tu sitio y un agente lo construye. Conéctalo a tu dominio con un clic: HTTPS incluido y sin copiar registros.</p>
+      <p class="text-sm text-fg-muted mt-1">Descríbelo y un agente lo construye. Queda en tu dominio con un clic: HTTPS incluido y sin copiar registros.</p>
     </button>`;
   cont.innerHTML = destacado + WEB_PLATFORMS.map(p => `
     <button type="button" data-web-platform="${p.id}" class="border border-line rounded-xl p-3 bg-bg-elev text-sm font-semibold text-fg hover:border-accent transition-colors text-left">

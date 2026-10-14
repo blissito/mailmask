@@ -263,8 +263,10 @@ export async function publishSite(input: PublishInput, dns: DnsOps) {
     throw err;
   }
 
-  let verified = ebDomain.verified;
-  for (const wait of verified ? [] : input.verifyDelays ?? [3000, 6000, 10_000]) {
+  // Se verifica SIEMPRE, aunque EasyBits ya lo diera por verificado: su verify es lo que
+  // registra el host en el borde (antes de oct-2026 lo hacía en Fly, que ya no existe).
+  let verified = false;
+  for (const wait of input.verifyDelays ?? [0, 3000, 6000, 10_000]) {
     if (wait) await new Promise((r) => setTimeout(r, wait));
     try {
       const v = await ebFetch<{ domain: EasyBitsDomain }>(email, redirectUri, `/domains/${ebDomain.id}/verify`, { method: "POST" });
