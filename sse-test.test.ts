@@ -19,11 +19,11 @@ import {
 } from "./sse-hub.ts";
 
 /** Doble del controller: en vez de servir un stream, guarda los bytes que le encolan. */
-function clienteFalso({ revienta = false }: { revienta?: boolean } = {}) {
+function fakeClient({ throws = false }: { throws?: boolean } = {}) {
   const chunks: Uint8Array[] = [];
   const controller = {
     enqueue(chunk: Uint8Array) {
-      if (revienta) throw new TypeError("stream ya cerrado");
+      if (throws) throw new TypeError("stream ya cerrado");
       chunks.push(chunk);
     },
     close() {},
@@ -31,81 +31,81 @@ function clienteFalso({ revienta = false }: { revienta?: boolean } = {}) {
     desiredSize: 1,
   } as unknown as ReadableStreamDefaultController;
   /** El aviso que recibió, como texto: es lo que vería el `EventSource` del navegador. */
-  const recibido = () => chunks.map((c) => new TextDecoder().decode(c)).join("");
-  return { controller, chunks, recibido };
+  const received = () => chunks.map((c) => new TextDecoder().decode(c)).join("");
+  return { controller, chunks, received };
 }
 
 describe("sse-hub: a quién le llega el aviso de la Bandeja", () => {
   it("sólo lo reciben los clientes del dominio avisado", () => {
-    const propio = clienteFalso();
-    const ajeno = clienteFalso();
-    const sueltaPropio = addSseClient("ana@x.com", "dom-a", propio.controller);
-    const sueltaAjeno = addSseClient("beto@x.com", "dom-b", ajeno.controller);
+    const own = fakeClient();
+    const other = fakeClient();
+    const releaseOwn = addSseClient("ana@x.com", "dom-a", own.controller);
+    const releaseOther = addSseClient("beto@x.com", "dom-b", other.controller);
 
     notifyInbox("dom-a", "new_message", { conversationId: "c1" });
 
-    assert.equal(propio.chunks.length, 1);
-    assert.equal(ajeno.chunks.length, 0, "el aviso no cruza de dominio");
+    assert.equal(own.chunks.length, 1);
+    assert.equal(other.chunks.length, 0, "el aviso no cruza de dominio");
 
-    sueltaPropio();
-    sueltaAjeno();
+    releaseOwn();
+    releaseOther();
   });
 
   it("sale con el formato SSE exacto", () => {
-    const cliente = clienteFalso();
-    const suelta = addSseClient("ana@x.com", "dom-a", cliente.controller);
+    const client = fakeClient();
+    const release = addSseClient("ana@x.com", "dom-a", client.controller);
 
     notifyInbox("dom-a", "new_message", { conversationId: "c1", unread: 2 });
 
-    assert.equal(cliente.recibido(), 'event: new_message\ndata: {"conversationId":"c1","unread":2}\n\n');
-    suelta();
+    assert.equal(client.received(), 'event: new_message\ndata: {"conversationId":"c1","unread":2}\n\n');
+    release();
   });
 
   it("las tres pestañas del mismo agente reciben el aviso", () => {
-    const p1 = clienteFalso();
-    const p2 = clienteFalso();
-    const p3 = clienteFalso();
-    const sueltas = [
-      addSseClient("ana@x.com", "dom-a", p1.controller),
-      addSseClient("ana@x.com", "dom-a", p2.controller),
-      addSseClient("ana@x.com", "dom-a", p3.controller),
+    const tab1 = fakeClient();
+    const tab2 = fakeClient();
+    const tab3 = fakeClient();
+    const releases = [
+      addSseClient("ana@x.com", "dom-a", tab1.controller),
+      addSseClient("ana@x.com", "dom-a", tab2.controller),
+      addSseClient("ana@x.com", "dom-a", tab3.controller),
     ];
 
     notifyInbox("dom-a", "conv_updated", { conversationId: "c1" });
 
-    assert.deepEqual([p1.chunks.length, p2.chunks.length, p3.chunks.length], [1, 1, 1]);
-    sueltas.forEach((s) => s());
+    assert.deepEqual([tab1.chunks.length, tab2.chunks.length, tab3.chunks.length], [1, 1, 1]);
+    releases.forEach((release) => release());
   });
 
   it("un cliente caído no impide que los demás reciban el aviso", () => {
-    const caido = clienteFalso({ revienta: true });
-    const sano = clienteFalso();
+    const dead = fakeClient({ throws: true });
+    const healthy = fakeClient();
     // El caído se registra primero: si el `try` no estuviera donde está, el aviso no llegaría al sano.
-    const sueltaCaido = addSseClient("ana@x.com", "dom-a", caido.controller);
-    const sueltaSano = addSseClient("beto@x.com", "dom-a", sano.controller);
+    const releaseDead = addSseClient("ana@x.com", "dom-a", dead.controller);
+    const releaseHealthy = addSseClient("beto@x.com", "dom-a", healthy.controller);
 
     assert.doesNotThrow(() => notifyInbox("dom-a", "new_message", { conversationId: "c1" }));
-    assert.equal(sano.chunks.length, 1);
+    assert.equal(healthy.chunks.length, 1);
 
-    sueltaCaido();
-    sueltaSano();
+    releaseDead();
+    releaseHealthy();
   });
 
   it("al irse el último cliente el conteo vuelve a cero", () => {
     const base = getSseClientCount();
-    const uno = clienteFalso();
-    const dos = clienteFalso();
-    const sueltaUno = addSseClient("ana@x.com", "dom-a", uno.controller);
-    const sueltaDos = addSseClient("beto@x.com", "dom-b", dos.controller);
+    const one = fakeClient();
+    const two = fakeClient();
+    const releaseOne = addSseClient("ana@x.com", "dom-a", one.controller);
+    const releaseTwo = addSseClient("beto@x.com", "dom-b", two.controller);
 
     assert.equal(getSseClientCount(), base + 2);
-    sueltaUno();
+    releaseOne();
     assert.equal(getSseClientCount(), base + 1);
-    sueltaDos();
+    releaseTwo();
     assert.equal(getSseClientCount(), base, "sin clientes el mapa queda vacío");
 
     // Y la baja es idempotente: soltar dos veces no puede descontar a otro.
-    sueltaDos();
+    releaseTwo();
     assert.equal(getSseClientCount(), base);
   });
 });
@@ -149,14 +149,14 @@ describe("sse-hub: presencia (TTL de typing vs viewing)", () => {
   });
 
   it("notifyPresence manda el snapshot completo", () => {
-    const cliente = clienteFalso();
-    const suelta = addSseClient("ana@x.com", "dom-p", cliente.controller);
+    const client = fakeClient();
+    const release = addSseClient("ana@x.com", "dom-p", client.controller);
     setPresence("dom-p", "ana@x.com", "Ana", "c1", "viewing");
     setPresence("dom-p", "beto@x.com", "Beto", "c2", "typing");
 
     notifyPresence("dom-p");
 
-    const payload = cliente.recibido();
+    const payload = client.received();
     assert.ok(payload.startsWith("event: presence\ndata: "), `formato inesperado: ${payload}`);
     assert.ok(payload.endsWith("\n\n"));
     const data = JSON.parse(payload.slice("event: presence\ndata: ".length, -2)) as {
@@ -168,22 +168,31 @@ describe("sse-hub: presencia (TTL de typing vs viewing)", () => {
       "el snapshot lleva a todos los del dominio, no deltas",
     );
 
-    suelta();
+    release();
     clearPresence("dom-p", "ana@x.com");
     clearPresence("dom-p", "beto@x.com");
   });
 });
 
-describe("sse-hub.ts: sin identificadores en español", () => {
-  it("no conserva los nombres viejos del módulo", () => {
-    const fuente = readFileSync(new URL("./sse-hub.ts", import.meta.url), "utf8")
+describe("identificadores en inglés: el módulo y esta prueba", () => {
+  it("no quedan nombres en español en el código (comentarios y strings no cuentan)", () => {
+    // Quita comentarios y literales de texto: los comentarios y los strings pueden seguir en español.
+    const codeOnly = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/\/\/.*$/gm, "");
-    for (const viejo of ["expira", "ahora", "vivos"]) {
-      assert.ok(
-        !new RegExp(`\\b${viejo}\\b`).test(fuente),
-        `\`${viejo}\` sigue en el código de sse-hub.ts (los comentarios en español no cuentan)`,
-      );
+      .replace(/\/\/.*$/gm, "")
+      .replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g, '""');
+    const forbidden = [
+      "expira", "ahora", "vivos",
+      "clienteFalso", "revienta", "recibido", "propio", "ajeno",
+      "sueltaPropio", "sueltaAjeno", "suelta", "sueltas", "cliente",
+      "caido", "sano", "sueltaCaido", "sueltaSano", "uno", "dos", "sueltaUno", "sueltaDos",
+      "fuente", "viejo",
+    ];
+    for (const file of ["./sse-hub.ts", "./sse-test.test.ts"]) {
+      const code = codeOnly(file);
+      for (const name of forbidden) {
+        assert.ok(!new RegExp(`\\b${name}\\b`).test(code), `\`${name}\` sigue en el código de ${file}`);
+      }
     }
   });
 });
