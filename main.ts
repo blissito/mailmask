@@ -320,7 +320,7 @@ function ensureEnv() {
 /** `next` del login: sólo de vuelta al consentimiento OAuth o a un recibo (nada de redirecciones abiertas). */
 function safeNext(v: unknown): string | undefined {
   if (typeof v !== "string" || v.length > 4000) return undefined;
-  return v.startsWith("/oauth/authorize?") || RECEIPT_PATH.test(v) ? v : undefined;
+  return v.startsWith("/oauth/authorize?") || RECEIPT_PATH.test(v) || v === "/app#pagos" ? v : undefined;
 }
 
 function getMainDomainUrl(): string {
