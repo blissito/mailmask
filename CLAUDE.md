@@ -703,6 +703,7 @@ La clave del sitio es pública y vive en el HTML; la secreta es `TURNSTILE_SECRE
   `restantes`) se CONSERVARON a propósito: cambiarlas rompe lo que busca en el log, y el shorthand las habría renombrado en silencio.
   Ojo: `porDominio`/`derechos` viajan en el JSON de `/api/auth/me` y los lee el front — renombrar los dos
   lados en el mismo commit, y el MCP/SDK si exponen alguno. Sin cambiar comportamiento; `npm test` en verde.
+  **Sprint #10 (ticket E, `pure-helpers.test.ts`)**: en `route53.ts` `desescaparNombre`→`unescapeRecordName`, `normalizarZona`→`normalizeZoneName` (ahora exportada, sólo para la prueba) y su parámetro `nombre`→`name`. Pendiente en `route53.ts`: `fusionarSpf`, el tipo `WhoisContacto` (de `db.ts`), las clases `MxAjenoError`/`TransferNoPosible`/`CambioDns` y las locales de `configureDnsRecords`. `MxAjenoError` y `e.existentes` se asertan en `route53-dns.test.ts:123` y su `name` puede viajar a la API: no se tocan aquí.
   Al renombrar una llave del JSON que come el front, grep primero en `public/js/*.js`: están minificados y
   la línea entera pasa de 1 MB (usa `grep -c` o `-o`; un `grep -rn` revienta la salida de la caja).
 
