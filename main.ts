@@ -3529,8 +3529,12 @@ const app = new Elysia({ adapter: node() })
             }
           } else if (sub.status === "cancelled" || sub.status === "paused") {
             updateAddon(addon.id, { status: "cancelled", cancelledAt: new Date().toISOString() });
-            log("info", "billing", "Add-on cancelado", { addonId: addon.id, kind: addon.kind, mpStatus: sub.status });
-            recordOrder({
+            // Un checkout que nunca se pagó no deja «Cancelado» en el historial: no hubo
+            // nada que cancelar. Pasó con insightslab y kandey (oct-2026): cada reintento
+            // del checkout dejaba una fila de $0 que ensuciaba el historial del cliente.
+            const everActive = listOrdersForSubject("addon", addon.id).length > 0;
+            log("info", "billing", everActive ? "Add-on cancelado" : "Add-on cancelado: checkout abandonado", { addonId: addon.id, kind: addon.kind, mpStatus: sub.status });
+            if (everActive) recordOrder({
               userEmail: addon.userEmail,
               kind: "cancellation",
               subject: "addon",

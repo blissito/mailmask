@@ -127,10 +127,16 @@ describe("Libro mayor: choque de folio", () => {
     // cuando caía, la orden se perdía en silencio porque el null se leía como duplicado.
     // Pares al azar en cada corrida: `data/test.db` sobrevive entre corridas, y con pares
     // fijos la segunda corrida del mes chocaba con los folios que dejó la primera.
+    // Y los dos tienen que estar libres en la base de antes: con cientos de órdenes de
+    // otras corridas, un par al azar ya ocupado tumbaba la siembra (fallo intermitente).
     const byte = () => Math.floor(Math.random() * 256);
-    const ocupado = [byte(), byte()];
-    let libre = [byte(), byte()];
-    while (libre[0] === ocupado[0] && libre[1] === ocupado[1]) libre = [byte(), byte()];
+    const now = new Date();
+    const folio = (p: number[]) =>
+      `MM-${String(now.getUTCFullYear()).slice(2)}${String(now.getUTCMonth() + 1).padStart(2, "0")}-${p.map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+    const freePair = () => { let p = [byte(), byte()]; while (getOrderByNumber(folio(p))) p = [byte(), byte()]; return p; };
+    const ocupado = freePair();
+    let libre = freePair();
+    while (libre[0] === ocupado[0] && libre[1] === ocupado[1]) libre = freePair();
     let llamadas = 0;
     t.mock.method(globalThis.crypto, "getRandomValues", (buf: Uint8Array) => {
       const par = ++llamadas <= 2 ? ocupado : libre;

@@ -1276,6 +1276,40 @@ describe("Webhook", () => {
 
       assert.equal(getAddonById(addon.id)?.status, "cancelled");
       assert.equal(getUser(email)?.subscription?.status, "active", "el plan base sigue vivo");
+      const { listOrdersForSubject } = await import("./db.ts");
+      assert.equal(listOrdersForSubject("addon", addon.id).length, 0, "un checkout nunca pagado no deja «Cancelado» en el historial");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("cancelar un add-on que sí estuvo activo deja su «Cancelado» en el historial", async () => {
+    const email = `webhook-addon-cancel-active-${suffix}@example.com`;
+    createUser(email, await hashPassword("testpass123"));
+    const addon = createAddon(email, "domain");
+    const { recordOrder, listOrdersForSubject } = await import("./db.ts");
+    recordOrder({ userEmail: email, kind: "charge", subject: "addon", subjectId: addon.id, subjectKey: "domain", description: "Dominio activado", amountCents: 9900, eventKey: `addon-activate:${addon.id}` });
+    const subId = `sub-addon-cancel-active-${crypto.randomUUID()}`;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: string | URL | Request, _init?: RequestInit): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("api.mercadopago.com/preapproval/")) {
+        return new Response(JSON.stringify({
+          payer_email: email,
+          external_reference: `addon:${addon.id}`,
+          status: "cancelled",
+          auto_recurring: { transaction_amount: 99, frequency: 1 },
+        }));
+      }
+      return originalFetch(input, _init);
+    };
+
+    try {
+      const res = await postWebhook({ type: "subscription_preapproval", data: { id: subId } }, subId);
+      assert.equal(res.status, 200);
+      await res.body?.cancel();
+      assert.deepEqual(listOrdersForSubject("addon", addon.id).map((o) => o.kind).sort(), ["cancellation", "charge"]);
     } finally {
       globalThis.fetch = originalFetch;
     }

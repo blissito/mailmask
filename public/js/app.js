@@ -492,7 +492,7 @@ async function showOrdersModal() {
           <span class="font-mono">${esc(o.number)}</span>
           ${o.reference ? `<span class="font-mono">MP ${esc(o.reference)}</span>` : ""}
           <button data-action="copy-order" data-order-number="${esc(o.number)}" class="text-accent-text hover:text-accent ml-auto">Copiar folio</button>
-          <a href="/recibo/${encodeURIComponent(o.number)}" target="_blank" rel="noopener" class="text-accent-text hover:text-accent">Recibo</a>
+          ${o.kind === "charge" && o.amountCents > 0 ? `<a href="/recibo/${encodeURIComponent(o.number)}" target="_blank" rel="noopener" class="text-accent-text hover:text-accent">Recibo</a>` : ""}
         </div>
       </div>`;
   }).join("");
