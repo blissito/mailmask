@@ -1,4 +1,6 @@
 # CI de la Software Factory de Ghosty. Lo exige la protección de la rama principal.
+# Va en ubuntu-latest a propósito: el repo es público y ahí corre gratis y en paralelo (~3 min);
+# en la caja de CI del espacio (ws-business) tardaba ~26 min y gitleaks tronaba (13-oct).
 name: ci
 on:
   pull_request:

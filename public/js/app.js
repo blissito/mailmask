@@ -246,7 +246,8 @@ function setupProfileModal() {
 async function checkAuth() {
   const res = await fetch("/api/auth/me");
   if (!res.ok) {
-    window.location.href = "/login";
+    // `/app#pagos` sobrevive al login: el hash no llega al servidor, así que viaja en `next`.
+    window.location.href = window.location.hash === "#pagos" ? "/login?next=%2Fapp%23pagos" : "/login";
     return;
   }
   currentUser = await res.json();
@@ -491,6 +492,7 @@ async function showOrdersModal() {
           <span class="font-mono">${esc(o.number)}</span>
           ${o.reference ? `<span class="font-mono">MP ${esc(o.reference)}</span>` : ""}
           <button data-action="copy-order" data-order-number="${esc(o.number)}" class="text-accent-text hover:text-accent ml-auto">Copiar folio</button>
+          <a href="/recibo/${encodeURIComponent(o.number)}" target="_blank" rel="noopener" class="text-accent-text hover:text-accent">Recibo</a>
         </div>
       </div>`;
   }).join("");
@@ -1001,6 +1003,9 @@ async function loadDomains() {
   renderDomains();
   renderHello();
   renderPlanCard(); // los reenvíos del mes salen de los dominios
+
+  // `/app#pagos`: liga directa al historial de pagos (soporte se la manda al cliente).
+  if (window.location.hash === "#pagos") showOrdersModal();
 
   // `/app#apikeys` (desde /docs): abre el primer dominio en la pestaña de API Keys.
   if (window.location.hash === "#apikeys" && domains[0]) {
