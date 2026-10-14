@@ -7,7 +7,7 @@
     "dev": "tsx --watch main.ts",
     "start": "tsx main.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build": "npm run build:css && npm run build:chat && npm run build:composer && npm run check:skills",
+    "build": "npm run build:css && npm run build:chat && npm run build:composer && npm run build:direccion && npm run check:skills",
     "test": "NODE_OPTIONS=\"--import ./test-setup.mjs\" DATABASE_PATH=./data/test.db JWT_SECRET=test-secret-key MP_ACCESS_TOKEN=test MP_WEBHOOK_SECRET=test AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_ENDPOINT_URL=http://localhost:1 tsx --test --test-timeout=60000 --test-concurrency=1 --experimental-test-module-mocks \"*.test.ts\" \"public/js/asistente/*.test.ts\"",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -16,6 +16,7 @@
     "check:skills": "npx tsx scripts/skills-pack.mts",
     "skills:pack": "npx tsx scripts/skills-pack.mts --write",
     "skills:publish": "npm run check:skills && git subtree push --prefix public/skills git@github.com:blissito/mailmask-skills.git main",
+    "build:direccion": "NODE_ENV=production esbuild public/js/direccion.tsx --bundle --outfile=public/js/direccion.js --format=esm --jsx=automatic --target=es2020 --minify --define:process.env.NODE_ENV='\"production\"'",
     "build:composer": "NODE_ENV=production esbuild public/js/composer.ts --bundle --outfile=public/js/composer.js --format=iife --target=es2020 --minify"
   },
   "dependencies": {
@@ -29,6 +30,7 @@
     "@elysiajs/node": "^1.2",
     "@elysiajs/openapi": "^1.4.16",
     "@formmy.app/chat": "^0.2.0",
+    "@ghostystudio/boxes": "^0.1.5",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@streamdown/code": "^2.0.0",
     "better-sqlite3": "^13",

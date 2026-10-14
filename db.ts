@@ -739,10 +739,19 @@ export function addLog(log: Omit<EmailLog, "id">, logDays = 30): EmailLog {
   return rowToLog(rows[0]);
 }
 
-export function listLogs(domainId: string, limit = 50): EmailLog[] {
+export function listLogs(domainId: string, limit = 50, address?: string): EmailLog[] {
   const now = new Date().toISOString();
+  // Con `address`, sólo lo que tocó esa dirección: el entrante la lleva en `to` y el
+  // saliente en `from`. LIKE porque ambos pueden traer nombre y varias direcciones.
+  const pattern = address ? `%${address.toLowerCase().replace(/[\\%_]/g, (c) => "\\" + c)}%` : null;
   const rows = db.select().from(emailLogs)
-    .where(and(eq(emailLogs.domainId, domainId), gt(emailLogs.expiresAt, now)))
+    .where(and(
+      eq(emailLogs.domainId, domainId),
+      gt(emailLogs.expiresAt, now),
+      pattern
+        ? rawSql`(lower(${emailLogs.to}) LIKE ${pattern} ESCAPE '\\' OR lower(${emailLogs.from}) LIKE ${pattern} ESCAPE '\\')`
+        : undefined,
+    ))
     .orderBy(desc(emailLogs.timestamp))
     .limit(limit)
     .all();

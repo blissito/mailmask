@@ -204,6 +204,8 @@ async function loadDomains() {
   // Al recargar se vuelve al dominio donde estabas, no al primero de la lista.
   let recordado = null;
   try { recordado = localStorage.getItem("bandeja.domainId"); } catch {}
+  // `?domainId=` (desde el detalle de una dirección en /app) gana sobre lo recordado.
+  recordado = new URLSearchParams(location.search).get("domainId") || recordado;
   selectedDomainId = domains.some(d => d.id === recordado) ? recordado : domains[0].id;
   sel.value = selectedDomainId;
   await loadAliasesForCompose();

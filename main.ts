@@ -3266,7 +3266,8 @@ const app = new Elysia({ adapter: node() })
       100,
     );
 
-    const logs = await listLogs(domain.id, limit);
+    const alias = url.searchParams.get("alias")?.trim();
+    const logs = await listLogs(domain.id, limit, alias && alias !== "*" ? `${alias}@${domain.domain}` : undefined);
     return new Response(JSON.stringify(logs), {
       headers: { "content-type": "application/json" },
     });
