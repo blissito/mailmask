@@ -6,9 +6,10 @@
 //  - Un DeleteObject que falla no detiene el barrido y no cuenta.
 //  - Lista únicamente los prefijos de imágenes y archivos de correo, nunca domain-assets/.
 //
-// S3 no se toca: se dobla sólo `S3Client` con el módulo real esparcido, ANTES de importar
-// `ses.ts`. El doble respeta el filtro por Prefix y sólo manda IsTruncated/NextContinuationToken
-// en páginas intermedias, como lo haría S3.
+// Se dobla sólo `S3Client` con el módulo real esparcido, ANTES de importar `ses.ts`. Los comandos
+// (ListObjectsV2Command, DeleteObjectCommand) son los reales: el doble despacha por
+// `command.constructor.name` y lee `command.input`. El doble respeta el filtro por Prefix y sólo
+// manda IsTruncated/NextContinuationToken en páginas intermedias, como lo haría S3.
 
 import { describe, it, before, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -17,47 +18,46 @@ const HOUR_MS = 3600_000;
 const PAGE_SIZE = 2;
 
 type StoredObject = { Key: string; LastModified: Date };
+type ListInput = { Prefix?: string; ContinuationToken?: string };
 
 let storedObjects: StoredObject[] = [];
-let listCalls: { Prefix?: string; ContinuationToken?: string }[] = [];
+let listCalls: ListInput[] = [];
 let deletedKeys: string[] = [];
 let keysThatFailToDelete = new Set<string>();
 
-class ListObjectsV2Command {
-  constructor(public input: { Prefix?: string; ContinuationToken?: string }) {}
-}
-class DeleteObjectCommand {
-  constructor(public input: { Key: string }) {}
-}
-
 class FakeS3Client {
-  async send(command: unknown) {
-    if (command instanceof ListObjectsV2Command) {
-      listCalls.push({ ...command.input });
-      const prefix = command.input.Prefix ?? "";
-      const matching = storedObjects
-        .filter((object) => object.Key.startsWith(prefix))
-        .sort((a, b) => a.Key.localeCompare(b.Key));
-      // La página se identifica por su índice de inicio, que es lo que viaja como token.
-      const start = command.input.ContinuationToken ? Number(command.input.ContinuationToken) : 0;
-      const page = matching.slice(start, start + PAGE_SIZE);
-      const nextStart = start + PAGE_SIZE;
-      const hasMore = nextStart < matching.length;
-      return {
-        Contents: page,
-        IsTruncated: hasMore,
-        NextContinuationToken: hasMore ? String(nextStart) : undefined,
-      };
-    }
-    if (command instanceof DeleteObjectCommand) {
-      if (keysThatFailToDelete.has(command.input.Key)) {
-        throw new Error(`AccessDenied al borrar ${command.input.Key}`);
+  async send(command: { constructor: { name: string }; input: ListInput & { Key?: string } }) {
+    const input = command.input;
+    switch (command.constructor.name) {
+      case "ListObjectsV2Command": {
+        listCalls.push({ ...input });
+        const prefix = input.Prefix ?? "";
+        const matching = storedObjects
+          .filter((object) => object.Key.startsWith(prefix))
+          .sort((a, b) => a.Key.localeCompare(b.Key));
+        // La página se identifica por su índice de inicio, que es lo que viaja como token.
+        const start = input.ContinuationToken ? Number(input.ContinuationToken) : 0;
+        const page = matching.slice(start, start + PAGE_SIZE);
+        const nextStart = start + PAGE_SIZE;
+        const hasMore = nextStart < matching.length;
+        return {
+          Contents: page,
+          IsTruncated: hasMore,
+          NextContinuationToken: hasMore ? String(nextStart) : undefined,
+        };
       }
-      deletedKeys.push(command.input.Key);
-      storedObjects = storedObjects.filter((object) => object.Key !== command.input.Key);
-      return {};
+      case "DeleteObjectCommand": {
+        const key = input.Key!;
+        if (keysThatFailToDelete.has(key)) {
+          throw new Error(`AccessDenied al borrar ${key}`);
+        }
+        deletedKeys.push(key);
+        storedObjects = storedObjects.filter((object) => object.Key !== key);
+        return {};
+      }
+      default:
+        throw new Error(`comando S3 no esperado: ${command.constructor.name}`);
     }
-    throw new Error("comando S3 no esperado");
   }
 }
 
@@ -72,12 +72,7 @@ describe("sweepOrphanEmailImages: barrido de S3", () => {
   before(async () => {
     const realS3 = await import("@aws-sdk/client-s3");
     mock.module("@aws-sdk/client-s3", {
-      namedExports: {
-        ...realS3,
-        S3Client: FakeS3Client,
-        ListObjectsV2Command,
-        DeleteObjectCommand,
-      },
+      namedExports: { ...realS3, S3Client: FakeS3Client },
     });
     const ses = await import("./ses.ts");
     ({ sweepOrphanEmailImages } = ses);
