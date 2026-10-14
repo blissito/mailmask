@@ -8,6 +8,7 @@ import { checkInboundMx, domainFlagStatus, refreshDomainFlags, saveDomainFlags }
 import { schedule, isServer } from "./scheduler.js";
 import { assertNoPreview, debeArrancarEfectos, esPreview, PreviewDeshabilitado } from "./preview.js";
 import { revisarPatron } from "./regex-guard.js";
+import { renderReceipt, RECEIPT_PATH } from "./receipt.js";
 import { buildDnsSetup } from "./dns-setup.js";
 import { verificarTurnstile } from "./turnstile.js";
 import { generarPerfilApple, nombreArchivoPerfil, IMAP_HOST } from "./apple-profile.js";
@@ -82,6 +83,7 @@ import {
   recordOrder,
   chargeEventKey,
   listOrders,
+  getOrderByNumber,
   getLastOrder,
   planLabel,
   planPriceCents,
@@ -315,9 +317,10 @@ function ensureEnv() {
 
 // --- Helpers ---
 
-/** `next` del login: sólo de vuelta al consentimiento OAuth (nada de redirecciones abiertas). */
+/** `next` del login: sólo de vuelta al consentimiento OAuth o a un recibo (nada de redirecciones abiertas). */
 function safeNext(v: unknown): string | undefined {
-  return typeof v === "string" && v.length <= 4000 && v.startsWith("/oauth/authorize?") ? v : undefined;
+  if (typeof v !== "string" || v.length > 4000) return undefined;
+  return v.startsWith("/oauth/authorize?") || RECEIPT_PATH.test(v) || v === "/app#pagos" ? v : undefined;
 }
 
 function getMainDomainUrl(): string {
@@ -1573,6 +1576,30 @@ const app = new Elysia({ adapter: node() })
   .get("/login", () => serveStatic("/login.html"))
   .get("/register", () => serveStatic("/register.html"))
   .get("/app", () => serveStatic("/app.html"))
+  // Recibo imprimible: privado (dueña de la orden o admin). Sin sesión manda al login,
+  // que regresa aquí; desde WhatsApp la cookie SameSite=Strict no viaja en el primer clic.
+  .get("/recibo/:number", async ({ request, params }) => {
+    const html = (body: string, status: number) =>
+      new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" } });
+    const here = `/recibo/${params.number}`;
+    if (!RECEIPT_PATH.test(here)) return html("Recibo no encontrado", 404);
+    const auth = await getAuthUser(request);
+    if (!auth) {
+      return new Response(null, { status: 302, headers: { location: `/login?next=${encodeURIComponent(here)}` } });
+    }
+    const order = getOrderByNumber(params.number);
+    // Mismo 404 para ajeno e inexistente: no se confirma que un folio exista.
+    if (!order || (order.userEmail !== auth.email && !isAdmin(auth.email))) return html("Recibo no encontrado", 404);
+    let domain: string | null = null;
+    if (order.subject === "addon" && order.subjectId) {
+      const domainId = getAddonById(order.subjectId)?.domainId;
+      domain = domainId ? getDomain(domainId)?.domain ?? null : null;
+    } else if (order.subject === "domain_registration" && order.subjectId) {
+      domain = getDomainRegistration(order.subjectId)?.domainName ?? null;
+    }
+    const domainExpiresAt = domain ? getDomainRegistrationByDomainName(domain)?.expiresAt ?? null : null;
+    return html(renderReceipt(order, { domain, domainExpiresAt }), 200);
+  })
   // Página de prueba del compositor. Sólo en desarrollo: no es parte del producto.
   .get("/composer-demo", () => process.env.NODE_ENV === "production"
     ? new Response("No encontrado", { status: 404 })
@@ -3502,8 +3529,12 @@ const app = new Elysia({ adapter: node() })
             }
           } else if (sub.status === "cancelled" || sub.status === "paused") {
             updateAddon(addon.id, { status: "cancelled", cancelledAt: new Date().toISOString() });
-            log("info", "billing", "Add-on cancelado", { addonId: addon.id, kind: addon.kind, mpStatus: sub.status });
-            recordOrder({
+            // Un checkout que nunca se pagó no deja «Cancelado» en el historial: no hubo
+            // nada que cancelar. Pasó con insightslab y kandey (oct-2026): cada reintento
+            // del checkout dejaba una fila de $0 que ensuciaba el historial del cliente.
+            const everActive = listOrdersForSubject("addon", addon.id).length > 0;
+            log("info", "billing", everActive ? "Add-on cancelado" : "Add-on cancelado: checkout abandonado", { addonId: addon.id, kind: addon.kind, mpStatus: sub.status });
+            if (everActive) recordOrder({
               userEmail: addon.userEmail,
               kind: "cancellation",
               subject: "addon",

@@ -15,6 +15,10 @@ social), `dominios-seo.test.ts` (`/dominios`, sin cifras por TLD) y
 - **`dateModified` = la fecha visible** («Actualizado: <fecha>», con `<time datetime>`).
   Al editar la página, se cambian las dos y el `lastmod` del sitemap. En los legales
   (`/terms`, `/privacy`) `public-seo.test.ts` amarra las tres: la visible, el `dateModified` y el `lastmod`.
+- **Enlaces internos blog→landings:** un solo enlace por artículo, con ancla que nombra la
+  página destino y dentro del cuerpo (nunca en el `<head>`). Un enlace no es edición de
+  contenido: no mueve el `dateModified` ni el `lastmod` del sitemap. Los vigila
+  `blog-enlaces-landings.test.ts`.
 - **`hasPart` apunta a anclas que existen**; los `id` de los `<h2>` no se renombran
   (rompe enlaces y el ranking por sección).
 - **Imagen social propia** (1200×630 JPEG, < 200 KB), renderizada con Chromium desde HTML
