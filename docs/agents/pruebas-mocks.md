@@ -101,7 +101,6 @@ desde una prueba del root da TS2307 y rompe `npm run typecheck`. Para vigilar un
 (`plans.test.ts`), igual que `docs-cli.test.ts` lee los comandos. Con `assert.ok(match)` y una lista
 no vacía ANTES de comparar, la prueba falla —en vez de pasar vacía— si la constante cambia de forma.
 
-
 ## `pending_agent_actions` va con FK: crea el usuario antes de archivar
 
 `pending_agent_actions.user_email` es FK a `users.email` con `ON DELETE CASCADE`, y `pg.ts` enciende
@@ -109,7 +108,11 @@ no vacía ANTES de comparar, la prueba falla —en vez de pasar vacía— si la 
 `FOREIGN KEY constraint failed` si ese email no existe. En `agent-actions.test.ts` cada prueba se
 lleva su propio usuario: `createUser(email, "x")` de `db.ts` antes de tocar el módulo.
 
-## Doblar el cliente de AWS (no `route53.ts`)
+## Doblar el cliente de AWS: el paquete `@aws-sdk/client-*`, no el módulo
+
+Si una prueba toca S3, SES o Route 53, no dobla `ses.ts` ni `route53.ts`: dobla el cliente del SDK, con el módulo real esparcido y antes del import del código bajo prueba. Hace falta porque esos módulos guardan el cliente en una variable de módulo al primer uso, y un cliente ya creado no se reemplaza. Los identificadores de los ejemplos van en inglés; los títulos de las pruebas siguen en español y no se copian aquí.
+
+### Route 53 (`route53.ts`)
 
 `domain-renewal.test.ts` y `transfer-lock.test.ts` doblan `./route53.ts` entero, así que nunca pasan
 por la forma en que AWS contesta. `domain-sync.test.ts` hace lo contrario: `route53.ts` corre REAL y
@@ -141,6 +144,111 @@ lo único falso es el SDK.
   `GetDomainDetail` contestando, la segunda opinión salva al dominio y la prueba pasa aunque la
   guarda de `enLaCuenta?.size` no esté: el escenario fiel es unas credenciales apuntando a OTRA
   cuenta (lista vacía *y* `DomainNotFound`). Se comprueba con el mutante `if (enLaCuenta && …)`.
+
+### S3: la paginación se prueba contando llamadas
+
+Aquí el doble sustituye sólo `S3Client`: los comandos son los reales, así que `command.constructor.name` trae el nombre bueno. `getS3` no se exporta (`ses.ts:52`), por eso se dobla el paquete y no esa función.
+
+Extracto de `email-images-sweep.test.ts`:
+
+```ts
+type ListInput = { Prefix?: string; ContinuationToken?: string };
+
+class FakeS3Client {
+  async send(command: { constructor: { name: string }; input: ListInput & { Key?: string } }) {
+    const input = command.input;
+    switch (command.constructor.name) {
+      case "ListObjectsV2Command": {
+        listCalls.push({ ...input });
+        const prefix = input.Prefix ?? "";
+        const matching = storedObjects
+          .filter((object) => object.Key.startsWith(prefix))
+          .sort((a, b) => a.Key.localeCompare(b.Key));
+        // La página se identifica por su índice de inicio, que es lo que viaja como token.
+        const start = input.ContinuationToken ? Number(input.ContinuationToken) : 0;
+        const page = matching.slice(start, start + PAGE_SIZE);
+        const nextStart = start + PAGE_SIZE;
+        const hasMore = nextStart < matching.length;
+        return {
+          Contents: page,
+          IsTruncated: hasMore,
+          NextContinuationToken: hasMore ? String(nextStart) : undefined,
+        };
+      }
+      case "DeleteObjectCommand": {
+        const key = input.Key!;
+        if (keysThatFailToDelete.has(key)) {
+          throw new Error(`AccessDenied al borrar ${key}`);
+        }
+        deletedKeys.push(key);
+        storedObjects = storedObjects.filter((object) => object.Key !== key);
+        return {};
+      }
+      default:
+        throw new Error(`comando S3 no esperado: ${command.constructor.name}`);
+    }
+  }
+}
+```
+
+Registro del módulo, en `before()`:
+
+```ts
+    const realS3 = await import("@aws-sdk/client-s3");
+    mock.module("@aws-sdk/client-s3", {
+      namedExports: { ...realS3, S3Client: FakeS3Client },
+    });
+    const ses = await import("./ses.ts");
+```
+
+La afirmación de la paginación:
+
+```ts
+    const imageCalls = listCalls.filter((call) => call.Prefix === EMAIL_IMAGE_PREFIX);
+    assert.ok(imageCalls.length >= 2, `esperaba al menos 2 páginas, hubo ${imageCalls.length}`);
+    assert.equal(imageCalls[0].ContinuationToken, undefined);
+    assert.equal(imageCalls[1].ContinuationToken, String(PAGE_SIZE));
+```
+
+`IsTruncated` y `NextContinuationToken` vienen sólo en páginas intermedias: la última vuelve sin token. La segunda llamada trae el token de la primera página, y eso demuestra que se siguió la paginación; que se borre el objeto viejo de la segunda página sólo lo confirma de paso. Se filtra por `Prefix` porque el barrido lista más de un prefijo.
+
+### SES: aquí también se sustituyen los comandos
+
+En `receipt-rules-repair.test.ts` no basta con `SESClient`: `DescribeReceiptRuleSetCommand` y `UpdateReceiptRuleCommand` también son clases propias con un campo `kind`, y el doble despacha por `cmd.kind`. Es la diferencia con S3: aquí el doble registra lo que mandó la función, no el comando real. La respuesta se devuelve con `structuredClone` porque `repairReceiptRules` muta la regla in situ; sin la copia, el doble cambiaría su propio estado.
+
+Extracto de `receipt-rules-repair.test.ts`:
+
+```ts
+    const real = await import("@aws-sdk/client-ses");
+    mock.module("@aws-sdk/client-ses", {
+      namedExports: {
+        ...real,
+        SESClient: class {
+          // deno-lint-ignore no-explicit-any
+          async send(cmd: any) {
+            sentCommands.push(cmd.kind);
+            if (cmd.kind === "Describe") {
+              // Sin Rules: el caso 'no trae Rules' necesita que la respuesta venga sin la llave.
+              // Copia: la función muta la regla in situ y el estado del doble no debe cambiar con ella.
+              return sesRules === undefined ? {} : { Rules: structuredClone(sesRules) };
+            }
+            updatesReceived.push(structuredClone(cmd.input));
+            return {};
+          }
+        },
+        DescribeReceiptRuleSetCommand: class { kind = "Describe"; constructor(public input: any) {} },
+        UpdateReceiptRuleCommand: class { kind = "Update"; constructor(public input: any) {} },
+      },
+    });
+```
+
+Trampa de la misma prueba: `SNS_TOPIC_ARN` se lee al importar `ses.ts`, así que el caso sin tópico reimporta el módulo con otra query, que Node trata como módulo distinto:
+
+```ts
+    process.env.SNS_TOPIC_ARN = "";
+    ({ repairReceiptRules: repairWithoutTopic } = await import(`./ses.ts?v=${Math.random()}`));
+    process.env.SNS_TOPIC_ARN = TOPIC_ARN;
+```
 
 ## Probar que un proceso TERMINA SOLO (y que la prueba lo notaría)
 
