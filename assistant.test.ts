@@ -68,7 +68,7 @@ describe("Asistente: Ghosty, turn token y confirmaciones", () => {
       deleteReceiptRule: async () => undefined,
       deleteConfigurationSet: async () => undefined,
       deleteDomainIdentity: async () => undefined,
-      checkDomainStatus: async () => ({ verified: true, dkimVerified: true, respondio: true }),
+      checkDomainStatus: async () => ({ verified: true, dkimVerified: true, responded: true }),
       putAssistantUploadToS3: async (k: string, body: Uint8Array, contentType: string) => { uploads.set(k, { body, contentType }); },
       getAssistantUploadFromS3: async (k: string) => uploads.get(k) ?? null,
     } });

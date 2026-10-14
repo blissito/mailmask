@@ -183,8 +183,8 @@ export async function ensureConfigSetEventDestination(domain: string): Promise<{
       log("warn", "ses", "El config set tiene un destino con otro nombre; no se reparará solo", {
         domain,
         configSet: name,
-        esperado: destination.Name,
-        encontrados: desc.EventDestinations?.map((d: { Name?: string }) => d.Name) ?? [],
+        expected: destination.Name,
+        found: desc.EventDestinations?.map((d: { Name?: string }) => d.Name) ?? [],
       });
       return { created: false, updated: false };
     }
@@ -205,7 +205,7 @@ export function getConfigSetName(domain: string): string {
 /**
  * Estado real del dominio en SES.
  *
- * `respondio` separa "SES dice que no está verificado" de "no pudimos
+ * `responded` separa "SES dice que no está verificado" de "no pudimos
  * preguntarle". Antes todo error caía en `verified: false`, así que un parpadeo
  * de red se veía igual que un dominio caído; por miedo a eso, la ruta de verify
  * dejó de preguntar del todo y empezó a responder `true` de memoria. Resultado:
@@ -214,7 +214,7 @@ export function getConfigSetName(domain: string): string {
  */
 export async function checkDomainStatus(
   domain: string
-): Promise<{ verified: boolean; dkimVerified: boolean; respondio: boolean }> {
+): Promise<{ verified: boolean; dkimVerified: boolean; responded: boolean }> {
   try {
     const ses = await getSesInbound();
     const { GetIdentityVerificationAttributesCommand, GetIdentityDkimAttributesCommand } =
@@ -224,7 +224,7 @@ export async function checkDomainStatus(
 
     // Sin atributos, SES respondió y no conoce el dominio: eso es un "no"
     // legítimo, no una falla de consulta.
-    if (!attrs) return { verified: false, dkimVerified: false, respondio: true };
+    if (!attrs) return { verified: false, dkimVerified: false, responded: true };
 
     // El DKIM se consultaba nunca y se reportaba siempre como false.
     let dkimVerified = false;
@@ -238,11 +238,11 @@ export async function checkDomainStatus(
     return {
       verified: attrs.VerificationStatus === "Success",
       dkimVerified,
-      respondio: true,
+      responded: true,
     };
   } catch (err) {
     log("warn", "ses", "No se pudo consultar el estado del dominio", { domain, error: String(err) });
-    return { verified: false, dkimVerified: false, respondio: false };
+    return { verified: false, dkimVerified: false, responded: false };
   }
 }
 
@@ -304,7 +304,7 @@ export async function ensureDomainInbound(domain: string): Promise<{ ruleCreated
       log("error", "ses", "El bucket de la regla de recepción no es el que leemos", {
         domain,
         sesBucket,
-        bucketConfigurado: S3_BUCKET,
+        configuredBucket: S3_BUCKET,
       });
     }
   } catch (err) {

@@ -2455,7 +2455,7 @@ const app = new Elysia({ adapter: node() })
     // exactamente cómo un dominio borrado de la cuenta pasó meses reportándose
     // sano mientras no podía enviar ni recibir.
     const estadoSes = await checkDomainStatus(d);
-    if (!estadoSes.respondio) {
+    if (!estadoSes.responded) {
       checks.verified = {
         ok: domain.verified,
         detail: "No se pudo consultar SES; este es el último estado conocido.",
@@ -2475,7 +2475,7 @@ const app = new Elysia({ adapter: node() })
     // Lo medido se guarda: `list_domains` lee estas banderas. Antes `mxConfigured`
     // sólo se escribía al comprar el dominio y la lista mentía (7-oct-2026).
     saveDomainFlags(domain, {
-      verified: estadoSes.respondio ? estadoSes.verified : null,
+      verified: estadoSes.responded ? estadoSes.verified : null,
       mxConfigured: mx.resolved ? mx.ok : null,
     });
 
@@ -2598,16 +2598,16 @@ const app = new Elysia({ adapter: node() })
     // ni recibir, sin una sola señal.
     //
     // Ahora siempre se pregunta, y el resguardo vive donde corresponde: la
-    // bandera sólo baja si SES respondió de verdad (`respondio`), no si la
+    // bandera sólo baja si SES respondió de verdad (`responded`), no si la
     // consulta falló.
     const [status, mx] = await Promise.all([checkDomainStatus(domain.domain), checkInboundMx(domain.domain)]);
 
     // Se guardan las dos banderas con su fecha, igual que en health (domain-flags.ts).
     saveDomainFlags(domain, {
-      verified: status.respondio ? status.verified : null,
+      verified: status.responded ? status.verified : null,
       mxConfigured: mx.resolved ? mx.ok : null,
     });
-    if (status.respondio && status.verified !== domain.verified) {
+    if (status.responded && status.verified !== domain.verified) {
       if (!status.verified) {
         log("warn", "ses", "El dominio dejó de estar verificado en SES", {
           domain: domain.domain,
@@ -2618,7 +2618,7 @@ const app = new Elysia({ adapter: node() })
 
     // Identidad verificada no implica recepción: la regla del rule set es
     // otro recurso y puede faltar (brendago.design, sep-2026). Se repara aquí.
-    if (status.respondio && status.verified) {
+    if (status.responded && status.verified) {
       try {
         await ensureDomainInbound(domain.domain);
       } catch (err) {
@@ -2628,7 +2628,7 @@ const app = new Elysia({ adapter: node() })
 
     // Si no se pudo consultar, se reporta lo último que se sabía en vez de
     // inventar un "no verificado" que alarme sin motivo.
-    if (!status.respondio) {
+    if (!status.responded) {
       return new Response(
         JSON.stringify({
           domain: domain.domain,

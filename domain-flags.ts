@@ -80,7 +80,7 @@ export function saveDomainFlags(
 export async function refreshDomainFlags(d: Domain): Promise<{ verified: boolean | null; mxConfigured: boolean | null }> {
   const [ses, mx] = await Promise.all([checkDomainStatus(d.domain), checkInboundMx(d.domain)]);
   const measured = {
-    verified: ses.respondio ? ses.verified : null,
+    verified: ses.responded ? ses.verified : null,
     mxConfigured: mx.resolved ? mx.ok : null,
   };
   saveDomainFlags(d, measured);

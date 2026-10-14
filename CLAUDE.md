@@ -670,7 +670,7 @@ La clave del sitio es pública y vive en el HTML; la secreta es `TURNSTILE_SECRE
   (`esServidor`→`isServer`, `programar`→`schedule`), `search-backfill.ts` (`ejecutarBackfill`→`runBackfill`,
   `backfillPendiente`→`pendingBackfillCount`, `ResultadoBackfill`→`BackfillResult`, `LOTE`/`PAUSA_MS`/
   `dormir`/`corriendo`) y `domain-sync.ts` (`avisarRenovaciones`→`notifyRenewals`, `cobranzaDominios`→
-  `chargeDomainRenewals`, `cerrarTransferOut`→`closeTransferOut`, `DIA`/`dias`/`HITOS_*`). `ses.ts` (pedido #82, 14-oct-2026): `clasificarErrorS3`→`classifyS3Error` (y su test en `firma-logo.test.ts`), `bucketDeSes`→`sesBucket`, `nombre`→`errorName` (local). Queda el resto
+  `chargeDomainRenewals`, `cerrarTransferOut`→`closeTransferOut`, `DIA`/`dias`/`HITOS_*`). `ses.ts` (pedido #82, 14-oct-2026): `clasificarErrorS3`→`classifyS3Error` (y su test en `firma-logo.test.ts`), `bucketDeSes`→`sesBucket`, `nombre`→`errorName` (local), `respondio`→`responded` (retorno de `checkDomainStatus`, también en `main.ts`, `domain-flags.ts` y sus pruebas), `bucketConfigurado`→`configuredBucket` y las llaves de log `esperado`/`encontrados`→`expected`/`found`. Queda el resto
   del legado —`preview.ts` incluido, que sigue con `esServidor` como parámetro de `debeProgramar`— y todo
   lo demás de la lista. La llave JSON `backfillPendiente` NO se toca: la lee `public/js/bandeja.js`.
   Ojo: `porDominio`/`derechos` viajan en el JSON de `/api/auth/me` y los lee el front — renombrar los dos
