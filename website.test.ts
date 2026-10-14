@@ -9,6 +9,9 @@ describe("website: detección de plataforma", () => {
     assert.equal(detectPlatform([{ type: "CNAME", values: ["cname.vercel-dns.com."] }])?.id, "vercel");
     assert.equal(detectPlatform([{ type: "CNAME", values: ["cname.sandboxes.easybits.cloud"] }])?.id, "easybits");
     assert.equal(detectPlatform([{ type: "A", values: ["216.24.57.1"] }])?.id, "render");
+    // EasyBits Sitios vive en Fly: su destino no debe salir como Fly.io.
+    assert.equal(detectPlatform([{ type: "CNAME", values: ["easybits.fly.dev"] }])?.id, "easybits-sites");
+    assert.equal(detectPlatform([{ type: "CNAME", values: ["mi-app.fly.dev"] }])?.id, "fly");
     assert.equal(detectPlatform([{ type: "A", values: ["1.2.3.4"] }]), null);
   });
 

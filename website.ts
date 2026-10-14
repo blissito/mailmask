@@ -20,6 +20,8 @@ async function inBatches<T>(tasks: (() => Promise<T>)[], limit: number): Promise
 
 /** Qué se reconoce por su valor. Son datos: una IP nueva de una plataforma se agrega aquí. */
 export const PLATFORMS: { id: string; label: string; ips?: string[]; hosts?: RegExp }[] = [
+  // Antes que Fly: EasyBits Sitios vive en Fly y su destino también termina en `.fly.dev`.
+  { id: "easybits-sites", label: "EasyBits Sitios", ips: ["66.241.125.82"], hosts: /^easybits\.fly\.dev$/ },
   // 216.198.79.x es el pool nuevo de Vercel (2025); 76.76.21.21 sigue sirviendo.
   { id: "vercel", label: "Vercel", ips: ["76.76.21.21", "216.198.79.1", "216.198.79.65"], hosts: /(\.vercel-dns\.com|\.vercel\.app)$/ },
   { id: "netlify", label: "Netlify", ips: ["75.2.60.5"], hosts: /(\.netlify\.app|\.netlify\.com)$/ },
@@ -28,7 +30,6 @@ export const PLATFORMS: { id: string; label: string; ips?: string[]; hosts?: Reg
   { id: "render", label: "Render", ips: ["216.24.57.1"], hosts: /\.onrender\.com$/ },
   { id: "fly", label: "Fly.io", hosts: /\.fly\.dev$/ },
   { id: "railway", label: "Railway", hosts: /\.up\.railway\.app$/ },
-  { id: "easybits-sites", label: "EasyBits Sitios", ips: ["66.241.125.82"], hosts: /^easybits\.fly\.dev$/ },
   { id: "easybits", label: "EasyBits Sandbox", hosts: /(^|\.)sandboxes\.easybits\.cloud$/ },
   { id: "shopify", label: "Shopify", ips: ["23.227.38.65"], hosts: /\.myshopify\.com$/ },
   { id: "wix", label: "Wix", ips: ["185.230.63.107", "185.230.63.171", "185.230.63.186"], hosts: /\.wixdns\.net$/ },
@@ -95,7 +96,7 @@ export async function probeHttps(host: string, timeoutMs = 5000): Promise<HttpsC
       resolve({ validTo: c?.valid_to ? new Date(c.valid_to).toISOString() : undefined, error });
     });
     // Sin `rejectUnauthorized: false` el handshake falla con un certificado ajeno, y justo eso es lo que queremos ver.
-    sock.on("error", (e) => resolve({ error: e.message }));
+    sock.on("error", (e) => resolve({ error: /ENOTFOUND|EAI_AGAIN/.test(e.message) ? "todavía no resuelve (si lo acabas de crear, espera un par de minutos)" : e.message }));
     sock.on("timeout", () => { sock.destroy(); resolve({ error: "sin respuesta en el puerto 443" }); });
   });
   let http: { status?: number; location?: string; error?: string } = {};
@@ -104,6 +105,8 @@ export async function probeHttps(host: string, timeoutMs = 5000): Promise<HttpsC
     http = { status: res.status, location: res.headers.get("location") ?? undefined };
   } catch (e) {
     http = { error: (e as Error).cause ? String((e as { cause?: { message?: string } }).cause?.message ?? e) : (e as Error).message };
+    // Un registro recién escrito tarda en verse: «ENOTFOUND» asusta y casi siempre es eso.
+    if (/ENOTFOUND|EAI_AGAIN/.test(http.error ?? "")) http.error = "todavía no resuelve (si lo acabas de crear, espera un par de minutos)";
   }
   const c = await cert;
   const error = c.error ?? http.error;
