@@ -210,6 +210,7 @@ import {
   openGhostyTurn,
   relayTurn,
   buildScreenContext,
+  buildScreenReminder,
   isOwnUpload,
   attachmentMarkdown,
   saveAssistantMessage,
@@ -8150,8 +8151,10 @@ const app = new Elysia({ adapter: node() })
     const appendSystemPrompt = [ASSISTANT_BASE_PROMPT, pantalla ? `Contexto de pantalla:\n${pantalla}` : null].filter(Boolean).join("\n\n");
     // El append sólo se aplica cuando Ghosty CREA la conversación (es sticky por groupId,
     // lección de Deník), así que cuando la pantalla cambió también viaja en el mensaje.
-    const textForGhosty = b.screenChanged === true && pantalla
-      ? `<contexto-de-pantalla>\n${pantalla}\n</contexto-de-pantalla>\n\n${text}`
+    // Si no cambió, igual viaja una línea: sin ella el agente seguía el dominio del hilo.
+    const screenNote = b.screenChanged === true ? pantalla : buildScreenReminder(auth.email, b.screen);
+    const textForGhosty = screenNote
+      ? `<contexto-de-pantalla>\n${screenNote}\n</contexto-de-pantalla>\n\n${text}`
       : text;
 
     const upstreamAbort = new AbortController();

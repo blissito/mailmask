@@ -168,6 +168,21 @@ export function buildScreenContext(email: string, screen: unknown): string | nul
   return lines.length ? lines.join("\n") : null;
 }
 
+/**
+ * Recordatorio de una línea para los turnos en que la pantalla NO cambió. Sin él, el
+ * agente seguía el dominio del hilo y no el de la pantalla: con fancyfiles.app abierto,
+ * «subdominio contador» se creó en hectorbliss.com porque de ahí venía la charla.
+ */
+export function buildScreenReminder(email: string, screen: unknown): string | null {
+  if (!screen || typeof screen !== "object") return null;
+  const s = screen as { domainId?: unknown; tab?: unknown };
+  if (typeof s.domainId !== "string" || !/^[A-Za-z0-9-]{1,64}$/.test(s.domainId)) return null;
+  const domain = getDomain(s.domainId);
+  if (!domain || (domain.ownerEmail !== email && !getAgentByEmail(domain.id, email))) return null;
+  const tab = typeof s.tab === "string" && TAB_ALLOWLIST.has(s.tab) ? `, pestaña ${s.tab}` : "";
+  return `En pantalla: ${domain.domain} (domainId ${domain.id})${tab}.`;
+}
+
 // --- Turno en Ghosty ---
 
 export type TurnInput = {
@@ -361,4 +376,5 @@ export const ASSISTANT_BASE_PROMPT = [
   "Opera su cuenta con las herramientas del MCP `mailmask`; nunca le pidas su API key.",
   "Las acciones destructivas (borrar dominio, máscara, buzón o registro DNS, trasladar el dominio, quitar a una persona) piden confirmación: si una herramienta responde que necesita confirmación, dile que apruebe la tarjeta y no reintentes.",
   "El pago siempre lo hace el usuario: comparte el enlace, nunca digas que ya quedó pagado.",
+  "Cada mensaje puede traer la pantalla abierta (`<contexto-de-pantalla>`). Si el usuario no nombra un dominio, actúa sobre el que está en pantalla, aunque la conversación viniera de otro.",
 ].join("\n");
