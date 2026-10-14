@@ -663,7 +663,7 @@ async function buyAddon(kind, domainId) {
 }
 
 async function cancelAddon(id) {
-  if (!confirm("¿Cancelar este add-on? Lo conservas hasta que termine el periodo que ya pagaste.")) return;
+  if (!(await confirmar({ titulo: "Cancelar add-on", mensaje: "¿Cancelar este add-on? Lo conservas hasta que termine el periodo que ya pagaste.", accion: "Cancelar add-on" }))) return;
   const err = document.getElementById("addons-error");
   err.classList.add("hidden");
   const res = await fetch(`/api/addons/${id}/cancel`, { method: "POST" });
@@ -899,7 +899,7 @@ function askMpEmail() {
 }
 
 async function cancelSubscription() {
-  if (!confirm("¿Cancelar tu plan anterior? Al terminar el periodo pagado, tu primer dominio sigue gratis y los demás necesitarán activarse ($99/mes cada uno).")) return;
+  if (!(await confirmar({ titulo: "Cancelar plan", mensaje: "¿Cancelar tu plan anterior? Al terminar el periodo pagado, tu primer dominio sigue gratis y los demás necesitarán activarse ($99/mes cada uno).", accion: "Cancelar plan" }))) return;
   try {
     const res = await fetch("/api/billing/cancel", { method: "POST" });
     const data = await res.json();
@@ -1233,11 +1233,11 @@ function goBack() {
 
 async function deleteDomain() {
   if (!selectedDomain) return;
-  if (!confirm(`¿Eliminar dominio ${selectedDomain.domain}? Se borrarán todas las direcciones y reglas.`)) return;
+  if (!(await confirmar({ titulo: "Eliminar dominio", mensaje: `¿Eliminar dominio ${selectedDomain.domain}? Se borrarán todas las direcciones y reglas.`, accion: "Eliminar dominio" }))) return;
   const res = await fetch(`/api/domains/${selectedDomain.id}`, { method: "DELETE" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    alert(data.error || "Error al eliminar dominio");
+    showToast(data.error || "Error al eliminar dominio", true);
     return;
   }
   goBack();
@@ -1884,7 +1884,7 @@ async function toggleAlias(alias, enabled) {
 }
 
 async function removeAlias(alias) {
-  if (!confirm(`¿Eliminar la dirección ${alias}@${selectedDomain.domain}?`)) return;
+  if (!(await confirmar({ titulo: "Eliminar dirección", mensaje: `¿Eliminar la dirección ${alias}@${selectedDomain.domain}?`, accion: "Eliminar dirección" }))) return;
   await fetch(`/api/domains/${selectedDomain.id}/alias/${alias}`, { method: "DELETE" });
   await loadAliases();
   await refreshUsage();
@@ -1932,7 +1932,7 @@ function renderRules(rules) {
 }
 
 async function removeRule(ruleId) {
-  if (!confirm("¿Eliminar esta regla?")) return;
+  if (!(await confirmar({ titulo: "Eliminar regla", mensaje: "¿Eliminar esta regla?", accion: "Eliminar regla" }))) return;
   await fetch(`/api/domains/${selectedDomain.id}/rules/${ruleId}`, { method: "DELETE" });
   await loadRules();
 }
@@ -2048,7 +2048,7 @@ async function inviteMember(name, email, role) {
 }
 
 async function removeMember(agentId, name) {
-  if (!confirm(`¿Eliminar a ${name} de este dominio?`)) return;
+  if (!(await confirmar({ titulo: "Quitar del dominio", mensaje: `¿Eliminar a ${name} de este dominio?`, accion: "Quitar del dominio" }))) return;
   const res = await fetch(`/api/domains/${selectedDomain.id}/agents/${agentId}`, { method: "DELETE" });
   if (res.ok) {
     showToast("Miembro eliminado");
@@ -2418,7 +2418,7 @@ async function dnsCrearZona() {
   if (!res.ok) {
     btn.disabled = false;
     btn.textContent = "Activar el editor de DNS";
-    alert(data.error || "No se pudo crear la zona.");
+    showToast(data.error || "No se pudo crear la zona.", true);
     return;
   }
   playSound("success");
@@ -2998,7 +2998,7 @@ function dnsFormulario(registro) {
 }
 
 async function dnsBorrar(registro) {
-  if (!confirm(`¿Borrar el registro ${registro.type} de ${registro.name}? Esto puede tumbar lo que dependa de él.`)) return;
+  if (!(await confirmar({ titulo: "Borrar registro", mensaje: `¿Borrar el registro ${registro.type} de ${registro.name}? Esto puede tumbar lo que dependa de él.`, accion: "Borrar registro" }))) return;
 
   const res = await fetch(`/api/domains/${selectedDomain.id}/dns/records`, {
     method: "DELETE",
@@ -3006,7 +3006,7 @@ async function dnsBorrar(registro) {
     body: JSON.stringify({ name: registro.name, type: registro.type }),
   });
   const data = await res.json();
-  if (!res.ok) { alert(data.error || "No se pudo borrar."); return; }
+  if (!res.ok) { showToast(data.error || "No se pudo borrar.", true); return; }
   playSound("pop");
   loadDns();
 }
@@ -3216,11 +3216,11 @@ async function createSmtpCredentialUI(label) {
 
 async function revokeSmtpCredentialUI(credId) {
   if (!selectedDomain) return;
-  if (!confirm("¿Revocar esta credencial SMTP? Tu aplicación dejará de poder enviar emails.")) return;
+  if (!(await confirmar({ titulo: "Revocar credencial", mensaje: "¿Revocar esta credencial SMTP? Tu aplicación dejará de poder enviar emails.", accion: "Revocar credencial" }))) return;
   const res = await fetch(`/api/domains/${selectedDomain.id}/smtp-credentials/${credId}`, { method: "DELETE" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    alert(data.error || "Error al revocar credencial");
+    showToast(data.error || "Error al revocar credencial", true);
     return;
   }
   await loadSmtpCredentials();
@@ -3313,7 +3313,7 @@ function renderApiKeys(keys) {
 }
 
 async function revokeApiKeyUI(id) {
-  if (!confirm("¿Revocar esta API key?")) return;
+  if (!(await confirmar({ titulo: "Revocar API key", mensaje: "¿Revocar esta API key?", accion: "Revocar API key" }))) return;
   const res = await fetch(`/api/api-keys/${id}`, { method: "DELETE" });
   if (res.ok) {
     playSound("delete");
@@ -3677,6 +3677,42 @@ function hideModal(id) {
   if (!el || el.classList.contains("hidden")) return; // ya estaba cerrado
   el.classList.add("hidden");
   unlockBodyScroll();
+}
+
+// Diálogo de confirmación con la marca de la app; reemplaza al diálogo nativo del navegador.
+// Resuelve true sólo si la persona pulsa el botón de acción. Escape, «Cancelar» y el clic
+// fuera del cuadro resuelven false. El evento close es el único que libera el scroll.
+function confirmar({ titulo, mensaje, accion, peligro = true }) {
+  const dialog = document.getElementById("confirm-dialog");
+  const btnAccion = document.getElementById("confirm-accion");
+  const btnCancelar = document.getElementById("confirm-cancelar");
+  if (!dialog.dataset.listo) {
+    dialog.dataset.listo = "1";
+    btnAccion.addEventListener("click", () => dialog.close("ok"));
+    btnCancelar.addEventListener("click", () => dialog.close(""));
+    // El <dialog> no tiene padding: el clic que cae en él mismo es el fondo.
+    dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(""); });
+  }
+  document.getElementById("confirm-titulo").textContent = titulo;
+  document.getElementById("confirm-mensaje").textContent = mensaje;
+  btnAccion.textContent = accion;
+  btnAccion.className = peligro
+    ? "px-4 py-2 text-sm font-semibold rounded-lg bg-red-600 hover:bg-red-500 text-white"
+    : "px-4 py-2 text-sm font-semibold rounded-lg bg-accent hover:bg-accent/90 text-white";
+  const origen = document.activeElement;
+  return new Promise((resolve) => {
+    const alCerrar = () => {
+      dialog.removeEventListener("close", alCerrar);
+      unlockBodyScroll();
+      origen?.focus?.();
+      resolve(dialog.returnValue === "ok");
+    };
+    dialog.addEventListener("close", alCerrar);
+    lockBodyScroll();
+    dialog.returnValue = "";
+    dialog.showModal();
+    btnCancelar.focus();
+  });
 }
 
 // Los precios los manda el servidor: esta lista estaba duplicada a mano y se quedó
@@ -4138,7 +4174,7 @@ function setupEventListeners() {
       return;
     }
     if (b.dataset.mailbox === "password") {
-      if (!confirm("Se generará una contraseña nueva y la actual dejará de servir en todos tus dispositivos. ¿Seguir?")) return;
+      if (!(await confirmar({ titulo: "Generar contraseña nueva", mensaje: "Se generará una contraseña nueva y la actual dejará de servir en todos tus dispositivos. ¿Seguir?", accion: "Generar contraseña nueva", peligro: false }))) return;
       const res = await fetch(`${base}/password`, { method: "POST" });
       const data = await res.json();
       document.getElementById("mailbox-body").innerHTML = res.ok
@@ -4148,7 +4184,7 @@ function setupEventListeners() {
     }
     if (b.dataset.mailbox === "delete") {
       // Esto borra correo y no se puede deshacer, así que se ofrece la descarga antes.
-      if (!confirm("Se borrará el buzón Y TODO SU CORREO, sin vuelta atrás. Descárgalo antes si lo necesitas. ¿Seguir?")) return;
+      if (!(await confirmar({ titulo: "Borrar buzón", mensaje: "Se borrará el buzón Y TODO SU CORREO, sin vuelta atrás. Descárgalo antes si lo necesitas. ¿Seguir?", accion: "Borrar buzón" }))) return;
       const res = await fetch(base, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) {
@@ -4214,7 +4250,7 @@ function setupEventListeners() {
 
   // ESC to close modals
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
+    if (e.key === "Escape" && !document.getElementById("confirm-dialog")?.open) {
       document.querySelectorAll("[id^='modal-']:not(.hidden)").forEach(m => hideModal(m.id));
     }
   });

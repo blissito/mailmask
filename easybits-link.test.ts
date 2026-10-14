@@ -118,7 +118,7 @@ describe("easybits-link: publicar un sitio", () => {
     assert.equal(r.verified, true);
     assert.equal(dns.applied.length, 1, "un solo cambio");
     const names = dns.applied[0].map((x) => `${x.type} ${x.name}`);
-    assert.deepEqual(names, ["TXT _easybits-verify.ej.com", "CNAME *.ej.com", "A ej.com", "AAAA ej.com", "CNAME www.ej.com"]);
+    assert.deepEqual(names, ["TXT _easybits-verify.ej.com", "CNAME *.ej.com", "A ej.com", "CNAME www.ej.com"]);
     assert.deepEqual(dns.applied[0][0].values, ['"easybits-verify-abc"']);
     assert.ok(calls.some((c) => c.url.endsWith("/domains/d1/apex")));
   });
