@@ -2529,7 +2529,9 @@ function renderWebHost(h) {
   return `
     <div class="border border-line rounded-xl p-4 bg-bg-elev">
       <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
-        <div class="font-semibold text-fg">${nombre}</div>
+        <div class="font-semibold text-fg flex items-center gap-2">${nombre}${h.records.length && h.https?.ok ? `
+          <a href="https://${esc(h.name)}" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-fg-muted hover:text-accent-text inline-flex items-center gap-1">Abrir
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></a>` : ""}</div>
         <div class="flex items-center gap-2">
           ${h.platform ? `<span class="text-xs font-medium text-fg-muted">${esc(h.platform.label)}</span>` : ""}
           ${chip}
