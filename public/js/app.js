@@ -2519,8 +2519,10 @@ async function loadWebsite() {
     // Con EasyBits conectado, cada host `<slug>.dominio` que sea un sitio tuyo se puede editar.
     _webSitios = {};
     if (_webEstado.hosts.some(h => h.platform?.id === "easybits")) {
-      const eb = await fetch("/api/integrations/easybits").then(r => r.ok ? r.json() : null).catch(() => null);
+      const eb = await fetch(`/api/domains/${selectedDomain.id}/website/easybits`).then(r => r.ok ? r.json() : null).catch(() => null);
       for (const x of eb?.sites || []) _webSitios[x.slug] = x.id;
+      // El sitio en la raíz no se reconoce por el nombre: lo dice la publicación.
+      if (eb?.publication?.placement === "apex") _webSitios["@"] = _webSitios.www = eb.publication.websiteId;
     }
   } catch (err) {
     cont.innerHTML = `<div class="text-sm text-red-500">${esc(err.message)}</div>`;
