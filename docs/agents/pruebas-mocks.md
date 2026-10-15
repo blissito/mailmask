@@ -289,3 +289,14 @@ notificó). Tres cosas que no se ven en el código:
 - El fin de periodo se calcula con `setDate(+35)` en **hora local**: se afirma por rango medido
   alrededor de la llamada con ±1 h de margen, no con el reloj congelado (`mock.method(Date, "now")`
   no frena `new Date()`).
+
+## Capturar los jobs de cron.ts doblando `./scheduler.ts`
+
+`cron.test.ts` corre una vez cada uno de los 25 jobs que `cron.ts` agenda al importarse, sobre una base recién migrada y vacía, y afirma que ninguno lanza ni sale a la red.
+
+- El doble de `./scheduler.ts` va con el módulo real esparcido: `schedule(expr, fn)` guarda `{expr, fn}` en una lista en vez de agendar. Así se capturan los jobs anónimos sin tocar `cron.ts`, y la prueba afirma las 25 expresiones en orden.
+- `forwarding.ts` llega a `cron.ts` por sus imports y agenda su propio `*/5` al cargarse. Se importa ANTES de instalar el doble: su `schedule` real es inerte fuera de `main.ts`, y su llamada no entra a la lista. Si no, la lista sale con 26 entradas y un `*/5` de más al frente.
+- La base se aísla con `DATABASE_PATH` en un `mkdtemp` antes de importar `pg.ts`, que migra al cargarse.
+- Guardia de red: `net.Socket.prototype.connect` registra y lanza; `fetch` contesta 503 y registra la URL. La última prueba afirma cero conexiones y que todo host pedido por `fetch` está en la lista de dobles.
+
+Trampa de la suite completa: `data/test.db` es una sola para todos los archivos. Si un `npm test` de una corrida anterior sigue vivo, dos procesos escriben sobre la misma base y aparece `SQLITE_CORRUPT` en pruebas que no tienen nada que ver. Antes de correr, confirma que no quede ningún `npm test` vivo y borra `data/test.db`, `data/test.db-wal` y `data/test.db-shm`.
