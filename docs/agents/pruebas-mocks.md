@@ -289,3 +289,14 @@ notificó). Tres cosas que no se ven en el código:
 - El fin de periodo se calcula con `setDate(+35)` en **hora local**: se afirma por rango medido
   alrededor de la llamada con ±1 h de margen, no con el reloj congelado (`mock.method(Date, "now")`
   no frena `new Date()`).
+
+
+## domain-provision (domain-provision.test.ts)
+
+- Se doblan **los tres clientes del SDK a la vez** (`Route53Client`, `Route53DomainsClient`, `SESClient`) con el módulo real esparcido. Sin esto, la prueba sale a AWS. Los comandos son los reales, así que el despacho es por `cmd.constructor.name`.
+- `emails.ts` y `dns-import.ts` también se doblan: el primero manda por SES y el segundo pregunta a DNS públicos (los nameservers del cliente se fijan).
+- El estado de AWS (zonas, dominios, operaciones de transferencia) se reinicia en `beforeEach`; los dominios y correos llevan sufijo único porque la base es compartida.
+- **Throttle de `sendAlert`**: vive en la tabla `tokens` (`alert-throttle:<tipo>`, 1 h). Un caso anterior en la misma hora silencia la alerta del siguiente. El `beforeEach` borra `alert-throttle:%` con `db` de `db.ts` (no hay `sqlite` exportado).
+- Un dueño de dominio distinto necesita su `createUser` antes de `createDomain` (FK `owner_email`).
+- `SendRawEmail` es el único comando de SES que la prueba espera; `CreateConfigurationSet` lanza y es no fatal (sólo queda el `warn`).
+- Requiere `node_modules` instalado en la caja (`npm ci`); sin eso el import de `@aws-sdk/*` falla antes de cualquier caso.
