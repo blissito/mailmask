@@ -22,7 +22,7 @@
     "citty": "^0.2"
   },
   "devDependencies": {
-    "@types/node": "^26",
+    "@types/node": "^22",
     "tsup": "^8.0.0",
     "tsx": "^4",
     "typescript": "^7.0.2"

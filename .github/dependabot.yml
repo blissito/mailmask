@@ -21,6 +21,10 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    # @types/node se queda en ^22 a propósito: engines node >=18 (ver docs/agents/dependencias-ci.md).
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: "/sdk"
     schedule:
