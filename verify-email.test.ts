@@ -152,13 +152,12 @@ describe("Verificación de correo: el enlace desbloquea la cuenta", () => {
     assert.equal(res.status, 302);
   });
 
-  it("cuenta sin verificar de 14 días puede agregar una dirección", async () => {
-    const email = uniqueEmail("14-dias");
+  it("cuenta sin verificar de 14 días puede agregar un dominio", async () => {
+    const email = uniqueEmail("14-dominio");
     createUser(email, "no-usado:0000");
-    const domain = createDomain(email, `${crypto.randomUUID()}.example.test`, ["dkim1"], "vt-14");
     setCreatedAt(email, 14 * DAY_MS);
 
-    const res = await postAuthed(`/api/domains/${domain.id}/alias`, { alias: "hola", destinations: ["d@example.com"] }, email);
+    const res = await postAuthed("/api/domains", { domain: `${crypto.randomUUID().slice(0, 8)}.example.com` }, email);
     const body = await res.text();
     assert.ok(!body.includes(VERIFY_ERROR), `no debe bloquear antes de los 15 días: ${res.status} ${body}`);
     assert.notEqual(res.status, 403);
@@ -185,15 +184,15 @@ describe("Verificación de correo: el enlace desbloquea la cuenta", () => {
     assert.deepEqual(await res.json(), { error: VERIFY_ERROR });
   });
 
-  it("cuenta verificada de 16 días sí puede crear una dirección", async () => {
+  it("cuenta verificada de 16 días sí puede agregar un dominio", async () => {
     const email = uniqueEmail("16-verificada");
     createUser(email, "no-usado:0000");
-    const domain = createDomain(email, `${crypto.randomUUID()}.example.test`, ["dkim1"], "vt-ok");
     setCreatedAt(email, 16 * DAY_MS);
     verifyUserEmail(email);
 
-    const res = await postAuthed(`/api/domains/${domain.id}/alias`, { alias: "hola", destinations: ["d@example.com"] }, email);
+    const res = await postAuthed("/api/domains", { domain: `${crypto.randomUUID().slice(0, 8)}.example.com` }, email);
     const body = await res.text();
     assert.ok(!body.includes(VERIFY_ERROR), `verificada no debe bloquearse: ${res.status} ${body}`);
+    assert.notEqual(res.status, 403);
   });
 });
