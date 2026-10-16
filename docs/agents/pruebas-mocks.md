@@ -291,6 +291,16 @@ notificó). Tres cosas que no se ven en el código:
   no frena `new Date()`).
 
 
+## domain-provision (domain-provision.test.ts)
+
+- Se doblan **los tres clientes del SDK a la vez** (`Route53Client`, `Route53DomainsClient`, `SESClient`) con el módulo real esparcido. Sin esto, la prueba sale a AWS. Los comandos son los reales, así que el despacho es por `cmd.constructor.name`.
+- `emails.ts` y `dns-import.ts` también se doblan: el primero manda por SES y el segundo pregunta a DNS públicos (los nameservers del cliente se fijan).
+- El estado de AWS (zonas, dominios, operaciones de transferencia) se reinicia en `beforeEach`; los dominios y correos llevan sufijo único porque la base es compartida.
+- **Throttle de `sendAlert`**: vive en la tabla `tokens` (`alert-throttle:<tipo>`, 1 h). Un caso anterior en la misma hora silencia la alerta del siguiente. El `beforeEach` borra `alert-throttle:%` con `db` de `db.ts` (no hay `sqlite` exportado).
+- Un dueño de dominio distinto necesita su `createUser` antes de `createDomain` (FK `owner_email`).
+- `SendRawEmail` es el único comando de SES que la prueba espera; `CreateConfigurationSet` lanza y es no fatal (sólo queda el `warn`).
+- Requiere `node_modules` instalado en la caja (`npm ci`); sin eso el import de `@aws-sdk/*` falla antes de cualquier caso.
+
 ## Capturar los jobs de cron.ts doblando `./scheduler.ts`
 
 `cron.test.ts` corre una vez cada uno de los 25 jobs que `cron.ts` agenda al importarse, sobre una base vacía y aislada, y afirma que ninguno lanza, que ninguno registra un error no esperado y que ninguno sale a la red.
