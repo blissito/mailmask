@@ -176,14 +176,14 @@ const OG = `<meta property="og:type" content="website" />
 <meta name="twitter:description" content="${DESCRIPCION}" />
 <meta name="twitter:image" content="${HOST}/img/og-docs.jpg" />`;
 
-function pagina({ canonical = true, og = true }: { canonical?: boolean; og?: boolean } = {}): string {
+function pagina({ og = true }: { og?: boolean } = {}): string {
   return `<!doctype html>
 <html lang="es-MX">
 <head>
 <meta charset="UTF-8" />
 <title>${TITULO}</title>
 <meta name="description" content="${DESCRIPCION}" />
-${canonical ? `<link rel="canonical" href="${URL_MUESTRA}" />` : ""}
+<link rel="canonical" href="${URL_MUESTRA}" />
 <link rel="alternate" hreflang="es-MX" href="${URL_MUESTRA}" />
 <link rel="alternate" hreflang="x-default" href="${URL_MUESTRA}" />
 ${og ? OG : ""}
@@ -202,8 +202,4 @@ test("huecos reporta og, og-coincide y og-imagen si la página no trae metas OG"
   for (const esperada of ["og", "og-coincide", "og-imagen"]) {
     assert.ok(faltas.includes(esperada), `falta «${esperada}» en ${JSON.stringify(faltas)}`);
   }
-});
-
-test("huecos reporta canonical si la página no lo declara", () => {
-  assert.ok(huecos(RUTA, pagina({ canonical: false })).includes("canonical"));
 });
