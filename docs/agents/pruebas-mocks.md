@@ -289,3 +289,28 @@ notificó). Tres cosas que no se ven en el código:
 - El fin de periodo se calcula con `setDate(+35)` en **hora local**: se afirma por rango medido
   alrededor de la llamada con ±1 h de margen, no con el reloj congelado (`mock.method(Date, "now")`
   no frena `new Date()`).
+
+
+## domain-provision (domain-provision.test.ts)
+
+- Se doblan **los tres clientes del SDK a la vez** (`Route53Client`, `Route53DomainsClient`, `SESClient`) con el módulo real esparcido. Sin esto, la prueba sale a AWS. Los comandos son los reales, así que el despacho es por `cmd.constructor.name`.
+- `emails.ts` y `dns-import.ts` también se doblan: el primero manda por SES y el segundo pregunta a DNS públicos (los nameservers del cliente se fijan).
+- El estado de AWS (zonas, dominios, operaciones de transferencia) se reinicia en `beforeEach`; los dominios y correos llevan sufijo único porque la base es compartida.
+- **Throttle de `sendAlert`**: vive en la tabla `tokens` (`alert-throttle:<tipo>`, 1 h). Un caso anterior en la misma hora silencia la alerta del siguiente. El `beforeEach` borra `alert-throttle:%` con `db` de `db.ts` (no hay `sqlite` exportado).
+- Un dueño de dominio distinto necesita su `createUser` antes de `createDomain` (FK `owner_email`).
+- `SendRawEmail` es el único comando de SES que la prueba espera; `CreateConfigurationSet` lanza y es no fatal (sólo queda el `warn`).
+- Requiere `node_modules` instalado en la caja (`npm ci`); sin eso el import de `@aws-sdk/*` falla antes de cualquier caso.
+
+## Capturar los jobs de cron.ts doblando `./scheduler.ts`
+
+`cron.test.ts` corre una vez cada uno de los 25 jobs que `cron.ts` agenda al importarse, sobre una base vacía y aislada, y afirma que ninguno lanza, que ninguno registra un error no esperado y que ninguno sale a la red.
+
+- **`./logger.ts`** con el real esparcido: los niveles `error` se guardan por job y el resto pasa al real. Hace falta porque casi todos los jobs envuelven su cuerpo en `try/catch` y sólo llaman `log("error", …)`: con `doesNotReject` solo, un `ReferenceError` dentro del job pasa en verde. Este doble va PRIMERO, antes de cargar cualquier módulo.
+- **`ERRORES_ESPERADOS`** (por índice de job): hoy vacía. Con el 503 del fetch doblado ningún job registra error. Un error nuevo es un fallo; si un doble futuro provoca uno esperado, se agrega ahí, explícito.
+- **`./scheduler.ts`** con el real esparcido: `schedule(expr, fn)` guarda `{expr, fn}` en vez de agendar. Así se capturan los jobs anónimos sin tocar `cron.ts`, y la prueba afirma las 25 expresiones en orden.
+- **`forwarding.ts`** llega a `cron.ts` por sus imports y agenda su propio `*/5` al cargarse. Se importa ANTES del doble de scheduler: su `schedule` real es inerte fuera de `main.ts`, así que su llamada no entra a la lista.
+- **IMAP**: con base vacía sólo `*/5` (`estaVivo`), `0 6` (`diasDeCertificado`) y `0 7` (`listarBuzones`) llegan a Stalwart. Su `it` afirma que el fetch doblado recibió `stalwart.invalid`. `30 6` (`leerUso`) y `15 7` iteran listas vacías y nunca llaman al servidor: sólo se cubren como «no truenan».
+- **Base aislada**: `DATABASE_PATH` apunta a un `mkdtemp` ANTES de importar `pg.ts`, que migra al cargarse.
+- **Guardia de red**: `net.Socket.prototype.connect` registra y lanza; `fetch` contesta 503 y registra la URL. La última prueba afirma cero conexiones y que todo host pedido por `fetch` está en la lista de dobles. DNS no pasa por `net.Socket`: `dmarc-reports.ts` hace `reverse()` de `node:dns/promises` en `0 15 * * 1`. Con base vacía no se llama, pero la guardia no lo ve.
+- **Cómo se comprobó que muerde**: meter `(globalThis as any).noExiste.boom();` dentro del `try` del job `*/15` hace fallar el job 4 con `cron: Cleanup failed`. Cambiar los `if (!stalwartConfigurado()) return;` por `if (true) return;` hace fallar los jobs 18, 19 y 21; los jobs 20 y 22 pasan, como se espera.
+- **Trampa de la suite completa**: `data/test.db` es una sola para todos los archivos. Si un `npm test` anterior sigue vivo, dos procesos escriben sobre la misma base y aparece `SQLITE_CORRUPT` en pruebas sin relación. Antes de correr, confirma que no quede ningún `npm test` vivo y borra `data/test.db`, `data/test.db-wal` y `data/test.db-shm`.
