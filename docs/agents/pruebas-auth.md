@@ -52,3 +52,12 @@ se lee como un acierto:
   defiende el cruce—; sin él verifica bien y quien lo detiene es el `if (payload.aud !== undefined)`
   de `getAuthUser`, que es justo la defensa que se quiere cubrir.
 - **`mt_` con un JWT de sesión** (sin `aud`) → `verifyTurnToken` null: ése sí pasa por el `aud`.
+
+## Verificación de correo: el enlace y el corte de 15 días
+
+`verify-email.test.ts` (raíz) prueba el enlace sin dobles: `setVerifyToken` y `GET /api/auth/verify-email`, con la base de pruebas real.
+
+- Para el corte de 15 días no se congela el reloj: se fecha `users.created_at` con un `UPDATE` directo (14 días pasa; 16 bloquea con 403 si la cuenta no está verificada).
+- El enlace vence por `tokens.expires_at`: para probar el vencido se reescribe esa fecha al pasado con un `UPDATE`.
+- `setVerifyToken` sólo inserta una fila: reenviar NO invalida el enlace anterior. El caso «BUG CONOCIDO» lo fija tal cual; si se arregla, ese caso debe cambiar de verde.
+- Mutar `verifyUserEmail`, el filtro de `kind` o el periodo de gracia de `checkEmailVerified` hace caer la prueba correspondiente.
