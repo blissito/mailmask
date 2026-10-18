@@ -145,6 +145,10 @@ lo único falso es el SDK.
   guarda de `enLaCuenta?.size` no esté: el escenario fiel es unas credenciales apuntando a OTRA
   cuenta (lista vacía *y* `DomainNotFound`). Se comprueba con el mutante `if (enLaCuenta && …)`.
 
+- **`route53.test.ts` dobla los dos clientes con comandos reales**: `@aws-sdk/client-route-53` y `@aws-sdk/client-route-53-domains`, con el módulo real esparcido y `route53.ts` importado dentro de `before()`. Cubre lo que las otras dos no: `fusionarSpf` y `normalizeZoneName` (puras), la carrera de `ensureHostedZone` con la zona visible o no, el `MxAjenoError` con lista paginada y `checkTransferability` por cada estado.
+- **`route53-dns.test.ts` es la excepción histórica**: dobla comandos inventados (`cmd.tipo`) en vez de los reales. No se migró en ese cambio; si se migra, es otro pedido.
+- **`TransferNoPosible` no lo lanza nadie**: `checkTransferability` devuelve `{ transferable, motivo }` y `domain-transfer.ts` lo lee sin la clase. Una prueba que espere esa clase fallaría siempre; lo que se prueba es el motivo.
+
 ### S3: la paginación se prueba contando llamadas
 
 Aquí el doble sustituye sólo `S3Client`: los comandos son los reales, así que `command.constructor.name` trae el nombre bueno. `getS3` no se exporta (`ses.ts:52`), por eso se dobla el paquete y no esa función.
