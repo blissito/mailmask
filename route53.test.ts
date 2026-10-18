@@ -102,6 +102,9 @@ describe("route53.ts", () => {
   let r53: typeof import("./route53.ts");
 
   before(async () => {
+    // Se vacían UNA vez aquí y no en beforeEach: la guardia final lee lo que pasó en TODO el archivo.
+    conexionesBloqueadas.length = 0;
+    fetchBloqueados.length = 0;
     (net.Socket.prototype as any).connect = function (...args: unknown[]) {
       conexionesBloqueadas.push(String(args[0]));
       throw new Error("conexión de red bloqueada en pruebas");
@@ -126,8 +129,6 @@ describe("route53.ts", () => {
     cambiosEnviados = [];
     respuestaTransferabilidad = {};
     comandos = [];
-    conexionesBloqueadas.length = 0;
-    fetchBloqueados.length = 0;
   });
 
   afterEach(() => {
