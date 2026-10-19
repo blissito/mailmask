@@ -6,6 +6,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
@@ -123,3 +124,56 @@ jobs:
         continue-on-error: true
         with:
           fail-on-severity: high
+
+  # Deploy a producción. Sólo corre si verify, verify-cli y verify-sdk pasaron en verde en main.
+  # Vive aquí y no en un workflow aparte con `workflow_run`: así la corrida sigue siendo de evento
+  # `push` y la ve el vigilante post-merge. En un PR queda «skipped» y los checks requeridos no cambian.
+  # Un rojo del rollout pone en rojo la corrida de ci en main, no bloquea PRs.
+  # No agregar always() ni !cancelled() al if: el success() implícito sobre needs es lo que garantiza
+  # que un rojo no despliega.
+  deploy:
+    name: Imagen a GHCR y rollout
+    needs: [verify, verify-cli, verify-sdk]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency: deploy-group
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/blissito/mailmask:${{ github.sha }}
+            ghcr.io/blissito/mailmask:main
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # La caja confirma el rollout: /version devuelve el SHA del build. Si no aparece en ~5 min
+      # (50×6 s, más hasta 5 s por curl) el rollout no llegó: la caja hace rollback y se queda con
+      # la imagen anterior, así que el paso falla en vez de avisar.
+      - name: Wait for rollout
+        run: |
+          last="sin respuesta"
+          for i in $(seq 1 50); do
+            v=$(curl -fsS -m 5 https://www.mailmask.studio/version 2>/dev/null || true)
+            [ -n "$v" ] && last="$v"
+            [ "$v" = "${{ github.sha }}" ] && { echo "prod en ${{ github.sha }}"; exit 0; }
+            sleep 6
+          done
+          echo "::error::prod no reporta ${{ github.sha }} tras ~5 min; prod está sirviendo: $last. La caja app-host no publicó la imagen nueva (rollback): revisa journalctl -u app-deploy en la caja."
+          exit 1
