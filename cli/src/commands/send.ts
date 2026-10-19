@@ -60,7 +60,7 @@ export function parseFrom(raw: string, domain: string, opts: Opts, flag = "--fro
     failUsage(`${flag} "${from}": con el dominio dado como id usa sólo la parte local (p. ej. "${local || "hola"}").`, opts);
   }
   if (host.toLowerCase() !== domain.toLowerCase()) {
-    failUsage(`${flag} "${from}" no es de ${domain}: sólo se puede enviar desde un alias de ese dominio.`, opts);
+    failUsage(`${flag} "${from}" no es de ${domain}: sólo se puede enviar desde una dirección de ese dominio.`, opts);
   }
   if (!local) failUsage(`${flag} "${from}" no tiene parte local.`, opts);
   return local;
@@ -99,12 +99,12 @@ function readAttachments(paths: string[], opts: Opts): LocalAttachment[] {
 }
 
 const email = defineCommand({
-  meta: { name: "email", description: "Envía un correo desde un alias activo del dominio (sale a terceros: pide confirmación)" },
+  meta: { name: "email", description: "Envía un correo desde una dirección activa del dominio (sale a terceros: pide confirmación)" },
   args: {
     ...domainArg,
     to: { type: "string" as const, description: "Destinatario" },
     subject: { type: "string" as const, description: "Asunto" },
-    from: { type: "string" as const, description: "Alias remitente: parte local (hola) o dirección completa del dominio. Sin él sale desde noreply@" },
+    from: { type: "string" as const, description: "Dirección remitente: parte local (hola) o dirección completa del dominio. Sin él sale desde noreply@" },
     "from-name": { type: "string" as const, description: "Nombre visible del remitente" },
     "reply-to": { type: "string" as const, description: "Dirección de respuesta" },
     cc: { type: "string" as const, description: "Copia visible (repetible, máx. 20)" },

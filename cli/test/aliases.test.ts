@@ -269,3 +269,111 @@ describe("aliases apple-profile / export: escriben archivo", () => {
     }
   });
 });
+
+// Contrato --json: la forma de la salida la fija el SDK, no el texto. Estas pruebas
+// nacen antes del cambio de textos y deben seguir en verde después de él.
+describe("aliases --json: salida idéntica al SDK", () => {
+  it("list --json imprime exactamente lo que devuelve aliases.list (printJson)", async () => {
+    const payload = [{ alias: "hola", domainId: "dom_1", destinations: ["yo@gmail.com"], enabled: true, mailboxEnabled: false, forwardCount: 0, createdAt: "now" }];
+    const { client } = fakeClient({ aliases: { list: () => payload } });
+    currentClient = client;
+    const out = captureStdout();
+    try {
+      await list.run({ args: { domain: "dom_1", json: true } });
+    } finally {
+      out.restore();
+    }
+    assert.equal(out.text(), `${JSON.stringify(payload, null, 2)}\n`);
+  });
+
+  it("create --json imprime exactamente la respuesta del SDK, incluido el buzón con su contraseña", async () => {
+    const payload = {
+      alias: "hola", domainId: "dom_1", destinations: [], enabled: true, forwardCount: 0, createdAt: "now",
+      buzon: { email: "hola@acme.com", password: "s3cr3t-password-123", quotaBytes: 0, imap: { host: "imap", port: 993, security: "ssl" }, smtp: { host: "smtp", port: 587, security: "starttls" } },
+    };
+    const { client } = fakeClient({ aliases: { create: () => payload } });
+    currentClient = client;
+    const out = captureStdout();
+    try {
+      await create.run({ args: { domain: "dom_1", alias: "hola", mailbox: true, json: true, _: ["dom_1", "hola"] } });
+    } finally {
+      out.restore();
+    }
+    assert.equal(out.text(), `${JSON.stringify(payload, null, 2)}\n`);
+  });
+
+  it("create --json con errorBuzon conserva ese campo tal cual", async () => {
+    const payload = { alias: "hola", domainId: "dom_1", destinations: ["yo@gmail.com"], enabled: true, forwardCount: 0, createdAt: "now", errorBuzon: "dominio sin activar" };
+    const { client } = fakeClient({ aliases: { create: () => payload } });
+    currentClient = client;
+    const out = captureStdout();
+    try {
+      await create.run({ args: { domain: "dom_1", alias: "hola", mailbox: true, json: true, _: ["dom_1", "hola", "yo@gmail.com"] } });
+    } finally {
+      out.restore();
+    }
+    assert.equal(out.text(), `${JSON.stringify(payload, null, 2)}\n`);
+  });
+});
+
+// Textos visibles: ayuda y mensajes de la CLI hablan de «dirección», nunca de «alias» ni
+// «máscara». El nombre del comando (`mailmask aliases ...`) es contrato y se excluye.
+describe("aliases: textos visibles hablan de «dirección»", () => {
+  const PROHIBIDO = /alias|máscara|mascara/i;
+  const sinComando = (texto: string) => texto.replace(/mailmask aliases/g, "");
+
+  function textosDeAyuda(cmd: any, acumulado: string[] = []): string[] {
+    if (cmd.meta?.description) acumulado.push(cmd.meta.description);
+    for (const arg of Object.values(cmd.args ?? {}) as any[]) {
+      if (arg?.description) acumulado.push(arg.description);
+    }
+    for (const sub of Object.values(cmd.subCommands ?? {})) textosDeAyuda(sub as any, acumulado);
+    return acumulado;
+  }
+
+  it("la descripción del comando, de sus subcomandos y de todos sus argumentos no dice alias ni máscara", () => {
+    const malos = textosDeAyuda(aliases).filter((t) => PROHIBIDO.test(sinComando(t)));
+    assert.deepEqual(malos, []);
+  });
+
+  it("list sin direcciones y con datos no dice alias ni máscara", async () => {
+    const { client } = fakeClient({ aliases: { list: () => [] } });
+    currentClient = client;
+    const out = captureStdout();
+    try {
+      await list.run({ args: { domain: "dom_1" } });
+    } finally {
+      out.restore();
+    }
+    assert.doesNotMatch(sinComando(out.text()), PROHIBIDO);
+
+    const conDatos = fakeClient({ aliases: { list: () => [{ alias: "hola", domainId: "dom_1", destinations: ["yo@gmail.com"], enabled: true, mailboxEnabled: false, forwardCount: 0, createdAt: "now" }] } });
+    currentClient = conDatos.client;
+    const out2 = captureStdout();
+    try {
+      await list.run({ args: { domain: "dom_1" } });
+    } finally {
+      out2.restore();
+    }
+    assert.doesNotMatch(sinComando(out2.text()), PROHIBIDO);
+  });
+
+  it("create, update y delete no dicen alias ni máscara en sus mensajes de éxito", async () => {
+    const dir = { alias: "hola", domainId: "dom_1", destinations: ["yo@gmail.com"], enabled: true, forwardCount: 0, createdAt: "now" };
+    const textos: string[] = [];
+    const capturar = async (fn: () => Promise<unknown>, client: any) => {
+      currentClient = client;
+      const out = captureStdout();
+      try {
+        await fn();
+      } finally {
+        out.restore();
+      }
+      textos.push(out.text());
+    };
+    await capturar(() => create.run({ args: { domain: "dom_1", alias: "hola", _: ["dom_1", "hola", "yo@gmail.com"] } }), fakeClient({ aliases: { create: () => dir } }).client);
+    await capturar(() => update.run({ args: { domain: "dom_1", alias: "hola", enable: true, _: ["dom_1", "hola"] } }), fakeClient({ aliases: { update: () => dir } }).client);
+    await capturar(() => del.run({ args: { domain: "dom_1", alias: "hola", yes: true } }), fakeClient({ aliases: { delete: () => ({ ok: true }) } }).client);
+    for (const t of textos) assert.doesNotMatch(sinComando(t), PROHIBIDO, t);
+  });
+});

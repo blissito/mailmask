@@ -47,15 +47,15 @@ mailmask suppressions list <dominio> [--json]
 mailmask suppressions add <dominio> <correo> [--json]
 mailmask suppressions remove <dominio> <correo> [--yes] [--json]
 
-mailmask send email <dominio> --to <correo> --subject <asunto> [--from <alias>] [--from-name <nombre>] [--reply-to <correo>] [--cc <correo>]... [--bcc <correo>]... [--text <texto|@archivo> | --html <html|@archivo> | --markdown <md|@archivo>] [--attach <archivo>]... [--idempotency-key <clave>] [--yes] [--json]
+mailmask send email <dominio> --to <correo> --subject <asunto> [--from <dirección>] [--from-name <nombre>] [--reply-to <correo>] [--cc <correo>]... [--bcc <correo>]... [--text <texto|@archivo> | --html <html|@archivo> | --markdown <md|@archivo>] [--attach <archivo>]... [--idempotency-key <clave>] [--yes] [--json]
 mailmask send bulk <dominio> <archivo.json> [--yes] [--json]
 mailmask send status <dominio> <jobId> [--json]
 mailmask logs <dominio> [--limit 1-100] [--json]
 
-mailmask inbox list <dominio> [--status open|snoozed|closed|unread|deleted] [--alias <máscara>] [--assigned <usuario>] [--q <texto>] [--limit N] [--cursor <c>] [--json]
+mailmask inbox list <dominio> [--status open|snoozed|closed|unread|deleted] [--alias <dirección>] [--assigned <usuario>] [--q <texto>] [--limit N] [--cursor <c>] [--json]
 mailmask inbox get <dominio> <conversación> [--before <mensaje>] [--json]
 mailmask inbox reply <dominio> <conversación> --markdown <texto> [--cc <a,b>] [--bcc <a,b>] [--no-quote] [--yes] [--json]
-mailmask inbox compose <dominio> --from <máscara> --to <correo> --subject <asunto> --markdown <texto> [--cc <a,b>] [--bcc <a,b>] [--yes] [--json]
+mailmask inbox compose <dominio> --from <dirección> --to <correo> --subject <asunto> --markdown <texto> [--cc <a,b>] [--bcc <a,b>] [--yes] [--json]
 mailmask inbox update <dominio> <conversación> [--status open|snoozed|closed] [--snooze-until <ISO>] [--tags <a,b>] [--priority normal|urgent] [--json]
 mailmask inbox read <dominio> <conversación> [--json]
 mailmask inbox assign <dominio> <conversación> [usuario] [--json]
@@ -106,14 +106,14 @@ mailmask referrals slug <slug> [--json]
 mailmask referrals name <nombre> [--json]
 
 mailmask aliases list <dominio> [--json]
-mailmask aliases create <dominio> <alias> [destino...] [--mailbox] [--json]
-mailmask aliases update <dominio> <alias> [destino...] [--enable | --disable] [--json]
-mailmask aliases delete <dominio> <alias> [--yes] [--json]
-mailmask aliases mailbox create <dominio> <alias> [--json]
-mailmask aliases mailbox delete <dominio> <alias> [--yes] [--json]
-mailmask aliases mailbox reset-password <dominio> <alias> [--yes] [--json]
-mailmask aliases apple-profile <dominio> <alias> -o perfil.mobileconfig
-mailmask aliases export <dominio> <alias> [-o buzon.mbox]
+mailmask aliases create <dominio> <dirección> [destino...] [--mailbox] [--json]
+mailmask aliases update <dominio> <dirección> [destino...] [--enable | --disable] [--json]
+mailmask aliases delete <dominio> <dirección> [--yes] [--json]
+mailmask aliases mailbox create <dominio> <dirección> [--json]
+mailmask aliases mailbox delete <dominio> <dirección> [--yes] [--json]
+mailmask aliases mailbox reset-password <dominio> <dirección> [--yes] [--json]
+mailmask aliases apple-profile <dominio> <dirección> -o perfil.mobileconfig
+mailmask aliases export <dominio> <dirección> [-o buzon.mbox]
 
 mailmask webhooks list <dominio> [--json]
 mailmask webhooks create <dominio> <url> --events email.received,email.bounced [--json]
@@ -149,29 +149,29 @@ al SDK (`client.dns.preset`). `dns upsert` reemplaza el conjunto completo de
 valores de un (nombre, tipo); los registros `managed: true` (MX, verificación,
 DKIM, SPF) los protege el servidor.
 
-### Alias y buzones
+### Direcciones y buzones
 
 `aliases create` acepta uno o más destinos como argumentos sueltos
 (`aliases create acme.com soporte ana@acme.com luis@acme.com`); con `--mailbox`
 también se permite sin ningún destino, porque el correo se queda en el buzón
 IMAP en vez de reenviarse. `aliases update` cambia destinos y/o el estado de
-la máscara con `--enable`/`--disable` (mutuamente excluyentes); sin ninguno de
+la dirección con `--enable`/`--disable` (mutuamente excluyentes); sin ninguno de
 los dos y sin destinos nuevos, no hay nada que actualizar y sale con error.
 
-El buzón IMAP vive bajo `aliases mailbox`: `create` lo crea para una máscara
+El buzón IMAP vive bajo `aliases mailbox`: `create` lo crea para una dirección
 existente (requiere el dominio activado), `delete` lo borra junto con todo su
 correo, y `reset-password` genera una contraseña nueva e invalida la
 anterior. La contraseña sólo se devuelve en el momento de crear el buzón o de
 reiniciarla — en texto sale enmascarada (`sk_a...3f2`, ver `maskSecret()`).
 Para copiarla completa: en `reset-password` corre el mismo comando con
 `--json` (no muta nada más, repetirlo es seguro). En `aliases create --mailbox`
-y `aliases mailbox create` repetir el comando NO sirve — la máscara o el
+y `aliases mailbox create` repetir el comando NO sirve — la dirección o el
 buzón ya existen y el SDK responde 409 —, así que ahí hay que seguir con
-`aliases mailbox reset-password <dominio> <alias> --yes --json`, que genera
+`aliases mailbox reset-password <dominio> <dirección> --yes --json`, que genera
 una contraseña nueva (la de la creación ya no se puede recuperar).
 
 `aliases apple-profile -o perfil.mobileconfig` escribe el perfil de
-configuración de Apple Mail para el buzón de una máscara, listo para
+configuración de Apple Mail para el buzón de una dirección, listo para
 instalarse con doble clic. `aliases export` descarga el buzón completo en
 formato mbox: a un archivo con `-o`, o por stdout si no se indica (para
 encadenarlo con otro comando).
@@ -253,7 +253,7 @@ borra la firma (máx. 2000 caracteres).
 
 ### Enviar correo y logs
 
-`send email` manda un correo desde un alias activo del dominio. `--from` acepta la
+`send email` manda un correo desde una dirección activa del dominio. `--from` acepta la
 parte local (`hola`) o la dirección completa (`hola@acme.com`); la completa se recorta
 sólo si es del dominio dado por nombre, y cualquier otra falla sin tocar la red. Sin
 `--from` el correo sale desde `noreply@` y el CLI lo avisa en stderr. `--text`, `--html`
