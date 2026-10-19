@@ -93,7 +93,7 @@ lista y revisarla contra las políticas. Ficha: `docs/agents/chatgpt-app-directo
 Cualquier cliente MCP con el spec de autorización (Ghosty, Claude) conecta `/mcp` sólo con la URL.
 El 401 de `/mcp` lleva `WWW-Authenticate: Bearer resource_metadata=".../.well-known/oauth-protected-resource"`;
 de ahí `/.well-known/oauth-authorization-server` → `POST /oauth/register` (DCR público, 20/h por IP;
-redirect https o http a loopback) → `GET /oauth/authorize` (sólo **sesión** de navegador, PKCE S256
+redirect https, http a loopback o esquema propio de app de escritorio como `cursor://`, RFC 8252) → `GET /oauth/authorize` (sólo **sesión** de navegador, PKCE S256
 obligatorio, `resource` = `<issuer>/mcp`, pantalla de consentimiento) → `POST /oauth/token` → `Bearer mo_…`.
 Tablas `oauth_clients`, `oauth_codes`, `oauth_tokens` (migración 0026); todo con SHA-256. `mo_` vive
 1 h, `mr_` 60 días y **rota**: presentar uno ya rotado revoca la familia entera (reuso = robo); reusar
@@ -1087,6 +1087,13 @@ Objetivo: solidificar el tronco del servicio. Blindar seguridad, rendimiento y r
 
 ### Contenido / Educación
 
+- [ ] **Post: conectar MailMask a tu chat de IA, paso a paso con capturas** (anotado 19-oct-2026). Una
+  guía por cliente con captura real de cada pantalla: ChatGPT (modo desarrollador → Apps & Connectors),
+  Claude.ai/Desktop (Connectors → Add custom connector) y los otros populares (Gemini, Copilot, Cursor,
+  Le Chat, Perplexity: verificar cuáles aceptan MCP remoto con OAuth hoy). Incluir la pantalla de
+  consentimiento de `/oauth/authorize` y la primera petición que funciona. Skills (`npx skills add
+  https://www.mailmask.studio`) como primera forma para agentes de código. El post
+  `correo-con-ia-sin-google-workspace.html` sólo lo resume en una lista: enlazarlo desde ahí.
 - [ ] **Auditoría del blog** (una sola pasada, pendiente de agendar). Dos frentes:
   - **Riqueza visual**: los 24 posts son **texto plano** — cero `<img>` y cero `<svg>` en el cuerpo, solo 3 tienen tabla. Los JPG de `blog/img/` existen únicamente para la tarjeta de compartir; el lector nunca los ve. Falta enriquecer con diagramas, ilustraciones, SVG animados, comparativas en tabla y bloques de código donde aplique.
   - **Navegación**: el índice es una lista plana de 24 posts sin forma de filtrar. Agregar **categorías y filtros** (por audiencia: freelancer, agencia, startup, tienda, equipo remoto; y por tipo: guía, comparativa, tutorial) y un **buscador**. Con 24 piezas ya duele; con 40 el índice deja de servir. Considerar que las categorías necesitan páginas propias indexables para que aporten SEO, no solo filtrado en cliente.

@@ -93,15 +93,33 @@ describe("OAuth del MCP", () => {
     assert.deepEqual(as.token_endpoint_auth_methods_supported, ["none", "client_secret_post"]);
   });
 
+  it("una app de escritorio con esquema propio (Cursor) completa el consentimiento", async () => {
+    const cb = "cursor://anysphere.cursor-mcp/oauth/callback";
+    const reg = await req("/oauth/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ client_name: "Cursor", redirect_uris: [cb], token_endpoint_auth_method: "none" }) });
+    assert.equal(reg.status, 201);
+    const { client_id } = await reg.json();
+    const { challenge } = pkce();
+    const q = new URLSearchParams({ response_type: "code", client_id, redirect_uri: cb, state: "c1", code_challenge: challenge, code_challenge_method: "S256", resource: "http://localhost/mcp", scope: "mailmask" });
+    const html = await (await req(`/oauth/authorize?${q}`, { headers: { cookie } })).text();
+    assert.match(html, /te regresamos a <span class="break-all">la app cursor<\/span>/);
+    const fields = Object.fromEntries([...html.matchAll(/<input type="hidden" name="([^"]+)" value="([^"]*)">/g)].map((m) => [m[1], m[2].replace(/&amp;/g, "&")]));
+    const res = await req("/oauth/authorize", { ...form({ ...fields, decision: "allow" }), headers: { "content-type": "application/x-www-form-urlencoded", cookie } });
+    assert.equal(res.status, 302);
+    const loc = new URL(res.headers.get("location")!);
+    assert.equal(`${loc.protocol}//${loc.host}${loc.pathname}`, cb);
+    assert.ok(loc.searchParams.get("code"));
+  });
+
   it("DCR rechaza redirect_uris inseguras", async () => {
-    for (const uris of [["http://evil.example/cb"], ["javascript:alert(1)"], [], ["https://a.example/cb#x"]]) {
+    for (const uris of [["http://evil.example/cb"], ["javascript:alert(1)"], ["data:text/html,x"], ["file:///etc/passwd"], ["vbscript:x"], [], ["https://a.example/cb#x"], ["cursor://a/cb#x"]]) {
       const r = await req("/oauth/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ redirect_uris: uris }) });
       assert.equal(r.status, 400, JSON.stringify(uris));
     }
     const local = await req("/oauth/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ redirect_uris: ["http://127.0.0.1:3333/cb"] }) });
     assert.equal(local.status, 201);
     // Los regresos de ChatGPT (con iss, RFC 9207, y el legado por callback) y el de Claude.
-    for (const uri of ["https://chatgpt.com/connector_platform_oauth_redirect", "https://chatgpt.com/connector/oauth/abc123", "https://claude.ai/api/mcp/auth_callback"]) {
+    // Los de apps de escritorio con esquema propio (Cursor, VS Code).
+    for (const uri of ["https://chatgpt.com/connector_platform_oauth_redirect", "https://chatgpt.com/connector/oauth/abc123", "https://claude.ai/api/mcp/auth_callback", "cursor://anysphere.cursor-mcp/oauth/callback", "vscode://vscode.github-authentication/did-authenticate"]) {
       const r = await req("/oauth/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ redirect_uris: [uri] }) });
       assert.equal(r.status, 201, uri);
     }

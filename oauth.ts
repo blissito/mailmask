@@ -95,14 +95,33 @@ function safeEqualHex(a: string, b: string): boolean {
   return ba.length === bb.length && timingSafeEqual(ba, bb);
 }
 
-/** https en cualquier host, o http sólo a loopback (clientes de escritorio y desarrollo). */
+// Esquemas que un navegador interpreta él mismo: nunca son el regreso de una app.
+const BLOCKED_SCHEMES = new Set(["javascript:", "data:", "file:", "vbscript:", "about:", "blob:", "ws:", "wss:", "ftp:", "mailto:", "chrome:", "view-source:"]);
+
+/** Esquema propio de app de escritorio (RFC 8252 §7.1: `cursor://`, `vscode://`…). */
+function isPrivateUseScheme(u: URL): boolean {
+  return /^[a-z][a-z0-9+.-]*:$/.test(u.protocol) && !BLOCKED_SCHEMES.has(u.protocol) && u.protocol !== "http:" && u.protocol !== "https:";
+}
+
+/**
+ * https en cualquier host, http sólo a loopback, o el esquema propio de una app de escritorio
+ * (Cursor regresa a `cursor://anysphere.cursor-mcp/oauth/callback`). Otra app podría reclamar
+ * el mismo esquema, pero sin el `code_verifier` de PKCE (obligatorio) el código no le sirve.
+ */
 export function validRedirectUri(raw: unknown): boolean {
   if (typeof raw !== "string" || raw.length > 2000) return false;
   let u: URL;
   try { u = new URL(raw); } catch { return false; }
   if (u.hash || u.username || u.password) return false;
   if (u.protocol === "https:") return true;
-  return u.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname);
+  if (u.protocol === "http:") return ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname);
+  return isPrivateUseScheme(u);
+}
+
+/** A dónde regresa el consentimiento, legible: el host web o la app de escritorio. */
+function returnTarget(redirectUri: string): string {
+  const u = new URL(redirectUri);
+  return u.protocol === "https:" || u.protocol === "http:" ? u.host : `la app ${u.protocol.slice(0, -1)}`;
 }
 
 function parseScope(raw: unknown): string | null {
@@ -169,7 +188,7 @@ export function registerClient(body: unknown, ip: string): Response {
   const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const uris = b.redirect_uris;
   if (!Array.isArray(uris) || uris.length === 0 || uris.length > 10 || !uris.every(validRedirectUri)) {
-    return oauthError("invalid_redirect_uri", "redirect_uris: lista de 1 a 10 URLs https (o http://localhost).");
+    return oauthError("invalid_redirect_uri", "redirect_uris: lista de 1 a 10 URLs https, http://localhost o el esquema propio de una app.");
   }
   const method = str(b.token_endpoint_auth_method) ?? "none";
   if (method !== "none" && method !== "client_secret_post") {
@@ -283,7 +302,7 @@ export function authorizeGet(request: Request, query: Record<string, unknown>, u
   const ticket = randomBytes(24).toString("base64url");
   sqlite.prepare("INSERT INTO tokens (token, kind, value, expires_at) VALUES (?, 'oauth-consent', ?, ?)")
     .run(ticket, JSON.stringify({ email: userEmail, h: paramsHash(c.p) }), isoIn(CONSENT_TTL_S));
-  const host = new URL(c.p.redirectUri).host;
+  const host = returnTarget(c.p.redirectUri);
   const hidden = Object.entries({
     client_id: c.p.clientId, redirect_uri: c.p.redirectUri, state: c.p.state ?? "", code_challenge: c.p.codeChallenge,
     code_challenge_method: "S256", scope: c.p.scope, resource: c.p.resource, response_type: "code", ticket,
