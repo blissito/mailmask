@@ -31,8 +31,10 @@ describe("failFromError: taxonomía de exit codes", () => {
   it("500 → transitorio (5)", () => {
     assert.throws(() => failFromError(new MailMaskError(500, "boom")), (err: unknown) => err instanceof ExitSignal && err.code === EXIT.TRANSIENT);
   });
-  it("401 → auth (2)", () => {
+  it("401 → auth (2) y sugiere mailmask login", () => {
+    const out = captureStderr();
     assert.throws(() => failFromError(new MailMaskError(401, "sin llave")), (err: unknown) => err instanceof ExitSignal && err.code === EXIT.AUTH);
+    assert.match(out.text(), /mailmask login/);
   });
   it("error sin status conocido → genérico (1)", () => {
     assert.throws(() => failFromError(new Error("lo que sea")), (err: unknown) => err instanceof ExitSignal && err.code === EXIT.ERROR);
@@ -44,6 +46,33 @@ describe("failFromError: taxonomía de exit codes", () => {
     const err = new TypeError("fetch failed");
     (err as unknown as { cause: unknown }).cause = Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" });
     assert.throws(() => failFromError(err), (e: unknown) => e instanceof ExitSignal && e.code === EXIT.TRANSIENT);
+  });
+});
+
+describe("failFromError: 403 no pide volver a hacer login", () => {
+  it("403 → prohibido (6), no auth (2)", () => {
+    assert.throws(() => failFromError(new MailMaskError(403, "no tienes permiso")), (err: unknown) => err instanceof ExitSignal && err.code === EXIT.FORBIDDEN);
+  });
+  it("muestra el mensaje del servidor tal cual y no habla de login", () => {
+    const out = captureStderr();
+    assert.throws(() => failFromError(new MailMaskError(403, "no tienes permiso para esta acción")), (err: unknown) => err instanceof ExitSignal && err.code === EXIT.FORBIDDEN);
+    assert.match(out.text(), /no tienes permiso para esta acción/);
+    assert.doesNotMatch(out.text(), /login/);
+  });
+  it("si el mensaje habla de activar o de $99, sugiere el comando de billing", () => {
+    const out = captureStderr();
+    assert.throws(() => failFromError(new MailMaskError(403, "dominio no activado: activarlo cuesta $99 MXN al mes")), (err: unknown) => err instanceof ExitSignal && err.code === EXIT.FORBIDDEN);
+    assert.match(out.text(), /mailmask billing checkout <dominio>/);
+  });
+  it("sin mención de activación, no sugiere billing", () => {
+    const out = captureStderr();
+    assert.throws(() => failFromError(new MailMaskError(403, "no tienes permiso")), (err: unknown) => err instanceof ExitSignal && err.code === EXIT.FORBIDDEN);
+    assert.doesNotMatch(out.text(), /billing/);
+  });
+  it("--json imprime {error, status: 403} y sale con 6", () => {
+    const out = captureStderr();
+    assert.throws(() => failFromError(new MailMaskError(403, "no tienes permiso"), { json: true }), (err: unknown) => err instanceof ExitSignal && err.code === EXIT.FORBIDDEN);
+    assert.deepEqual(JSON.parse(out.text()), { error: "no tienes permiso", status: 403 });
   });
 });
 

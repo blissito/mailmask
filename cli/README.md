@@ -189,10 +189,11 @@ permisos `600`. `mailmask logout` borra la sesión de donde haya quedado.
 
 - `0` — éxito
 - `1` — error genérico
-- `2` — no hay API key activa, o MailMask la rechazó
+- `2` — no hay API key activa, o MailMask la rechazó (401)
 - `3` — conflicto (409 de MailMask; p. ej. el dominio ya existe)
 - `4` — no encontrado (404 de MailMask)
 - `5` — error transitorio (429 o 5xx de MailMask, o de red) — vale la pena reintentar
+- `6` — prohibido (403 de MailMask: la llave sirve, pero la cuenta no puede hacerlo, p. ej. el dominio no está activado). No pide `mailmask login`; si el mensaje habla de activar, indica `mailmask billing checkout <dominio>`
 
 Con `--json`, un error no imprime "✖ ..." sino `{"error": "...", "status": 404}`
 a stderr (sin `status` si no vino de la API), para que un script lo parsee sin

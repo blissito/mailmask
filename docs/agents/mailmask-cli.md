@@ -32,7 +32,7 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   propio ticket, para no mezclar el cambio de ruta con el de la respuesta en
   pantalla.
 - **Exit codes — taxonomía completa (ticket de confirmaciones):** `0` éxito, `1`
-  error genérico, `2` sin API key activa o rechazada por MailMask (401/403), `3`
+  error genérico, `2` sin API key activa o rechazada por MailMask (401), `3`
   conflicto (409), `4` no encontrado (404), `5` transitorio (429 o 5xx de
   MailMask, **o un error de red sin `status`**: `fetch` (undici) nunca lanza
   `MailMaskError` ante un corte de red o DNS caído — lanza un `TypeError("fetch
@@ -40,7 +40,10 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   en `cli/src/output.ts` reconoce ese patrón (`isNetworkError()`, por código de
   `.cause`/`.code` o por el mensaje `fetch failed`) y lo manda también a `5`, no
   a `1` — es justo el caso donde vale la pena que un script reintente. Cualquier
-  otro error que no sea `MailMaskError` ni de red es `1`. Cualquier comando
+  otro error que no sea `MailMaskError` ni de red es `1`. `6` prohibido (403 de
+  MailMask: la llave es válida pero la cuenta no puede hacerlo, p. ej. dominio sin activar):
+  NO sugiere `mailmask login`; imprime el mensaje del servidor y, si habla de activar o de
+  `$99`, indica `mailmask billing checkout <dominio>`. Cualquier comando
   nuevo que llame a `failFromError(err)` hereda esto solo: no hace falta (ni se
   debe) mapear códigos a mano en el comando.
 - **Confirmación de lo destructivo — `confirmOrExit()` en `cli/src/output.ts`:**
@@ -189,9 +192,8 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   escribe el aviso a stderr y sigue. Sugiere `mailmask login`; en `--json` agrega
   `activeKeyRevoked: true`. Si dos llaves comparten prefijo puede avisar de más,
   nunca de menos.
-- **Trampa:** `webhooks` y `smtp` exigen dominio activado y la API responde 403, que
-  `failFromError` trata como "corre login" (exit 2). Es engañoso pero cambiarlo toca
-  la taxonomía de exit codes; queda para un issue aparte.
+- **403 de dominio sin activar:** `webhooks` y `smtp` exigen dominio activado; la API
+  responde 403 y `failFromError` lo manda a exit `6` (ya no a `2`) sin pedir login.
 
 - **`rules`, `suppressions`, `domains dns-setup|logo` y `dns import`:** 1:1 con el SDK.
   `rules create|update` toman `--field` (to|from|subject), `--match`
@@ -233,7 +235,7 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   `--status`) → `requireClient` → `confirmOrExit` → `resolveDomainId`. Los ids de `inbox
   delete` salen de `args._.slice(1)`, no de `rawArgs`. **`--no-quote`:** citty lo convierte en
   `quote=false`, así que el arg se llama `quote` (con `default: true`); declarar `"no-quote"`
-  nunca recibe nada. `compose` exige dominio activado (403 → exit 2, la trampa de arriba).
+  nunca recibe nada. `compose` exige dominio activado (403 → exit 6, ver taxonomía).
 ## `account`, `members`, `billing`, `registrations`, `transfers` y `referrals`
 
 Dinero y dominios de por medio: el CLI **confirma, no cobra y no expone el EPP**.
@@ -281,7 +283,7 @@ Dinero y dominios de por medio: el CLI **confirma, no cobra y no expone el EPP**
   (`recipients`, `subject`, `html`, `from?`): una llave extra (`markdown`, `cc`,
   `attachments`) es error antes de la red, porque el servidor la ignoraría en silencio.
   `logs --limit` es un entero 1–100 validado antes de red. Enviar pide dominio activado:
-  el 403 sale como exit 2, la misma trampa de `webhooks`/`smtp`.
+  el 403 sale como exit 6 y sin pedir login, igual que `webhooks`/`smtp`.
 
 - **Trampa de PRs apilados (C13/#29):** al mergear el PR de abajo de una pila, mover la base del de
   arriba a `main` ANTES de mergearlo. Si no, el código del de arriba queda huérfano en la rama vieja:
