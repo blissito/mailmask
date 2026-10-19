@@ -5,7 +5,7 @@ license: MIT
 compatibility: An MCP client with Streamable HTTP transport (OAuth-capable, or with custom headers for an API key), or curl for the raw JSON-RPC.
 metadata:
   author: mailmask
-  version: "1.6"
+  version: "1.7"
 ---
 
 # MailMask over MCP
@@ -27,7 +27,7 @@ refresh token (60 days) from `POST /oauth/token`. `POST /oauth/revoke` cuts it.
 
 - Ghosty Studio: Conectores → Mailmask → Conectar.
 - Claude.ai / Claude Desktop: Settings → Connectors → Add custom connector → the URL.
-- ChatGPT: Settings → Apps & Connectors → Create (developer mode) → the URL with OAuth.
+- ChatGPT: Plugins (sidebar) → Add → Add custom MCP server → the URL, Authentication OAuth → Create as a plugin → Connect. Use it with `@MailMask` in the chat. Works on the Free plan.
 - Claude Code: `claude mcp add --transport http mailmask https://www.mailmask.studio/mcp`,
   then `/mcp` → mailmask → Authenticate.
 

@@ -197,7 +197,7 @@ Hay dos formas de conectarlo. La recomendada es OAuth: sólo se pega la URL, sin
 Forma 1 (recomendada) — OAuth, sólo con la URL:
 - Ghosty Studio: Conectores → Mailmask → Conectar.
 - Claude.ai y Claude Desktop: Settings → Connectors → Add custom connector, con la URL https://www.mailmask.studio/mcp, y luego Connect.
-- ChatGPT: Settings → Apps & Connectors → Create (con el modo desarrollador), la URL y autenticación OAuth.
+- ChatGPT: Plugins (barra lateral) → Add → Add custom MCP server, la URL y autenticación OAuth → Create as a plugin → Connect. Se usa con @MailMask en el chat; funciona en la cuenta Free.
 - Claude Code: claude mcp add --transport http mailmask https://www.mailmask.studio/mcp y luego /mcp → mailmask → Authenticate.
 - Cualquier cliente que implemente la autorización del spec MCP: sólo la URL.
 Qué pasa: el cliente abre MailMask en el navegador; si no hay sesión pide entrar (correo o Google) y luego muestra una pantalla con el nombre del cliente y los botones Permitir y Cancelar. Al permitir, queda conectado.

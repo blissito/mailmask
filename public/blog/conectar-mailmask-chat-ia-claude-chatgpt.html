@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Conecta MailMask a Claude y ChatGPT, paso a paso — MailMask</title>
+    <meta name="description" content="Guía con capturas reales para conectar tu correo de MailMask a Claude.ai, ChatGPT, Le Chat, Cursor y Claude Code por MCP, sin copiar llaves." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/conectar-mailmask-chat-ia-claude-chatgpt" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="Conecta MailMask a tu chat de IA: Claude, ChatGPT y más, paso a paso" />
+    <meta property="og:description" content="Cada pantalla, capturada el 19 de octubre de 2026: dónde se agrega el conector en Claude.ai y ChatGPT, qué aprueba la pantalla de consentimiento y qué clientes aceptan hoy un MCP propio." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/conectar-mailmask-chat-ia-claude-chatgpt" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="og:image" content="https://www.mailmask.studio/blog/img/conectar-ia-og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Título «Conecta MailMask a tu chat de IA» junto a la pantalla de consentimiento de MailMask con el botón Permitir" />
+    <meta property="og:image:secure_url" content="https://www.mailmask.studio/blog/img/conectar-ia-og.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta name="twitter:image" content="https://www.mailmask.studio/blog/img/conectar-ia-og.jpg" />
+    <meta property="article:published_time" content="2026-10-19" />
+    <meta property="article:modified_time" content="2026-10-19" />
+    <meta property="article:section" content="Guías" />
+    <meta property="article:tag" content="MCP" />
+    <meta property="article:tag" content="Claude" />
+    <meta property="article:tag" content="ChatGPT" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@HectorBlisS" />
+    <meta name="twitter:creator" content="@HectorBlisS" />
+    <meta name="twitter:title" content="Conecta MailMask a tu chat de IA: Claude, ChatGPT y más, paso a paso" />
+    <meta name="twitter:description" content="Capturas reales de cada pantalla para conectar tu correo a Claude.ai y ChatGPT por MCP, y qué otros clientes lo aceptan hoy." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <script src="/js/theme.js"></script>
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Conecta MailMask a tu chat de IA: Claude, ChatGPT y más, paso a paso",
+      "description": "Guía con capturas reales para conectar el correo de MailMask a Claude.ai, ChatGPT, Le Chat, Cursor y Claude Code por MCP con OAuth, sin copiar llaves.",
+      "datePublished": "2026-10-19",
+      "dateModified": "2026-10-19",
+      "image": "https://www.mailmask.studio/blog/img/conectar-ia.jpg",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/conectar-mailmask-chat-ia-claude-chatgpt"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Conecta MailMask a tu chat de IA: Claude, ChatGPT y más, paso a paso", "item": "https://www.mailmask.studio/blog/conectar-mailmask-chat-ia-claude-chatgpt" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Cuál es la forma más rápida de conectar un agente de código a MailMask?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Instalar las skills de MailMask con npx skills add https://www.mailmask.studio. Las skills le enseñan a Claude Code, Cursor, Codex o Copilot cómo funciona MailMask y cómo conectarse a su servidor MCP en https://www.mailmask.studio/mcp."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo conecto MailMask a Claude.ai?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "En Claude.ai abre Customize, pestaña Connectors, botón Add y Add custom connector. Escribe el nombre MailMask y la URL https://www.mailmask.studio/mcp, da Continue y luego Connect. Claude abre mailmask.studio, inicias sesión, apruebas en la pantalla de consentimiento y regresas con el mensaje Connected to MailMask."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo conecto MailMask a ChatGPT?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "En ChatGPT abre Plugins en la barra lateral, botón Add y Add custom MCP server. Escribe el nombre, la Server URL https://www.mailmask.studio/mcp, deja Authentication en OAuth, marca I understand and want to continue y da Create as a plugin. Después Connect MailMask, inicias sesión y apruebas. Funcionó con una cuenta Free el 19 de octubre de 2026. En el chat se usa escribiendo @MailMask."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué aprueba la pantalla de consentimiento de MailMask?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Le da a esa app permiso para ver y administrar tus dominios, direcciones, buzones y reglas, enviar correo desde tus dominios, revisar el DNS y generar ligas de pago que tú abres. No le deja crear llaves de API. Para cortar el acceso desconecta el conector en el cliente; cambiar tu contraseña de MailMask corta todos los tokens a la vez."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué otros clientes de IA aceptan un servidor MCP propio?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Revisado el 19 de octubre de 2026: Le Chat de Mistral sí, en Intelligence, Connectors, Add Connector, Custom MCP Connector con OAuth. Cursor y Claude Code sí, por configuración. Perplexity sólo en Pro, Max o Enterprise. Gemini sólo para cuentas en Estados Unidos y en inglés. Microsoft Copilot sólo por Copilot Studio o Microsoft 365, configurado por un administrador."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué le pido primero al agente para comprobar que funciona?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Una petición de sólo lectura, por ejemplo: Con MailMask, ¿qué dominios tengo y cuántas direcciones tiene cada uno? Pídele que liste cada dirección además de contarlas: en la prueba ChatGPT primero sumó 13 y se corrigió a 12."
+          }
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="site bg-bg text-fg antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4 border-b border-line/70 bg-bg/85 backdrop-blur">
+      <a href="/" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Conecta MailMask a tu chat de IA: Claude, ChatGPT y más, paso a paso</h1>
+        <div class="meta">
+          <span>📅 19 Oct 2026</span>
+          <span>⏱ 8 min de lectura</span>
+        </div>
+      </header>
+
+      <figure class="blog-cover">
+        <img src="/blog/img/conectar-ia-il.jpg" alt="Título «Conecta MailMask a tu chat de IA» junto a la pantalla de consentimiento de MailMask con el botón Permitir" width="1200" height="800" fetchpriority="high" />
+      </figure>
+
+      <div class="blog-content">
+        <p>MailMask tiene un servidor MCP en <code>https://www.mailmask.studio/mcp</code>. Con esa URL, Claude, ChatGPT y otros clientes pueden leer tu Bandeja, contestar correos, crear direcciones o revisar el DNS de tu dominio. No copias ninguna llave: el cliente y MailMask se ponen de acuerdo con OAuth y tú apruebas en una pantalla.</p>
+
+        <p>En <a href="/blog/correo-con-ia-sin-google-workspace">correo con IA sin Google Workspace</a> lo resumimos en una lista. Aquí va cada pantalla, capturada el 19 de octubre de 2026. Las interfaces de estos chats cambian seguido; si algo ya no se llama igual, la URL y la pantalla de consentimiento siguen siendo las mismas.</p>
+
+        <figure class="diagram">
+          <svg viewBox="0 0 720 210" width="100%" role="img" aria-labelledby="diagConectar" xmlns="http://www.w3.org/2000/svg">
+            <title id="diagConectar">El chat de IA llama al servidor MCP de MailMask; la primera vez el servidor lo manda a la pantalla de consentimiento, tú inicias sesión y apruebas, el chat recibe un token propio y con él opera sólo tu cuenta.</title>
+            <defs>
+              <marker id="arwCon" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" fill="rgb(var(--mask-500))" />
+              </marker>
+            </defs>
+
+            <rect x="12" y="36" width="140" height="64" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="82" y="62" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Tu chat de IA</text>
+            <text x="82" y="82" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">Claude, ChatGPT…</text>
+
+            <line x1="152" y1="68" x2="200" y2="68" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwCon)" />
+            <text x="176" y="58" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">llama</text>
+
+            <rect x="202" y="36" width="160" height="64" rx="8" fill="#18181b" stroke="rgb(var(--mask-500))" stroke-width="2" />
+            <text x="282" y="62" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Servidor MCP</text>
+            <text x="282" y="82" text-anchor="middle" fill="#a1a1aa" font-family="ui-monospace, monospace" font-size="10">mailmask.studio/mcp</text>
+
+            <line x1="362" y1="68" x2="410" y2="68" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwCon)" />
+            <text x="386" y="58" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">1.ª vez</text>
+
+            <rect x="412" y="36" width="150" height="64" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="487" y="62" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Consentimiento</text>
+            <text x="487" y="82" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">inicias sesión y apruebas</text>
+
+            <line x1="562" y1="68" x2="610" y2="68" stroke="rgb(var(--mask-500))" stroke-width="2" marker-end="url(#arwCon)" />
+            <text x="586" y="58" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="10">token</text>
+
+            <rect x="612" y="36" width="96" height="64" rx="8" fill="#18181b" stroke="#3f3f46" />
+            <text x="660" y="62" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Tu cuenta</text>
+            <text x="660" y="82" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11">sólo la tuya</text>
+
+            <line x1="12" y1="132" x2="708" y2="132" stroke="#3f3f46" stroke-dasharray="4 4" />
+            <text x="12" y="156" fill="#a1a1aa" font-family="system-ui, sans-serif" font-size="11" letter-spacing="1.5">LO QUE NUNCA PASA</text>
+            <text x="12" y="180" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="12">No copias llaves · el chat no ve tu contraseña · no puede crear llaves de API · lo desconectas cuando quieras</text>
+          </svg>
+          <figcaption>El mismo camino sirve para todos los clientes. Lo único que cambia es en qué menú pegas la URL.</figcaption>
+        </figure>
+
+        <h2>¿Cuál es la forma más rápida de conectar un agente de código a MailMask?</h2>
+
+        <p><strong>Instalar las skills de MailMask con <code>npx skills add https://www.mailmask.studio</code>.</strong> Las skills le enseñan a Claude Code, Cursor, Codex o Copilot cómo funciona MailMask y cómo conectarse a su servidor MCP.</p>
+
+        <p>Después le pides lo que necesitas en español, por ejemplo <em>«crea hola@ que reenvíe a mi Gmail»</em>. Si trabajas en un chat del navegador y no en un editor, sigue con las secciones de Claude.ai o ChatGPT.</p>
+
+        <h2>¿Cómo conecto MailMask a Claude.ai?</h2>
+
+        <p><strong>En Claude.ai abre Customize → Connectors → Add → Add custom connector, pega la URL y da Connect.</strong></p>
+
+        <p><strong>1. Abre el menú para agregar.</strong> En la barra lateral entra a <strong>Customize</strong>, elige la pestaña <strong>Connectors</strong> y abre el botón <strong>Add</strong>. La única opción es <strong>Add custom connector</strong>.</p>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/claude-1-agregar.jpg" width="543" height="560" alt="Claude.ai, sección Customize con la pestaña Connectors abierta y el menú Add mostrando la opción Add custom connector" loading="lazy" />
+          <figcaption>Customize → Connectors → Add → Add custom connector.</figcaption>
+        </figure>
+
+        <p><strong>2. Escribe el nombre y la URL.</strong> En <em>Name</em> pon <code>MailMask</code> y en <em>MCP server URL</em> pega <code>https://www.mailmask.studio/mcp</code>. Da <strong>Continue</strong>.</p>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/claude-2-formulario.jpg" width="560" height="465" alt="Ventana Add custom connector de Claude con el nombre MailMask y la URL https://www.mailmask.studio/mcp" loading="lazy" />
+          <figcaption>El nombre es el que verás en la lista de conectores.</figcaption>
+        </figure>
+
+        <p><strong>3. Da Connect.</strong> Claude guarda el conector y te enseña su ficha con el botón <strong>Connect</strong>. Al darle, abre mailmask.studio para que inicies sesión, con Google o con correo y contraseña.</p>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/claude-3-connect.jpg" width="543" height="235" alt="Ficha del conector MailMask en Claude con el texto You're not connected to MailMask yet y el botón Connect" loading="lazy" />
+        </figure>
+
+        <p><strong>4. Aprueba en la pantalla de MailMask.</strong> Verás qué pide Claude en tu nombre (la explicamos más abajo). Da <strong>Permitir</strong>.</p>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/claude-4-consentimiento.jpg" width="415" height="640" alt="Pantalla Conectar con MailMask: Claude quiere usar tu cuenta de MailMask, con la lista de permisos y los botones Permitir y Cancelar" loading="lazy" />
+          <figcaption>La pantalla vive en mailmask.studio, no en Claude. Tapamos el correo de la cuenta.</figcaption>
+        </figure>
+
+        <p><strong>5. Revisa los permisos por herramienta.</strong> Claude te regresa a la ficha con el aviso <em>Connected to MailMask</em>. Ahí aparecen las herramientas en dos grupos, de sólo lectura y de escritura, y cada una arranca en <strong>Needs approval</strong>: Claude te pregunta antes de usarla. Puedes dejar pasar solas las de lectura y conservar la pregunta en las que envían o borran.</p>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/claude-5-conectado.jpg" width="543" height="755" alt="Ficha del conector MailMask en Claude con el aviso Connected to MailMask y la lista Read-only tools en Needs approval" loading="lazy" />
+        </figure>
+
+        <p><strong>6. Úsalo en un chat.</strong> Escribe tu petición en un chat nuevo. Cuando Claude quiere usar una herramienta te pregunta con tres botones: <strong>Decline</strong>, <strong>Always allow</strong> o <strong>Allow once</strong>.</p>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/claude-6-permiso.jpg" width="543" height="755" alt="Chat de Claude preguntando Claude wants to use List domains from MailMask, con los botones Decline, Always allow y Allow once" loading="lazy" />
+        </figure>
+
+        <p>En Claude Code es un comando: <code>claude mcp add --transport http mailmask https://www.mailmask.studio/mcp</code>, y después <code>/mcp</code> → mailmask → Authenticate.</p>
+
+        <h2>¿Cómo conecto MailMask a ChatGPT?</h2>
+
+        <p><strong>En ChatGPT abre Plugins → Add → Add custom MCP server, pega la URL con autenticación OAuth y da Create as a plugin.</strong> Lo probamos con una cuenta <strong>Free</strong> y funcionó; ChatGPT lo marca como plugin en <em>dev mode</em> sin que tengas que activar nada más.</p>
+
+        <p><strong>1. Abre el menú para agregar.</strong> Entra a <strong>Plugins</strong> en la barra lateral y abre <strong>Add</strong>, arriba a la derecha. Elige <strong>Add custom MCP server</strong>.</p>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/chatgpt-1-agregar.jpg" width="573" height="420" alt="Página Plugins de ChatGPT con el menú Add abierto: Create plugin, Upload plugin archive y Add custom MCP server" loading="lazy" />
+        </figure>
+
+        <p><strong>2. Llena el formulario.</strong> <em>Name</em>: <code>MailMask</code>. <em>Description</em> es opcional. En <em>Connection</em> deja <strong>Server URL</strong> y pega <code>https://www.mailmask.studio/mcp</code>. <em>Authentication</em>: <strong>OAuth</strong>. Marca <strong>I understand and want to continue</strong> y da <strong>Create as a plugin</strong>. No hace falta tocar <em>Advanced OAuth settings</em>: ChatGPT descubre la configuración solo.</p>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/chatgpt-2-formulario.jpg" width="600" height="760" alt="Ventana Add custom MCP server de ChatGPT con el nombre MailMask, la URL https://www.mailmask.studio/mcp, autenticación OAuth y la casilla I understand marcada" loading="lazy" />
+        </figure>
+
+        <p><strong>3. Conecta tu cuenta.</strong> ChatGPT te avisa qué datos compartirá con el plugin. Da <strong>Connect MailMask</strong>, inicia sesión en mailmask.studio y da <strong>Permitir</strong> en la misma pantalla de consentimiento, que esta vez dice <em>ChatGPT</em>.</p>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/chatgpt-3-connect.jpg" width="480" height="476" alt="Ventana Connect MailMask de ChatGPT con el aviso de datos compartidos y los botones Connect MailMask y Cancel" loading="lazy" />
+        </figure>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/chatgpt-4-consentimiento.jpg" width="415" height="640" alt="Pantalla Conectar con MailMask: ChatGPT quiere usar tu cuenta de MailMask, con los botones Permitir y Cancelar" loading="lazy" />
+        </figure>
+
+        <p><strong>4. Revisa el permiso.</strong> La ficha del plugin dice qué cuenta quedó conectada y cómo pide permiso. El valor de fábrica es <strong>Allow low-risk</strong>: las herramientas de lectura corren sin preguntar y las que escriben te piden confirmación.</p>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/chatgpt-5-conectado.jpg" width="573" height="720" alt="Ficha del plugin MailMask en ChatGPT con Permission en Allow low-risk, la cuenta conectada y la URL https://www.mailmask.studio/mcp" loading="lazy" />
+        </figure>
+
+        <p><strong>5. Úsalo con @MailMask.</strong> En un chat nuevo escribe <code>@MailMask</code> antes de tu petición para que ChatGPT use el plugin.</p>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/chatgpt-6-activar.jpg" width="573" height="220" alt="Caja de texto de ChatGPT con la mención @MailMask" loading="lazy" />
+        </figure>
+
+        <h2>¿Qué aprueba la pantalla de consentimiento de MailMask?</h2>
+
+        <p><strong>Le da a esa app permiso para operar tu cuenta de MailMask en tu nombre, salvo crear llaves de API.</strong> La pantalla nombra a la app que pide acceso y la cuenta con la que entraste, y enlista lo que podrá hacer:</p>
+
+        <ul>
+          <li>Ver y administrar tus dominios, direcciones, buzones y reglas.</li>
+          <li>Enviar correo desde tus dominios.</li>
+          <li>Revisar el DNS y generar ligas de pago que tú abres. Un agente nunca paga solo: te da la liga.</li>
+        </ul>
+
+        <p>Lo que no puede es fabricar llaves de API: un agente con acceso no se da a sí mismo más acceso. Tampoco ve tu contraseña, porque el inicio de sesión pasa en mailmask.studio y el chat sólo recibe un token propio.</p>
+
+        <p>Para cortarlo, desconecta el conector en el cliente: <strong>Disconnect</strong> en la ficha de Claude o <strong>Uninstall</strong> en la de ChatGPT. Si quieres cortar todos los clientes de golpe, cambia tu contraseña de MailMask: eso invalida todos los tokens que hayas aprobado.</p>
+
+        <h2>¿Qué otros clientes de IA aceptan un servidor MCP propio?</h2>
+
+        <p><strong>Le Chat, Cursor y Claude Code sí; Perplexity sólo en planes de pago; Gemini y Copilot no para una cuenta personal en México.</strong> Revisado el 19 de octubre de 2026:</p>
+
+        <ul>
+          <li><strong>Le Chat (Mistral):</strong> sí, según su ayuda. Intelligence → Connectors → Add Connector → Custom MCP Connector, con nombre y URL; detecta el OAuth solo. En planes de equipo sólo lo agrega un administrador.</li>
+          <li><strong>Cursor:</strong> sí, por configuración. En <code>~/.cursor/mcp.json</code>:
+            <pre><code>{ "mcpServers": { "mailmask": { "url": "https://www.mailmask.studio/mcp" } } }</code></pre>
+            Según su documentación, Cursor abre el navegador para la misma pantalla de consentimiento y regresa a la app.</li>
+          <li><strong>Claude Code:</strong> sí, con <code>claude mcp add --transport http mailmask https://www.mailmask.studio/mcp</code>.</li>
+          <li><strong>Perplexity:</strong> sólo en Pro, Max o Enterprise, en Settings → Connectors.</li>
+          <li><strong>Gemini:</strong> las apps propias existen, pero sólo para cuentas personales en Estados Unidos y en inglés. En una cuenta de México la opción no aparece.</li>
+          <li><strong>Microsoft Copilot:</strong> no en la versión personal. Los MCP entran por Copilot Studio o Microsoft 365 Copilot, y los configura un administrador.</li>
+        </ul>
+
+        <h2>¿Qué le pido primero al agente para comprobar que funciona?</h2>
+
+        <p><strong>Una petición de sólo lectura que puedas verificar en el panel, por ejemplo: <em>«Con MailMask: ¿qué dominios tengo y cuántas direcciones tiene cada uno?»</em></strong> No cambia nada y te enseña si el conector ve tu cuenta.</p>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/claude-7-respuesta.jpg" width="543" height="612" alt="Respuesta de Claude con una tabla de seis dominios, cuántas direcciones tiene cada uno y cuáles son" loading="lazy" />
+          <figcaption>La respuesta de Claude. Cambiamos los nombres de los dominios y las direcciones por unos de ejemplo.</figcaption>
+        </figure>
+
+        <p>Un consejo honesto: <strong>pide que liste las direcciones, no sólo que las cuente.</strong> En la misma prueba ChatGPT sumó 13 direcciones, revisó la tabla y se corrigió a 12. El dato que trae MailMask era correcto; la suma la hizo el modelo. Con la lista a la vista el error se nota solo.</p>
+
+        <figure class="screenshot">
+          <img src="/blog/img/conectar-ia/chatgpt-7-respuesta.jpg" width="573" height="640" alt="Respuesta de ChatGPT que dice 13 direcciones, muestra una tabla con total 12 y agrega Corrección: la suma de las direcciones es 12, no 13" loading="lazy" />
+          <figcaption>ChatGPT se corrige solo en la misma respuesta. También aquí los dominios son de ejemplo.</figcaption>
+        </figure>
+
+        <p>De ahí puedes pasar a lo útil: <em>«¿qué llegó hoy a ventas@ que no he leído?»</em>, <em>«contesta este hilo con el horario de la tienda»</em> o <em>«crea soporte@ con buzón»</em>. Las herramientas que envían o borran te piden confirmación en el chat antes de correr: léela antes de aprobar.</p>
+
+        <h2>Resumen rápido</h2>
+
+        <ul>
+          <li><strong>La URL es una sola:</strong> <code>https://www.mailmask.studio/mcp</code>, con OAuth. No hay llaves que copiar.</li>
+          <li><strong>Claude.ai:</strong> Customize → Connectors → Add → Add custom connector → Connect.</li>
+          <li><strong>ChatGPT:</strong> Plugins → Add → Add custom MCP server → Create as a plugin → Connect MailMask. Funciona en Free; se usa con <code>@MailMask</code>.</li>
+          <li><strong>Agentes de código:</strong> <code>npx skills add https://www.mailmask.studio</code>, o la URL en Cursor y Claude Code.</li>
+          <li><strong>Para cortar el acceso:</strong> desconecta el conector en el cliente, o cambia tu contraseña para cortarlos todos.</li>
+        </ul>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Tu correo, con el agente que tú elijas</h2>
+      <p>Correo en tu dominio, Bandeja compartida y servidor MCP para Claude o ChatGPT. Gratis para empezar · $99 por dominio activado.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-line py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-fg-muted text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-fg-subtle text-sm flex gap-4">
+          <a href="/terms" class="hover:text-fg transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-fg transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-fg transition-colors">Blog</a>
+          <a href="/login" class="hover:text-fg transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-fg-subtle text-xs mt-4">
+        © 2026 by fixter.org
+      </p>
+    </footer>
+  </body>
+</html>

@@ -1067,6 +1067,14 @@ Objetivo: solidificar el tronco del servicio. Blindar seguridad, rendimiento y r
 - [ ] Evaluar pattern de almacenamiento de mensajes en Bandeja: ¿leer body de S3 on demand vs duplicar en SQLite? Investigar otros patterns (cache intermedio, pre-procesado a formato ligero, CDN/signed URLs). Concluir cuál es el mejor approach antes de implementar. **Ya no es teórico**: el 6-sep-2026 se perdieron los objetos de S3 de un dominio entero y el único rescate fue el texto plano del índice FTS (32 KB, sin formato ni adjuntos). Depender de S3 como fuente única del cuerpo tiene un costo demostrado.
 - [ ] **Radar de Actividad por Alias**: Dashboard analítico por alias — volumen de emails por día/semana, horas pico, ratio legítimo vs marketing/spam, aliases "muertos" (30+ días sin actividad) con sugerencia de desactivarlos. Layer de IA (via formmy.app) que genera resumen semanal en lenguaje natural ("Tu alias newsletter@ recibió 47 emails esta semana, 82% son marketing — considera desactivarlo"). El 90% son queries SQL sobre datos existentes (logs/mensajes), la IA solo genera el resumen. Email semanal via SES con cron. Implementación: 3-4 días. Disponible en todos los planes como feature de retención.
 
+### Apps conectadas (OAuth)
+
+- [ ] **Pantalla de «apps conectadas» en `/app`** (anotado 19-oct-2026). El consentimiento de
+  `/oauth/authorize` promete «puedes cortar el acceso cuando quieras desde la aplicación», pero no
+  hay dónde: hoy sólo se corta desconectando desde el cliente o cambiando la contraseña (que mata
+  todos los `mo_`/`mr_`). Listar `oauth_tokens` vivos por cliente (nombre, logo, scope, último uso)
+  con un botón que revoque la familia. Hasta entonces, la frase del consentimiento miente.
+
 ### Compositor de correo
 
 - [ ] **Corrección ortográfica en el compositor**. Hoy el editor de la Bandeja
@@ -1087,7 +1095,7 @@ Objetivo: solidificar el tronco del servicio. Blindar seguridad, rendimiento y r
 
 ### Contenido / Educación
 
-- [ ] **Post: conectar MailMask a tu chat de IA, paso a paso con capturas** (anotado 19-oct-2026). Una
+- [x] **Post: conectar MailMask a tu chat de IA, paso a paso con capturas** (anotado 19-oct-2026; hecho el mismo día: `public/blog/conectar-mailmask-chat-ia-claude-chatgpt.html`, capturas tapadas en `public/blog/img/conectar-ia/`). Una
   guía por cliente con captura real de cada pantalla: ChatGPT (modo desarrollador → Apps & Connectors),
   Claude.ai/Desktop (Connectors → Add custom connector) y los otros populares (Gemini, Copilot, Cursor,
   Le Chat, Perplexity: verificar cuáles aceptan MCP remoto con OAuth hoy). Incluir la pantalla de

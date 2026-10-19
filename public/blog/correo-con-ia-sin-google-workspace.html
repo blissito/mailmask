@@ -99,7 +99,7 @@
           "name": "¿Cómo conecto Claude o ChatGPT a mi correo?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Lo más rápido es instalar las skills de MailMask en tu agente con npx skills add https://www.mailmask.studio: le enseñan a Claude Code, Cursor, Codex o Copilot a usar MailMask y a conectarse a su MCP. En un chat, agrega un conector personalizado con la URL https://www.mailmask.studio/mcp. En Claude.ai o Claude Desktop es Settings, Connectors, Add custom connector; en ChatGPT es Settings, Apps & Connectors, Create, con el modo desarrollador. El cliente te manda a mailmask.studio, inicias sesión, apruebas el acceso en una pantalla de consentimiento y listo: no copias ninguna llave."
+            "text": "Lo más rápido es instalar las skills de MailMask en tu agente con npx skills add https://www.mailmask.studio: le enseñan a Claude Code, Cursor, Codex o Copilot a usar MailMask y a conectarse a su MCP. En un chat, agrega un conector personalizado con la URL https://www.mailmask.studio/mcp. En Claude.ai es Customize, Connectors, Add, Add custom connector; en ChatGPT es Plugins, Add, Add custom MCP server, con autenticación OAuth. El cliente te manda a mailmask.studio, inicias sesión, apruebas el acceso en una pantalla de consentimiento y listo: no copias ninguna llave."
           }
         },
         {
@@ -296,11 +296,11 @@
 
         <ul>
           <li><strong>Claude Code, Cursor, Codex o Copilot:</strong> <code>npx skills add https://www.mailmask.studio</code>. En Claude Code, además, <code>claude mcp add --transport http mailmask https://www.mailmask.studio/mcp</code> y luego <code>/mcp</code> → mailmask → Authenticate.</li>
-          <li><strong>Claude.ai o Claude Desktop:</strong> Settings → Connectors → Add custom connector, con el nombre MailMask y la URL. Después, Connect.</li>
-          <li><strong>ChatGPT:</strong> Settings → Apps &amp; Connectors → Create, con la URL y autenticación OAuth. Requiere el modo desarrollador.</li>
+          <li><strong>Claude.ai:</strong> Customize → Connectors → Add → Add custom connector, con el nombre MailMask y la URL. Después, Connect.</li>
+          <li><strong>ChatGPT:</strong> Plugins → Add → Add custom MCP server, con la URL y autenticación OAuth → Create as a plugin → Connect MailMask. Funciona también en la cuenta gratis; en el chat se usa con <code>@MailMask</code>.</li>
         </ul>
 
-        <p>Al conectar el MCP, el cliente abre mailmask.studio, inicias sesión y ves una pantalla de consentimiento con el nombre de la app que pide acceso. Al aprobar, el agente recibe un token propio. La guía técnica completa está en la documentación de las <a href="/docs#skills">skills</a> y del <a href="/docs#mcp">MCP</a>.</p>
+        <p>Al conectar el MCP, el cliente abre mailmask.studio, inicias sesión y ves una pantalla de consentimiento con el nombre de la app que pide acceso. Al aprobar, el agente recibe un token propio. El paso a paso con capturas de cada pantalla está en <a href="/blog/conectar-mailmask-chat-ia-claude-chatgpt">conecta MailMask a tu chat de IA</a>, y la guía técnica en la documentación de las <a href="/docs#skills">skills</a> y del <a href="/docs#mcp">MCP</a>.</p>
 
         <h2>¿Qué puede hacer un agente de IA con mi correo en MailMask?</h2>
 
