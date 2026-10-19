@@ -146,6 +146,7 @@ const preset = defineCommand({
     preset: { type: "positional", required: true as const, description: `Uno de: ${PRESETS.join(", ")}` },
     target: { type: "string", description: "Valor del registro (p. ej. el *.vercel.app del proyecto)" },
     subdomain: { type: "string", description: "Subdominio donde aplicarlo; sin esto, fija la raíz Y www" },
+    preview: { type: "boolean", description: "Muestra lo que escribiría y lo que hay hoy, sin aplicar nada" },
     json: { type: "boolean", description: "Salida en JSON para scripts/agentes" },
   },
   async run({ args }) {
@@ -156,9 +157,48 @@ const preset = defineCommand({
     const { client } = await requireClient();
     const id = await resolveDomainId(client, args.domain, { json: args.json });
     try {
+      if (args.preview) {
+        // Sólo lectura: no pasa por confirmOrExit ni por dns.preset.
+        const vista = await client.dns.presetPreview(id, args.preset as DnsPreset, args.target, args.subdomain);
+        if (args.json) return printJson(vista);
+        process.stdout.write(`Vista previa de "${args.preset}" para ${args.domain} (no se aplicó nada):\n`);
+        vista.records.forEach((r, i) => {
+          const hoy = vista.current[i]?.values.join(", ") || "nada";
+          process.stdout.write(`  ${r.type.padEnd(5)} ${r.name}  →  ${r.values.join(", ")}\n`);
+          process.stdout.write(`        hoy: ${hoy}\n`);
+        });
+        return;
+      }
       const result = await client.dns.preset(id, args.preset as DnsPreset, args.target, args.subdomain);
       if (args.json) return printJson(result);
       process.stdout.write(`✓ Preset "${args.preset}" aplicado (propagación: ${result.propagacion}).\n`);
+    } catch (err) {
+      failFromError(err, { json: args.json });
+    }
+  },
+});
+
+const website = defineCommand({
+  meta: { name: "website", description: "Muestra a dónde apunta el sitio del dominio (raíz, www, subdominios), la plataforma, los problemas y si responde por HTTPS" },
+  args: { ...domainArg, ...jsonArg },
+  async run({ args }) {
+    const { client } = await requireClient();
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
+    try {
+      const result = await client.dns.website(id);
+      if (args.json) return printJson(result);
+      process.stdout.write(`Sitio de ${result.domain} (${result.editable ? "zona de MailMask, editable" : "zona fuera de MailMask, sólo lectura"})\n`);
+      for (const h of result.hosts) {
+        const plataforma = h.platform ? h.platform.label : "sin plataforma reconocida";
+        const https = !h.https
+          ? "HTTPS sin comprobar"
+          : h.https.ok
+            ? `HTTPS ok (${h.https.status})`
+            : `HTTPS falla${h.https.status ? ` (${h.https.status})` : ""}${h.https.error ? `: ${h.https.error}` : ""}`;
+        process.stdout.write(`${h.name}  ${plataforma}  ${https}\n`);
+        for (const r of h.records) process.stdout.write(`    ${r.type.padEnd(5)} →  ${r.values.join(", ")}\n`);
+        for (const issue of h.issues) process.stdout.write(`    ✖ ${issue}\n`);
+      }
     } catch (err) {
       failFromError(err, { json: args.json });
     }
@@ -224,5 +264,5 @@ const importCmd = defineCommand({
 
 export default defineCommand({
   meta: { name: "dns", description: "Administra los registros DNS de un dominio" },
-  subCommands: { list, upsert, delete: del, preset, "create-zone": createZone, delegation, import: importCmd },
+  subCommands: { list, upsert, delete: del, preset, website, "create-zone": createZone, delegation, import: importCmd },
 });

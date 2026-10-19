@@ -133,6 +133,11 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   fallar por un `--preset` mal escrito. Deliberadamente NO hay un
   `domains preset` separado: `dns preset` es el único lugar fuera de `create`,
   para no tener dos comandos haciendo lo mismo.
+- **`dns website` y `dns preset --preview`:** ambos son de **sólo lectura** y no pasan
+  por `confirmOrExit`. `website` llama `client.dns.website(id)` y `--preview` llama
+  `client.dns.presetPreview(...)` en lugar de `dns.preset`; las pruebas
+  (`cli/test/dns-website-preview.test.ts`) exigen cero llamadas a `preset` con `--preview`.
+  Un preset inválido sigue fallando antes de cualquier red, también con `--preview`.
 - **`dns upsert` y sus valores:** citty no tiene un tipo de positional "rest",
   así que `<nombre>` y `<tipo>` se declaran como positionals normales y los
   valores restantes se toman de `args._.slice(3)` (la lista completa de
@@ -206,7 +211,9 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   logo set` sólo acepta archivo local (.png/.jpg/.jpeg/.webp, ≤ 500 KB, límite
   replicado del servidor: si cambia, moverlo en los dos lados); **no tiene `--url`**
   porque `setLogoFromUrl` sólo admite adjuntos firmados del chat del asistente y el
-  servidor rechaza cualquier otra URL. `dns import` es de **sólo lectura** en el
+  servidor rechaza cualquier otra URL (`profile.ts` responde 400 a todo lo demás). Un
+  usuario de la CLI no tiene de dónde sacar esas URLs, así que `--from-url` (#108) se
+  descartó; no reabrirlo sin cambiar antes ese contrato del servidor. `dns import` es de **sólo lectura** en el
   servidor, así que NO lleva `confirmOrExit`; su rate limit (2 cada 5 min) cae solo en
   exit 5. `rules delete`, `suppressions remove` y `domains logo remove` sí confirman
   ANTES de `resolveDomainId`.

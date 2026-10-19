@@ -36,7 +36,8 @@ mailmask domains easybits unpublish <dominio> [--yes] [--json]
 mailmask dns list <dominio> [--json]
 mailmask dns upsert <dominio> <nombre> <tipo> <valor...> [--ttl 300]
 mailmask dns delete <dominio> <nombre> <tipo> [--yes] [--json]
-mailmask dns preset <dominio> <preset> [--target ...] [--subdomain ...]
+mailmask dns preset <dominio> <preset> [--target ...] [--subdomain ...] [--preview] [--json]
+mailmask dns website <dominio> [--json]
 mailmask dns create-zone <dominio>
 mailmask dns delegation <dominio>
 mailmask dns import <dominio> [--json]
