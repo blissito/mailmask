@@ -316,3 +316,9 @@ Todo cambio de comandos actualiza `cli/README.md`, `public/docs.html#cli` y
 nivel. Al publicar en npm, cambiar la instalación en los tres y poner
 `CLI_PUBLICADO_EN_NPM = true` en `llms.test.ts`. Mientras el paquete dé 404, ningún
 documento público dice `npm i mailmask-cli`.
+
+## Publicación en npm (`mailmask-cli`)
+
+Dos PRs, en este orden. **PR 1 (empaquetado):** la versión sale de `cli/package.json` vía `createRequire` en `cli/src/index.ts`, y `cli/test/version.test.ts` la compara contra `node dist/index.js --version` (contra el build, no contra `src`: el bug posible es de rutas en `dist`). `cli/test/pack.test.ts` fija el tarball en `dist/`, `README.md` y `package.json`. **Se publica desde `main`** con CI verde, según el flujo de `CLAUDE.md`. **PR 2 (después de publicar):** la instalación por npm en `README`, `docs.html#cli` y `llms.txt`, más `CLI_PUBLICADO_EN_NPM = true` en `llms.test.ts`.
+
+Trampas: `engines` va en `>=20` (CI y prod son Node 22; nadie prueba 18). La descripción de npm va en español, como la del `--help`. `npm pack` no corre `prepublishOnly`: la prueba de pack construye antes.
