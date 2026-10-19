@@ -19,7 +19,7 @@
  */
 import {
   getUser, createUser, getDomainByName, createDomain, listAliases, createAlias, listEffectiveAddonsForDomain,
-  createCourtesyAddon, listConversations, createConversation, addMessage, indexMessage,
+  createCourtesyAddon, listConversations, createConversation, addMessage, indexMessage, addNote,
 } from "../db.js";
 import { sqlite } from "../pg.js";
 import { verifyDomain, createReceiptRule } from "../ses.js";
@@ -76,28 +76,53 @@ for (const alias of ["hello", "support", "billing"]) {
   if (!existentes.has(alias)) { createAlias(dom.id, alias, [EMAIL]); console.log(`dirección ${alias}@ creada`); }
 }
 
-// 5. Bandeja de muestra: remitentes de example.com (no entregan a nadie)
-const muestras = [
+// 5. Bandeja de muestra: remitentes de example.com (no entregan a nadie). Las del 19-oct traen
+// urgente, pospuesta, asignada, respuesta y nota interna para que la pantalla de la Bandeja
+// (MCP Apps) enseñe todo en la revisión.
+type Muestra = {
+  from: string; to: string; subject: string; hoursAgo: number; body: string;
+  priority?: "urgent"; assignedTo?: string; snoozeDays?: number; reply?: string; note?: string;
+};
+const muestras: Muestra[] = [
   { from: "Laura Méndez <laura.mendez@example.com>", to: `support@${DOMAIN}`, subject: "Can't log in to my account", hoursAgo: 2,
     body: "Hi,\n\nSince this morning I can't log in to my account. I reset my password twice and I still get \"invalid credentials\". My username is laura.mendez.\n\nCould you help me?\n\nThanks,\nLaura" },
   { from: "Carlos Ruiz <carlos@example.org>", to: `billing@${DOMAIN}`, subject: "Invoice for September", hoursAgo: 20,
     body: "Hello,\n\nCould you send me the invoice for September? Our company details are the same as last month.\n\nBest regards,\nCarlos Ruiz\nAcme Supplies" },
   { from: "Ana Torres <ana.torres@example.net>", to: `hello@${DOMAIN}`, subject: "Partnership proposal", hoursAgo: 48,
     body: "Hi team,\n\nI run a small design studio and I'd love to explore a partnership. Do you have 20 minutes next week for a call? Tuesday or Thursday afternoon works for me.\n\nCheers,\nAna" },
+  { from: "Diego Herrera <diego@example.com>", to: `support@${DOMAIN}`, subject: "Emails to our domain are bouncing", hoursAgo: 1, priority: "urgent",
+    body: "Hello,\n\nSince an hour ago every email sent to contact@ on our domain bounces with \"mailbox unavailable\". Our customers can't reach us. Can you check it as soon as possible?\n\nDiego",
+    note: "Diego is on the annual plan. Check the MX records first." },
+  { from: "Sofía Navarro <sofia.navarro@example.org>", to: `hello@${DOMAIN}`, subject: "Quote for 300 custom mugs", hoursAgo: 5, assignedTo: EMAIL,
+    body: "Hi,\n\nWe need 300 mugs with our logo for an event on November 20. Could you send us a quote with delivery to Mexico City?\n\nThank you,\nSofía",
+    reply: "Hi Sofía,\n\nThanks for writing. We'll send you the quote today, including delivery to Mexico City.\n\nBest,\nThe team" },
+  { from: "Martín López <martin@example.net>", to: `billing@${DOMAIN}`, subject: "Payment confirmation next week", hoursAgo: 30, snoozeDays: 3,
+    body: "Hi,\n\nOur finance team will confirm the payment next Tuesday. I'll write back as soon as I have the receipt.\n\nMartín" },
 ];
 const convs = listConversations(dom.id);
 for (const m of muestras) {
   if (convs.some((c) => c.subject === m.subject)) continue;
   const at = new Date(Date.now() - m.hoursAgo * 3600_000).toISOString();
+  const replyAt = new Date(Date.parse(at) + 20 * 60_000).toISOString();
   const conv = createConversation({
-    domainId: dom.id, from: m.from, to: m.to, subject: m.subject, status: "open", priority: "normal",
-    lastMessageAt: at, messageCount: 1, tags: [], threadReferences: [],
+    domainId: dom.id, from: m.from, to: m.to, subject: m.subject,
+    status: m.snoozeDays ? "snoozed" : "open", priority: m.priority ?? "normal",
+    ...(m.assignedTo ? { assignedTo: m.assignedTo } : {}),
+    ...(m.snoozeDays ? { snoozedUntil: new Date(Date.now() + m.snoozeDays * 86_400_000).toISOString() } : {}),
+    lastMessageAt: m.reply ? replyAt : at, messageCount: m.reply ? 2 : 1, tags: [], threadReferences: [],
   } as Parameters<typeof createConversation>[0]);
   const msg = addMessage({
     conversationId: conv.id, from: m.from, body: m.body, direction: "inbound",
     messageId: `<${crypto.randomUUID()}@example.com>`, createdAt: at,
   } as Parameters<typeof addMessage>[0]);
   indexMessage({ messageId: msg.id, conversationId: conv.id, domainId: dom.id, from: m.from, subject: m.subject, text: m.body });
+  if (m.reply) {
+    addMessage({
+      conversationId: conv.id, from: m.to, body: m.reply, direction: "outbound",
+      messageId: `<${crypto.randomUUID()}@${DOMAIN}>`, createdAt: replyAt,
+    } as Parameters<typeof addMessage>[0]);
+  }
+  if (m.note) addNote({ conversationId: conv.id, author: EMAIL, body: m.note, createdAt: at });
   console.log(`conversación «${m.subject}» sembrada`);
 }
 
