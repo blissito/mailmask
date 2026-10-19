@@ -9,7 +9,7 @@ import { domainArg, jsonArg, yesArg } from "../args.js";
 /** `<dominio> <alias>`: compartidos entre casi todos los subcomandos de este archivo. */
 const aliasArgs = {
   domain: { type: "positional" as const, required: true as const, description: "Dominio (acme.com) o su id" },
-  alias: { type: "positional" as const, required: true as const, description: "Parte local de la máscara, p. ej. hola (usa * para catch-all)" },
+  alias: { type: "positional" as const, required: true as const, description: "Parte local de la dirección, p. ej. hola (usa * para catch-all)" },
 };
 
 // Repetir el comando que creó la contraseña (create / mailbox create) no sirve: la
@@ -22,7 +22,7 @@ function afterSecretCreate(domain: string, alias: string): string {
 const AFTER_SECRET_RESET = "  Corre el mismo comando con --json para obtenerla completa ahora; no se vuelve a mostrar.\n";
 
 const list = defineCommand({
-  meta: { name: "list", description: "Lista las máscaras (alias) de un dominio" },
+  meta: { name: "list", description: "Lista las direcciones de un dominio" },
   args: { ...domainArg, ...jsonArg },
   async run({ args }) {
     const { client } = await requireClient();
@@ -31,7 +31,7 @@ const list = defineCommand({
       const aliases = await client.aliases.list(id);
       if (args.json) return printJson(aliases);
       if (aliases.length === 0) {
-        process.stdout.write('Sin alias. Crea uno con "mailmask aliases create <dominio> <alias>".\n');
+        process.stdout.write('Sin direcciones. Crea una con "mailmask aliases create <dominio> <dirección>".\n');
         return;
       }
       for (const a of aliases) {
@@ -45,7 +45,7 @@ const list = defineCommand({
 });
 
 const create = defineCommand({
-  meta: { name: "create", description: "Crea una máscara (alias) en un dominio" },
+  meta: { name: "create", description: "Crea una dirección en un dominio" },
   args: {
     ...aliasArgs,
     mailbox: { type: "boolean", description: "Crea también un buzón IMAP (requiere dominio activado)" },
@@ -65,7 +65,7 @@ const create = defineCommand({
     try {
       const created = await client.aliases.create(id, input);
       if (args.json) return printJson(created);
-      process.stdout.write(`✓ Máscara creada: ${created.alias}  →  ${created.destinations.join(", ") || "(sin destinos)"}\n`);
+      process.stdout.write(`✓ Dirección creada: ${created.alias}  →  ${created.destinations.join(", ") || "(sin destinos)"}\n`);
       if (created.buzon) {
         process.stdout.write(`  Buzón: ${created.buzon.email}\n`);
         process.stdout.write(`  Contraseña: ${maskSecret(created.buzon.password)}\n`);
@@ -80,11 +80,11 @@ const create = defineCommand({
 });
 
 const update = defineCommand({
-  meta: { name: "update", description: "Actualiza una máscara: destinos y/o estado (activa/desactiva)" },
+  meta: { name: "update", description: "Actualiza una dirección: destinos y/o estado (activa/desactiva)" },
   args: {
     ...aliasArgs,
-    enable: { type: "boolean", description: "Activa la máscara" },
-    disable: { type: "boolean", description: "Desactiva la máscara" },
+    enable: { type: "boolean", description: "Activa la dirección" },
+    disable: { type: "boolean", description: "Desactiva la dirección" },
     ...jsonArg,
   },
   async run({ args }) {
@@ -106,7 +106,7 @@ const update = defineCommand({
     try {
       const updated = await client.aliases.update(id, args.alias, input);
       if (args.json) return printJson(updated);
-      process.stdout.write(`✓ Máscara actualizada: ${updated.alias}  →  ${updated.destinations.join(", ") || "(sin destinos)"}  (${updated.enabled ? "activa" : "desactivada"})\n`);
+      process.stdout.write(`✓ Dirección actualizada: ${updated.alias}  →  ${updated.destinations.join(", ") || "(sin destinos)"}  (${updated.enabled ? "activa" : "desactivada"})\n`);
     } catch (err) {
       failFromError(err, { json: args.json });
     }
@@ -114,11 +114,11 @@ const update = defineCommand({
 });
 
 const del = defineCommand({
-  meta: { name: "delete", description: "Borra una máscara" },
+  meta: { name: "delete", description: "Borra una dirección" },
   args: { ...aliasArgs, ...yesArg, ...jsonArg },
   async run({ args }) {
     const { client } = await requireClient();
-    await confirmOrExit(`¿Borrar la máscara "${args.alias}"? Es irreversible.`, { yes: args.yes, json: args.json });
+    await confirmOrExit(`¿Borrar la dirección "${args.alias}"? Es irreversible.`, { yes: args.yes, json: args.json });
     const id = await resolveDomainId(client, args.domain, { json: args.json });
     try {
       await client.aliases.delete(id, args.alias);
@@ -126,12 +126,12 @@ const del = defineCommand({
       failFromError(err, { json: args.json });
     }
     if (args.json) return printJson({ ok: true });
-    process.stdout.write(`✓ Máscara borrada: ${args.alias}\n`);
+    process.stdout.write(`✓ Dirección borrada: ${args.alias}\n`);
   },
 });
 
 const mailboxCreate = defineCommand({
-  meta: { name: "create", description: "Crea un buzón IMAP para una máscara existente (requiere dominio activado)" },
+  meta: { name: "create", description: "Crea un buzón IMAP para una dirección existente (requiere dominio activado)" },
   args: { ...aliasArgs, ...jsonArg },
   async run({ args }) {
     const { client } = await requireClient();
@@ -151,7 +151,7 @@ const mailboxCreate = defineCommand({
 });
 
 const mailboxDelete = defineCommand({
-  meta: { name: "delete", description: "Borra el buzón de una máscara Y su correo (la máscara debe conservar al menos un destino)" },
+  meta: { name: "delete", description: "Borra el buzón de una dirección Y su correo (la dirección debe conservar al menos un destino)" },
   args: { ...aliasArgs, ...yesArg, ...jsonArg },
   async run({ args }) {
     const { client } = await requireClient();
@@ -186,12 +186,12 @@ const resetPassword = defineCommand({
 });
 
 const mailbox = defineCommand({
-  meta: { name: "mailbox", description: "Administra el buzón IMAP de una máscara" },
+  meta: { name: "mailbox", description: "Administra el buzón IMAP de una dirección" },
   subCommands: { create: mailboxCreate, delete: mailboxDelete, "reset-password": resetPassword },
 });
 
 const appleProfile = defineCommand({
-  meta: { name: "apple-profile", description: "Genera el perfil de configuración de Apple Mail (.mobileconfig) para el buzón de una máscara" },
+  meta: { name: "apple-profile", description: "Genera el perfil de configuración de Apple Mail (.mobileconfig) para el buzón de una dirección" },
   args: {
     ...aliasArgs,
     output: { type: "string", alias: "o", description: "Ruta del archivo .mobileconfig a escribir" },
@@ -214,7 +214,7 @@ const appleProfile = defineCommand({
 });
 
 const exportMailbox = defineCommand({
-  meta: { name: "export", description: "Exporta el buzón de una máscara en formato mbox, a un archivo o a stdout" },
+  meta: { name: "export", description: "Exporta el buzón de una dirección en formato mbox, a un archivo o a stdout" },
   args: {
     ...aliasArgs,
     output: { type: "string", alias: "o", description: "Ruta del archivo a escribir; sin esto, sale por stdout" },
@@ -238,7 +238,7 @@ const exportMailbox = defineCommand({
 });
 
 export default defineCommand({
-  meta: { name: "aliases", description: "Administra las máscaras (alias) y buzones de un dominio" },
+  meta: { name: "aliases", description: "Administra las direcciones y buzones de un dominio" },
   subCommands: {
     list,
     create,

@@ -26,7 +26,7 @@ const main = defineCommand({
   meta: {
     name: "mailmask",
     version: "0.1.0",
-    description: "CLI oficial de MailMask — dominios, alias, DNS, reglas, envío, logs, equipo, cobros, dominios registrados y más desde la terminal.",
+    description: "CLI oficial de MailMask — dominios, direcciones, DNS, reglas, envío, logs, equipo, cobros, dominios registrados y más desde la terminal.",
   },
   subCommands: { login, logout, whoami, domains, dns, aliases, webhooks, smtp, "api-keys": apiKeys, rules, suppressions, inbox, canned, signature, account, members, billing, registrations, transfers, referrals, send, logs },
 });

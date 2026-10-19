@@ -49,7 +49,7 @@ const list = defineCommand({
   args: {
     ...domainArg,
     status: { type: "string", description: `Estado: ${INBOX_LIST_STATUSES.join(", ")}` },
-    alias: { type: "string", description: "Sólo una máscara (dirección completa, ventas@acme.com)" },
+    alias: { type: "string", description: "Sólo una dirección (completa, ventas@acme.com)" },
     assigned: { type: "string", description: "Sólo las asignadas a esta persona" },
     q: { type: "string", description: "Busca en asunto, remitente y cuerpo (sin paginación, tope 50)" },
     limit: { type: "string", description: "Máximo de filas (hasta 100)" },
@@ -120,7 +120,7 @@ const get = defineCommand({
 });
 
 const reply = defineCommand({
-  meta: { name: "reply", description: "Responde en el hilo desde la máscara del hilo (sale al contacto)" },
+  meta: { name: "reply", description: "Responde en el hilo desde la dirección del hilo (sale al contacto)" },
   args: {
     ...conversationArgs,
     markdown: { type: "string", required: true as const, description: "Cuerpo de la respuesta en markdown" },
@@ -152,10 +152,10 @@ const reply = defineCommand({
 });
 
 const compose = defineCommand({
-  meta: { name: "compose", description: "Abre un hilo nuevo con un correo desde una máscara (gasta cuota de envío)" },
+  meta: { name: "compose", description: "Abre un hilo nuevo con un correo desde una dirección (gasta cuota de envío)" },
   args: {
     ...domainArg,
-    from: { type: "string", required: true as const, description: "Máscara del dominio desde la que sale (ventas o ventas@acme.com)" },
+    from: { type: "string", required: true as const, description: "Dirección del dominio desde la que sale (ventas o ventas@acme.com)" },
     to: { type: "string", required: true as const, description: "Destinatario" },
     subject: { type: "string", required: true as const, description: "Asunto" },
     markdown: { type: "string", required: true as const, description: "Cuerpo en markdown" },

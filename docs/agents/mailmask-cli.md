@@ -3,7 +3,7 @@
 **Qué:** CLI en TypeScript sobre `@easybits.cloud/mailmask` (`sdk/`), un subcomando
 por recurso del SDK — sin modelo declarativo encima. Esta primera entrega (ticket 1
 del sprint) trae `login`, `logout`, `whoami`, `domains` y `dns`. El ticket C del
-sprint 4 agregó `aliases` (máscaras y buzones IMAP). Un modo pensado para agentes llega después en un PR propio sobre esta misma base.
+sprint 4 agregó `aliases` (direcciones y buzones IMAP). Un modo pensado para agentes llega después en un PR propio sobre esta misma base.
 
 **Por qué:** la CLI no inventa nada encima del SDK — cada comando es 1:1 con un
 método ya documentado, para que no haya dos formas de aprenderse la API.
@@ -66,6 +66,7 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   a uno y no a los otros deja un comando que mezcla texto y JSON en el mismo
   flag. `domains health` siempre pasa `{ json: true }` porque su salida nunca
   tiene forma de texto.
+- **Término visible: «dirección».** En lo que lee quien usa la CLI (ayuda, mensajes, README, docs web) el recurso se llama «dirección»: nunca «alias» ni «máscara». Lo que no se ve se queda como estaba por compatibilidad: el comando `aliases`, los flags (`--alias`, `--from`), los positionales, los tipos y los campos del SDK/JSON. Un PR que cambie texto visible no renombra nada de eso; un test (`cli/test/aliases.test.ts`) vigila que la ayuda no diga «alias» ni «máscara». **Excepción conocida:** citty imprime el positional en mayúsculas en la línea USAGE (`<ALIAS>`), porque el nombre interno se conserva.
 - **Secretos:** nunca se imprimen completos más de una vez. `maskSecret()` en
   `cli/src/output.ts` muestra sólo cabeza y cola; úsala para cualquier API key,
   contraseña de buzón, secreto de webhook o credencial SMTP que un comando nuevo
@@ -114,7 +115,7 @@ método ya documentado, para que no haya dos formas de aprenderse la API.
   nunca completa salvo con `--json`. El aviso de cómo recuperarla completa
   NO es el mismo en los tres comandos: en `reset-password` sí vale "corre el
   mismo comando con --json" (no muta nada más, repetirlo es seguro), pero en
-  `create --mailbox` y `mailbox create` repetir el comando da 409 (la máscara
+  `create --mailbox` y `mailbox create` repetir el comando da 409 (la dirección
   o el buzón ya existen) — ahí el aviso (`afterSecretCreate()`) manda a
   `aliases mailbox reset-password <dominio> <alias> --yes --json`, que sí
   genera una contraseña nueva. Cada password sólo sale completa una vez, por
@@ -268,7 +269,7 @@ Dinero y dominios de por medio: el CLI **confirma, no cobra y no expone el EPP**
 
 - **`send` y `logs` (C13):** el grupo es `send email|bulk|status` y NO `send <dominio>`
   porque en citty un grupo con `subCommands` trata el primer positional como
-  subcomando. `--from` es la parte local del alias o la dirección completa: con `@` se
+  subcomando. `--from` es la parte local de la dirección o la dirección completa: con `@` se
   recorta sólo si lo que sigue es el dominio dado por nombre (sin mayúsculas); con otro
   dominio, o con `<dominio>` dado como id, `failUsage` antes de la red. El input lleva
   `from`, **nunca `fromLocal`** (el bug de la 0.1.4 mandó correos desde el remitente
