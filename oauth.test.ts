@@ -110,6 +110,17 @@ describe("OAuth del MCP", () => {
     assert.ok(loc.searchParams.get("code"));
   });
 
+  it("el consentimiento de /mcp/directory no promete ligas de pago", async () => {
+    const clientId = await register();
+    const { challenge } = pkce();
+    const base = { response_type: "code", client_id: clientId, redirect_uri: REDIRECT, state: "d1", code_challenge: challenge, code_challenge_method: "S256", scope: "mailmask" };
+    const dir = await (await req(`/oauth/authorize?${new URLSearchParams({ ...base, resource: "http://localhost/mcp/directory" })}`, { headers: { cookie } })).text();
+    assert.doesNotMatch(dir, /ligas de pago/);
+    assert.match(dir, /No podrá comprar ni cobrar nada/);
+    const full = await (await req(`/oauth/authorize?${new URLSearchParams({ ...base, resource: "http://localhost/mcp" })}`, { headers: { cookie } })).text();
+    assert.match(full, /ligas de pago/);
+  });
+
   it("DCR rechaza redirect_uris inseguras", async () => {
     for (const uris of [["http://evil.example/cb"], ["javascript:alert(1)"], ["data:text/html,x"], ["file:///etc/passwd"], ["vbscript:x"], [], ["https://a.example/cb#x"], ["cursor://a/cb#x"]]) {
       const r = await req("/oauth/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ redirect_uris: uris }) });

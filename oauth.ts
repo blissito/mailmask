@@ -308,11 +308,21 @@ export function authorizeGet(request: Request, query: Record<string, unknown>, u
     code_challenge_method: "S256", scope: c.p.scope, resource: c.p.resource, response_type: "code", ticket,
   }).map(([k, v]) => `<input type="hidden" name="${k}" value="${esc(v)}">`).join("");
   const soloDns = isDnsOnlyScope(c.p.scope);
+  // /mcp/directory no trae cobros ni crea buzones (DIRECTORY_ALLOWLIST en mcp.ts): el texto no
+  // puede prometer más de lo que el revisor del directorio va a encontrar.
+  const directory = new URL(c.p.resource).pathname === "/mcp/directory";
   const permisos = soloDns
     ? `<ul class="list-disc pl-5 space-y-1 text-sm text-fg-muted">
       <li>Ver tus dominios y crear o borrar registros DNS.</li>
     </ul>
     <p class="text-sm text-fg-muted mt-3">No podrá leer tu correo ni tus buzones.</p>`
+    : directory
+    ? `<ul class="list-disc pl-5 space-y-1 text-sm text-fg-muted">
+      <li>Ver y administrar tus dominios, máscaras y reglas.</li>
+      <li>Leer y contestar tu Bandeja y enviar correo desde tus dominios.</li>
+      <li>Revisar y editar el DNS de tus dominios.</li>
+    </ul>
+    <p class="text-sm text-fg-muted mt-3">No podrá comprar ni cobrar nada.</p>`
     : `<ul class="list-disc pl-5 space-y-1 text-sm text-fg-muted">
       <li>Ver y administrar tus dominios, máscaras, buzones y reglas.</li>
       <li>Enviar correo desde tus dominios.</li>
