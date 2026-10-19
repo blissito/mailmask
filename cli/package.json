@@ -1,7 +1,7 @@
 {
   "name": "mailmask-cli",
   "version": "0.1.0",
-  "description": "Official CLI for MailMask — manage domains, aliases, DNS, rules, webhooks and more from the terminal.",
+  "description": "CLI oficial de MailMask — gestiona dominios, direcciones, DNS, reglas, webhooks y más desde la terminal.",
   "type": "module",
   "bin": {
     "mailmask": "./dist/index.js"
@@ -28,7 +28,7 @@
     "typescript": "^7.0.2"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "keywords": [
     "mailmask",
@@ -36,5 +36,11 @@
     "cli",
     "dns"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blissito/mailmask.git",
+    "directory": "cli"
+  },
+  "homepage": "https://www.mailmask.studio/docs.html#cli"
 }

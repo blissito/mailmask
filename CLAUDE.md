@@ -20,6 +20,16 @@ diario propio a `mailmask-backups`). Secretos en `/app/secrets.env` de la caja (
 se queda a propósito: de él cuelgan las cookies `Secure` y el CORS; `TRUSTED_IP_HEADER=x-real-client-ip`).
 Runbook: `sandbox-host/docs/runbook-fly-migration.md` §7.
 
+## CLI (`cli/`)
+Paquete `mailmask-cli` en npm, aparte del SDK. La versión sale de `cli/package.json` (la lee `cli/src/index.ts` con `createRequire`), así que subirla ahí es lo único que cambia `--version`. Una versión publicada no se puede reusar: si sale de un commit equivocado queda quemada.
+
+Publicar, siempre desde `main` y no desde una rama:
+1. Mergea el PR con la versión nueva. Confirma que el check `verify-cli` de `main` está en verde.
+2. Desde un `main` limpio: `cd cli && npm ci && npm test && npm publish`. `prepublishOnly` corre el build.
+3. Anota el SHA publicado (`git rev-parse HEAD`) en el PR de seguimiento.
+
+El README, `docs.html#cli` y `llms.txt` dicen `npm i mailmask-cli` sólo después de publicar (ver `docs/agents/mailmask-cli.md`).
+
 ## SDK (`sdk/`)
 When any file inside `sdk/` is modified: bump the version (`npm version patch` in `sdk/`), build, and publish to npm:
 ```bash
