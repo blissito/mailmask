@@ -798,11 +798,13 @@ mailmask domains easybits unpublish &lt;dominio&gt; [--yes] [--json]</code></pre
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask dns list &lt;dominio&gt; [--json]
 mailmask dns upsert &lt;dominio&gt; &lt;nombre&gt; &lt;tipo&gt; &lt;valor...&gt; [--ttl 300]
 mailmask dns delete &lt;dominio&gt; &lt;nombre&gt; &lt;tipo&gt; [--yes] [--json]
-mailmask dns preset &lt;dominio&gt; &lt;preset&gt; [--target ...] [--subdomain ...]
+mailmask dns preset &lt;dominio&gt; &lt;preset&gt; [--target ...] [--subdomain ...] [--preview] [--json]
+mailmask dns website &lt;dominio&gt; [--json]
 mailmask dns create-zone &lt;dominio&gt;
 mailmask dns delegation &lt;dominio&gt;
 mailmask dns import &lt;dominio&gt; [--json]</code></pre>
       <p class="text-fg-muted text-sm mb-4"><code>dns preset</code> es la misma operaci&oacute;n que <code>domains create --preset</code>, para cuando el dominio ya existe: apunta la ra&iacute;z (y <code>www</code>, salvo que fijes <code>--subdomain</code>) a Vercel, Netlify, GitHub Pages, Cloudflare Pages, Render, Fly, un redirect a <code>www</code> o DMARC &mdash; sin escribir el registro a mano. <code>dns upsert</code> <strong class="text-fg">reemplaza</strong> el conjunto completo de valores de ese (nombre, tipo); los registros con <code>managed: true</code> (MX, verificaci&oacute;n, DKIM, SPF) los protege el servidor y no se pueden tocar desde aqu&iacute;. <code>dns import</code> es de s&oacute;lo lectura: muestra los registros encontrados, los nameservers y el aviso, sin cambiar nada (2 cada 5 min; el l&iacute;mite sale con <code>5</code>).</p>
+      <p class="text-fg-muted text-sm mb-4"><code>dns website</code> dice a d&oacute;nde apunta hoy la ra&iacute;z, <code>www</code> y cada subdominio, qu&eacute; plataforma es, qu&eacute; est&aacute; mal y si responde por HTTPS; s&oacute;lo lee. <code>dns preset --preview</code> muestra lo que escribir&iacute;a y lo que hay hoy, sin aplicar nada ni pedir confirmaci&oacute;n: &uacute;salo antes de un preset que vaya a cambiar un registro en uso.</p>
 
       <p class="text-sm font-bold mb-1">Reglas y supresiones</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask rules list &lt;dominio&gt; [--json]

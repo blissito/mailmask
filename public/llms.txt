@@ -112,7 +112,7 @@ respectivamente. Quien solo reenvía nunca toca el límite de envíos.
    - **CLI** (`mailmask`, terminal): aún no publicado en npm; se instala desde el repo
      (`cli/`: `npm install && npm run build`, luego `node dist/index.js --help`). Se autentica
      con `MAILMASK_API_KEY` (lo recomendado para un agente) o con `mailmask login`. Comandos:
-     `login`/`logout`/`whoami`, `domains` (con `dns-setup` y `logo`), `dns` (con `import`), `aliases` (con buzones IMAP en
+     `login`/`logout`/`whoami`, `domains` (con `dns-setup` y `logo`), `dns` (con `import`, `website` y `preset --preview`), `aliases` (con buzones IMAP en
      `aliases mailbox`, más `aliases apple-profile` y `aliases export`), `webhooks`, `smtp`,
      `rules`, `suppressions`, `send` (`send email`, `send bulk` y `send status`, con adjuntos) y `logs`, `inbox` (la Bandeja: list, get, reply, compose, update, assign, note, delete, restore, metrics, attachment), `canned` (respuestas guardadas), `signature` y `api-keys` (el secreto sale completo sólo en `create`), más `account` (perfil y foto), `members` (equipo e invitaciones), `billing` (cobros y add-ons), `domains easybits` (sitio de EasyBits por dominio: status, publish con `--dry-run`, unpublish), `registrations` (registrar, renovar, trasladar dominios y poner el candado de transferencia; quitarlo sólo desde el panel), `transfers` (traer un dominio: requisitos y DNS) y `referrals`. El CLI nunca paga ni espera el pago —`billing checkout`, `registrations register` y `registrations renewal` imprimen la liga— y nunca maneja el código EPP. `--json` para
      máquinas (los errores salen como JSON por stderr); lo destructivo y todo envío piden `--yes` fuera de una
