@@ -2,20 +2,20 @@
 :root {
   --mascara: 215 38 61; --mascara-sombra: 160 24 44; --gold: 242 183 5;
   --bg: 250 246 238; --bg-elev: 255 253 249; --bg-inset: 242 236 223; --line: 228 220 205;
-  --fg: 28 25 23; --fg-muted: 87 83 78; --fg-subtle: 120 113 108;
+  --fg: 28 25 23; --fg-muted: 87 83 78; --fg-subtle: 102 96 91; --accent-btn: 215 38 61;
   --accent: 215 38 61; --accent-text: 179 31 51; --mask: 5 150 105;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
   --bg: 22 18 15; --bg-elev: 32 26 22; --bg-inset: 42 35 30; --line: 62 52 45;
-  --fg: 245 239 230; --fg-muted: 184 173 160; --fg-subtle: 138 127 115;
+  --fg: 245 239 230; --fg-muted: 184 173 160; --fg-subtle: 138 127 115; --accent-btn: 196 36 56;
   --accent: 240 75 90; --accent-text: 255 122 133; --mascara: 226 58 74; --gold: 250 204 21; --mask: 52 211 153;
   color-scheme: dark;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: 22 18 15; --bg-elev: 32 26 22; --bg-inset: 42 35 30; --line: 62 52 45;
-    --fg: 245 239 230; --fg-muted: 184 173 160; --fg-subtle: 138 127 115;
+    --fg: 245 239 230; --fg-muted: 184 173 160; --fg-subtle: 138 127 115; --accent-btn: 196 36 56;
     --accent: 240 75 90; --accent-text: 255 122 133; --mascara: 226 58 74; --gold: 250 204 21; --mask: 52 211 153;
     color-scheme: dark;
   }
@@ -63,7 +63,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .actions button, .detail-top button, .toolbar select {
   padding: 6px 12px; border-radius: 8px; border: 1px solid rgb(var(--line)); background: rgb(var(--bg-elev));
 }
-.actions .primary { background: rgb(var(--accent)); border-color: rgb(var(--accent)); color: #fff; font-weight: 600; }
+.actions .primary { background: rgb(var(--accent-btn)); border-color: rgb(var(--accent-btn)); color: #fff; font-weight: 600; }
 .empty { color: rgb(var(--fg-subtle)); padding: 12px 2px; margin: 0; }
 .error { color: rgb(var(--accent-text)); margin: 0 0 8px; }
 

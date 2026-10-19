@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { readFileSync } from "node:fs";
 import { MailMask, MailMaskError } from "./sdk/src/index.js";
+import { log } from "./logger.js";
 
 export const MCP_VERSION = "1.0.0";
 
@@ -421,12 +422,21 @@ function pideConfirmacion(titulo: string): Salida {
 // iframe la arma el host con `csp` (vacía = sin red: todo pasa por tools).
 export const BANDEJA_UI_URI = "ui://mailmask/bandeja.html";
 const MCP_APP_MIME = "text/html;profile=mcp-app";
-const BANDEJA_RESOURCE_META = {
-  ui: { csp: { connectDomains: [], resourceDomains: [] }, prefersBorder: true },
-  "openai/widgetDescription": "La Bandeja compartida del dominio: conversaciones recientes, no leídas y urgentes.",
-  "openai/widgetPrefersBorder": true,
-  "openai/widgetCSP": { connect_domains: [], resource_domains: [] },
-};
+// `domain`: ChatGPT lo exige para publicar un plugin con UI (nuestro origen, del que deriva su
+// sandbox); Claude lo acepta sólo con su formato `<hash>.claudemcpcontent.com` y con cualquier
+// otro valor no pinta la pantalla. Como el servidor es stateless (el `clientInfo` sólo llega en
+// `initialize`), se decide por el User-Agent: a ChatGPT se le da, a los demás no.
+export const BANDEJA_UI_DOMAIN = "https://www.mailmask.studio";
+export const isChatGptAgent = (ua: string | null | undefined) => /openai|chatgpt/i.test(ua ?? "");
+function bandejaResourceMeta(chatgpt: boolean) {
+  return {
+    ui: { csp: { connectDomains: [], resourceDomains: [] }, prefersBorder: true, ...(chatgpt ? { domain: BANDEJA_UI_DOMAIN } : {}) },
+    "openai/widgetDescription": "La Bandeja compartida del dominio: conversaciones recientes, no leídas y urgentes.",
+    "openai/widgetPrefersBorder": true,
+    "openai/widgetCSP": { connect_domains: [], resource_domains: [] },
+    ...(chatgpt ? { "openai/widgetDomain": BANDEJA_UI_DOMAIN } : {}),
+  };
+}
 // inbox_list abre la pantalla; las tres las puede llamar la pantalla (visibility por defecto
 // = modelo y app). `widgetAccessible` es el equivalente de ChatGPT.
 const BANDEJA_LIST_META = {
@@ -451,7 +461,7 @@ function bandejaHtml(): string {
   return bandejaCache;
 }
 
-export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; profile?: McpProfile }): McpServer {
+export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; profile?: McpProfile; userAgent?: string | null }): McpServer {
   const directory = o.profile === "directory";
   // El SDK sólo conserva `error` del cuerpo; el título de la tarjeta se lee aquí.
   let confirmacion: string | null = null;
@@ -1010,9 +1020,13 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
 
   // Pantalla de la Bandeja (MCP Apps): el host la pide al ver `_meta.ui.resourceUri` en
   // inbox_list y la pinta en su iframe. Va en los dos perfiles: sus tools están en ambos.
-  server.registerResource("Bandeja", BANDEJA_UI_URI, { title: "Bandeja de MailMask", description: "Lista y detalle de las conversaciones de la Bandeja compartida.", mimeType: MCP_APP_MIME, _meta: BANDEJA_RESOURCE_META }, (uri) => ({
-    contents: [{ uri: uri.href, mimeType: MCP_APP_MIME, text: bandejaHtml(), _meta: BANDEJA_RESOURCE_META }],
-  }));
+  const chatgpt = isChatGptAgent(o.userAgent);
+  const resourceMeta = bandejaResourceMeta(chatgpt);
+  server.registerResource("Bandeja", BANDEJA_UI_URI, { title: "Bandeja de MailMask", description: "Lista y detalle de las conversaciones de la Bandeja compartida.", mimeType: MCP_APP_MIME, _meta: resourceMeta }, (uri) => {
+    // Para confirmar con tráfico real qué User-Agent manda cada host.
+    log("info", "assistant", "mcp ui resource read", { uri: uri.href, userAgent: o.userAgent ?? null, chatgpt, profile: o.profile ?? "full" });
+    return { contents: [{ uri: uri.href, mimeType: MCP_APP_MIME, text: bandejaHtml(), _meta: resourceMeta }] };
+  });
 
   return server;
 }
@@ -1020,7 +1034,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
 /** Atiende una petición HTTP de `/mcp` ya autenticada. Stateless: un servidor por petición. */
 export async function atenderMcp(request: Request, o: { apiKey: string; fetchLocal: typeof fetch; profile?: McpProfile }): Promise<Response> {
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-  const server = crearServidorMcp(o);
+  const server = crearServidorMcp({ ...o, userAgent: request.headers.get("user-agent") });
   await server.connect(transport);
   return transport.handleRequest(request);
 }

@@ -105,7 +105,8 @@ function rowHtml(c: Conversation): string {
   ].join("");
   const who = c.assignedTo ? `<span class="avatar" title="${esc(c.assignedTo)}">${esc(c.assignedTo[0]?.toUpperCase())}</span>` : "";
   const on = state.selected?.id === c.id ? " on" : "";
-  return `<button class="row${c.unread ? " unread" : ""}${on}" data-open="${esc(c.id)}">
+  const label = `${c.unread ? "Sin leer. " : ""}${sender(c.contact)}: ${c.subject || "sin asunto"}`;
+  return `<button class="row${c.unread ? " unread" : ""}${on}" data-open="${esc(c.id)}" aria-label="${esc(label)}">
     <span class="dot"></span>
     <span class="main">
       <span class="line1"><span class="from">${esc(sender(c.contact))}</span><span class="chip">${esc(localPart(c.alias))}</span>${badges}<span class="time">${esc(relativeTime(c.lastMessageAt))}</span></span>
@@ -176,7 +177,8 @@ function fullscreenHtml(l: ListResult): string {
 function render() {
   const l = state.list;
   document.documentElement.classList.toggle("fullscreen", state.fullscreen);
-  const head = `<header class="brand">${MASK_SVG}<span>Bandeja</span>${state.loading ? `<span class="spinner"></span>` : ""}</header>`;
+  // La guía de UI de ChatGPT no quiere el logo dentro de la tarjeta: sólo en pantalla completa.
+  const head = `<header class="brand">${state.fullscreen ? MASK_SVG : ""}<span>Bandeja</span>${state.loading ? `<span class="spinner" role="status" aria-label="Cargando"></span>` : ""}</header>`;
   const error = state.error ? `<p class="error">${esc(state.error)}</p>` : "";
   if (!l) { root.innerHTML = `${head}${error || `<p class="empty">Cargando…</p>`}`; return; }
   // En la tarjeta, abrir una fila lleva a pantalla completa con el detalle.

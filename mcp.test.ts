@@ -562,6 +562,24 @@ describe("MCP: agentes contra la app", () => {
     }
   });
 
+  it("pantalla de la Bandeja: `domain` sólo para ChatGPT (Claude no la pinta con otro formato)", async () => {
+    const { BANDEJA_UI_URI, BANDEJA_UI_DOMAIN } = await import("./mcp.js");
+    const leer = async (ua?: string) => {
+      const headers: Record<string, string> = { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `Bearer ${key}` };
+      if (ua) headers["user-agent"] = ua;
+      const res = await app.fetch(new Request("http://localhost/mcp/directory", { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: ++idRpc, method: "resources/read", params: { uri: BANDEJA_UI_URI } }) }));
+      return (await res.json()).result.contents[0]._meta;
+    };
+    const gpt = await leer("openai-mcp/1.0.0");
+    assert.equal(gpt.ui.domain, BANDEJA_UI_DOMAIN);
+    assert.equal(gpt["openai/widgetDomain"], BANDEJA_UI_DOMAIN);
+    for (const ua of ["Claude-User", undefined]) {
+      const m = await leer(ua);
+      assert.equal(m.ui.domain, undefined, String(ua));
+      assert.equal(m["openai/widgetDomain"], undefined, String(ua));
+    }
+  });
+
   it("cuenta de revisión: no manda correo ni invita a terceros reales; a sus dominios y a example.com sí", async () => {
     const { sandboxBlockedRecipients, isSandboxAccount } = await import("./sandbox.js");
     const rev = `dir-${suffix}-review@mailmask.studio`;
