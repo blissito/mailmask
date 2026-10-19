@@ -62,6 +62,7 @@ por la confirmación del host. Requisitos que cumple:
   es stateless, se decide por User-Agent (`isChatGptAgent` en `mcp.ts`): ChatGPT lo recibe, los demás
   no. El log `mcp ui resource read` guarda el User-Agent real para confirmarlo.
 - Guía de UI de OpenAI: máx. 2 acciones en la tarjeta, sin logo dentro de ella, contraste AA, móvil.
+- **Ficha de Claude corregida el 19-oct-2026** (seguía *In review* desde el 13): tools sincronizadas desde `/mcp/directory` (96 → 64, sin cobros, transferencias, `bulk_*` ni secretos), descripción sin pagos ni registro de dominios y con la pantalla de la Bandeja, «Has an MCP App» y carrusel `public/img/directory/bandeja-{1,2,3}.png` (2x, hechas con un arnés host local sobre el widget real y los datos de la cuenta demo, porque el monitor de bliss es 1x). El conector «MailMask (directorio)» de Claude.ai de bliss quedó conectado a la cuenta de revisor.
 - Directorio de Claude: los cambios del servidor no se reenvían; en `claude.ai/directory/manage` se
   suben 3–5 capturas PNG ≥1000 px recortadas a la respuesta, cada una con su prompt.
 - ZIP de ChatGPT `chatgpt-plugin/mailmask-plugin.zip` en 1.1.0 (la descripción menciona la pantalla).
