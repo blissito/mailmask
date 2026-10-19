@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Correo con IA sin pagar Gemini por persona — MailMask</title>
+    <meta name="description" content="Correo con IA sin Google Workspace: conecta Claude o ChatGPT a tu dominio por MCP y paga $99 MXN por dominio, no $140 por persona. Qué hace y qué no." />
+    <link rel="canonical" href="https://www.mailmask.studio/blog/correo-con-ia-sin-google-workspace" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="Correo con IA sin Google Workspace: tu agente lee y contesta tu dominio" />
+    <meta property="og:description" content="Gemini en Gmail se cobra por persona. Con MailMask conectas Claude, ChatGPT o cualquier agente MCP al correo de tu dominio y pagas $99 MXN por dominio, con personas ilimitadas." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.mailmask.studio/blog/correo-con-ia-sin-google-workspace" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="MailMask" />
+    <meta property="og:image" content="https://www.mailmask.studio/blog/img/correo-ia-og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Un buzón rojo sonriente con los ojos de la mascota de MailMask manda un sobre a una laptop que muestra una bandeja de correo y un chat con un asistente" />
+    <meta property="og:image:secure_url" content="https://www.mailmask.studio/blog/img/correo-ia-og.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta name="twitter:image" content="https://www.mailmask.studio/blog/img/correo-ia-og.jpg" />
+    <meta property="article:published_time" content="2026-10-19" />
+    <meta property="article:modified_time" content="2026-10-19" />
+    <meta property="article:section" content="Guías" />
+    <meta property="article:tag" content="correo con IA" />
+    <meta property="article:tag" content="Google Workspace" />
+    <meta property="article:tag" content="MCP" />
+    <meta property="article:tag" content="buzón inteligente" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@HectorBlisS" />
+    <meta name="twitter:creator" content="@HectorBlisS" />
+    <meta name="twitter:title" content="Correo con IA sin Google Workspace: tu agente lee y contesta tu dominio" />
+    <meta name="twitter:description" content="Conecta Claude o ChatGPT al correo de tu dominio por MCP. $99 MXN por dominio con personas ilimitadas, en vez de una licencia por persona." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <script src="/js/theme.js"></script>
+    <link rel="stylesheet" href="/blog/blog.css" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "Correo con IA sin Google Workspace: tu agente lee y contesta tu dominio",
+      "description": "Gemini en Gmail se cobra por persona. Con MailMask conectas Claude, ChatGPT o cualquier agente MCP al correo de tu dominio y pagas $99 MXN por dominio, con personas ilimitadas.",
+      "datePublished": "2026-10-19",
+      "dateModified": "2026-10-19",
+      "image": "https://www.mailmask.studio/blog/img/correo-ia.jpg",
+      "author": { "@type": "Organization", "name": "MailMask" },
+      "publisher": { "@type": "Organization", "name": "MailMask", "logo": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/logo.png" } },
+      "mainEntityOfPage": "https://www.mailmask.studio/blog/correo-con-ia-sin-google-workspace"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://www.mailmask.studio/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://www.mailmask.studio/blog" },
+        { "@type": "ListItem", "position": 3, "name": "Correo con IA sin Google Workspace: tu agente lee y contesta tu dominio", "item": "https://www.mailmask.studio/blog/correo-con-ia-sin-google-workspace" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Qué es un correo con IA o buzón inteligente?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Un correo con IA es una bandeja donde un modelo de lenguaje lee tus mensajes y trabaja con ellos: resume lo nuevo, redacta respuestas, busca un dato en hilos viejos y ordena conversaciones. Hay dos formas de tenerlo: la IA viene pegada al proveedor (Gemini dentro de Gmail, Copilot dentro de Outlook) o tú conectas el agente que ya usas (Claude, ChatGPT) a tu correo por un estándar abierto llamado MCP. Un buzón inteligente es eso mismo visto desde el buzón: no sólo guarda lo que llega, también lo entiende y actúa con lo que le pides."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cuánto cuesta Gemini en Gmail con Google Workspace en México?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Gemini en Gmail viene incluido en Google Workspace desde el plan Business Starter, que en México cuesta $140 MXN por usuario al mes con compromiso anual, antes de impuestos (página de precios de Google Workspace México, consultada el 19 de octubre de 2026). Para un equipo de cinco personas son $700 MXN al mes antes de IVA, porque la IA se cobra dentro de cada licencia."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Se puede tener correo con IA sin Google Workspace?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí. Con MailMask el correo vive en tu dominio y expone un servidor MCP en https://www.mailmask.studio/mcp. Conectas Claude, ChatGPT o cualquier cliente compatible con MCP y ese agente puede leer, buscar y contestar tu correo. El dominio activado cuesta $99 MXN al mes con personas ilimitadas; la suscripción del agente de IA se paga aparte con su proveedor."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo conecto Claude o ChatGPT a mi correo?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Agrega un conector personalizado con la URL https://www.mailmask.studio/mcp. En Claude.ai o Claude Desktop es Settings, Connectors, Add custom connector; en ChatGPT es Settings, Apps & Connectors, Create, con el modo desarrollador. El cliente te manda a mailmask.studio, inicias sesión, apruebas el acceso en una pantalla de consentimiento y listo: no copias ninguna llave."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué puede hacer un agente de IA con mi correo en MailMask?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Puede listar lo no leído de la Bandeja, leer cada conversación en texto, buscar en el historial, contestar como la dirección del dominio, redactar correos nuevos, asignar, etiquetar, posponer y dejar notas internas. También crea direcciones y buzones, y administra el DNS del dominio. Son unas cien herramientas del mismo SDK público de MailMask, así que el agente puede hacer lo que haces tú en el panel, salvo pagar: todo cobro es una liga que abres tú."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Es seguro conectar un agente de IA a mi correo?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "El acceso se da con OAuth 2.1 y PKCE: el agente nunca ve tu contraseña, recibe un token que dura una hora y se renueva con rotación, y cambiar tu contraseña corta todos los tokens. El servidor no entrega llaves de API ni contraseñas de buzón. Con Mask, el asistente dentro de la app, las acciones irreversibles como borrar un dominio no se ejecutan hasta que las apruebas con tu sesión."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Qué pierdo si dejo Google Workspace por MailMask?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Pierdes la suite de oficina: Drive, Docs, Hojas de cálculo, Meet y Calendar, y la IA integrada en esas apps. MailMask resuelve el correo del dominio (direcciones, Bandeja compartida, buzones IMAP para Apple Mail y Outlook, envío y DNS), no documentos ni videollamadas. Si tu equipo vive en Docs, conviene quedarte; si Workspace solo te da el correo, pagas licencias por algo que ya no necesitas."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Cómo paso mi correo de Google Workspace a MailMask?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Crea una cuenta gratis, agrega tu dominio y pega los registros que te da el panel (MX, verificación y DKIM) en tu proveedor de DNS. Después creas las direcciones que usabas en Workspace, con reenvío, buzón IMAP o ambos, y conectas tu agente al MCP. El dominio más antiguo de la cuenta es gratis; activarlo cuesta $99 MXN al mes."
+          }
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="site bg-bg text-fg antialiased min-h-screen">
+    <nav class="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-6 py-4 border-b border-line/70 bg-bg/85 backdrop-blur">
+      <a href="/" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">← MailMask</a>
+      <a href="/login" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">Iniciar sesión</a>
+    </nav>
+
+    <article class="blog-article">
+      <a href="/blog" class="blog-back">← Todos los artículos</a>
+      <header>
+        <h1>Correo con IA sin Google Workspace: tu agente lee y contesta tu dominio</h1>
+        <div class="meta">
+          <span>📅 19 Oct 2026</span>
+          <span>⏱ 8 min de lectura</span>
+        </div>
+      </header>
+
+      <figure class="blog-cover">
+        <img src="/blog/img/correo-ia-il.jpg" alt="Un buzón rojo sonriente con los ojos de la mascota de MailMask manda un sobre a una laptop que muestra una bandeja de correo y un chat con un asistente" width="1200" height="800" fetchpriority="high" />
+      </figure>
+
+      <div class="blog-content">
+        <p>Google metió Gemini en todos los planes de Workspace y subió el precio de cada licencia. La consecuencia es sencilla: <strong>la IA de tu correo se paga por persona</strong>. Cada vez que entra alguien al equipo, pagas otra licencia completa.</p>
+
+        <p>Hay otra forma de tener correo con IA. El correo vive en tu dominio, y el agente de IA que ya usas (Claude, ChatGPT u otro) se conecta a ese correo por un estándar abierto. Esta guía explica cómo funciona, cuánto cuesta cada camino y qué pierdes si dejas Workspace.</p>
+
+        <h2>¿Qué es un correo con IA o buzón inteligente?</h2>
+
+        <p><strong>Un correo con IA es una bandeja donde un modelo de lenguaje lee tus mensajes y trabaja con ellos.</strong> Resume lo que llegó, redacta respuestas, encuentra el número de pedido de un hilo de marzo y ordena las conversaciones por prioridad.</p>
+
+        <p>Hoy hay dos formas de tenerlo:</p>
+
+        <ul>
+          <li><strong>La IA viene pegada al proveedor.</strong> Gemini dentro de Gmail, Copilot dentro de Outlook. Funciona sólo dentro de esa app y se cobra en la licencia de cada persona.</li>
+          <li><strong>Tú conectas tu propio agente.</strong> El correo expone un servidor <strong>MCP</strong> (Model Context Protocol, el estándar abierto con el que Claude, ChatGPT y otros clientes usan herramientas externas). El agente que ya pagas trabaja sobre tu correo, tu DNS y lo demás que tengas conectado.</li>
+        </ul>
+
+        <p><strong>Un buzón inteligente es el mismo correo visto desde el buzón:</strong> no sólo guarda lo que llega, también lo entiende y actúa. En MailMask el buzón es tu dirección del dominio, con su Bandeja y su buzón IMAP para Apple Mail u Outlook. El agente conectado lo vuelve inteligente: le preguntas qué llegó, le pides que conteste y él lo hace sobre ese buzón.</p>
+
+        <p>La segunda forma es la que usa MailMask. La diferencia práctica es quién elige el modelo y cómo se cobra.</p>
+
+        <h2>¿Cuánto cuesta Gemini en Gmail con Google Workspace en México?</h2>
+
+        <p><strong>Gemini en Gmail viene desde el plan Business Starter, que en México cuesta $140 MXN por usuario al mes con compromiso anual, antes de impuestos.</strong> El dato sale de la <a href="https://workspace.google.com/intl/es-419_mx/pricing" rel="noopener" target="_blank">página de precios de Google Workspace México</a>, consultada el 19 de octubre de 2026.</p>
+
+        <p>Desde enero de 2025 Google dejó de vender Gemini como complemento y lo metió en el precio de los planes Business. En Starter incluye el asistente de Gemini en Gmail; Gemini en Docs, Hojas de cálculo, Meet y Drive queda para los planes superiores.</p>
+
+        <p>La cuenta para un equipo de cinco personas:</p>
+
+        <table>
+          <thead>
+            <tr><th></th><th>Google Workspace Starter</th><th>MailMask, dominio activado</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Cómo se cobra</td><td>Por persona</td><td>Por dominio</td></tr>
+            <tr><td>5 personas</td><td>5 × $140 = <strong>$700 MXN/mes</strong> + IVA</td><td><strong>$99 MXN/mes</strong></td></tr>
+            <tr><td>La persona número 6</td><td>+$140 MXN/mes</td><td>$0</td></tr>
+            <tr><td>Qué IA trae</td><td>Gemini, dentro de Gmail</td><td>La que conectes por MCP (su suscripción va aparte)</td></tr>
+            <tr><td>Suite de oficina</td><td>Drive, Docs, Meet, Calendar</td><td>No incluye</td></tr>
+          </tbody>
+        </table>
+
+        <p>Ojo con la última fila de IA: MailMask no te vende un modelo. Si tu equipo ya paga Claude o ChatGPT, ese mismo agente trabaja sobre tu correo sin otra licencia de correo por persona.</p>
+
+        <figure style="margin:36px 0">
+          <svg viewBox="0 0 720 400" width="100%" height="auto" role="img"
+               aria-label="Comparación: en Google Workspace cinco personas pagan cinco licencias de 140 pesos y Gemini trabaja sólo dentro de Gmail. En MailMask cinco personas comparten un dominio activado de 99 pesos, y Claude, ChatGPT o Mask se conectan al correo por el servidor MCP con OAuth."
+               style="max-width:720px;display:block;margin:0 auto">
+            <defs>
+              <marker id="fia" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="rgb(var(--fg-subtle))" />
+              </marker>
+            </defs>
+            <style>
+              .ia-caja { fill: rgb(var(--bg-elev)); stroke: rgb(var(--line)); stroke-width: 1.5; }
+              .ia-ok { fill: rgb(var(--mask-500) / .12); stroke: rgb(var(--mask-600)); stroke-width: 1.5; }
+              .ia-cob { fill: rgb(var(--accent) / .10); stroke: rgb(var(--accent)); stroke-width: 1.5; }
+              .ia-tit { fill: rgb(var(--fg)); font: 700 14px Inter, system-ui, sans-serif; letter-spacing: .04em; }
+              .ia-rot { fill: rgb(var(--fg)); font: 600 12.5px Inter, system-ui, sans-serif; }
+              .ia-sub { fill: rgb(var(--fg-muted)); font: 400 11px Inter, system-ui, sans-serif; }
+              .ia-v { fill: rgb(var(--fg-subtle)); font: 600 10.5px Inter, system-ui, sans-serif; }
+              .ia-l { stroke: rgb(var(--fg-subtle)); stroke-width: 1.4; fill: none; marker-end: url(#fia); }
+              .ia-sep { stroke: rgb(var(--line)); stroke-width: 1.5; stroke-dasharray: 4 4; }
+            </style>
+
+            <!-- Columna izquierda: Google Workspace -->
+            <text class="ia-tit" x="175" y="24" text-anchor="middle">GOOGLE WORKSPACE</text>
+
+            <rect class="ia-caja" x="40" y="44" width="270" height="52" rx="10" />
+            <text class="ia-rot" x="175" y="66" text-anchor="middle">Equipo de 5 personas</text>
+            <text class="ia-sub" x="175" y="84" text-anchor="middle">ana@, beto@, caro@, dani@, eli@</text>
+
+            <path class="ia-l" d="M175,96 L175,132" />
+            <text class="ia-v" x="185" y="118">cobra por persona</text>
+
+            <rect class="ia-cob" x="40" y="134" width="270" height="56" rx="10" />
+            <text class="ia-rot" x="175" y="157" text-anchor="middle">5 licencias Business Starter</text>
+            <text class="ia-sub" x="175" y="176" text-anchor="middle">5 × $140 = $700 MXN/mes + IVA</text>
+
+            <path class="ia-l" d="M175,190 L175,226" />
+            <text class="ia-v" x="185" y="212">incluye</text>
+
+            <rect class="ia-caja" x="40" y="228" width="270" height="56" rx="10" />
+            <text class="ia-rot" x="175" y="251" text-anchor="middle">Gmail + Gemini</text>
+            <text class="ia-sub" x="175" y="270" text-anchor="middle">la IA trabaja sólo dentro de Gmail</text>
+
+            <rect class="ia-caja" x="40" y="320" width="270" height="52" rx="10" />
+            <text class="ia-rot" x="175" y="342" text-anchor="middle">Modelo: el que elige Google</text>
+            <text class="ia-sub" x="175" y="360" text-anchor="middle">persona nueva = otra licencia</text>
+            <path class="ia-l" d="M175,284 L175,318" />
+
+            <line class="ia-sep" x1="360" y1="12" x2="360" y2="388" />
+
+            <!-- Columna derecha: MailMask -->
+            <text class="ia-tit" x="545" y="24" text-anchor="middle">MAILMASK</text>
+
+            <rect class="ia-caja" x="410" y="44" width="270" height="52" rx="10" />
+            <text class="ia-rot" x="545" y="66" text-anchor="middle">Equipo de 5 personas</text>
+            <text class="ia-sub" x="545" y="84" text-anchor="middle">las mismas direcciones del dominio</text>
+
+            <path class="ia-l" d="M545,96 L545,132" />
+            <text class="ia-v" x="555" y="118">cobra por dominio</text>
+
+            <rect class="ia-ok" x="410" y="134" width="270" height="56" rx="10" />
+            <text class="ia-rot" x="545" y="157" text-anchor="middle">1 dominio activado</text>
+            <text class="ia-sub" x="545" y="176" text-anchor="middle">$99 MXN/mes · personas ilimitadas</text>
+
+            <path class="ia-l" d="M545,190 L545,226" />
+            <text class="ia-v" x="555" y="212">guarda el correo en</text>
+
+            <rect class="ia-caja" x="410" y="228" width="270" height="56" rx="10" />
+            <text class="ia-rot" x="545" y="251" text-anchor="middle">Bandeja + buzones IMAP</text>
+            <text class="ia-sub" x="545" y="270" text-anchor="middle">servidor MCP en /mcp</text>
+
+            <path class="ia-l" d="M545,318 L545,286" />
+            <text class="ia-v" x="555" y="306">se conecta con OAuth</text>
+
+            <rect class="ia-ok" x="410" y="320" width="270" height="52" rx="10" />
+            <text class="ia-rot" x="545" y="342" text-anchor="middle">Claude · ChatGPT · Mask</text>
+            <text class="ia-sub" x="545" y="360" text-anchor="middle">el agente que tú elijas</text>
+          </svg>
+        </figure>
+
+        <h2>¿Se puede tener correo con IA sin Google Workspace?</h2>
+
+        <p><strong>Sí: con MailMask el correo vive en tu dominio y cualquier agente compatible con MCP puede trabajar sobre él.</strong> El servidor está en <code>https://www.mailmask.studio/mcp</code> y usa exactamente el mismo SDK público que el panel, así que el agente ve lo mismo que tú.</p>
+
+        <p>El correo en sí no depende de la IA. Las direcciones del dominio (también llamadas alias) pueden reenviar a otro correo, guardar en la <a href="/blog/bandeja-compartida-tutorial">Bandeja compartida</a> o tener un <a href="/blog/buzones-imap-apple-mail-outlook-dominio-propio">buzón IMAP para Apple Mail y Outlook</a>. La IA es una capa que conectas encima, y la puedes cambiar de proveedor sin mover el correo.</p>
+
+        <p>Para empezar no pagas nada. El dominio más antiguo de tu cuenta es gratis: reenvía, tiene 5 direcciones y una Bandeja para una persona con 7 días visibles. Activarlo cuesta $99 MXN al mes y abre direcciones ilimitadas, personas ilimitadas, 50 envíos de correo nuevo al día y buzones IMAP. Los detalles están en <a href="/pricing">precios</a>.</p>
+
+        <h2>¿Cómo conecto Claude o ChatGPT a mi correo?</h2>
+
+        <p><strong>Agrega un conector personalizado con la URL <code>https://www.mailmask.studio/mcp</code> y aprueba el acceso en mailmask.studio.</strong> No copias ninguna llave: el cliente y MailMask se ponen de acuerdo con OAuth.</p>
+
+        <ul>
+          <li><strong>Claude.ai o Claude Desktop:</strong> Settings → Connectors → Add custom connector, con el nombre MailMask y la URL. Después, Connect.</li>
+          <li><strong>ChatGPT:</strong> Settings → Apps &amp; Connectors → Create, con la URL y autenticación OAuth. Requiere el modo desarrollador.</li>
+          <li><strong>Claude Code:</strong> <code>claude mcp add --transport http mailmask https://www.mailmask.studio/mcp</code> y luego <code>/mcp</code> → mailmask → Authenticate.</li>
+        </ul>
+
+        <p>En los tres casos el cliente abre mailmask.studio, inicias sesión y ves una pantalla de consentimiento con el nombre de la app que pide acceso. Al aprobar, el agente recibe un token propio. La guía técnica completa está en la <a href="/docs#mcp">documentación del MCP</a>.</p>
+
+        <h2>¿Qué puede hacer un agente de IA con mi correo en MailMask?</h2>
+
+        <p><strong>Un agente conectado puede leer, buscar, contestar y ordenar el correo del dominio, y además administrar direcciones, buzones y DNS.</strong> Son unas cien herramientas, y cada una llama al mismo SDK que usa el panel de MailMask. Algunas peticiones que funcionan tal cual:</p>
+
+        <ul>
+          <li><em>«¿Qué llegó hoy a ventas@ que no he leído?»</em> El agente lista lo no leído de esa dirección y lee cada conversación en texto.</li>
+          <li><em>«Contéstale a Laura que el envío sale el jueves.»</em> Redacta la respuesta en el mismo hilo, como la dirección del dominio y con tu firma.</li>
+          <li><em>«Asígnale a Beto los correos de facturación y deja una nota.»</em> Asigna, etiqueta y escribe notas internas que el cliente nunca ve.</li>
+          <li><em>«Crea pagos@ con buzón para Apple Mail.»</em> Crea la dirección con su buzón IMAP.</li>
+          <li><em>«Apunta www a Vercel.»</em> Escribe el registro DNS correcto, sin que tú adivines si va CNAME o A.</li>
+        </ul>
+
+        <p>Lo que el agente no puede hacer, a propósito: no paga nada (todo cobro es una liga de MercadoPago que abres tú), no ve tus llaves de API ni fabrica llaves nuevas, y no puede quitar el candado de transferencia de un dominio. El texto que lee de cada correo llega en texto plano, no en HTML.</p>
+
+        <p>Si lo que buscas es clasificación automática o respuestas sugeridas dentro de la Bandeja, sin conectar nada, eso lo estamos explorando: lo contamos en <a href="/blog/clasificador-automatico-emails-ia">clasificar correos con IA</a> y en <a href="/blog/respuestas-sugeridas-ia">respuestas sugeridas con IA</a>.</p>
+
+        <h2>¿Es seguro conectar un agente de IA a mi correo?</h2>
+
+        <p><strong>El agente nunca ve tu contraseña: recibe un token de OAuth 2.1 con PKCE que dura una hora y se renueva con rotación.</strong> Si un token de renovación se usa dos veces, MailMask revoca toda la familia de tokens, porque el reuso es la señal de un robo. Cambiar tu contraseña corta todos los tokens de golpe.</p>
+
+        <p>El servidor tampoco entrega secretos. Un agente no puede pedir tus llaves de API, ni las credenciales SMTP, ni el panel de administración. Para el DNS existe un permiso más chico (<code>dns</code>) que sólo deja leer y escribir registros, sin tocar el correo.</p>
+
+        <p>Dentro de la app está <strong>Mask</strong>, el asistente de MailMask, que usa el mismo MCP con un token de cinco minutos por turno. Con Mask, borrar un dominio, una dirección, un buzón o un registro DNS no se ejecuta: aparece una tarjeta con los datos reales y la acción corre sólo cuando la apruebas con tu sesión. Mask se está abriendo por etapas a las cuentas con dominio activado.</p>
+
+        <p>Con un agente externo como Claude, las instrucciones del servidor le piden confirmar contigo antes de enviar o borrar, y los clientes de MCP suelen pedirte permiso antes de usar cada herramienta. Aun así, conecta sólo agentes en los que confíes: tienen el mismo alcance que tu sesión.</p>
+
+        <h2>¿Qué pierdo si dejo Google Workspace por MailMask?</h2>
+
+        <p><strong>Pierdes la suite de oficina: Drive, Docs, Hojas de cálculo, Meet, Calendar y la IA integrada en esas apps.</strong> MailMask resuelve el correo del dominio, no documentos ni videollamadas.</p>
+
+        <p>La pregunta útil es qué usa tu equipo de verdad. Si viven en Docs y Meet, Workspace se paga solo y conviene quedarse. Si Workspace sólo te da el correo con tu dominio, estás pagando licencias por persona por algo que no usas. Comparamos los dos casos con más calma en <a href="/alternativa-google-workspace">la alternativa a Google Workspace</a> y en <a href="/blog/email-profesional-sin-google-workspace">email profesional sin Google Workspace</a>.</p>
+
+        <p>Lo que sí conservas: escribir desde tu dominio, leer en Apple Mail o Outlook con IMAP, una Bandeja compartida para todo el equipo y el DNS del dominio en el mismo lugar.</p>
+
+        <h2>¿Cómo paso mi correo de Google Workspace a MailMask?</h2>
+
+        <p><strong>Crea una cuenta gratis, agrega tu dominio y pega en tu DNS los registros que te da el panel.</strong> Son el MX, la verificación y tres CNAME de DKIM. Si tu agente ya está conectado, puede dictarte los registros y comprobar después que quedaron bien.</p>
+
+        <ol>
+          <li>Crea la cuenta en <a href="/register">mailmask.studio</a> y agrega tu dominio.</li>
+          <li>Copia los registros de DNS. Cambiar el MX es el momento en que el correo deja de llegar a Workspace y empieza a llegar a MailMask.</li>
+          <li>Crea las direcciones que usabas: con reenvío, con buzón IMAP o con las dos.</li>
+          <li>Conecta tu agente a <code>https://www.mailmask.studio/mcp</code>.</li>
+          <li>Cuando todo funcione, cancela las licencias de Workspace.</li>
+        </ol>
+
+        <p>El paso a paso, incluido qué hacer con el correo viejo, está en <a href="/blog/migrar-google-workspace-a-mailmask">cómo migrar de Google Workspace a MailMask</a>.</p>
+
+        <h2>Resumen rápido</h2>
+
+        <ul>
+          <li><strong>Gemini en Gmail se cobra por persona:</strong> $140 MXN por usuario al mes en Business Starter, antes de IVA.</li>
+          <li><strong>MailMask cobra por dominio:</strong> $99 MXN al mes con personas ilimitadas, y un dominio gratis para empezar.</li>
+          <li><strong>La IA la eliges tú:</strong> Claude, ChatGPT o cualquier cliente MCP se conecta a <code>/mcp</code> con OAuth, sin copiar llaves.</li>
+          <li><strong>El agente lee, busca, contesta y ordena</strong> el correo, y administra direcciones y DNS; no paga ni ve tus secretos.</li>
+          <li><strong>Si usas Docs y Meet, quédate en Workspace.</strong> Si sólo usas el correo, estás pagando licencias de más.</li>
+        </ul>
+      </div>
+    </article>
+
+    <section class="blog-cta">
+      <h2>Tu correo, con el agente que tú elijas</h2>
+      <p>Correo en tu dominio, Bandeja compartida y servidor MCP para Claude o ChatGPT. Gratis para empezar · $99 por dominio activado.</p>
+      <a href="/register" class="cta-btn">Crear cuenta gratis</a>
+    </section>
+
+    <footer class="border-t border-line py-8 mt-8">
+      <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-2 text-fg-muted text-sm">
+          <svg class="w-5 h-5" viewBox="0 0 80 80" fill="none">
+            <ellipse cx="40" cy="40" rx="20" ry="18" fill="rgb(var(--mask-500))" />
+            <ellipse cx="32" cy="37" rx="5" ry="4" fill="#18181b" />
+            <ellipse cx="48" cy="37" rx="5" ry="4" fill="#18181b" />
+          </svg>
+          MailMask · mailmask.studio
+        </div>
+        <div class="text-fg-subtle text-sm flex gap-4">
+          <a href="/terms" class="hover:text-fg transition-colors">Términos</a>
+          <a href="/privacy" class="hover:text-fg transition-colors">Privacidad</a>
+          <a href="/blog" class="hover:text-fg transition-colors">Blog</a>
+          <a href="/login" class="hover:text-fg transition-colors">Iniciar sesión</a>
+        </div>
+      </div>
+      <p class="text-center text-fg-subtle text-xs mt-4">
+        © 2026 by fixter.org
+      </p>
+    </footer>
+  </body>
+</html>
