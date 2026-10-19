@@ -811,7 +811,7 @@ mailmask suppressions remove &lt;dominio&gt; &lt;correo&gt; [--yes] [--json]</co
       <p class="text-fg-muted text-sm mb-4"><code>forward</code> y <code>webhook</code> exigen <code>--target</code>. Los flags se validan antes de tocar la red; la regex la valida el servidor, y una peligrosa sale con <code>1</code> y el mensaje del servidor.</p>
 
       <p class="text-sm font-bold mb-1">Env&iacute;o y logs</p>
-      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask send email &lt;dominio&gt; --to &lt;correo&gt; --subject &lt;asunto&gt; [--from &lt;alias&gt;] [--from-name &lt;nombre&gt;] [--reply-to &lt;correo&gt;] [--cc &lt;correo&gt;]... [--bcc &lt;correo&gt;]... [--text &lt;texto|@archivo&gt; | --html &lt;html|@archivo&gt; | --markdown &lt;md|@archivo&gt;] [--attach &lt;archivo&gt;]... [--idempotency-key &lt;clave&gt;] [--yes] [--json]
+      <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask send email &lt;dominio&gt; --to &lt;correo&gt; --subject &lt;asunto&gt; [--from &lt;dirección&gt;] [--from-name &lt;nombre&gt;] [--reply-to &lt;correo&gt;] [--cc &lt;correo&gt;]... [--bcc &lt;correo&gt;]... [--text &lt;texto|@archivo&gt; | --html &lt;html|@archivo&gt; | --markdown &lt;md|@archivo&gt;] [--attach &lt;archivo&gt;]... [--idempotency-key &lt;clave&gt;] [--yes] [--json]
 mailmask send bulk &lt;dominio&gt; &lt;archivo.json&gt; [--yes] [--json]
 mailmask send status &lt;dominio&gt; &lt;jobId&gt; [--json]
 mailmask logs &lt;dominio&gt; [--limit 1-100] [--json]</code></pre>
@@ -841,14 +841,14 @@ mailmask signature set &lt;dominio&gt; &lt;markdown&gt; [--json]</code></pre>
 
       <p class="text-sm font-bold mb-1">Direcciones y buzones</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask aliases list &lt;dominio&gt; [--json]
-mailmask aliases create &lt;dominio&gt; &lt;alias&gt; [destino...] [--mailbox] [--json]
-mailmask aliases update &lt;dominio&gt; &lt;alias&gt; [destino...] [--enable | --disable] [--json]
-mailmask aliases delete &lt;dominio&gt; &lt;alias&gt; [--yes] [--json]
-mailmask aliases mailbox create &lt;dominio&gt; &lt;alias&gt; [--json]
-mailmask aliases mailbox delete &lt;dominio&gt; &lt;alias&gt; [--yes] [--json]
-mailmask aliases mailbox reset-password &lt;dominio&gt; &lt;alias&gt; [--yes] [--json]
-mailmask aliases apple-profile &lt;dominio&gt; &lt;alias&gt; -o perfil.mobileconfig
-mailmask aliases export &lt;dominio&gt; &lt;alias&gt; [-o buzon.mbox]</code></pre>
+mailmask aliases create &lt;dominio&gt; &lt;dirección&gt; [destino...] [--mailbox] [--json]
+mailmask aliases update &lt;dominio&gt; &lt;dirección&gt; [destino...] [--enable | --disable] [--json]
+mailmask aliases delete &lt;dominio&gt; &lt;dirección&gt; [--yes] [--json]
+mailmask aliases mailbox create &lt;dominio&gt; &lt;dirección&gt; [--json]
+mailmask aliases mailbox delete &lt;dominio&gt; &lt;dirección&gt; [--yes] [--json]
+mailmask aliases mailbox reset-password &lt;dominio&gt; &lt;dirección&gt; [--yes] [--json]
+mailmask aliases apple-profile &lt;dominio&gt; &lt;dirección&gt; -o perfil.mobileconfig
+mailmask aliases export &lt;dominio&gt; &lt;dirección&gt; [-o buzon.mbox]</code></pre>
 
       <p class="text-sm font-bold mb-1">Webhooks, SMTP y API keys</p>
       <pre class="bg-bg-elev border border-line rounded-lg p-4 overflow-x-auto text-sm font-mono mb-6"><code>mailmask webhooks list &lt;dominio&gt; [--json]

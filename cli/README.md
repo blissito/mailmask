@@ -47,7 +47,7 @@ mailmask suppressions list <dominio> [--json]
 mailmask suppressions add <dominio> <correo> [--json]
 mailmask suppressions remove <dominio> <correo> [--yes] [--json]
 
-mailmask send email <dominio> --to <correo> --subject <asunto> [--from <alias>] [--from-name <nombre>] [--reply-to <correo>] [--cc <correo>]... [--bcc <correo>]... [--text <texto|@archivo> | --html <html|@archivo> | --markdown <md|@archivo>] [--attach <archivo>]... [--idempotency-key <clave>] [--yes] [--json]
+mailmask send email <dominio> --to <correo> --subject <asunto> [--from <dirección>] [--from-name <nombre>] [--reply-to <correo>] [--cc <correo>]... [--bcc <correo>]... [--text <texto|@archivo> | --html <html|@archivo> | --markdown <md|@archivo>] [--attach <archivo>]... [--idempotency-key <clave>] [--yes] [--json]
 mailmask send bulk <dominio> <archivo.json> [--yes] [--json]
 mailmask send status <dominio> <jobId> [--json]
 mailmask logs <dominio> [--limit 1-100] [--json]
@@ -106,14 +106,14 @@ mailmask referrals slug <slug> [--json]
 mailmask referrals name <nombre> [--json]
 
 mailmask aliases list <dominio> [--json]
-mailmask aliases create <dominio> <alias> [destino...] [--mailbox] [--json]
-mailmask aliases update <dominio> <alias> [destino...] [--enable | --disable] [--json]
-mailmask aliases delete <dominio> <alias> [--yes] [--json]
-mailmask aliases mailbox create <dominio> <alias> [--json]
-mailmask aliases mailbox delete <dominio> <alias> [--yes] [--json]
-mailmask aliases mailbox reset-password <dominio> <alias> [--yes] [--json]
-mailmask aliases apple-profile <dominio> <alias> -o perfil.mobileconfig
-mailmask aliases export <dominio> <alias> [-o buzon.mbox]
+mailmask aliases create <dominio> <dirección> [destino...] [--mailbox] [--json]
+mailmask aliases update <dominio> <dirección> [destino...] [--enable | --disable] [--json]
+mailmask aliases delete <dominio> <dirección> [--yes] [--json]
+mailmask aliases mailbox create <dominio> <dirección> [--json]
+mailmask aliases mailbox delete <dominio> <dirección> [--yes] [--json]
+mailmask aliases mailbox reset-password <dominio> <dirección> [--yes] [--json]
+mailmask aliases apple-profile <dominio> <dirección> -o perfil.mobileconfig
+mailmask aliases export <dominio> <dirección> [-o buzon.mbox]
 
 mailmask webhooks list <dominio> [--json]
 mailmask webhooks create <dominio> <url> --events email.received,email.bounced [--json]
@@ -167,7 +167,7 @@ Para copiarla completa: en `reset-password` corre el mismo comando con
 `--json` (no muta nada más, repetirlo es seguro). En `aliases create --mailbox`
 y `aliases mailbox create` repetir el comando NO sirve — la dirección o el
 buzón ya existen y el SDK responde 409 —, así que ahí hay que seguir con
-`aliases mailbox reset-password <dominio> <alias> --yes --json`, que genera
+`aliases mailbox reset-password <dominio> <dirección> --yes --json`, que genera
 una contraseña nueva (la de la creación ya no se puede recuperar).
 
 `aliases apple-profile -o perfil.mobileconfig` escribe el perfil de
