@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "tsx --watch main.ts",
     "start": "tsx main.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build": "npm run build:css && npm run build:chat && npm run build:composer && npm run build:direccion && npm run check:skills",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p widgets/tsconfig.json",
+    "build": "npm run build:css && npm run build:chat && npm run build:composer && npm run build:direccion && npm run build:widgets && npm run check:skills",
     "test": "NODE_OPTIONS=\"--import ./test-setup.mjs\" DATABASE_PATH=./data/test.db JWT_SECRET=test-secret-key MP_ACCESS_TOKEN=test MP_WEBHOOK_SECRET=test AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_ENDPOINT_URL=http://localhost:1 tsx --test --test-timeout=60000 --test-concurrency=1 --experimental-test-module-mocks \"*.test.ts\" \"public/js/asistente/*.test.ts\"",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -17,7 +17,8 @@
     "skills:pack": "npx tsx scripts/skills-pack.mts --write",
     "skills:publish": "npm run check:skills && git subtree push --prefix public/skills git@github.com:blissito/mailmask-skills.git main",
     "build:direccion": "NODE_ENV=production esbuild public/js/direccion.tsx --bundle --outfile=public/js/direccion.js --format=esm --jsx=automatic --target=es2020 --minify --define:process.env.NODE_ENV='\"production\"'",
-    "build:composer": "NODE_ENV=production esbuild public/js/composer.ts --bundle --outfile=public/js/composer.js --format=iife --target=es2020 --minify"
+    "build:composer": "NODE_ENV=production esbuild public/js/composer.ts --bundle --outfile=public/js/composer.js --format=iife --target=es2020 --minify",
+    "build:widgets": "NODE_ENV=production esbuild widgets/bandeja.ts --bundle --outfile=widgets/bandeja.js --format=iife --target=es2020 --minify --define:process.env.NODE_ENV='\"production\"'"
   },
   "dependencies": {
     "@aws-sdk/client-iam": "^3",
@@ -55,6 +56,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@modelcontextprotocol/ext-apps": "1.7.5",
     "@tiptap/core": "^3.31.4",
     "@tiptap/extension-image": "^3.31.4",
     "@tiptap/extension-placeholder": "^3.31.4",

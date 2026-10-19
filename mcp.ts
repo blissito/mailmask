@@ -6,7 +6,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { readFileSync } from "node:fs";
 import { MailMask, MailMaskError } from "./sdk/src/index.js";
+import { log } from "./logger.js";
 
 export const MCP_VERSION = "1.0.0";
 
@@ -412,7 +414,54 @@ function pideConfirmacion(titulo: string): Salida {
   return { content: [{ type: "text", text: `Necesita confirmación del usuario: le apareció una tarjeta en el asistente para aprobar «${titulo}». No reintentes; espera a que confirme.` }], structuredContent: { needsConfirmation: true, title: titulo } };
 }
 
-export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; profile?: McpProfile }): McpServer {
+// --- Pantallas MCP Apps (ChatGPT, Claude) ---
+//
+// Estándar abierto de MCP Apps (`@modelcontextprotocol/ext-apps`, el mismo en ChatGPT y
+// Claude) más las llaves `openai/*` que ChatGPT todavía lee. El HTML viaja dentro de
+// `resources/read`, así que la CSP y el X-Frame-Options de main.ts no le aplican; la del
+// iframe la arma el host con `csp` (vacía = sin red: todo pasa por tools).
+export const BANDEJA_UI_URI = "ui://mailmask/bandeja.html";
+const MCP_APP_MIME = "text/html;profile=mcp-app";
+// `domain`: ChatGPT lo exige para publicar un plugin con UI (nuestro origen, del que deriva su
+// sandbox); Claude lo acepta sólo con su formato `<hash>.claudemcpcontent.com` y con cualquier
+// otro valor no pinta la pantalla. Como el servidor es stateless (el `clientInfo` sólo llega en
+// `initialize`), se decide por el User-Agent: a ChatGPT se le da, a los demás no.
+export const BANDEJA_UI_DOMAIN = "https://www.mailmask.studio";
+export const isChatGptAgent = (ua: string | null | undefined) => /openai|chatgpt/i.test(ua ?? "");
+function bandejaResourceMeta(chatgpt: boolean) {
+  return {
+    ui: { csp: { connectDomains: [], resourceDomains: [] }, prefersBorder: true, ...(chatgpt ? { domain: BANDEJA_UI_DOMAIN } : {}) },
+    "openai/widgetDescription": "La Bandeja compartida del dominio: conversaciones recientes, no leídas y urgentes.",
+    "openai/widgetPrefersBorder": true,
+    "openai/widgetCSP": { connect_domains: [], resource_domains: [] },
+    ...(chatgpt ? { "openai/widgetDomain": BANDEJA_UI_DOMAIN } : {}),
+  };
+}
+// inbox_list abre la pantalla; las tres las puede llamar la pantalla (visibility por defecto
+// = modelo y app). `widgetAccessible` es el equivalente de ChatGPT.
+const BANDEJA_LIST_META = {
+  ui: { resourceUri: BANDEJA_UI_URI },
+  "ui/resourceUri": BANDEJA_UI_URI,
+  "openai/outputTemplate": BANDEJA_UI_URI,
+  "openai/widgetAccessible": true,
+  "openai/toolInvocation/invoking": "Abriendo la Bandeja…",
+  "openai/toolInvocation/invoked": "Bandeja",
+};
+const BANDEJA_CALLABLE_META = { "openai/widgetAccessible": true };
+
+// widgets/bandeja.{js,css} los compila `npm run build:widgets` y van commiteados, igual que
+// public/js/*.js. Se arma una vez por proceso.
+let bandejaCache: string | null = null;
+function bandejaHtml(): string {
+  if (bandejaCache) return bandejaCache;
+  const leer = (f: string) => readFileSync(new URL(`./widgets/${f}`, import.meta.url), "utf8");
+  // `</script` dentro del bundle cerraría la etiqueta antes de tiempo.
+  const js = leer("bandeja.js").replace(/<\/script/gi, "<\\/script");
+  bandejaCache = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Bandeja · MailMask</title><style>${leer("bandeja.css")}</style></head><body><div id="app"></div><script>${js}</script></body></html>`;
+  return bandejaCache;
+}
+
+export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; profile?: McpProfile; userAgent?: string | null }): McpServer {
   const directory = o.profile === "directory";
   // El SDK sólo conserva `error` del cuerpo; el título de la tarjeta se lee aquí.
   let confirmacion: string | null = null;
@@ -437,7 +486,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
     mxConfigured: d.mxStatus === "unknown" ? null : d.mxConfigured,
   });
 
-  const tool = <S extends z.ZodRawShape>(name: string, description: string, shape: S, run: (args: z.infer<z.ZodObject<S>>) => Promise<unknown>) => {
+  const tool = <S extends z.ZodRawShape>(name: string, description: string, shape: S, run: (args: z.infer<z.ZodObject<S>>) => Promise<unknown>, _meta?: Record<string, unknown>) => {
     // Directorio: lo que no está en la lista blanca ni se registra (ni tools/list, ni
     // search_tools, ni tools/call); los parámetros omitidos ni se ven ni llegan al SDK.
     if (directory) {
@@ -464,7 +513,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
       destructiveHint: readOnly ? false : DESTRUCTIVE_TOOLS.has(name),
       openWorldHint: OPEN_WORLD_TOOLS.has(name),
     };
-    server.registerTool(name, { title: annotations.title, description, inputSchema: shape, annotations }, cb as unknown as Parameters<typeof server.registerTool>[2]);
+    server.registerTool(name, { title: annotations.title, description, inputSchema: shape, annotations, ...(_meta ? { _meta } : {}) }, cb as unknown as Parameters<typeof server.registerTool>[2]);
   };
 
   // --- Dominios ---
@@ -785,7 +834,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
         unreadCount: r.unreadCount,
         aliases: r.aliases,
       };
-    });
+    }, BANDEJA_LIST_META);
 
   tool("inbox_read",
     "Opens a conversation and returns its messages as plain text (the 30 most recent; pass `before` = nextBefore for older ones), the team's internal notes and each message's attachments. Marks it as read for you. `direction` inbound = from the contact, outbound = sent from the domain.",
@@ -805,7 +854,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
         totalMessages: c.totalMessages,
         nextBefore: c.hasMore && c.messages.length ? c.messages[0].createdAt : null,
       };
-    });
+    }, BANDEJA_CALLABLE_META);
 
   tool("inbox_attachment",
     "Reads an attachment of a received message by messageId and index. Text, CSV, JSON and similar come back as text; images up to 2 MB as an image; other types (PDF, Office, zip) only with name and size.",
@@ -865,7 +914,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
       const conv = hayCambios ? await sdk.inbox.update(d, c, cambios) : undefined;
       const leida = read ? await sdk.inbox.markRead(d, c) : undefined;
       return { ok: true, ...(conv ? { status: conv.status, priority: conv.priority, tags: conv.tags, snoozedUntil: conv.snoozedUntil ?? null } : {}), ...(leida ? { unreadCount: leida.unreadCount } : {}) };
-    });
+    }, BANDEJA_CALLABLE_META);
 
   tool("inbox_assign", "Assigns a conversation to a team member by email or, without `assignedTo`, unassigns it. Requires owner or admin.",
     { domainId, conversationId, assignedTo: z.string().optional() }, (a) => sdk.inbox.assign(a.domainId, a.conversationId, a.assignedTo));
@@ -969,13 +1018,23 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
     });
   });
 
+  // Pantalla de la Bandeja (MCP Apps): el host la pide al ver `_meta.ui.resourceUri` en
+  // inbox_list y la pinta en su iframe. Va en los dos perfiles: sus tools están en ambos.
+  const chatgpt = isChatGptAgent(o.userAgent);
+  const resourceMeta = bandejaResourceMeta(chatgpt);
+  server.registerResource("Bandeja", BANDEJA_UI_URI, { title: "Bandeja de MailMask", description: "Lista y detalle de las conversaciones de la Bandeja compartida.", mimeType: MCP_APP_MIME, _meta: resourceMeta }, (uri) => {
+    // Para confirmar con tráfico real qué User-Agent manda cada host.
+    log("info", "assistant", "mcp ui resource read", { uri: uri.href, userAgent: o.userAgent ?? null, chatgpt, profile: o.profile ?? "full" });
+    return { contents: [{ uri: uri.href, mimeType: MCP_APP_MIME, text: bandejaHtml(), _meta: resourceMeta }] };
+  });
+
   return server;
 }
 
 /** Atiende una petición HTTP de `/mcp` ya autenticada. Stateless: un servidor por petición. */
 export async function atenderMcp(request: Request, o: { apiKey: string; fetchLocal: typeof fetch; profile?: McpProfile }): Promise<Response> {
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-  const server = crearServidorMcp(o);
+  const server = crearServidorMcp({ ...o, userAgent: request.headers.get("user-agent") });
   await server.connect(transport);
   return transport.handleRequest(request);
 }

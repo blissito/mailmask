@@ -5,7 +5,8 @@ Es el mismo servidor de `/mcp` filtrado por `DIRECTORY_ALLOWLIST` (`mcp.ts`), co
 `MCP_DIRECTORY_INSTRUCTIONS`, mismo OAuth 2.1 de `oauth.ts` con `resource` propio y metadata RFC 9728 en
 `/.well-known/oauth-protected-resource/mcp/directory` (su 401 la anuncia). Un token de `/mcp` no entra a
 `/mcp/directory` ni al revés. `/mcp` (completo) no cambia para nadie y **no** se menciona en los portales.
-Sin widgets: el directorio acepta apps sólo con tools. Nada se ha enviado a OpenAI.
+Desde el 19-oct-2026 lleva **una pantalla** (MCP Apps): la Bandeja, ver «Pantalla de la Bandeja» abajo.
+Nada se ha enviado a OpenAI.
 Copia de lo hecho en Ghosty (`ghosty-studio/docs/claude/chatgpt-app-directorio.md`).
 
 ## Requisitos de OpenAI y dónde se cumplen
@@ -48,6 +49,24 @@ descripciones y los esquemas no nombran nada de lo de arriba ni `/mcp`, ni Merca
 5. Grabar el video (los 5 positivos), subirlo no listado y pegar la liga.
 6. Llenar textos, casos y Review details. Enviar.
 
+## Pantalla de la Bandeja (19-oct-2026)
+
+`inbox_list` declara `_meta.ui.resourceUri = ui://mailmask/bandeja.html` (fuente `widgets/bandeja.ts`
++ `.css`, `npm run build:widgets`, bundle commiteado). El HTML va dentro de `resources/read`, sin red
+propia (`csp` vacía). Tarjeta: contadores y 8 conversaciones con 2 botones; pantalla completa: filtros,
+hilo con notas y cerrar/posponer/urgente (`inbox_mark`). Responder lo redacta el modelo y el envío pasa
+por la confirmación del host. Requisitos que cumple:
+
+- **`ui.domain`**: ChatGPT lo exige para enviar un plugin con UI (`https://www.mailmask.studio`); Claude
+  sólo acepta `<sha256(url)[:32]>.claudemcpcontent.com` y con otro valor no la pinta. Como el servidor
+  es stateless, se decide por User-Agent (`isChatGptAgent` en `mcp.ts`): ChatGPT lo recibe, los demás
+  no. El log `mcp ui resource read` guarda el User-Agent real para confirmarlo.
+- Guía de UI de OpenAI: máx. 2 acciones en la tarjeta, sin logo dentro de ella, contraste AA, móvil.
+- Directorio de Claude: los cambios del servidor no se reenvían; en `claude.ai/directory/manage` se
+  suben 3–5 capturas PNG ≥1000 px recortadas a la respuesta, cada una con su prompt.
+- ZIP de ChatGPT `chatgpt-plugin/mailmask-plugin.zip` en 1.1.0 (la descripción menciona la pantalla).
+  Basta la verificación **individual** de la organización; cambios del MCP se recogen con «Rescan».
+
 ## Cuenta de revisor (13-oct-2026)
 
 `directory-review@mailmask.studio` (la misma para Claude y ChatGPT), creada en prod con
@@ -83,7 +102,7 @@ Lo frena la ruta (403 legible) y, como última barrera, `ses.ts` (`sendFromDomai
 | 2 | Salud del correo | «Is email on my domain set up correctly?» | `list_domains`, `domain_health` | Resumen de MX, SPF, DKIM y DMARC con lo que falte |
 | 3 | Ver direcciones | «Which addresses do I have on my domain?» | `list_aliases` | Las direcciones de muestra y a dónde reenvían |
 | 4 | Crear dirección | «Create a sales@ address on my domain that forwards to my email» | `list_domains`, `create_alias` | La dirección nueva confirmada; no envía correo |
-| 5 | Revisar la Bandeja | «What's new in my shared inbox? Summarize the latest message» | `inbox_list`, `inbox_read` | Lista de conversaciones y resumen de la más reciente |
+| 5 | Revisar la Bandeja | «Show my MailMask shared inbox», luego «Abrir bandeja», abrir una conversación y «Cerrar» | `list_domains`, `inbox_list` (pinta la pantalla); desde la pantalla `inbox_read` e `inbox_mark` | La tarjeta con contadores y conversaciones; en pantalla completa el hilo con su nota interna; la conversación sale de «Abiertas» |
 
 ### Casos negativos
 
@@ -108,4 +127,5 @@ Lo frena la ruta (403 legible) y, como última barrera, `ses.ts` (`sendFromDomai
 - Ícono claro: `public/img/chatgpt-app/mailmask-icon.svg` / `mailmask-icon-512.png`
   (https://www.mailmask.studio/img/chatgpt-app/mailmask-icon-512.png).
 - Ícono oscuro (opcional): `mailmask-icon-dark.svg` / `mailmask-icon-dark-512.png`.
-- Video de recorrido: pendiente (lo graba bliss con los 5 positivos).
+- Video de recorrido: pendiente (lo graba bliss con los 5 positivos; el 5 enseña la tarjeta, la
+  pantalla completa y «Cerrar», en escritorio y en móvil).
