@@ -262,8 +262,9 @@ Dinero y dominios de por medio: el CLI **confirma, no cobra y no expone el EPP**
 - **Avatar sin `--url`:** `account avatar set <archivo>` valida .png/.jpg/.jpeg/.webp y ≤ 2 MB (límite
   replicado del servidor, como `domains logo set`) antes de `requireClient`. `setAvatarFromUrl` sólo sirve
   con adjuntos firmados del asistente. `account profile --name` ≤ 60 caracteres; `--name ""` lo borra.
-- **Fuera de alcance a propósito:** `account me` (lo hará `whoami`), `account export`, y
-  `registrations lock`: poner el candado existe en el SDK pero quitarlo no se expone nunca desde aquí.
+- **Fuera de alcance a propósito:** `account me` (lo hará `whoami`) y `account export`.
+- **`registrations lock` (pedido 111):** pone el candado de transferencia (`client.registrations.lock`). Confirma con `confirmOrExit` ANTES de resolver el registro. **Quitar el candado nunca se expone desde el CLI**: sólo desde el panel, con confirmación por correo.
+- **`domains easybits` (pedido 111):** `status|publish|unpublish` 1:1 con `client.domains.easyBitsSiteStatus|publishEasyBitsSite|unpublishEasyBitsSite`. `publish --dry-run` llama al SDK con `dryRun: true`: la vista previa la calcula el servidor y no toca EasyBits ni el DNS, así que el CLI imprime los registros que escribiría y no publica nada. `publish` valida `--placement` (apex|subdomain) antes de tocar la red. `unpublish` confirma ANTES de `resolveDomainId`: sin TTY y sin `--yes` sale con 1 sin llamar al SDK.
 - **Trampa en `docs-cli.test.ts`:** `transfers dns` se llama igual que el grupo `dns`; el lector de
   rutas sólo expande un nombre como grupo si es de primer nivel, o habría inventado `transfers dns list`.
 

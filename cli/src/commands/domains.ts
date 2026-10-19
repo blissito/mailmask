@@ -222,6 +222,88 @@ const logoRemove = defineCommand({
   },
 });
 
+const EASYBITS_PLACEMENTS = ["apex", "subdomain"];
+
+const easybitsStatus = defineCommand({
+  meta: { name: "status", description: "Qué sitio de EasyBits está publicado en el dominio y si la cuenta de EasyBits está conectada" },
+  args: { ...domainArg, ...jsonArg },
+  async run({ args }) {
+    const { client } = await requireClient();
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
+    try {
+      const result = await client.domains.easyBitsSiteStatus(id);
+      if (args.json) return printJson(result);
+      if (result.publication) {
+        const pub = result.publication;
+        process.stdout.write(`${args.domain}: publicado en ${pub.url} (${pub.placement}, sitio ${pub.websiteId})\n`);
+        process.stdout.write(`  Publicado por ${pub.publishedBy} · actualizado ${pub.updatedAt}\n`);
+      } else {
+        process.stdout.write(`${args.domain}: sin sitio de EasyBits publicado.\n`);
+      }
+      if (!result.linked) process.stdout.write("  La cuenta de EasyBits no está conectada: conéctala en el navegador para publicar.\n");
+    } catch (err) {
+      failFromError(err, { json: args.json });
+    }
+  },
+});
+
+const easybitsPublish = defineCommand({
+  meta: { name: "publish", description: "Publica un sitio de EasyBits en el dominio (raíz y www, o un subdominio). Con --dry-run sólo muestra lo que escribiría" },
+  args: {
+    ...domainArg,
+    site: { type: "string" as const, required: true as const, description: "Id del sitio de EasyBits (sale en \"domains easybits status --json\")" },
+    placement: { type: "string" as const, required: true as const, description: "apex (raíz y www) o subdomain (<slug>.<dominio>)" },
+    "dry-run": { type: "boolean" as const, description: "Muestra los registros que escribiría, sin publicar nada" },
+    ...jsonArg,
+  },
+  async run({ args }) {
+    if (!EASYBITS_PLACEMENTS.includes(args.placement)) failUsage("--placement debe ser apex o subdomain.", { json: args.json });
+    const dryRun = Boolean(args["dry-run"]);
+    const { client } = await requireClient();
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
+    try {
+      const result = await client.domains.publishEasyBitsSite(id, { websiteId: args.site, placement: args.placement as "apex" | "subdomain", dryRun });
+      if (args.json) return printJson(result);
+      if (dryRun) {
+        process.stdout.write(`Vista previa: no se publicó nada. En ${args.domain} se escribiría:\n`);
+        for (const rr of result.records) process.stdout.write(`  ${rr.name}  ${rr.type}  ${rr.values.join(", ")}\n`);
+        return;
+      }
+      process.stdout.write(`✓ Sitio de EasyBits publicado en ${result.url}\n`);
+      if (result.verified === false) process.stdout.write("  EasyBits ya vio el TXT; la verificación llega en minutos.\n");
+    } catch (err) {
+      failFromError(err, { json: args.json });
+    }
+  },
+});
+
+const easybitsUnpublish = defineCommand({
+  meta: { name: "unpublish", description: "Quita el sitio de EasyBits: el DNS vuelve a como estaba (lo que cambiaste después no se toca)" },
+  args: { ...domainArg, ...yesArg, ...jsonArg },
+  async run({ args }) {
+    await confirmOrExit(`¿Quitar el sitio de EasyBits de "${args.domain}"? El DNS vuelve a como estaba antes de publicar.`, { yes: args.yes, json: args.json });
+    const { client } = await requireClient();
+    const id = await resolveDomainId(client, args.domain, { json: args.json });
+    try {
+      const result = await client.domains.unpublishEasyBitsSite(id);
+      if (args.json) return printJson(result);
+      if (result.nothing) {
+        process.stdout.write(`${args.domain}: no había ningún sitio de EasyBits publicado.\n`);
+        return;
+      }
+      for (const rr of result.restored) process.stdout.write(`✓ ${rr.name} ${rr.type} ${rr.to ? "vuelve a como estaba" : "se borró"}\n`);
+      for (const rr of result.skipped) process.stdout.write(`· ${rr.name} ${rr.type} cambiado después de publicar: se dejó como está\n`);
+    } catch (err) {
+      failFromError(err, { json: args.json });
+    }
+  },
+});
+
+const easybits = defineCommand({
+  meta: { name: "easybits", description: "Sitio de EasyBits publicado en el dominio" },
+  subCommands: { status: easybitsStatus, publish: easybitsPublish, unpublish: easybitsUnpublish },
+});
+
 const logo = defineCommand({
   meta: { name: "logo", description: "Logo de la firma del dominio" },
   subCommands: { set: logoSet, remove: logoRemove },
@@ -229,5 +311,5 @@ const logo = defineCommand({
 
 export default defineCommand({
   meta: { name: "domains", description: "Administra los dominios de la cuenta" },
-  subCommands: { list, get, create, delete: del, verify, health, "dns-setup": dnsSetup, logo },
+  subCommands: { list, get, create, delete: del, verify, health, "dns-setup": dnsSetup, logo, easybits },
 });

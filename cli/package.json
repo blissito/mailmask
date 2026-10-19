@@ -18,7 +18,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@easybits.cloud/mailmask": "^0.4.8",
+    "@easybits.cloud/mailmask": "^0.4.10",
     "citty": "^0.2"
   },
   "devDependencies": {

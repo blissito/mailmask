@@ -29,6 +29,9 @@ mailmask domains delete <dominio> [--yes] [--json]
 mailmask domains dns-setup <dominio> [--live] [--json]
 mailmask domains logo set <dominio> <archivo> [--json]
 mailmask domains logo remove <dominio> [--yes] [--json]
+mailmask domains easybits status <dominio> [--json]
+mailmask domains easybits publish <dominio> --site <id> --placement apex|subdomain [--dry-run] [--json]
+mailmask domains easybits unpublish <dominio> [--yes] [--json]
 
 mailmask dns list <dominio> [--json]
 mailmask dns upsert <dominio> <nombre> <tipo> <valor...> [--ttl 300]
@@ -94,6 +97,7 @@ mailmask registrations list [--json]
 mailmask registrations renewal <dominio|registroId> [--payer-email <correo>] [--json]
 mailmask registrations cancel-renewal <dominio|registroId> [--yes] [--json]
 mailmask registrations transfer-out <dominio|registroId> [--yes] [--json]
+mailmask registrations lock <dominio|registroId> [--yes] [--json]
 
 mailmask transfers check <dominio> [--json]
 mailmask transfers dns <dominio|registroId> [--json]
@@ -134,6 +138,12 @@ mailmask api-keys revoke <id> [--yes] [--json]
 `domains delete` y `dns delete` son destructivos: en una terminal preguntan
 antes de borrar, y fuera de una terminal (CI, un agente) exigen `--yes` — sin
 él salen con código `1` sin tocar la red.
+
+`domains easybits publish --dry-run` sólo muestra los registros que escribiría: no publica
+nada. `domains easybits unpublish` devuelve el DNS a como estaba antes de publicar (lo que
+cambiaste después no se toca) y `registrations lock` pone el candado de transferencia. Los
+tres confirman como `domains delete`. Quitar el candado de transferencia no se puede desde
+la CLI: sólo desde el panel, con confirmación por correo.
 
 Sin `--api-key`, `login` abre el navegador para autorizar el dispositivo
 (device-code, como `gh auth login`) — no hace falta copiar y pegar nada. Con

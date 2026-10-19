@@ -130,7 +130,24 @@ const transferOut = defineCommand({
   },
 });
 
+const lock = defineCommand({
+  meta: { name: "lock", description: "Pone el candado de transferencia (quitarlo sólo se hace desde el panel, con confirmación por correo)" },
+  args: { ...registrationArg, ...yesArg, ...jsonArg },
+  async run({ args }) {
+    await confirmOrExit(`¿Poner el candado de transferencia a "${args.registration}"? Quitarlo sólo se hace desde el panel, con confirmación por correo.`, { yes: args.yes, json: args.json });
+    const { client } = await requireClient();
+    const id = await resolveRegistrationId(client, args.registration, { json: args.json });
+    try {
+      const result = await client.registrations.lock(id);
+      if (args.json) return printJson(result);
+      process.stdout.write(`✓ Candado de transferencia puesto en "${args.registration}".\n`);
+    } catch (err) {
+      failFromError(err, { json: args.json });
+    }
+  },
+});
+
 export default defineCommand({
   meta: { name: "registrations", description: "Registro, renovación y traslado de dominios comprados en MailMask" },
-  subCommands: { search, tlds, register, list, renewal, "cancel-renewal": cancelRenewal, "transfer-out": transferOut },
+  subCommands: { search, tlds, register, list, renewal, "cancel-renewal": cancelRenewal, "transfer-out": transferOut, lock },
 });
