@@ -57,12 +57,12 @@ describe("smtp create", () => {
     assert.equal(JSON.parse(out.text()).password, PASSWORD);
   });
 
-  it("403 (dominio sin activar) → exit 2", async () => {
+  it("403 (dominio sin activar) → exit 6", async () => {
     const { client } = fakeClient({ smtp: { create: () => { throw new MailMaskError(403, "dominio no activado"); } } });
     currentClient = client;
     await assert.rejects(
       () => create.run({ args: { domain: "dom_1", label: "app" } }),
-      (err: unknown) => err instanceof ExitSignal && err.code === 2,
+      (err: unknown) => err instanceof ExitSignal && err.code === 6,
     );
   });
 });

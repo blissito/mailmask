@@ -916,10 +916,11 @@ mailmask referrals name &lt;nombre&gt; [--json]</code></pre>
       <ul class="list-disc pl-6 text-fg-muted text-sm space-y-1 mb-4">
         <li><code>0</code> &mdash; &eacute;xito.</li>
         <li><code>1</code> &mdash; error gen&eacute;rico (tambi&eacute;n, un comando destructivo sin <code>--yes</code> fuera de una terminal).</li>
-        <li><code>2</code> &mdash; no hay API key activa, o MailMask la rechaz&oacute; (401/403).</li>
+        <li><code>2</code> &mdash; no hay API key activa, o MailMask la rechaz&oacute; (401).</li>
         <li><code>3</code> &mdash; conflicto (409), p.&nbsp;ej. el dominio ya existe.</li>
         <li><code>4</code> &mdash; no encontrado (404).</li>
         <li><code>5</code> &mdash; transitorio: 429, 5xx de MailMask o error de red. Vale la pena reintentar.</li>
+        <li><code>6</code> &mdash; prohibido (403): la llave sirve, pero la cuenta no puede hacerlo, p.&nbsp;ej. el dominio no est&aacute; activado. No pide <code>mailmask login</code>.</li>
       </ul>
 
       <!-- MCP -->

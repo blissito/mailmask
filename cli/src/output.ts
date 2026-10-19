@@ -2,11 +2,13 @@ import { createInterface } from "node:readline/promises";
 import { MailMaskError } from "@easybits.cloud/mailmask";
 
 /** Taxonomía de exit codes (contrato fijo, ver docs/agents/mailmask-cli.md): 0 éxito, 1 genérico,
- * 2 sin API key activa o rechazada, 3 conflicto (409), 4 no encontrado (404), 5 transitorio (429/5xx/red). */
-export const EXIT = { OK: 0, ERROR: 1, AUTH: 2, CONFLICT: 3, NOT_FOUND: 4, TRANSIENT: 5 } as const;
+ * 2 sin API key activa o rechazada (401), 3 conflicto (409), 4 no encontrado (404), 5 transitorio (429/5xx/red),
+ * 6 prohibido (403: la llave sirve, pero la cuenta no puede hacerlo, p. ej. dominio sin activar). */
+export const EXIT = { OK: 0, ERROR: 1, AUTH: 2, CONFLICT: 3, NOT_FOUND: 4, TRANSIENT: 5, FORBIDDEN: 6 } as const;
 
 function exitCodeForStatus(status: number): number {
-  if (status === 401 || status === 403) return EXIT.AUTH;
+  if (status === 401) return EXIT.AUTH;
+  if (status === 403) return EXIT.FORBIDDEN;
   if (status === 404) return EXIT.NOT_FOUND;
   if (status === 409) return EXIT.CONFLICT;
   if (status === 429 || status >= 500) return EXIT.TRANSIENT;
@@ -61,6 +63,12 @@ export function failFromError(err: unknown, opts: { json?: boolean } = {}): neve
     if (opts.json) failJson(err.message, err.status, code);
     if (code === EXIT.AUTH) {
       fail(`${err.message} — corre "mailmask login" con una API key válida.`, code);
+    }
+    if (code === EXIT.FORBIDDEN) {
+      // Un 403 no es de login: la llave sirve y la cuenta no puede. Si el mensaje habla de activar
+      // (dominio sin activar, $99), el camino es el cobro, así que se indica ese comando.
+      const hint = /\$99|activ/i.test(err.message) ? "\nPara activar el dominio: mailmask billing checkout <dominio>" : "";
+      fail(`MailMask respondió 403: ${err.message}${hint}`, code);
     }
     fail(`MailMask respondió ${err.status}: ${err.message}`, code);
   }
