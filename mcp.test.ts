@@ -537,6 +537,31 @@ describe("MCP: agentes contra la app", () => {
     assert.equal(r.headers.get("www-authenticate"), 'Bearer resource_metadata="http://localhost/.well-known/oauth-protected-resource/mcp/directory"');
   });
 
+  it("pantalla de la Bandeja (MCP Apps) en /mcp y /mcp/directory: inbox_list la anuncia y resources/read la entrega", async () => {
+    const { BANDEJA_UI_URI } = await import("./mcp.js");
+    for (const send of [rpc, rpcDir]) {
+      const init = await send("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "0" } });
+      assert.ok(init.json.result.capabilities.resources, "debe anunciar resources");
+      const tools = (await send("tools/list")).json.result.tools as { name: string; _meta?: Record<string, any> }[];
+      const list = tools.find((t) => t.name === "inbox_list")!;
+      assert.equal(list._meta?.ui?.resourceUri, BANDEJA_UI_URI);
+      assert.equal(list._meta?.["openai/outputTemplate"], BANDEJA_UI_URI);
+      for (const n of ["inbox_read", "inbox_mark"]) assert.equal(tools.find((t) => t.name === n)?._meta?.["openai/widgetAccessible"], true, n);
+      // Responder no se hace desde la pantalla.
+      assert.equal(tools.find((t) => t.name === "inbox_reply")?._meta, undefined);
+
+      const res = (await send("resources/list")).json.result.resources as { uri: string; mimeType: string }[];
+      assert.ok(res.some((r) => r.uri === BANDEJA_UI_URI && r.mimeType === "text/html;profile=mcp-app"));
+      const read = (await send("resources/read", { uri: BANDEJA_UI_URI })).json.result.contents[0];
+      assert.equal(read.mimeType, "text/html;profile=mcp-app");
+      assert.match(read.text, /^<!doctype html>/);
+      assert.match(read.text, /<div id="app"><\/div><script>/);
+      // Sin red propia: el iframe sólo habla con el host.
+      assert.deepEqual(read._meta.ui.csp, { connectDomains: [], resourceDomains: [] });
+      assert.ok(!/<script[^>]+src=/i.test(read.text), "todo va inline");
+    }
+  });
+
   it("cuenta de revisión: no manda correo ni invita a terceros reales; a sus dominios y a example.com sí", async () => {
     const { sandboxBlockedRecipients, isSandboxAccount } = await import("./sandbox.js");
     const rev = `dir-${suffix}-review@mailmask.studio`;
