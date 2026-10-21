@@ -16,6 +16,12 @@ function leerUtm() {
   return utm.source || utm.medium || utm.campaign ? utm : undefined;
 }
 
+// El dominio que escribió en /correo-en-tu-dominio: la app abre "Agregar dominio" con él.
+const _dominioParam = new URLSearchParams(location.search).get("dominio");
+if (_dominioParam) {
+  try { localStorage.setItem("mailmask_dominio", _dominioParam); } catch {}
+}
+
 const _refParam = new URLSearchParams(location.search).get("ref");
 if (_refParam) {
   localStorage.setItem("mailmask_ref", _refParam);

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<!--
+  Ilustración del hero de /alternativa-google-workspace (public/img/alternativa-google-workspace-il.jpg, 1200×800).
+  Reemplaza la del luchador y el torniquete (21-oct-2026: «no tiene sentido»): ahora es literal,
+  dos recibos. Se renderiza con Chrome headless a PNG y se pasa a JPEG (< 200 KB, lo exige landings-hero.test.ts):
+    Chrome --headless=new --window-size=1200,800 --screenshot=il.png file://…/scripts/il-alternativa-google-workspace.html
+    sips -s format jpeg -s formatOptions 80 il.png --out public/img/alternativa-google-workspace-il.jpg
+  Sin precios de Google: la página los cita con fuente y fecha, no los copia.
+-->
+<html lang="es-MX">
+<head>
+<meta charset="UTF-8">
+<title>il-alternativa-google-workspace</title>
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 800px; overflow: hidden; background: #fbf3e0; }
+  svg { display: block; }
+  .t { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  .m { font-family: Menlo, "SF Mono", monospace; }
+</style>
+</head>
+<body>
+<svg width="1200" height="800" viewBox="0 0 1200 800">
+  <!-- Recibo largo: una línea por persona -->
+  <g transform="rotate(-3 330 420)">
+    <path d="M118 78 H542 V742 l-26 -16 l-26 16 l-26 -16 l-26 16 l-26 -16 l-26 16 l-26 -16 l-26 16 l-26 -16 l-26 16 l-26 -16 l-26 16 l-26 -16 l-26 16 l-26 -16 l-26 16 Z" fill="#1c1917" transform="translate(12 12)"/>
+    <path d="M118 78 H542 V742 l-26 -16 l-26 16 l-26 -16 l-26 16 l-26 -16 l-26 16 l-26 -16 l-26 16 l-26 -16 l-26 16 l-26 -16 l-26 16 l-26 -16 l-26 16 l-26 -16 l-26 16 Z" fill="#fffdf9" stroke="#1c1917" stroke-width="5" stroke-linejoin="round"/>
+    <text x="150" y="136" class="t" font-size="32" font-weight="800" fill="#57534e">Google Workspace</text>
+    <text x="150" y="170" class="m" font-size="18" fill="#78716c">Cobro por persona, cada mes</text>
+    <path d="M150 196 H510" stroke="#1c1917" stroke-width="3" stroke-dasharray="8 8"/>
+    <g class="m" font-size="23" fill="#1c1917">
+      <text x="150" y="246">Ana</text><text x="510" y="246" text-anchor="end">1 licencia</text>
+      <text x="150" y="300">Beto</text><text x="510" y="300" text-anchor="end">1 licencia</text>
+      <text x="150" y="354">Carla</text><text x="510" y="354" text-anchor="end">1 licencia</text>
+      <text x="150" y="408">Diego</text><text x="510" y="408" text-anchor="end">1 licencia</text>
+      <text x="150" y="462">Eva</text><text x="510" y="462" text-anchor="end">1 licencia</text>
+      <text x="150" y="516">Fer</text><text x="510" y="516" text-anchor="end">1 licencia</text>
+      <text x="150" y="570" fill="#78716c">+ cada persona nueva</text>
+    </g>
+    <path d="M150 600 H510" stroke="#1c1917" stroke-width="3" stroke-dasharray="8 8"/>
+    <text x="150" y="652" class="t" font-size="30" font-weight="800" fill="#1c1917">Total</text>
+    <text x="510" y="652" class="t" font-size="30" font-weight="800" fill="#1c1917" text-anchor="end">6 licencias</text>
+  </g>
+
+  <!-- Recibo corto: un cobro por dominio -->
+  <g transform="rotate(4 860 360)">
+    <path d="M640 150 H1080 V520 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 Z" fill="#1c1917" transform="translate(12 12)"/>
+    <path d="M640 150 H1080 V520 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 l-27.5 -16 l-27.5 16 Z" fill="#fffdf9" stroke="#1c1917" stroke-width="5" stroke-linejoin="round"/>
+    <text x="672" y="208" class="t" font-size="34" font-weight="800" fill="#1c1917">MailMask</text>
+    <text x="672" y="242" class="m" font-size="18" fill="#78716c">Cobro por dominio, cada mes</text>
+    <path d="M672 268 H1048" stroke="#1c1917" stroke-width="3" stroke-dasharray="8 8"/>
+    <g class="m" font-size="23" fill="#1c1917">
+      <text x="672" y="318">tuempresa.mx</text><text x="1048" y="318" text-anchor="end">1 dominio</text>
+      <text x="672" y="372">Personas</text><text x="1048" y="372" text-anchor="end">las que sean</text>
+    </g>
+    <path d="M672 400 H1048" stroke="#1c1917" stroke-width="3" stroke-dasharray="8 8"/>
+    <text x="672" y="456" class="t" font-size="30" font-weight="800" fill="#1c1917">Total</text>
+    <text x="1048" y="456" class="t" font-size="30" font-weight="800" fill="#b31f33" text-anchor="end">$99 MXN</text>
+    <!-- plumón rojo encerrando el total -->
+    <ellipse cx="972" cy="446" rx="96" ry="36" fill="none" stroke="#d7263d" stroke-width="6" transform="rotate(-4 972 446)"/>
+  </g>
+
+  <!-- Sello de la máscara oficial -->
+  <g transform="rotate(-10 1000 640)">
+    <circle cx="1000" cy="640" r="74" fill="#1c1917" transform="translate(8 8)"/>
+    <circle cx="1000" cy="640" r="74" fill="#fffdf9" stroke="#1c1917" stroke-width="5"/>
+    <g transform="translate(938 578) scale(1.55)">
+      <ellipse cx="40" cy="42" rx="28" ry="24" fill="#a0182c"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="#d7263d"/>
+      <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/>
+      <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/>
+      <circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
+      <circle cx="30.2" cy="34.9" r="1.9" fill="#fff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#fff"/>
+      <path d="M40 18 L40 26" stroke="#f2b705" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="#f2b705" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>
+</body>
+</html>

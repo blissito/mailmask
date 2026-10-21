@@ -1249,6 +1249,24 @@ async function deleteDomain() {
   goBack();
   await loadDomains();
   await refreshUsage();
+  openDomainFromLanding();
+}
+
+// La landing /correo-en-tu-dominio guarda el dominio que escribió la persona (y lo pasa en
+// ?dominio=): al llegar a la app se abre "Agregar dominio" ya con él, una sola vez.
+function openDomainFromLanding() {
+  let wanted = new URLSearchParams(location.search).get("dominio") || "";
+  try {
+    wanted = wanted || localStorage.getItem("mailmask_dominio") || "";
+    localStorage.removeItem("mailmask_dominio");
+  } catch {}
+  wanted = wanted.trim().toLowerCase();
+  if (!/^([a-z0-9-]+\.)+[a-z]{2,24}$/.test(wanted)) return;
+  if (domains.some((d) => d.domain === wanted)) return;
+  showAddDomainModal();
+  const input = document.getElementById("add-domain-input");
+  if (input) input.value = wanted;
+  searchDomainAvailability();
 }
 
 // --- Domain Registration (Route 53) ---
