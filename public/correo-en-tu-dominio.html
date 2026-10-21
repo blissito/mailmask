@@ -198,7 +198,6 @@
       .dibujo:hover .j-crece { transform: scale(1.25); }
       .dibujo:hover .j-columpio { animation: vaiven 1.6s ease-in-out; transform-origin: 50% 0; }
       .dibujo:hover .j-sube { transform: translateY(-34px); }
-      .dibujo:hover .j-solapa { transform: scaleY(-1); transform-origin: 50% 0; }
       .dibujo:hover .j-asoma { transform: translate(84px, -62px) rotate(4deg); }
       .dibujo:hover .j-asoma-izq { transform: translate(-90px, -118px) rotate(-5deg); transition-delay: 0.08s; }
       .dibujo:hover .j-gira { transform: rotate(-8deg) scale(1.06); }
@@ -386,16 +385,17 @@
             <div class="paso dibujo">
               <svg viewBox="0 0 260 170" aria-hidden="true">
                 <rect class="sombra" x="58" y="72" width="160" height="96" rx="10" />
+                <!-- sobre abierto: solapa detrás, carta en medio, bolsillo delante -->
+                <path class="papel ink" d="M50 66 L130 22 L210 66 Z" stroke-width="4" stroke-linejoin="round" />
+                <rect class="papel ink" x="50" y="64" width="160" height="96" rx="10" stroke-width="4" />
                 <g class="a-entra" style="--d: 1.3s">
                   <g class="j j-sube">
-                    <rect class="papel ink" x="70" y="34" width="120" height="84" rx="6" stroke-width="4" />
-                    <text class="t-rojo f-mono" x="130" y="72" font-size="16" font-weight="500" text-anchor="middle">hola@</text>
-                    <path class="ink" d="M92 92 h76" stroke-width="4" stroke-linecap="round" />
+                    <rect class="papel ink" x="68" y="40" width="124" height="96" rx="6" stroke-width="4" />
+                    <text class="t-rojo f-mono" x="130" y="78" font-size="17" font-weight="500" text-anchor="middle">hola@</text>
+                    <path class="ink" d="M90 98 h80" stroke-width="4" stroke-linecap="round" />
                   </g>
                 </g>
-                <rect class="papel ink" x="50" y="64" width="160" height="96" rx="10" stroke-width="4" />
-                <path class="ink" d="M50 160 L130 104 L210 160" stroke-width="4" fill="none" stroke-linejoin="round" />
-                <path class="papel ink j j-solapa" d="M52 66 L130 120 L208 66 Z" stroke-width="4" stroke-linejoin="round" />
+                <path class="papel ink" d="M50 104 L130 134 L210 104 V150 a10 10 0 0 1 -10 10 H60 a10 10 0 0 1 -10 -10 Z" stroke-width="4" stroke-linejoin="round" />
               </svg>
               <p>Recibe en tu Gmail o en MailMask, y <span class="plumon" style="--d: 1.4s">responde con tu dominio.</span></p>
             </div>
