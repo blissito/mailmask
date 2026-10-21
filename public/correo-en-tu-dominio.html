@@ -404,13 +404,13 @@
         </div>
       </section>
 
-      <!-- Video del short: lista para encender. Al aprobarlo, poner el src/poster y quitar `hidden`.
-           Nativo, mudo y en bucle: los subtítulos van quemados, así que se entiende sin sonido. -->
-      <section class="pantalla centro" id="video" hidden>
+      <!-- Video del short: nativo, mudo y en bucle; los subtítulos van quemados, así que se entiende sin sonido.
+           Fuente: videos/short-correo-en-tu-dominio/renders/final.mp4 pasado a 720p (servido con Range por /video/*). -->
+      <section class="pantalla centro" id="video">
         <div class="marco">
           <h2 class="titular chico">Míralo en 30 segundos.</h2>
           <div class="video-marco">
-            <video id="video-short" muted autoplay loop playsinline preload="metadata" poster="" aria-label="Video: crea un correo nuevo en el dominio que ya tienes"></video>
+            <video id="video-short" muted autoplay loop playsinline preload="metadata" poster="/video/correo-en-tu-dominio.jpg" src="/video/correo-en-tu-dominio.mp4" aria-label="Video: crea un correo nuevo en el dominio que ya tienes"></video>
             <button type="button" class="video-sonido" id="video-sonido" aria-pressed="false">Activar sonido</button>
           </div>
         </div>

@@ -437,6 +437,49 @@ async function serveStatic(filePath: string): Promise<Response> {
 }
 
 /**
+ * Videos de las landings (`public/video/`). Va aparte de serveStatic porque
+ * Safari en iPhone no reproduce un MP4 si el servidor no contesta `Range`
+ * con 206: pide los primeros bytes y, si le llega el archivo entero con 200,
+ * deja el reproductor en negro.
+ */
+function serveVideo(filePath: string, request: Request): Response {
+  const resolved = path.resolve(PUBLIC_DIR, filePath.replace(/^\//, ""));
+  const ext = path.extname(resolved).toLowerCase();
+  const types: Record<string, string> = { ".mp4": "video/mp4", ".jpg": "image/jpeg", ".webm": "video/webm" };
+  if (!resolved.startsWith(PUBLIC_DIR + path.sep) || !types[ext] || !fs.existsSync(resolved)) {
+    return new Response("Not found", { status: 404 });
+  }
+  const size = fs.statSync(resolved).size;
+  const headers: Record<string, string> = {
+    "content-type": types[ext],
+    "accept-ranges": "bytes",
+    "cache-control": "public, max-age=604800",
+  };
+  const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get("range") ?? "");
+  if (!range || (!range[1] && !range[2])) {
+    headers["content-length"] = String(size);
+    return new Response(fs.readFileSync(resolved), { headers });
+  }
+  // `bytes=-N` pide los últimos N bytes.
+  const start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]));
+  const end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+  if (start >= size || start > end) {
+    return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}` } });
+  }
+  const length = end - start + 1;
+  const buf = Buffer.alloc(length);
+  const fd = fs.openSync(resolved, "r");
+  try {
+    fs.readSync(fd, buf, 0, length, start);
+  } finally {
+    fs.closeSync(fd);
+  }
+  headers["content-range"] = `bytes ${start}-${end}/${size}`;
+  headers["content-length"] = String(length);
+  return new Response(buf, { status: 206, headers });
+}
+
+/**
  * Prepara el cuerpo de un correo de la Bandeja para salir con sus imágenes
  * incrustadas, como hace Gmail: se adjuntan dentro del mensaje y el HTML las
  * referencia con `cid:` en vez de con una URL nuestra.
@@ -1443,7 +1486,7 @@ const app = new Elysia({ adapter: node() })
       tags: ["Auth", "Billing", "Admin", "Webhooks", "Coupons", "Referrals",
              "Export", "Bandeja", "Agents", "Domain Registration", "Assistant"],
       paths: [
-        "/", "/login", "/register", "/app", "/composer-demo", "/cli/authorize", "/css/*", "/js/*", "/img/*",
+        "/", "/login", "/register", "/app", "/composer-demo", "/cli/authorize", "/css/*", "/js/*", "/img/*", "/video/*",
         "/favicon.svg", "/landing", "/pricing", "/bandeja", "/bandeja-compartida", "/dominios", "/alternativa-google-workspace", "/correo-en-tu-dominio", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
@@ -1705,6 +1748,7 @@ const app = new Elysia({ adapter: node() })
   .get("/css/*", ({ params }) => serveStatic(`/css/${params["*"]}`))
   .get("/js/*", ({ params }) => serveStatic(`/js/${params["*"]}`))
   .get("/img/*", ({ params }) => serveStatic(`/img/${params["*"]}`))
+  .get("/video/*", ({ params, request }) => serveVideo(`/video/${params["*"]}`, request))
   .get("/favicon.svg", () => serveStatic("/favicon.svg"))
   .get("/cli/authorize", () => serveStatic("/cli-authorize.html"))
   .get("/landing", () => serveStatic("/landing.html"))
