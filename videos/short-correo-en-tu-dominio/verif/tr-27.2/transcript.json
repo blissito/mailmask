@@ -1,0 +1,86 @@
+[
+  {
+    "text": "Tu",
+    "start": 0,
+    "end": 0.18,
+    "id": "w0"
+  },
+  {
+    "text": "tarjeta",
+    "start": 0.18,
+    "end": 0.77,
+    "id": "w1"
+  },
+  {
+    "text": "y",
+    "start": 0.86,
+    "end": 0.9,
+    "id": "w2"
+  },
+  {
+    "text": "tu",
+    "start": 0.9,
+    "end": 1.04,
+    "id": "w3"
+  },
+  {
+    "text": "correo",
+    "start": 1.12,
+    "end": 1.66,
+    "id": "w4"
+  },
+  {
+    "text": "ya",
+    "start": 1.66,
+    "end": 1.85,
+    "id": "w5"
+  },
+  {
+    "text": "dicen",
+    "start": 1.85,
+    "end": 2.25,
+    "id": "w6"
+  },
+  {
+    "text": "tuestudio.mx.",
+    "start": 2.33,
+    "end": 3.66,
+    "id": "w7"
+  },
+  {
+    "text": "Crea",
+    "start": 3.66,
+    "end": 4.04,
+    "id": "w8"
+  },
+  {
+    "text": "tu",
+    "start": 4.04,
+    "end": 4.17,
+    "id": "w9"
+  },
+  {
+    "text": "correo",
+    "start": 4.17,
+    "end": 4.64,
+    "id": "w10"
+  },
+  {
+    "text": "gratis",
+    "start": 4.72,
+    "end": 5.19,
+    "id": "w11"
+  },
+  {
+    "text": "en",
+    "start": 5.19,
+    "end": 5.36,
+    "id": "w12"
+  },
+  {
+    "text": "mailmask.studio.",
+    "start": 5.36,
+    "end": 6.88,
+    "id": "w13"
+  }
+]

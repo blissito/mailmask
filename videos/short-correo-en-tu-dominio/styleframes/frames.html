@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,600..800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&family=Caveat:wght@700&display=swap" rel="stylesheet" />
+<style>
+  /* Style frames del short «Crea un correo nuevo en el dominio que ya tienes».
+     Piel del sitio público (crema + rojo de máscara, dorado sólo en la máscara) con acabado de
+     caricatura plana. Molde: un solo objeto grande al centro sobre un tapete de corte. */
+  :root {
+    --bg: #faf6ee; --elev: #fffdf9; --inset: #f2ecdf; --line: #e4dccd;
+    --ink: #1c1917; --muted: #57534e; --subtle: #78716c;
+    --red: #d7263d; --red-dk: #a0182c; --gold: #f2b705; --ok: #10b981; --ok-dk: #047857;
+    --pink: #ffd3da; --gray: #a8a29e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); color: var(--ink); font-family: "Inter", sans-serif; }
+  .f { position: absolute; inset: 0; display: none; overflow: hidden; background: var(--bg); }
+  .f.on { display: block; }
+  .mat { position: absolute; inset: 0; }
+  .abs { position: absolute; }
+  .mono { font-family: "JetBrains Mono", monospace; }
+  .bric { font-family: "Bricolage Grotesque"; font-weight: 800; font-variation-settings: "wdth" 92, "opsz" 72; letter-spacing: -.03em; }
+  .hand { font-family: "Caveat", cursive; font-weight: 700; }
+
+  /* objeto de papel: contorno de tinta + sombra dura */
+  .paper { position: absolute; background: var(--elev); border: 6px solid var(--ink); box-shadow: 8px 8px 0 var(--ink); border-radius: 22px; }
+
+  /* tarjeta de presentación */
+  .card { left: 90px; top: 330px; width: 900px; height: 520px; transform: rotate(-4deg); padding: 54px 60px; }
+  .card .eyebrow { font-family: "JetBrains Mono"; font-weight: 700; font-size: 24px; letter-spacing: .16em; color: var(--subtle); }
+  .card .name { font-size: 104px; line-height: .95; margin-top: 14px; }
+  .card .role { font-size: 34px; color: var(--muted); margin-top: 10px; font-weight: 600; }
+  .card .row { display: flex; align-items: center; gap: 22px; font-family: "JetBrains Mono"; font-weight: 700; font-size: 38px; margin-top: 26px; position: relative; white-space: nowrap; }
+  .card .row:first-of-type { margin-top: 44px; }
+  .card .ico { width: 54px; height: 54px; flex: none; }
+  .card .stripe { position: absolute; left: 0; top: 0; bottom: 0; width: 26px; background: var(--red); border-right: 6px solid var(--ink); border-radius: 16px 0 0 16px; }
+
+  /* cotización */
+  .quote { left: 110px; top: 880px; width: 700px; height: 340px; transform: rotate(3deg); padding: 34px 44px; }
+  .quote h4 { font-family: "JetBrains Mono"; font-size: 26px; letter-spacing: .16em; color: var(--subtle); }
+  .quote .amt { font-size: 104px; margin-top: 6px; }
+  .quote .from { font-family: "JetBrains Mono"; font-size: 28px; font-weight: 700; margin-top: 16px; color: var(--muted); white-space: nowrap; }
+  .quote .ln { height: 14px; background: var(--inset); border-radius: 7px; margin-top: 22px; }
+  /* énfasis por color y peso, nunca subrayado ni trazo de plumón sobre el texto */
+  .flag, .ok { color: var(--red); font-weight: 800; }
+  .stamp { position: absolute; border: 8px solid var(--red); color: var(--red); font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 64px; padding: 6px 26px; border-radius: 14px; transform: rotate(-14deg); background: rgba(255,253,249,.0); letter-spacing: -.01em; }
+
+  /* subtítulo karaoke */
+  .kara { position: absolute; left: 465px; transform: translateX(-50%); top: 1262px; height: 112px; padding: 0 40px; background: var(--ink); border-radius: 22px; box-shadow: 8px 8px 0 var(--red-dk);
+          display: flex; align-items: center; justify-content: center; gap: 18px; font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 72px; letter-spacing: -.02em; color: #fff; white-space: nowrap; }
+  .kara .now { color: #ff5c70; } .kara .next { color: #8a827a; }
+
+  /* CTA */
+  .btn { position: absolute; background: var(--red); color: #fff; border: 6px solid var(--ink); box-shadow: 8px 8px 0 var(--ink); border-radius: 999px; font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 60px; letter-spacing: -.02em; padding: 22px 54px; white-space: nowrap; }
+  .postit { position: absolute; background: var(--pink); border: 5px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); transform: rotate(6deg); padding: 18px 24px; font-family: "Caveat"; font-weight: 700; font-size: 50px; line-height: .95; width: 300px; }
+
+  /* overlay de zonas seguras (sólo para verificar) */
+  .zones .z { position: absolute; background: rgba(0,120,255,.28); border: 3px dashed #0050c8; }
+  body.nozones .zones { display: none; }
+</style>
+</head>
+<body class="nozones">
+
+<!-- tapete de corte compartido -->
+<template id="mat">
+  <svg class="mat" width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <pattern id="g" width="60" height="60" patternUnits="userSpaceOnUse" x="30" y="0">
+        <path d="M60 0 L0 0 0 60" fill="none" stroke="#e9e1d1" stroke-width="2"/>
+      </pattern>
+      <pattern id="G" width="300" height="300" patternUnits="userSpaceOnUse" x="30" y="0">
+        <path d="M300 0 L0 0 0 300" fill="none" stroke="#ddd2bd" stroke-width="3"/>
+      </pattern>
+    </defs>
+    <rect width="1080" height="1920" fill="#faf6ee"/>
+    <rect width="1080" height="1920" fill="url(#g)"/>
+    <rect width="1080" height="1920" fill="url(#G)"/>
+    <!-- regla en el borde izquierdo -->
+    <g stroke="#cfc3ab" stroke-width="3">
+      <path d="M0 0 V1920" stroke-width="0"/>
+    </g>
+    <g id="ticks"></g>
+    <!-- diagonal de 45° típica de tapete -->
+    <path d="M-40 1960 L1120 800" stroke="#e4d9c4" stroke-width="3" stroke-dasharray="14 12" fill="none"/>
+  </svg>
+</template>
+
+<template id="zones">
+  <div class="zones">
+    <div class="z" style="left:0;top:0;width:1080px;height:240px"></div>
+    <div class="z" style="left:0;top:1400px;width:1080px;height:520px"></div>
+    <div class="z" style="left:930px;top:880px;width:150px;height:520px"></div>
+  </div>
+</template>
+
+<!-- ============ SF1 · beat 0 a 4.6 s (fotograma 0 + plumón + sello) ============ -->
+<section class="f" id="sf1">
+  <div class="paper quote">
+    <h4>COTIZACIÓN #014</h4>
+    <div class="amt bric">$18,500</div>
+    <div class="from" data-txt>De: estudio.rios.2011@<span class="flag">gmail.com</span></div>
+        <div class="stamp" style="left:420px;top:-4px;font-size:54px" data-txt>¿ES REAL?</div>
+  </div>
+
+  <div class="paper card">
+    <div class="stripe"></div>
+    <div style="padding-left:20px">
+      <div class="eyebrow" data-txt>TARJETA · 2026</div>
+      <div class="name bric" data-txt>Estudio Ríos</div>
+      <div class="role" data-txt>diseño gráfico · branding</div>
+      <div class="row" data-txt>
+        <svg class="ico" viewBox="0 0 54 54"><circle cx="27" cy="27" r="22" fill="#fffdf9" stroke="#1c1917" stroke-width="5"/><ellipse cx="27" cy="27" rx="9" ry="22" fill="none" stroke="#1c1917" stroke-width="4"/><path d="M6 27 H48" stroke="#1c1917" stroke-width="4"/></svg>
+        <span>tuestudio.mx</span>
+      </div>
+      <div class="row" data-txt>
+        <svg class="ico" viewBox="0 0 54 54"><rect x="4" y="11" width="46" height="32" rx="5" fill="#fffdf9" stroke="#1c1917" stroke-width="5"/><path d="M6 14 L27 30 L48 14" fill="none" stroke="#1c1917" stroke-width="5" stroke-linejoin="round"/></svg>
+        <span>estudio.rios.2011@<span class="flag">gmail.com</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="kara" data-txt><span class="now">gmail</span><span class="next">punto</span><span class="next">com.</span></div>
+</section>
+
+<!-- ============ SF2 · beat 3 (Bandeja: llega el sobre, sale la respuesta) ============ -->
+<section class="f" id="sf2">
+  <!-- avión de papel con estela -->
+  <svg class="abs" style="left:40px;top:250px" width="560" height="260" viewBox="0 0 560 260">
+    <path d="M540 230 C 420 220, 330 120, 200 130" fill="none" stroke="#1c1917" stroke-width="5" stroke-dasharray="4 18" stroke-linecap="round"/>
+    <g transform="translate(40 40) rotate(-12)">
+      <path d="M0 70 L190 0 L120 120 Z" fill="#fffdf9" stroke="#1c1917" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M190 0 L70 88 L84 140 L104 104" fill="#f2ecdf" stroke="#1c1917" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M0 70 L70 88" stroke="#1c1917" stroke-width="5"/>
+    </g>
+    <g transform="translate(250 34)"><rect x="0" y="0" width="230" height="46" rx="10" fill="#1c1917"/><text x="115" y="32" text-anchor="middle" font-family="JetBrains Mono" font-weight="700" font-size="22" fill="#fff">respuesta enviada</text></g>
+  </svg>
+
+  <!-- hoja de respuesta (sale hacia el avión). Termina en y≈800: deja ≥60 px libres sobre el sobre -->
+  <div class="paper" data-obj="respuesta" data-gap="60" style="left:150px;top:440px;width:780px;height:330px;transform:rotate(-3deg);padding:34px 44px">
+    <div class="mono" style="font-size:22px;font-weight:700;color:var(--subtle);letter-spacing:.12em" data-txt>RE: ¿TIENES FECHAS EN NOVIEMBRE?</div>
+    <div class="hand" style="font-size:60px;line-height:1;margin-top:16px" data-txt>¡Hola, Marta! Sí: te mando la cotización hoy.</div>
+    <div style="height:5px;background:var(--line);margin:22px 0 16px"></div>
+    <div style="display:flex;align-items:baseline;gap:16px;white-space:nowrap" data-txt><span class="bric" style="font-size:40px">Estudio Ríos</span><span class="mono" style="font-size:30px;font-weight:800;color:var(--red)">hola@tuestudio.mx</span></div>
+  </div>
+
+  <!-- charola «Bandeja» con el sobre que llegó. Todo dentro del viewBox (el svg recorta lo que sale) -->
+  <svg class="abs" style="left:70px;top:870px" width="860" height="380" viewBox="0 0 860 380">
+    <!-- sobre abierto, asomando: solapa en y≈12, nunca fuera de la caja -->
+    <g data-obj="sobre" data-gap="60" transform="translate(170 84) rotate(4)">
+      <rect x="8" y="8" width="520" height="210" rx="12" fill="#1c1917"/>
+      <rect x="0" y="0" width="520" height="210" rx="12" fill="#fffdf9" stroke="#1c1917" stroke-width="6"/>
+      <path d="M0 0 L260 -90 L520 0" fill="#f2ecdf" stroke="#1c1917" stroke-width="6" stroke-linejoin="round"/>
+      <text x="34" y="66" font-family="JetBrains Mono" font-weight="700" font-size="24" fill="#57534e" data-txt>De: cliente@empresa.com</text>
+      <text x="34" y="108" font-family="JetBrains Mono" font-weight="800" font-size="28" fill="#1c1917" data-txt>Para: hola@tuestudio.mx</text>
+      <rect x="430" y="26" width="64" height="76" rx="6" fill="#d7263d" stroke="#1c1917" stroke-width="5"/>
+    </g>
+    <!-- charola metálica: borde derecho en x=920 abs (fuera de la franja de TikTok x 930–1080) -->
+    <path d="M20 244 L850 244 L805 366 L65 366 Z" fill="#e7dfcf" stroke="#1c1917" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M28 254 L842 254" stroke="#fffdf9" stroke-width="6"/>
+    <rect x="315" y="272" width="240" height="72" rx="12" fill="#fffdf9" stroke="#1c1917" stroke-width="6"/>
+    <text x="435" y="322" text-anchor="middle" font-family="Bricolage Grotesque" font-weight="800" font-size="44" fill="#1c1917">Bandeja</text>
+  </svg>
+
+  <div class="kara" data-txt><span>desde</span><span>la</span><span class="now">Bandeja.</span></div>
+</section>
+
+<!-- ============ SF3 · beat 5 (la misma tarjeta, transformada + CTA) ============ -->
+<section class="f" id="sf3">
+  <img class="abs" src="../../../public/img/brand/wordmark.svg" style="left:50%;top:1196px;height:0;display:none;transform:translateX(-50%)" alt="" />
+
+  <div class="paper card">
+    <div class="stripe"></div>
+    <div style="padding-left:20px">
+      <div class="eyebrow" data-txt>TARJETA · 2026</div>
+      <div class="name bric" data-txt>Estudio Ríos</div>
+      <div class="role" data-txt>diseño gráfico · branding</div>
+      <div class="row" data-txt>
+        <svg class="ico" viewBox="0 0 54 54"><circle cx="27" cy="27" r="22" fill="#fffdf9" stroke="#1c1917" stroke-width="5"/><ellipse cx="27" cy="27" rx="9" ry="22" fill="none" stroke="#1c1917" stroke-width="4"/><path d="M6 27 H48" stroke="#1c1917" stroke-width="4"/></svg>
+        <span class="ok">tuestudio.mx</span>
+      </div>
+      <div class="row" data-txt>
+        <svg class="ico" viewBox="0 0 54 54"><rect x="4" y="11" width="46" height="32" rx="5" fill="#fffdf9" stroke="#1c1917" stroke-width="5"/><path d="M6 14 L27 30 L48 14" fill="none" stroke="#1c1917" stroke-width="5" stroke-linejoin="round"/></svg>
+        <span>hola@<span class="ok">tuestudio.mx</span></span>
+      </div>
+    </div>
+    <!-- calcomanía de la máscara (asset oficial, sin repintar) -->
+    <svg class="abs" style="right:-46px;bottom:-70px;transform:rotate(14deg)" width="190" height="190" viewBox="0 0 80 80">
+      <circle cx="40" cy="40" r="38" fill="#fffdf9" stroke="#1c1917" stroke-width="2.6"/>
+      <g transform="translate(0 2)">
+      <ellipse cx="40" cy="42" rx="28" ry="24" fill="#a0182c"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="#d7263d"/>
+      <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="#f2b705" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="#f2b705" stroke-width="1.8"/>
+      <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
+      <circle cx="30.2" cy="34.9" r="1.9" fill="#ffffff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#ffffff"/>
+      <path d="M40 18 L40 26" stroke="#f2b705" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="#f2b705" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="postit" style="left:690px;top:520px;width:270px" data-txt>Lo siguiente: tu página</div>
+
+  <div class="btn" style="left:80px;top:950px" data-txt>Crea tu correo gratis</div>
+  <div class="abs mono" style="left:84px;top:1104px;font-size:34px;font-weight:800;white-space:nowrap" data-txt>mailmask.studio/correo-en-tu-dominio</div>
+  <div class="abs bric" style="left:84px;top:1160px;font-size:46px;color:var(--red)" data-txt>hoy, 21 de octubre</div>
+
+  <div class="kara" data-txt><span>Crea</span><span>tu</span><span class="now">correo</span><span class="next">gratis</span></div>
+</section>
+
+<script>
+  // monta el tapete y las zonas en cada cuadro; muestra el cuadro del hash
+  const mat = document.getElementById('mat'), zones = document.getElementById('zones');
+  document.querySelectorAll('.f').forEach(f => { f.prepend(mat.content.cloneNode(true)); f.append(zones.content.cloneNode(true)); });
+  document.querySelectorAll('#ticks').forEach(g => { for (let y = 0; y < 1920; y += 30) {
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    l.setAttribute('d', `M0 ${y} H${y % 150 === 0 ? 34 : 16}`); l.setAttribute('stroke', '#cfc3ab'); l.setAttribute('stroke-width', '3'); g.appendChild(l); } });
+  const [id, mode] = (location.hash.slice(1) || 'sf1').split(',');
+  document.getElementById(id).classList.add('on');
+  if (mode === 'zones') document.body.classList.remove('nozones');
+  // verificación de composición (la corre verif/check-layout.mjs; deja el resultado en #zonecheck):
+  //  inUnsafeZone: texto [data-txt] en franja tapada por TikTok · offCanvas: texto fuera de 0–1080
+  //  hidden: palabra de un [data-txt] tapada por otra pieza o recortada por la caja de su <svg>
+  //  tooClose: dos [data-obj] a menos de data-gap px (salvo pares en data-overlap-ok)
+  const hit = (r, z) => r.left < z[0] + z[2] && r.right > z[0] && r.top < z[1] + z[3] && r.bottom > z[1];
+  const Z = [[0,0,1080,240],[0,1400,1080,520],[930,880,150,520]];
+  const label = el => (el.dataset.obj || el.textContent).trim().replace(/\s+/g, ' ').slice(0, 40);
+  document.fonts.ready.then(() => {
+    const frame = document.getElementById(id), txt = [...frame.querySelectorAll('[data-txt]')];
+    const bad = txt.filter(el => Z.some(z => hit(el.getBoundingClientRect(), z))).map(label);
+    const over = txt.filter(el => { const r = el.getBoundingClientRect(); return r.right > 1080 || r.left < 0; }).map(label);
+    // oclusión: el centro de cada palabra debe pegarle al propio texto (o a algo dentro de él)
+    const hidden = [];
+    for (const el of txt) {
+      const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let n; (n = w.nextNode());) {
+        const re = /\S+/g; let m;
+        while ((m = re.exec(n.data))) {
+          const rg = document.createRange(); rg.setStart(n, m.index); rg.setEnd(n, m.index + m[0].length);
+          const r = rg.getBoundingClientRect(); if (!r.width) continue;
+          // arriba y abajo del renglón: un texto cortado a la mitad también falla
+          for (const fy of [0.2, 0.8]) {
+            const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height * fy);
+            if (!top || !(el === top || el.contains(top))) { hidden.push(`${m[0]} ← ${top ? (top.dataset?.obj || (top.className?.baseVal ?? top.className) || top.tagName) : 'fuera'}`); break; }
+          }
+        }
+      }
+    }
+    // separación entre objetos marcados (caja alineada a ejes, incluye rotación y transform del svg)
+    const objs = [...frame.querySelectorAll('[data-obj]')], tooClose = [];
+    for (let i = 0; i < objs.length; i++) for (let j = i + 1; j < objs.length; j++) {
+      const A = objs[i], B = objs[j];
+      const ok = (A.dataset.overlapOk || '').split(' ').includes(B.dataset.obj) || (B.dataset.overlapOk || '').split(' ').includes(A.dataset.obj);
+      if (ok) continue;
+      const a = A.getBoundingClientRect(), b = B.getBoundingClientRect();
+      const gap = Math.max(b.left - a.right, a.left - b.right, b.top - a.bottom, a.top - b.bottom);
+      const need = Math.max(+A.dataset.gap || 0, +B.dataset.gap || 0);
+      if (gap < need) tooClose.push(`${A.dataset.obj}↔${B.dataset.obj}: ${Math.round(gap)} px (mín ${need})`);
+    }
+    const out = document.createElement('pre'); out.id = 'zonecheck'; out.style.display = 'none';
+    out.textContent = JSON.stringify({ frame: id, inUnsafeZone: bad, offCanvas: over, hidden, tooClose });
+    document.body.append(out);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="es" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,600..800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&family=Caveat:wght@700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="score.gen.js"></script>
+    <style>
+      /* Short «Crea un correo nuevo en el dominio que ya tienes» de MailMask. Piel del sitio público
+         (crema + rojo de máscara, dorado sólo en la máscara) con acabado de caricatura plana: contorno de
+         tinta, rellenos sólidos, sombra dura. Molde: un solo objeto grande al centro sobre un tapete de
+         corte; entre escenas la cámara se clava en un glifo de la escena (zoom-punch) y un sello tapa el corte. */
+      :root {
+        --bg: #faf6ee; --elev: #fffdf9; --inset: #f2ecdf; --line: #e4dccd;
+        --ink: #1c1917; --muted: #57534e; --subtle: #78716c;
+        --red: #d7263d; --red-dk: #a0182c; --gold: #f2b705; --ok: #10b981; --ok-dk: #047857; --pink: #ffd3da;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); font-family: "Inter", sans-serif; color: var(--ink); }
+      #root { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); }
+      #mat { position: absolute; left: -120px; top: 0; width: 1320px; height: 1920px; }
+      .scene { position: absolute; inset: 0; display: none; }
+      #s-hook { display: block; }
+      .cam { position: absolute; inset: 0; }
+      .abs { position: absolute; }
+      .mono { font-family: "JetBrains Mono", monospace; }
+      .bric { font-family: "Bricolage Grotesque"; font-weight: 800; font-variation-settings: "wdth" 92, "opsz" 72; letter-spacing: -.03em; }
+      .hand { font-family: "Caveat", cursive; font-weight: 700; }
+      .eyebrow { font-family: "JetBrains Mono"; font-weight: 700; font-size: 24px; letter-spacing: .16em; color: var(--subtle); text-transform: uppercase; }
+      .paper { position: absolute; background: var(--elev); border: 6px solid var(--ink); box-shadow: 8px 8px 0 var(--ink); border-radius: 22px; }
+      .hidden { visibility: hidden; }
+
+      /* tarjeta de presentación (abre y cierra el video, misma posición) */
+      .card { left: 90px; top: 330px; width: 900px; height: 520px; transform: rotate(-4deg); padding: 54px 60px; }
+      .card .name { font-size: 104px; line-height: .95; margin-top: 14px; }
+      .card .role { font-size: 34px; color: var(--muted); margin-top: 10px; font-weight: 600; }
+      .card .row { display: flex; align-items: center; gap: 22px; font-family: "JetBrains Mono"; font-weight: 700; font-size: 38px; margin-top: 26px; position: relative; white-space: nowrap; height: 56px; }
+      .card .row.first { margin-top: 44px; }
+      .card .ico { width: 54px; height: 54px; flex: none; }
+      .card .stripe { position: absolute; left: 0; top: 0; bottom: 0; width: 26px; background: var(--red); border-right: 6px solid var(--ink); border-radius: 16px 0 0 16px; }
+      /* énfasis por color y peso; nada de subrayados ni trazos de plumón sobre el texto */
+      .flag { display: inline-block; font-weight: 800; }
+      .ink-path { fill: none; stroke: var(--red); stroke-linecap: round; stroke-dasharray: 1 2; stroke-dashoffset: 1.05; }
+
+      .quote { left: 110px; top: 880px; width: 700px; height: 340px; transform: rotate(3deg); padding: 34px 44px; }
+      .quote .amt { font-size: 104px; margin-top: 6px; }
+      .quote .from { font-family: "JetBrains Mono"; font-size: 28px; font-weight: 700; margin-top: 16px; color: var(--muted); white-space: nowrap; }
+      .stamp { position: absolute; border: 8px solid var(--red); color: var(--red); font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 54px; padding: 6px 26px; border-radius: 14px; transform: rotate(-14deg); background: var(--elev); white-space: nowrap; }
+
+      /* plan en tres pasos */
+      .step { position: absolute; display: flex; align-items: center; gap: 14px; font-family: "JetBrains Mono"; font-weight: 800; font-size: 26px; letter-spacing: .12em; text-transform: uppercase; }
+      .step b { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--red); color: #fff; border: 5px solid var(--ink); font-size: 28px; letter-spacing: 0; }
+      .field { position: absolute; left: 44px; right: 44px; top: 120px; height: 112px; background: var(--inset); border: 5px solid var(--ink); border-radius: 18px; display: flex; align-items: center; padding: 0 28px; font-family: "JetBrains Mono"; font-weight: 800; font-size: 60px; }
+      .caret { display: inline-block; width: 6px; height: 64px; background: var(--red); margin-left: 6px; }
+      .keys { position: absolute; left: 44px; top: 262px; display: flex; gap: 14px; }
+      .key { width: 116px; height: 70px; border: 5px solid var(--ink); border-radius: 14px; background: var(--elev); box-shadow: 0 8px 0 var(--ink); display: grid; place-items: center; font-family: "JetBrains Mono"; font-weight: 800; font-size: 30px; }
+      .tag { position: absolute; width: 250px; height: 150px; background: var(--elev); border: 6px solid var(--ink); border-radius: 16px; box-shadow: 8px 8px 0 var(--ink); text-align: center; padding-top: 22px; }
+      .tag .k { font-size: 66px; line-height: 1; }
+      .tag .s { font-family: "JetBrains Mono"; font-weight: 700; font-size: 26px; white-space: nowrap; color: var(--muted); margin-top: 10px; letter-spacing: .04em; }
+      .tape { position: absolute; left: 70px; top: -26px; width: 110px; height: 40px; background: var(--inset); border: 4px solid var(--ink); transform: rotate(-6deg); }
+      .check { position: absolute; right: -26px; top: -26px; width: 64px; height: 64px; }
+      /* lo que hace el agente: una ilustración por capacidad, texto ≥ 26 px */
+      .ill { position: absolute; top: 820px; height: 200px; padding: 10px 10px 0; text-align: center; }
+      .ill svg { display: block; margin: 0 auto; overflow: visible; }
+      .ill .lab { font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 30px; line-height: 1; letter-spacing: -.02em; margin-top: 8px; }
+      .badge { position: absolute; left: 150px; top: 960px; width: 720px; height: 230px; padding: 46px 40px 0; }
+      .badge .clip { position: absolute; left: 310px; top: -64px; width: 100px; height: 90px; }
+      .badge .addr { font-family: "JetBrains Mono"; font-weight: 800; font-size: 56px; margin-top: 12px; white-space: nowrap; }
+      .badge .addr i { font-style: normal; color: var(--red); }
+
+      /* Bandeja */
+      /* la hoja termina en y≈795 y el sobre arranca en y≈880: ≥60 px libres entre las dos piezas */
+      .sheet { left: 150px; top: 440px; width: 780px; height: 330px; transform: rotate(-3deg); padding: 34px 44px; }
+      .sheetIn { position: relative; }
+
+      /* llavero */
+      .kb { position: absolute; left: 150px; width: 600px; height: 112px; display: flex; align-items: center; gap: 22px; padding: 0 26px; }
+      .kb .hole { width: 34px; height: 34px; border-radius: 50%; border: 5px solid var(--ink); background: var(--bg); flex: none; }
+      .kb span { font-family: "JetBrains Mono"; font-weight: 800; font-size: 42px; white-space: nowrap; }
+      .kb span i { font-style: normal; color: var(--red); }
+
+      /* cierre */
+      .btn { position: absolute; background: var(--red); color: #fff; border: 6px solid var(--ink); box-shadow: 8px 8px 0 var(--ink); border-radius: 999px; font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 60px; letter-spacing: -.02em; padding: 22px 54px; white-space: nowrap; }
+      .postit { position: absolute; background: var(--pink); border: 5px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); padding: 18px 24px; font-family: "Caveat"; font-weight: 700; font-size: 50px; line-height: .95; width: 270px; }
+
+      /* subtítulo karaoke: una sola línea a la vez, 72 px; actual en rojo claro, dichas en blanco, por decir en gris */
+      #cap { position: absolute; left: 60px; width: 860px; top: 1262px; height: 112px; z-index: 50; }
+      .capPill { position: absolute; left: 0; top: 0; width: 860px; height: 112px; visibility: hidden; background: var(--ink); border-radius: 24px; display: flex; align-items: center; justify-content: center; gap: 18px;
+                 font-family: "Bricolage Grotesque"; font-variation-settings: "wdth" 92, "opsz" 72; font-weight: 800; font-size: 72px; letter-spacing: -.02em; line-height: 1; white-space: nowrap; box-shadow: 8px 8px 0 var(--red-dk); }
+      .capPill b { font-weight: 800; color: #8a827b; }
+      #measure { position: absolute; left: 0; top: 0; visibility: hidden; font-family: "Bricolage Grotesque"; font-variation-settings: "wdth" 92, "opsz" 72; font-weight: 800; font-size: 72px; letter-spacing: -.02em; white-space: nowrap; }
+
+      /* cortinilla: panel que crece desde el glifo, sello al centro y hueco que abre la escena siguiente */
+      #wipe { position: absolute; inset: 0; z-index: 90; pointer-events: none; }
+      .panel { position: absolute; left: -60px; top: -60px; width: 1200px; height: 2040px; visibility: hidden; }
+      .seal { position: absolute; left: 240px; top: 600px; width: 600px; height: 600px; visibility: hidden; z-index: 95; display: grid; place-items: center; }
+      .seal .g { font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 620px; line-height: 1; color: var(--elev); -webkit-text-stroke: 14px var(--ink); paint-order: stroke fill; filter: drop-shadow(16px 16px 0 var(--ink)); }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position:absolute">
+      <!-- máscara oficial: la misma del nav de public/correo-en-tu-dominio.html (tema claro), sin repintar -->
+      <symbol id="mask" viewBox="0 0 80 80">
+        <ellipse cx="40" cy="42" rx="28" ry="24" fill="#a0182c"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="#d7263d"/>
+        <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/>
+        <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/>
+        <circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
+        <circle cx="30.2" cy="34.9" r="1.9" fill="#fff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#fff"/>
+        <circle cx="26.7" cy="38.9" r="1.15" fill="#fff" opacity=".85"/><circle cx="50.7" cy="38.9" r="1.15" fill="#fff" opacity=".85"/>
+        <path d="M40 18 L40 26" stroke="#f2b705" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="#f2b705" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="globe" viewBox="0 0 54 54"><circle cx="27" cy="27" r="22" fill="#fffdf9" stroke="#1c1917" stroke-width="5"/><ellipse cx="27" cy="27" rx="9" ry="22" fill="none" stroke="#1c1917" stroke-width="4"/><path d="M6 27 H48" stroke="#1c1917" stroke-width="4"/></symbol>
+      <symbol id="mail" viewBox="0 0 54 54"><rect x="4" y="11" width="46" height="32" rx="5" fill="#fffdf9" stroke="#1c1917" stroke-width="5"/><path d="M6 14 L27 30 L48 14" fill="none" stroke="#1c1917" stroke-width="5" stroke-linejoin="round"/></symbol>
+      <symbol id="ok" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#10b981" stroke="#1c1917" stroke-width="5"/><path d="M18 33 L28 43 L46 22" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="envelope" viewBox="0 0 200 140"><rect x="6" y="6" width="188" height="128" rx="14" fill="#fffdf9" stroke="#1c1917" stroke-width="10"/><path d="M10 14 L100 84 L190 14" fill="none" stroke="#1c1917" stroke-width="10" stroke-linejoin="round"/></symbol>
+    </svg>
+
+    <div id="root" data-composition-id="main" data-start="0" data-width="1080" data-height="1920" data-duration="46.12">
+      <!-- tapete de corte: recorre exactamente una celda en todo el video -->
+      <svg id="mat" width="1320" height="1920" viewBox="0 0 1320 1920">
+        <defs>
+          <pattern id="g" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M60 0 L0 0 0 60" fill="none" stroke="#e9e1d1" stroke-width="2"/></pattern>
+          <pattern id="G" width="300" height="300" patternUnits="userSpaceOnUse"><path d="M300 0 L0 0 0 300" fill="none" stroke="#ddd2bd" stroke-width="3"/></pattern>
+        </defs>
+        <rect width="1320" height="1920" fill="#faf6ee"/><rect width="1320" height="1920" fill="url(#g)"/><rect width="1320" height="1920" fill="url(#G)"/>
+        <path d="M80 1960 L1240 800" stroke="#e4d9c4" stroke-width="3" stroke-dasharray="14 12" fill="none"/>
+        <g id="ticks"></g>
+      </svg>
+
+      <!-- 1 · gancho: la tarjeta dice tuestudio.mx y la cotización sale de gmail.com (fotograma 0 completo) -->
+      <section class="scene" id="s-hook"><div class="cam" id="cam-hook">
+        <div class="paper quote" id="hkQuote">
+          <div class="eyebrow" style="font-size:26px">Cotización #014</div>
+          <div class="amt bric">$18,500</div>
+          <div class="from">De: estudio.rios.2011@<span class="flag" id="hkFlag2">gmail.com</span></div>
+          <div class="stamp hidden" id="hkStamp" style="left:420px;top:-4px">¿ES REAL?</div>
+        </div>
+        <div class="paper card" id="hkCard">
+          <div class="stripe"></div>
+          <div style="padding-left:20px">
+            <div class="eyebrow">Tarjeta · 2026</div>
+            <div class="name bric">Estudio Ríos</div>
+            <div class="role">diseño gráfico · branding</div>
+            <div class="row first"><svg class="ico"><use href="#globe"/></svg>
+              <span class="flag" id="hkWeb">tuestudio.mx</span></div>
+            <div class="row"><svg class="ico"><use href="#mail"/></svg>
+              <span>estudio.rios.2011<span id="hkAt">@</span><span class="flag" id="hkFlag1">gmail.com</span></span></div>
+          </div>
+        </div>
+      </div></section>
+
+      <!-- 2 · el plan: escribes el dominio, cambias los nameservers a MailMask (un agente administra tu DNS), creas hola@ -->
+      <section class="scene" id="s-plan"><div class="cam" id="cam-plan">
+        <div class="paper" id="plPanel" style="left:80px;top:262px;width:920px;height:380px;transform:rotate(-2deg) scale(.8);transform-origin:0 0">
+          <div class="step" style="left:44px;top:40px"><b>1</b>Escribes tu dominio
+            <svg width="54" height="54" style="margin-left:auto"><use href="#mask"/></svg></div>
+          <div class="field"><span id="plTyped"></span><span class="caret" id="plCaret"></span></div>
+          <div class="keys"><div class="key">T</div><div class="key">U</div><div class="key">E</div><div class="key">S</div><div class="key">D</div><div class="key">.</div></div>
+        </div>
+        <div class="step" style="left:90px;top:588px"><b>2</b>Cambias tus nameservers</div>
+        <div class="tag hidden" id="plTag0" style="left:80px;top:660px;width:300px;height:132px;padding-top:18px;transform:rotate(-4deg)"><div class="tape"></div><div class="k bric" style="font-size:54px">NS</div><div class="s">→ MAILMASK</div><svg class="check hidden" id="plOk0"><use href="#ok"/></svg></div>
+        <div class="tag hidden" id="plTag1" style="left:420px;top:664px;width:470px;height:132px;padding-top:18px;transform:rotate(2deg)"><div class="tape" style="left:180px"></div><div class="k bric" style="font-size:54px">Agente</div><div class="s">ASISTENTE DE IA</div><svg class="check hidden" id="plOk1"><use href="#ok"/></svg></div>
+
+        <!-- 1) registros DNS: fichero de tarjetas que se llena solo -->
+        <div class="paper ill hidden" id="plDns" style="left:80px;width:230px;transform:rotate(-2deg)">
+          <svg width="200" height="100" viewBox="0 0 200 120">
+            <rect class="dnsCard" x="44" y="6" width="112" height="70" rx="8" fill="#fffdf9" stroke="#1c1917" stroke-width="5"/>
+            <rect class="dnsCard" x="36" y="22" width="128" height="70" rx="8" fill="#ffd3da" stroke="#1c1917" stroke-width="5"/>
+            <rect class="dnsCard" x="28" y="38" width="144" height="70" rx="8" fill="#fffdf9" stroke="#1c1917" stroke-width="5"/>
+            <path d="M44 54 H120 M44 68 H96" stroke="#1c1917" stroke-width="5" stroke-linecap="round" class="dnsCard"/>
+            <rect x="20" y="66" width="168" height="54" rx="8" fill="#1c1917"/>
+            <rect x="14" y="60" width="168" height="54" rx="8" fill="#e7dfcf" stroke="#1c1917" stroke-width="6"/>
+            <rect x="74" y="76" width="48" height="14" rx="7" fill="#fffdf9" stroke="#1c1917" stroke-width="4"/>
+          </svg>
+          <div class="lab">Registros<br>DNS</div>
+        </div>
+        <!-- 2) correos nuevos: buzón que suelta sobres con @tuestudio.mx -->
+        <div class="paper ill hidden" id="plMail" style="left:326px;width:230px;transform:rotate(1.5deg)">
+          <svg width="200" height="100" viewBox="0 0 200 120">
+            <g class="mailEnv"><rect x="96" y="2" width="76" height="50" rx="6" fill="#fffdf9" stroke="#1c1917" stroke-width="5"/><path d="M98 6 L134 30 L170 6" fill="none" stroke="#1c1917" stroke-width="4"/><text x="134" y="47" text-anchor="middle" font-family="JetBrains Mono" font-weight="800" font-size="26" fill="#d7263d">@</text></g>
+            <g class="mailEnv"><rect x="118" y="30" width="76" height="50" rx="6" fill="#fffdf9" stroke="#1c1917" stroke-width="5"/><path d="M120 34 L156 58 L192 34" fill="none" stroke="#1c1917" stroke-width="4"/><text x="156" y="75" text-anchor="middle" font-family="JetBrains Mono" font-weight="800" font-size="26" fill="#d7263d">@</text></g>
+            <rect x="18" y="38" width="96" height="70" rx="12" fill="#1c1917"/>
+            <path d="M12 104 V62 Q12 32 48 32 H76 Q106 32 106 62 V104 Z" fill="#d7263d" stroke="#1c1917" stroke-width="6" stroke-linejoin="round"/>
+            <rect x="28" y="62" width="62" height="12" rx="6" fill="#1c1917"/>
+            <path d="M58 104 V120" stroke="#1c1917" stroke-width="8"/>
+            <g id="mailFlag"><path d="M106 70 V40" stroke="#1c1917" stroke-width="5"/><rect x="106" y="40" width="22" height="14" fill="#f2ecdf" stroke="#1c1917" stroke-width="4"/></g>
+          </svg>
+          <div class="lab">Correos<br>nuevos</div>
+        </div>
+        <!-- 3) landing en tu subdominio: navegador con promo.tuestudio.mx que se arma -->
+        <div class="paper ill hidden" id="plWeb" style="left:572px;width:330px;transform:rotate(-1.5deg)">
+          <svg width="300" height="100" viewBox="0 0 300 120">
+            <rect x="8" y="8" width="290" height="112" rx="10" fill="#1c1917"/>
+            <rect x="2" y="2" width="290" height="112" rx="10" fill="#fffdf9" stroke="#1c1917" stroke-width="5"/>
+            <path d="M2 40 H292" stroke="#1c1917" stroke-width="5"/>
+            <text x="147" y="31" text-anchor="middle" font-family="JetBrains Mono" font-weight="800" font-size="26" fill="#1c1917"><tspan fill="#d7263d">promo</tspan>.tuestudio.mx</text>
+            <rect class="webBlock" x="16" y="52" width="150" height="26" rx="6" fill="#d7263d" stroke="#1c1917" stroke-width="4"/>
+            <rect class="webBlock" x="16" y="86" width="110" height="18" rx="9" fill="#1c1917"/>
+            <rect class="webBlock" x="184" y="52" width="94" height="52" rx="8" fill="#ffd3da" stroke="#1c1917" stroke-width="4"/>
+          </svg>
+          <div class="lab">Landing en tu<br>subdominio</div>
+        </div>
+        <div class="paper badge hidden" id="plBadge" style="top:1076px;height:178px;padding-top:24px">
+          <svg class="clip" viewBox="0 0 100 90" style="top:-46px;height:62px"><rect x="30" y="0" width="40" height="70" rx="10" fill="#fffdf9" stroke="#1c1917" stroke-width="7"/><rect x="10" y="50" width="80" height="34" rx="8" fill="#1c1917"/></svg>
+          <div class="step" style="position:relative;left:0;top:0"><b>3</b>Creas tu dirección</div>
+          <div class="addr">hola<i id="plAt">@</i>tuestudio.mx</div>
+        </div>
+      </div></section>
+
+      <!-- 3 · la Bandeja: llega el correo del cliente y sale la respuesta firmada -->
+      <section class="scene" id="s-bandeja"><div class="cam" id="cam-bandeja">
+        <svg class="abs hidden" id="bdPlane" style="left:40px;top:250px" width="560" height="260" viewBox="0 0 560 260">
+          <path id="bdTrail" pathLength="1" d="M540 230 C 420 220, 330 120, 200 130" fill="none" stroke="#1c1917" stroke-width="5" stroke-dasharray="0.012 0.03" stroke-linecap="round"/>
+          <g transform="translate(40 40) rotate(-12)">
+            <path d="M0 70 L190 0 L120 120 Z" fill="#fffdf9" stroke="#1c1917" stroke-width="6" stroke-linejoin="round"/>
+            <path d="M190 0 L70 88 L84 140 L104 104" fill="#f2ecdf" stroke="#1c1917" stroke-width="6" stroke-linejoin="round"/>
+            <path d="M0 70 L70 88" stroke="#1c1917" stroke-width="5"/>
+          </g>
+        </svg>
+        <div class="abs hidden mono" id="bdSent" style="left:290px;top:284px;background:var(--ink);color:#fff;font-weight:800;font-size:28px;border-radius:12px;padding:8px 18px">respuesta enviada</div>
+
+        <!-- sobre del cliente (cae a la charola) -->
+        <div class="abs hidden" id="bdEnv" style="left:260px;top:890px;width:540px;height:230px;transform:rotate(4deg)">
+          <svg width="540" height="230" viewBox="-8 -96 540 330" style="overflow:visible">
+            <rect x="8" y="8" width="520" height="210" rx="12" fill="#1c1917"/>
+            <rect x="0" y="0" width="520" height="210" rx="12" fill="#fffdf9" stroke="#1c1917" stroke-width="6"/>
+            <path d="M0 0 L260 -90 L520 0" fill="#f2ecdf" stroke="#1c1917" stroke-width="6" stroke-linejoin="round"/>
+            <text x="34" y="66" font-family="JetBrains Mono" font-weight="700" font-size="24" fill="#57534e">De: cliente@empresa.com</text>
+            <text x="34" y="112" font-family="JetBrains Mono" font-weight="800" font-size="28" fill="#1c1917">Para: <tspan id="bdTo">hola@tuestudio.mx</tspan></text>
+            <rect x="430" y="22" width="64" height="76" rx="6" fill="#d7263d" stroke="#1c1917" stroke-width="5"/>
+          </svg>
+        </div>
+
+        <!-- respuesta que sale del sobre -->
+        <div class="paper sheet hidden" id="bdSheet">
+          <div class="mono" style="font-size:22px;font-weight:700;color:var(--subtle);letter-spacing:.12em">RE: ¿TIENES FECHAS EN NOVIEMBRE?</div>
+          <div class="hand" id="bdHand" style="font-size:60px;line-height:1;margin-top:16px">¡Hola, Marta! Sí: te mando la cotización hoy.</div>
+          <div style="height:5px;background:var(--line);margin:22px 0 16px"></div>
+          <div style="display:flex;align-items:baseline;gap:16px;white-space:nowrap"><span class="bric" style="font-size:40px">Estudio Ríos</span><span class="mono" style="font-size:30px;font-weight:800;color:var(--red)">hola@tuestudio.mx</span></div>
+        </div>
+
+        <!-- charola de escritorio -->
+        <svg class="abs" id="bdTray" style="left:70px;top:960px" width="900" height="300" viewBox="0 0 900 300">
+          <path d="M30 128 L870 128 L820 288 L80 288 Z" fill="#e7dfcf" stroke="#1c1917" stroke-width="6" stroke-linejoin="round"/>
+          <path d="M38 138 L862 138" stroke="#fffdf9" stroke-width="6"/>
+        </svg>
+        <div class="abs bric" id="bdLabel" style="left:400px;top:1130px;width:240px;height:78px;background:var(--elev);border:6px solid var(--ink);border-radius:12px;display:grid;place-items:center;font-size:44px">Bandeja</div>
+      </div></section>
+
+      <!-- 4 · gratis: el llavero con cinco direcciones y la etiqueta $0 -->
+      <section class="scene" id="s-gratis"><div class="cam" id="cam-gratis">
+        <svg class="abs" id="grCords" style="left:0;top:0" width="1080" height="1300" viewBox="0 0 1080 1300"></svg>
+        <svg class="abs" id="grRing" style="left:380px;top:270px" width="180" height="180" viewBox="0 0 180 180">
+          <circle cx="90" cy="90" r="64" fill="none" stroke="#1c1917" stroke-width="22"/>
+          <circle cx="90" cy="90" r="64" fill="none" stroke="#e7dfcf" stroke-width="10"/>
+        </svg>
+        <div class="abs mono" id="grCount" style="left:600px;top:320px;font-weight:800;font-size:40px;background:var(--elev);border:5px solid var(--ink);border-radius:14px;padding:6px 18px;box-shadow:6px 6px 0 var(--ink)"><span id="grN">1</span> / 5</div>
+        <div id="grBadges"></div>
+        <svg class="abs hidden" id="grTag" style="left:800px;top:380px" width="200" height="360" viewBox="0 0 200 360">
+          <path d="M100 0 V70" stroke="#1c1917" stroke-width="6"/>
+          <path d="M20 110 L100 70 L180 110 V330 Q180 346 164 346 H36 Q20 346 20 330 Z" fill="#fffdf9" stroke="#1c1917" stroke-width="8" stroke-linejoin="round"/>
+          <circle cx="100" cy="108" r="13" fill="#faf6ee" stroke="#1c1917" stroke-width="6"/>
+          <text x="100" y="220" text-anchor="middle" font-family="Bricolage Grotesque" font-weight="800" font-size="92" fill="#d7263d">$0</text>
+          <text x="100" y="268" text-anchor="middle" font-family="Bricolage Grotesque" font-weight="800" font-size="27" fill="#1c1917">recibir y</text>
+          <text x="100" y="302" text-anchor="middle" font-family="Bricolage Grotesque" font-weight="800" font-size="27" fill="#1c1917">responder</text>
+        </svg>
+      </div></section>
+
+      <!-- 5 · cierre circular: la misma tarjeta, ya con hola@tuestudio.mx + CTA -->
+      <section class="scene" id="s-cierre"><div class="cam" id="cam-cierre">
+        <div class="paper card" id="ciCard">
+          <div class="stripe"></div>
+          <div style="padding-left:20px">
+            <div class="eyebrow">Tarjeta · 2026</div>
+            <div class="name bric">Estudio Ríos</div>
+            <div class="role">diseño gráfico · branding</div>
+            <div class="row first"><svg class="ico"><use href="#globe"/></svg>
+              <span class="flag" id="ciWeb">tuestudio.mx</span></div>
+            <div class="row"><svg class="ico"><use href="#mail"/></svg>
+              <span style="position:relative;display:inline-block;height:56px;line-height:56px">
+                <span id="ciOld" style="position:absolute;left:0;top:0">estudio.rios.2011@gmail.com</span>
+                <span id="ciNew" style="position:absolute;left:0;top:0;white-space:nowrap;visibility:hidden">hola@<span class="flag" id="ciMail" style="color:var(--red)">tuestudio.mx</span></span>
+              </span></div>
+          </div>
+          <div class="postit hidden" id="ciPost" style="left:600px;top:190px">Lo siguiente: tu página</div>
+          <!-- calcomanía de la máscara (asset oficial, sin repintar) -->
+          <svg class="abs hidden" id="ciSticker" style="right:110px;bottom:-80px" width="190" height="190" viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="38" fill="#fffdf9" stroke="#1c1917" stroke-width="2.6"/>
+            <use href="#mask" x="8" y="7" width="64" height="64"/>
+          </svg>
+        </div>
+        <div class="btn hidden" id="ciBtn" style="left:80px;top:950px">Crea tu correo gratis</div>
+        <div class="abs mono hidden" id="ciUrl" style="left:84px;top:1110px;font-size:36px;font-weight:800;white-space:nowrap">mailmask.studio/correo-en-tu-dominio</div>
+      </div></section>
+
+      <div id="cap"></div>
+      <div id="measure"></div>
+      <div id="wipe"></div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const SC = window.SCORE, T = SC.T, $ = (s) => document.querySelector(s);
+      const S = Object.fromEntries(SC.scenes.map((s) => [s.id, s]));
+
+      const build = () => {
+        const tl = gsap.timeline({ paused: true });
+        const vis = (el, t) => tl.set(el, { visibility: "visible" }, t);
+        const hide = (el, t) => tl.set(el, { visibility: "hidden" }, t);
+        const pop = (el, t, from = 0.6, dur = 0.32, s = 2) => { vis(el, t); tl.fromTo(el, { scale: from }, { scale: 1, duration: dur, ease: `back.out(${s})`, immediateRender: false }, t); };
+        const bump = (el, t, k = 1.12) => tl.fromTo(el, { scale: 1 }, { scale: k, duration: 0.12, yoyo: true, repeat: 1, ease: "power2.out", immediateRender: false }, t);
+        const draw = (el, t, dur) => tl.fromTo(el, { strokeDashoffset: 1.05 }, { strokeDashoffset: 0, duration: dur, ease: "power1.inOut", immediateRender: false }, t);
+        const keep = (sel, rot) => gsap.set(sel, { rotation: rot });
+
+        // regla del tapete y fondo en movimiento: una celda (60 px) en todo el video, sin bucle infinito
+        const ticks = $("#ticks");
+        for (let y = 0; y < 1920; y += 30) { const l = document.createElementNS("http://www.w3.org/2000/svg", "path"); l.setAttribute("d", `M120 ${y} H${y % 150 === 0 ? 154 : 136}`); l.setAttribute("stroke", "#cfc3ab"); l.setAttribute("stroke-width", "3"); ticks.appendChild(l); }
+        tl.fromTo("#mat", { x: 0 }, { x: 60, duration: SC.duration, ease: "none" }, 0);
+
+        // ---- qué escena se ve: el cambio ocurre debajo del panel de la cortinilla ----
+        SC.scenes.forEach((s, i) => { if (i) { tl.set("#s-" + SC.scenes[i - 1].id, { display: "none" }, s.t0 - 0.1); tl.set("#s-" + s.id, { display: "block" }, s.t0 - 0.1); } });
+
+        // ---- 1 · gancho ----
+        keep(".card", -4); keep("#hkQuote", 3);
+        tl.fromTo("#hkCard", { rotation: -4 }, { rotation: -3.2, duration: 1.2, yoyo: true, repeat: 3, ease: "sine.inOut", immediateRender: false }, 0.3);
+        bump("#hkWeb", T["hook.underline"], 1.1);
+        tl.fromTo("#hkQuote", { y: 0, rotation: 3 }, { y: -36, rotation: 6, duration: 0.4, ease: "back.out(2)", immediateRender: false }, T["hook.quote"]);
+        // gmail.com se enciende en rojo (color + golpe de escala), primero en la tarjeta y luego en la cotización
+        tl.fromTo("#hkFlag1", { color: "#1c1917" }, { color: "#d7263d", duration: 0.2, ease: "none", immediateRender: false }, T["hook.circle"]); bump("#hkFlag1", T["hook.circle"], 1.14);
+        tl.fromTo("#hkFlag2", { color: "#57534e" }, { color: "#d7263d", duration: 0.2, ease: "none", immediateRender: false }, T["hook.circle"] + 0.25); bump("#hkFlag2", T["hook.circle"] + 0.25, 1.14);
+        vis("#hkStamp", T["hook.stamp"]);
+        tl.fromTo("#hkStamp", { scale: 2.4, rotation: -30 }, { scale: 1, rotation: -14, duration: 0.45, ease: "back.out(2)", immediateRender: false }, T["hook.stamp"]);
+        tl.fromTo("#hkQuote", { x: 0 }, { x: 8, duration: 0.04, yoyo: true, repeat: 5, ease: "sine.inOut", immediateRender: false }, T["hook.stamp"] + 0.15);
+
+        // ---- 2 · plan ----
+        const typed = "tuestudio.mx";
+        T["plan.letters"].forEach((x, i) => {
+          tl.set("#plTyped", { textContent: typed.slice(0, i + 1) }, x);
+          const k = document.querySelectorAll("#plPanel .key")[i % 6];
+          tl.fromTo(k, { y: 0, boxShadow: "0 8px 0 #1c1917" }, { y: 8, boxShadow: "0 0px 0 #1c1917", duration: 0.05, yoyo: true, repeat: 1, ease: "power1.out", immediateRender: false }, x);
+        });
+        // el cursor parpadea mientras se escribe (bucle finito)
+        tl.fromTo("#plCaret", { opacity: 1 }, { opacity: 0, duration: 0.25, yoyo: true, repeat: 15, ease: "steps(1)", immediateRender: false }, S.plan.t0 + 0.3);
+        [0, 1].forEach((i) => {
+          const at = i ? T["plan.agent"] : T["plan.tags"], el = "#plTag" + i;
+          vis(el, at);
+          tl.fromTo(el, { y: -420, rotation: i % 2 ? 18 : -18 }, { y: 0, rotation: [-4, 3][i], duration: 0.4, ease: "back.out(1.6)", immediateRender: false }, at);
+          pop("#plOk" + i, i ? T["plan.agentOk"] : T["plan.checks"], 0.2, 0.3, 2.4);
+        });
+        // cada capacidad del agente entra cuando la voz la nombra; su objeto se anima una vez (bucle finito)
+        [["#plDns", "plan.dns", -2], ["#plMail", "plan.mail", 1.5], ["#plWeb", "plan.web", -1.5]].forEach(([el, k, r]) => {
+          vis(el, T[k]);
+          tl.fromTo(el, { y: 160, scale: 0.7, rotation: r * 4 }, { y: 0, scale: 1, rotation: r, duration: 0.4, ease: "back.out(1.7)", immediateRender: false }, T[k]);
+        });
+        gsap.utils.toArray("#plDns .dnsCard").forEach((c, i) => tl.fromTo(c, { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.25, ease: "back.out(2)", immediateRender: false }, T["plan.dns"] + 0.3 + i * 0.16));
+        gsap.utils.toArray("#plMail .mailEnv").forEach((c, i) => tl.fromTo(c, { x: -70, y: 50, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: 0.3, ease: "power2.out", immediateRender: false }, T["plan.mail"] + 0.35 + i * 0.2));
+        tl.fromTo("#mailFlag", { rotation: 90 }, { rotation: 0, duration: 0.3, ease: "back.out(2)", svgOrigin: "106 70", immediateRender: false }, T["plan.mail"] + 0.3);
+        gsap.utils.toArray("#plWeb .webBlock").forEach((c, i) => tl.fromTo(c, { scaleX: 0, opacity: 0 }, { scaleX: 1, opacity: 1, duration: 0.22, ease: "power2.out", transformOrigin: "0% 50%", immediateRender: false }, T["plan.web"] + 0.35 + i * 0.15));
+        gsap.set("#plBadge", { transformOrigin: "50% -60px" });
+        vis("#plBadge", T["plan.badge"]);
+        tl.fromTo("#plBadge", { y: -300, scale: 0.6, rotation: -8 }, { y: 0, scale: 1, rotation: 0, duration: 0.4, ease: "back.out(1.7)", immediateRender: false }, T["plan.badge"]);
+        tl.to("#plBadge", { keyframes: [{ rotation: 3, duration: 0.3 }, { rotation: -2, duration: 0.3 }, { rotation: 1, duration: 0.25 }, { rotation: 0, duration: 0.2 }], ease: "sine.inOut" }, T["plan.badge"] + 0.4);
+
+        // ---- 3 · Bandeja ----
+        tl.fromTo("#bdTray", { y: 0 }, { y: 10, duration: 0.12, yoyo: true, repeat: 1, ease: "power1.out", immediateRender: false }, T["bandeja.env"] + 0.3);
+        vis("#bdEnv", T["bandeja.env"]);
+        tl.fromTo("#bdEnv", { y: -1100, rotation: -16 }, { y: 0, rotation: 4, duration: 0.42, ease: "bounce.out", immediateRender: false }, T["bandeja.env"]);
+        tl.fromTo("#bdTo", { fill: "#1c1917" }, { fill: "#d7263d", duration: 0.2, ease: "none", immediateRender: false }, T["bandeja.to"]);
+        vis("#bdSheet", T["bandeja.reply"] - 0.15);
+        tl.fromTo("#bdSheet", { y: 420, rotation: 2 }, { y: 0, rotation: -3, duration: 0.4, ease: "back.out(1.5)", immediateRender: false }, T["bandeja.reply"] - 0.15);
+        tl.fromTo("#bdHand", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 1.1, ease: "none", immediateRender: false }, T["bandeja.reply"]);
+        gsap.set("#bdHand", { clipPath: "inset(0 100% 0 0)" });
+        vis("#bdPlane", T["bandeja.plane"]);
+        tl.fromTo("#bdPlane", { x: 520, y: 260, scale: 0.4, rotation: 20 }, { x: 0, y: 0, scale: 1, rotation: 0, duration: 0.55, ease: "power2.out", immediateRender: false }, T["bandeja.plane"]);
+        pop("#bdSent", T["bandeja.plane"] + 0.5, 0.4, 0.3, 2.2);
+        tl.fromTo("#bdPlane", { y: 0 }, { y: -12, duration: 0.5, yoyo: true, repeat: 3, ease: "sine.inOut", immediateRender: false }, T["bandeja.plane"] + 0.6);
+
+        // ---- 4 · llavero: cinco direcciones que cuelgan de un aro ----
+        const names = ["hola", "ventas", "pagos", "citas", "ana"], cords = $("#grCords"), wrap = $("#grBadges");
+        names.forEach((n, i) => {
+          const top = 500 + i * 136, rot = [-2, 2, -1, 3, -2][i];
+          const c = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          c.setAttribute("d", `M470 420 L${190} ${top + 56}`); c.setAttribute("stroke", "#1c1917"); c.setAttribute("stroke-width", "5"); c.setAttribute("fill", "none");
+          c.setAttribute("pathLength", "1"); c.setAttribute("stroke-dasharray", "1 2"); c.setAttribute("stroke-dashoffset", i ? "1.05" : "0");
+          cords.appendChild(c);
+          const b = document.createElement("div"); b.className = "paper kb"; b.style.top = top + "px"; b.style.transform = `rotate(${rot}deg)`;
+          b.innerHTML = `<div class="hole"></div><span>${n}<i>@</i>tuestudio.mx</span>`;
+          if (i) b.style.visibility = "hidden";
+          wrap.appendChild(b); keep(b, rot);
+          const at = T["gratis.badgeAt"][i];
+          if (i) {
+            vis(b, at);
+            tl.fromTo(b, { y: -700, rotation: rot * 6 }, { y: 0, rotation: rot, duration: 0.4, ease: "back.out(1.6)", immediateRender: false }, at);
+            draw(c, at + 0.1, 0.25);
+          } else bump(b, at, 1.08);
+          tl.set("#grN", { textContent: String(i + 1) }, at + 0.1);
+          bump("#grCount", at + 0.1, 1.15);
+        });
+        tl.fromTo("#grRing", { rotation: 0 }, { rotation: 12, duration: 0.3, yoyo: true, repeat: 3, ease: "sine.inOut", immediateRender: false }, S.gratis.t0 + 0.2);
+        gsap.set("#grTag", { transformOrigin: "50% 0%" });
+        vis("#grTag", T["gratis.tag"]);
+        tl.fromTo("#grTag", { y: -600, rotation: -30 }, { y: 0, rotation: 10, duration: 0.5, ease: "back.out(1.5)", immediateRender: false }, T["gratis.tag"]);
+        tl.to("#grTag", { keyframes: [{ rotation: -8, duration: 0.35 }, { rotation: 5, duration: 0.3 }, { rotation: -2, duration: 0.25 }, { rotation: 0, duration: 0.2 }], ease: "sine.inOut" }, T["gratis.tag"] + 0.5);
+
+        // ---- 5 · cierre ----
+        tl.fromTo("#ciCard", { rotation: -4 }, { rotation: -3.2, duration: 1.2, yoyo: true, repeat: 5, ease: "sine.inOut", immediateRender: false }, S.cierre.t0 + 0.6);
+        // el correo viejo se va hacia arriba y el nuevo se escribe en su lugar
+        tl.fromTo("#ciOld", { y: 0, opacity: 1 }, { y: -40, opacity: 0, duration: 0.3, ease: "power2.in", immediateRender: false }, T["cierre.rewrite"]);
+        hide("#ciOld", T["cierre.rewrite"] + 0.35); vis("#ciNew", T["cierre.rewrite"] + 0.35);
+        tl.fromTo("#ciNew", { clipPath: "inset(-20px 100% -40px 0)" }, { clipPath: "inset(-20px 0% -40px 0)", duration: 0.35, ease: "none", immediateRender: false }, T["cierre.rewrite"] + 0.35);
+        // los dos renglones combinan: tuestudio.mx en rojo en la web y en el correo
+        tl.fromTo("#ciWeb", { color: "#1c1917" }, { color: "#d7263d", duration: 0.2, ease: "none", immediateRender: false }, T["cierre.underline"]); bump("#ciWeb", T["cierre.underline"], 1.12); bump("#ciMail", T["cierre.underline"] + 0.15, 1.12);
+        vis("#ciSticker", T["cierre.sticker"]);
+        tl.fromTo("#ciSticker", { scale: 2.4, rotation: 40 }, { scale: 1, rotation: 14, duration: 0.4, ease: "back.out(2)", immediateRender: false }, T["cierre.sticker"]);
+        pop("#ciBtn", T["cierre.cta"], 0.4, 0.35, 2.2);
+        pop("#ciUrl", T["cierre.url"], 0.7, 0.3, 2);
+        tl.fromTo("#ciBtn", { scale: 1 }, { scale: 1.05, duration: 0.45, yoyo: true, repeat: 3, ease: "sine.inOut", immediateRender: false }, T["cierre.url"] + 0.5);
+        vis("#ciPost", T["cierre.postit"]);
+        tl.fromTo("#ciPost", { scale: 1.8, rotation: -14 }, { scale: 1, rotation: 6, duration: 0.35, ease: "back.out(2)", immediateRender: false }, T["cierre.postit"]);
+        tl.fromTo("#ciSticker", { rotation: 14 }, { rotation: 4, duration: 0.2, yoyo: true, repeat: 3, ease: "sine.inOut", immediateRender: false }, T["cierre.postit"] + 0.6);
+
+        // ---- karaoke: una sola línea; se parte en puntuación, en pausas > 0.6 s y en lo que cabe (≤ 780 px) ----
+        const meas = $("#measure");
+        const width = (ws) => { meas.textContent = ws.map((w) => w.w).join(" "); return meas.offsetWidth + 18 * (ws.length - 1); };
+        const chunks = [];
+        T.words.forEach(({ words }) => {
+          let cur = [];
+          words.forEach((w, i) => {
+            if (cur.length && width([...cur, w]) > 780) { chunks.push(cur); cur = []; }
+            cur.push(w);
+            const gap = words[i + 1] ? words[i + 1].s - w.e : 0;
+            if (/[,.:?!]$/.test(w.w) || gap > 0.6) { chunks.push(cur); cur = []; }
+          });
+          if (cur.length) chunks.push(cur);
+        });
+        const cap = $("#cap");
+        const sceneOf = (t) => SC.scenes.find((s) => s.t0 <= t && t < s.t1) || SC.scenes.at(-1);
+        chunks.forEach((ws, k) => {
+          const row = document.createElement("div"); row.className = "capPill";
+          row.innerHTML = ws.map((w) => `<b>${w.w}</b>`).join("");
+          cap.appendChild(row);
+          const bs = [...row.querySelectorAll("b")];
+          const start = k === 0 ? 0 : ws[0].s - 0.1;
+          vis(row, start);
+          if (k) tl.fromTo(row, { scale: 0.94 }, { scale: 1, duration: 0.14, ease: "back.out(2)", immediateRender: false }, start);
+          ws.forEach((w) => { const b = bs[ws.indexOf(w)]; tl.set(b, { color: "#ff6b7d" }, w.s); tl.set(b, { color: "#ffffff" }, w.e + 0.02); });
+          const next = chunks[k + 1], last = ws.at(-1).e, sc = sceneOf(ws[0].s);
+          const hideAt = Math.min(next ? next[0].s - 0.1 : Infinity, last + 1.2, sc.id === "cierre" ? Infinity : sc.t1 - 0.45);
+          if (hideAt < Infinity) hide(row, hideAt);
+        });
+
+        // ---- cortinillas: zoom-punch por un glifo de la escena que sale ----
+        // la cámara se clava en el glifo, un panel crece desde ahí hasta tapar las cuatro esquinas, un sello enorme
+        // cae al centro (back.out(1.8)) y sale volando mientras un hueco circular abre la escena siguiente.
+        const CUTS = [
+          { id: "plan", from: "hook", anchor: "#hkAt", panel: "#d7263d", seal: '<div class="g">@</div>' },
+          { id: "bandeja", from: "plan", anchor: "#plAt", panel: "#a0182c", seal: '<svg width="560" height="392" style="filter:drop-shadow(16px 16px 0 #1c1917)"><use href="#envelope"/></svg>' },
+          { id: "gratis", from: "bandeja", anchor: "#bdLabel", panel: "#d7263d", seal: '<div class="g">5</div>' },
+          { id: "cierre", from: "gratis", anchor: "#grTag", panel: "#f2ecdf", seal: '<svg width="560" height="560" viewBox="0 0 80 80" style="filter:drop-shadow(14px 14px 0 #1c1917)"><circle cx="40" cy="40" r="38" fill="#fffdf9" stroke="#1c1917" stroke-width="2.4"/><use href="#mask" x="8" y="7" width="64" height="64"/></svg>' },
+        ];
+        const wipe = $("#wipe");
+        CUTS.forEach((c) => {
+          const t = S[c.id].t0, sealAt = T.seal[c.id];
+          // centro del glifo: se mide con la escena visible un instante
+          const sc = $("#s-" + c.from), prev = sc.style.display; sc.style.display = "block";
+          const anc = $(c.anchor), hv = anc.style.visibility; anc.style.visibility = "visible";
+          const r = anc.getBoundingClientRect(); const ax = r.left + r.width / 2, ay = r.top + r.height / 2;
+          anc.style.visibility = hv; sc.style.display = prev;
+          // panel (más grande que el lienzo para que la sacudida no destape un borde)
+          const p = document.createElement("div"); p.className = "panel"; p.style.background = c.panel; wipe.appendChild(p);
+          const cx = ax + 60, cy = ay + 60;
+          const grow = { r: 0 }, hole = { r: 0 };
+          const setGrow = () => { p.style.clipPath = `circle(${grow.r}px at ${cx}px ${cy}px)`; };
+          const setHole = () => { const h = hole.r; p.style.clipPath = h <= 0 ? "none" : `path(evenodd, "M0 0 H1200 V2040 H0 Z M${600 - h} 1020 a${h} ${h} 0 1 0 ${2 * h} 0 a${h} ${h} 0 1 0 ${-2 * h} 0 Z")`; };
+          gsap.set("#cam-" + c.from, { transformOrigin: `${ax}px ${ay}px` });
+          tl.fromTo("#cam-" + c.from, { scale: 1 }, { scale: 4, duration: 0.4, ease: "power3.in", immediateRender: false }, t - 0.45);
+          vis(p, t - 0.36);
+          tl.fromTo(grow, { r: 0 }, { r: 2400, duration: 0.3, ease: "power2.in", immediateRender: false, onUpdate: setGrow, onStart: setGrow }, t - 0.36);
+          // sello
+          const s = document.createElement("div"); s.className = "seal"; s.innerHTML = c.seal; wipe.appendChild(s);
+          vis(s, sealAt);
+          tl.fromTo(s, { scale: 0.3, rotation: -14, y: 0 }, { scale: 1, rotation: 0, duration: 0.3, ease: "back.out(1.8)", immediateRender: false }, sealAt);
+          // sacudida de dos cuadros en el impacto
+          const hit = sealAt + 0.3 / 2.8;
+          tl.fromTo([p, s], { x: 0 }, { x: 14, duration: 0.034, yoyo: true, repeat: 3, ease: "none", immediateRender: false }, hit);
+          // se abre: el sello sale volando y el hueco crece desde el centro
+          tl.to(s, { y: -1500, rotation: 24, duration: 0.32, ease: "power2.in" }, t + 0.16);
+          hide(s, t + 0.5);
+          tl.fromTo(hole, { r: 0 }, { r: 1300, duration: 0.36, ease: "power2.in", immediateRender: false, onUpdate: setHole, onStart: setHole }, t + 0.2);
+          hide(p, t + 0.57);
+          tl.fromTo("#cam-" + c.id, { scale: 1.14 }, { scale: 1, duration: 0.55, ease: "back.out(1.4)", immediateRender: false }, t + 0.2);
+          gsap.set("#cam-" + c.id, { transformOrigin: "540px 900px" });
+        });
+
+        window.__timelines["main"] = tl;
+      };
+      document.fonts.ready.then(build);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,98 @@
+[
+  {
+    "text": "En",
+    "start": 0.03,
+    "end": 0.14,
+    "id": "w0"
+  },
+  {
+    "text": "Mailmask,",
+    "start": 0.14,
+    "end": 0.85,
+    "id": "w1"
+  },
+  {
+    "text": "la",
+    "start": 0.92,
+    "end": 0.99,
+    "id": "w2"
+  },
+  {
+    "text": "pestaña",
+    "start": 0.99,
+    "end": 1.49,
+    "id": "w3"
+  },
+  {
+    "text": "Sitio",
+    "start": 1.49,
+    "end": 1.84,
+    "id": "w4"
+  },
+  {
+    "text": "Web",
+    "start": 1.84,
+    "end": 2.05,
+    "id": "w5"
+  },
+  {
+    "text": "te",
+    "start": 2.05,
+    "end": 2.07,
+    "id": "w6"
+  },
+  {
+    "text": "dice",
+    "start": 2.19,
+    "end": 2.56,
+    "id": "w7"
+  },
+  {
+    "text": "a",
+    "start": 2.56,
+    "end": 2.63,
+    "id": "w8"
+  },
+  {
+    "text": "dónde",
+    "start": 2.63,
+    "end": 2.99,
+    "id": "w9"
+  },
+  {
+    "text": "lleva",
+    "start": 2.99,
+    "end": 3.36,
+    "id": "w10"
+  },
+  {
+    "text": "cada",
+    "start": 3.36,
+    "end": 3.68,
+    "id": "w11"
+  },
+  {
+    "text": "parte",
+    "start": 3.68,
+    "end": 3.93,
+    "id": "w12"
+  },
+  {
+    "text": "de",
+    "start": 4.02,
+    "end": 4.08,
+    "id": "w13"
+  },
+  {
+    "text": "tu",
+    "start": 4.08,
+    "end": 4.17,
+    "id": "w14"
+  },
+  {
+    "text": "dominio.",
+    "start": 4.25,
+    "end": 4.76,
+    "id": "w15"
+  }
+]

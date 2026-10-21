@@ -1,0 +1,62 @@
+[
+  {
+    "text": "Con",
+    "start": 0.05,
+    "end": 0.19,
+    "id": "w0"
+  },
+  {
+    "text": "Google",
+    "start": 0.19,
+    "end": 0.58,
+    "id": "w1"
+  },
+  {
+    "text": "pagas",
+    "start": 0.58,
+    "end": 0.79,
+    "id": "w2"
+  },
+  {
+    "text": "por",
+    "start": 0.89,
+    "end": 1.09,
+    "id": "w3"
+  },
+  {
+    "text": "cada",
+    "start": 1.11,
+    "end": 1.31,
+    "id": "w4"
+  },
+  {
+    "text": "persona",
+    "start": 1.39,
+    "end": 1.84,
+    "id": "w5"
+  },
+  {
+    "text": "975",
+    "start": 1.84,
+    "end": 2.95,
+    "id": "w6"
+  },
+  {
+    "text": "pesos",
+    "start": 2.95,
+    "end": 3.57,
+    "id": "w7"
+  },
+  {
+    "text": "al",
+    "start": 3.57,
+    "end": 3.73,
+    "id": "w8"
+  },
+  {
+    "text": "mes.",
+    "start": 3.83,
+    "end": 4.57,
+    "id": "w9"
+  }
+]

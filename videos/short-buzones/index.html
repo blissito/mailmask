@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="es" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,600..800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="score.gen.js"></script>
+    <style>
+      /* Short «Buzones» de MailMask. Piel del sitio público (crema + rojo de máscara, dorado sólo en la máscara,
+         Bricolage 800) con acabado de caricatura plana: contorno de tinta, rellenos sólidos, sombra dura.
+         Las escenas del luchador (assets/s*.png, Nano Banana 2 con el luchador del 404 como referencia) van
+         enmarcadas como póster; cifras y textos van en HTML encima, nunca dentro de la imagen. */
+      :root {
+        --bg: #faf6ee; --elev: #fffdf9; --inset: #f2ecdf; --line: #e4dccd;
+        --ink: #1c1917; --muted: #57534e; --subtle: #78716c;
+        --red: #d7263d; --red-dk: #a0182c; --gold: #f2b705; --ok: #10b981; --ok-dk: #047857;
+        --hard: 8px 8px 0 var(--ink);
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); font-family: "Inter", sans-serif; color: var(--ink); }
+      #root { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); }
+      /* fondo: rayado diagonal que recorre un módulo en todo el video + borde de correo aéreo arriba y abajo */
+      #stripes { position: absolute; left: -120px; top: -120px; width: 1320px; height: 2160px;
+        background-image: repeating-linear-gradient(-45deg, transparent 0 34px, var(--inset) 34px 40px); }
+      .airmail { position: absolute; left: -120px; width: 1320px; height: 26px; z-index: 60;
+        background: repeating-linear-gradient(-45deg, #e4007c 0 30px, var(--elev) 30px 60px, #00843d 60px 90px, var(--elev) 90px 120px); }
+      #amT { top: 0; } #amB { bottom: 0; }
+      .scene { position: absolute; inset: 0; display: none; }
+      #s-hook { display: block; }
+      .abs { position: absolute; }
+      .hl { position: absolute; left: 70px; right: 70px; top: 262px; font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 84px; line-height: 1.0; letter-spacing: -.03em; font-variation-settings: "wdth" 92, "opsz" 72; }
+      .hl em { font-style: normal; color: var(--red); }
+      .eyebrow { font-family: "JetBrains Mono"; font-weight: 700; font-size: 24px; letter-spacing: .14em; text-transform: uppercase; color: var(--subtle); }
+
+      /* póster con la escena del luchador */
+      .poster { position: absolute; left: 60px; top: 480px; width: 640px; height: 715px; border: 6px solid var(--ink); border-radius: 34px; overflow: hidden; background: #faf2e2; box-shadow: 12px 12px 0 var(--ink); }
+      .poster img { position: absolute; width: 628px; left: 0; }
+
+      .total { position: absolute; display: inline-block; font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 72px; padding: 0 22px; border: 5px solid var(--ink); border-radius: 22px; box-shadow: var(--hard); white-space: nowrap; }
+      .total.bad { background: var(--red); color: #fff; }
+      .total.good { background: var(--ok-dk); color: #fff; }
+      .total small { font-size: 34px; }
+      .tag195 { position: absolute; font-family: "JetBrains Mono"; font-weight: 700; font-size: 30px; background: var(--elev); color: var(--red); border: 4px solid var(--ink); border-radius: 14px; padding: 2px 12px; box-shadow: 4px 4px 0 var(--ink); }
+
+      /* recibo: papel con dientes abajo */
+      .rcpt { position: absolute; background: #fff; border: 4px solid var(--ink); border-bottom: none; padding: 16px 20px 12px; box-shadow: 8px 0 0 var(--ink); }
+      .rcpt::after { content: ""; position: absolute; left: -4px; right: -4px; bottom: -22px; height: 22px;
+        background: linear-gradient(-45deg, transparent 15px, var(--ink) 15px 19px, transparent 19px) 0 0 / 22px 22px repeat-x,
+                    linear-gradient(45deg, transparent 15px, var(--ink) 15px 19px, transparent 19px) 0 0 / 22px 22px repeat-x; }
+      .rcpt .row { display: flex; align-items: center; gap: 12px; font-size: 30px; font-weight: 700; }
+      .rcpt .row b { margin-left: auto; font-family: "JetBrains Mono"; font-size: 34px; color: var(--ok-dk); }
+      .floor { position: absolute; height: 6px; background: var(--ink); border-radius: 3px; }
+
+      .flyEnv { left: 330px; top: 860px; visibility: hidden; z-index: 20; }
+      .chip { position: absolute; display: inline-flex; align-items: center; gap: 14px; background: var(--elev); border: 4px solid var(--ink); border-radius: 999px; padding: 8px 26px 8px 10px; font-weight: 800; font-size: 38px; box-shadow: 6px 6px 0 var(--ink); white-space: nowrap; visibility: hidden; }
+      .domain { position: absolute; font-family: "JetBrains Mono"; font-weight: 700; font-size: 40px; background: var(--ink); color: #fff; border-radius: 18px; padding: 10px 24px; box-shadow: 6px 6px 0 var(--red); visibility: hidden; white-space: nowrap; }
+      .domain i { font-style: normal; color: var(--gold); }
+
+      .addr { position: absolute; display: flex; align-items: center; gap: 18px; background: var(--elev); border: 4px solid var(--ink); border-radius: 22px; padding: 16px 26px; font-family: "JetBrains Mono"; font-weight: 700; font-size: 38px; box-shadow: var(--hard); white-space: nowrap; visibility: hidden; }
+      .addr i { font-style: normal; color: var(--red); }
+      #s-ilim .addr:first-of-type { visibility: visible; }
+
+      .cta { position: absolute; display: inline-flex; align-items: center; gap: 18px; background: var(--red); color: #fff; border: 5px solid var(--ink); border-radius: 999px; padding: 18px 40px 18px 22px; font-weight: 800; font-size: 46px; box-shadow: var(--hard); white-space: nowrap; visibility: hidden; }
+      .conf { position: absolute; visibility: hidden; }
+      .cta .m { width: 74px; height: 74px; border-radius: 50%; background: var(--elev); border: 4px solid var(--ink); display: grid; place-items: center; }
+
+      /* subtítulo karaoke: una sola línea a la vez, 72 px; actual en dorado, dichas en blanco, por decir en gris */
+      #cap { position: absolute; left: 60px; width: 860px; top: 1262px; height: 118px; z-index: 50; }
+      .capPill { position: absolute; left: 0; top: 0; width: 860px; height: 118px; visibility: hidden; background: var(--ink); border-radius: 28px; display: flex; align-items: center; justify-content: center; gap: 18px; font-weight: 800; font-size: 72px; letter-spacing: -.02em; line-height: 1; white-space: nowrap; box-shadow: 8px 8px 0 var(--red); }
+      .capPill b { font-weight: 800; color: #8a827b; }
+      #measure { position: absolute; left: 0; top: 0; visibility: hidden; font-weight: 800; font-size: 72px; letter-spacing: -.02em; white-space: nowrap; }
+
+      /* cortinilla: rebanadas sesgadas + la máscara enorme que sella el corte */
+      #wipe { position: absolute; inset: 0; z-index: 90; pointer-events: none; }
+      .slice { position: absolute; left: -560px; top: -200px; width: 2200px; height: 2320px; visibility: hidden; border-left: 8px solid var(--ink); }
+      #seal { position: absolute; left: 240px; top: 660px; width: 600px; height: 600px; z-index: 95; visibility: hidden; }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position:absolute">
+      <!-- máscara oficial (public/favicon.svg) -->
+      <symbol id="mask" viewBox="0 0 80 80">
+        <ellipse cx="40" cy="42" rx="28" ry="24" fill="#a0182c"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="#d7263d"/>
+        <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/>
+        <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/>
+        <circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
+        <circle cx="30.2" cy="34.9" r="1.9" fill="#fff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#fff"/>
+        <circle cx="26.7" cy="38.9" r="1.15" fill="#fff" opacity=".85"/><circle cx="50.7" cy="38.9" r="1.15" fill="#fff" opacity=".85"/>
+        <path d="M40 18 L40 26" stroke="#f2b705" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="#f2b705" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </symbol>
+      <!-- íconos de las apps (trazo plano, sin gradiente; sólo para decir «funciona en») -->
+      <symbol id="appleMail" viewBox="0 0 100 100">
+        <rect x="4" y="4" width="92" height="92" rx="22" fill="#1d8bf8" stroke="#1c1917" stroke-width="6"/>
+        <rect x="20" y="30" width="60" height="42" rx="6" fill="#fff"/>
+        <path d="M22 33 L50 54 L78 33" fill="none" stroke="#1d8bf8" stroke-width="5" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="outlook" viewBox="0 0 100 100">
+        <rect x="4" y="4" width="92" height="92" rx="22" fill="#0f6cbd" stroke="#1c1917" stroke-width="6"/>
+        <rect x="46" y="28" width="38" height="44" rx="4" fill="#5fb0f5"/>
+        <path d="M48 32 L65 46 L82 32" fill="none" stroke="#0f6cbd" stroke-width="4"/>
+        <rect x="14" y="22" width="44" height="56" rx="6" fill="#0a4a8a" stroke="#1c1917" stroke-width="4"/>
+        <ellipse cx="36" cy="50" rx="12" ry="15" fill="none" stroke="#fff" stroke-width="7"/>
+      </symbol>
+      <symbol id="phone" viewBox="0 0 100 100">
+        <rect x="4" y="4" width="92" height="92" rx="22" fill="#fffdf9" stroke="#1c1917" stroke-width="6"/>
+        <rect x="32" y="16" width="36" height="68" rx="8" fill="#1c1917"/>
+        <rect x="36" y="24" width="28" height="50" rx="3" fill="#fffdf9"/>
+        <rect x="42" y="30" width="16" height="11" rx="2" fill="#d7263d"/>
+      </symbol>
+      <symbol id="envelope" viewBox="0 0 200 140">
+        <rect x="6" y="6" width="188" height="128" rx="14" fill="#fff" stroke="#1c1917" stroke-width="10"/>
+        <path d="M10 14 L100 84 L190 14" fill="none" stroke="#1c1917" stroke-width="10" stroke-linejoin="round"/>
+      </symbol>
+    </svg>
+
+    <div id="root" data-composition-id="main" data-start="0" data-width="1080" data-height="1920" data-duration="30.624">
+      <div id="stripes"></div>
+
+      <!-- 1 · gancho: la torre de recibos de Google contra un solo recibo de MailMask (fotograma 0 completo) -->
+      <section class="scene" id="s-hook">
+        <div class="hl" id="hkHl">Correo para <em>5 personas</em>.<br>¿Cuánto pagas?</div>
+        <div class="poster" id="hkPoster"><img id="hkImg" src="assets/s1-carga.png" style="top:-150px" /></div>
+        <div class="total bad" id="hkTotal" style="left:300px; top:500px; transform: rotate(-4deg)">$<span id="hkNum">975</span><small>/mes</small></div>
+        <div class="tag195" id="hk195" style="left:84px; top:640px; transform: rotate(-6deg)">5 × $195</div>
+        <div class="eyebrow abs" style="left:60px; top:1216px; width:640px; text-align:center">Google Workspace</div>
+        <div class="total good" id="hkOurs" style="left:686px; top:910px; font-size:56px; transform: rotate(4deg)">$99<small>/mes</small></div>
+        <div class="rcpt" id="hkRcpt" style="left:734px; top:1030px; width:180px">
+          <div class="row"><svg width="58" height="58"><use href="#mask"/></svg><b>$99</b></div>
+          <div class="row" style="font-size:22px; margin-top:6px">5 buzones</div>
+        </div>
+        <div class="floor" style="left:720px; top:1200px; width:200px"></div>
+        <div class="eyebrow abs" style="left:720px; top:1216px; width:200px; text-align:center">MailMask</div>
+      </section>
+
+      <!-- 2 · el luchador reparte: cada quien su buzón, con tu dominio -->
+      <section class="scene" id="s-buzon">
+        <div class="hl">Cada quien su <em>buzón</em>,<br>con tu dominio.</div>
+        <div class="poster" id="bzPoster"><img src="assets/s2-cartero.png" style="top:-210px" /></div>
+        <div class="chip" id="bzApple" style="left:660px; top:500px; transform: rotate(4deg)"><svg width="84" height="84"><use href="#appleMail"/></svg>Apple Mail</div>
+        <div class="chip" id="bzOutlook" style="left:690px; top:630px; transform: rotate(-3deg)"><svg width="84" height="84"><use href="#outlook"/></svg>Outlook</div>
+        <div class="chip" id="bzPhone" style="left:676px; top:760px; transform: rotate(3deg)"><svg width="84" height="84"><use href="#phone"/></svg>Teléfono</div>
+        <svg class="flyEnv abs" id="fe0" width="90" height="63"><use href="#envelope"/></svg><svg class="flyEnv abs" id="fe1" width="90" height="63"><use href="#envelope"/></svg><svg class="flyEnv abs" id="fe2" width="90" height="63"><use href="#envelope"/></svg>
+        <div class="domain" id="bzDom" style="left:110px; top:1110px; transform: rotate(-2deg)">ana<i>@</i>tunegocio.com</div>
+      </section>
+
+      <!-- 3 · direcciones que se multiplican; sumar a alguien cuesta $0 -->
+      <section class="scene" id="s-ilim">
+        <div class="hl">Buzones <em>ilimitados</em>.<br>Suma a quien quieras.</div>
+        <div class="addr" id="ad0" style="left:70px; top:520px; transform: rotate(-2deg)"><svg width="46" height="32"><use href="#envelope"/></svg>ana<i>@</i>tunegocio.com</div>
+        <div class="addr" id="ad1" style="left:110px; top:640px; transform: rotate(2deg)"><svg width="46" height="32"><use href="#envelope"/></svg>beto<i>@</i>tunegocio.com</div>
+        <div class="addr" id="ad2" style="left:60px; top:760px; transform: rotate(-1deg)"><svg width="46" height="32"><use href="#envelope"/></svg>ventas<i>@</i>tunegocio.com</div>
+        <div class="addr" id="ad3" style="left:130px; top:880px; transform: rotate(3deg)"><svg width="46" height="32"><use href="#envelope"/></svg>hola<i>@</i>tunegocio.com</div>
+        <div class="addr" id="ad4" style="left:80px; top:1000px; transform: rotate(-2deg)"><svg width="46" height="32"><use href="#envelope"/></svg>facturas<i>@</i>tunegocio.com</div>
+        <div class="addr" id="ad5" style="left:150px; top:1120px; transform: rotate(1deg)"><svg width="46" height="32"><use href="#envelope"/></svg>tú<i>@</i>tunegocio.com</div>
+        <svg id="ilTag" class="abs" style="left:740px; top:470px; visibility:hidden" width="180" height="240" viewBox="0 0 190 250">
+          <path d="M95 0 V40" stroke="#1c1917" stroke-width="6"/>
+          <path d="M20 70 L95 40 L170 70 V230 Q170 244 156 244 H34 Q20 244 20 230 Z" fill="#10b981" stroke="#1c1917" stroke-width="8" stroke-linejoin="round"/>
+          <circle cx="95" cy="70" r="12" fill="#faf6ee" stroke="#1c1917" stroke-width="6"/>
+          <text x="95" y="150" text-anchor="middle" font-family="Bricolage Grotesque" font-weight="800" font-size="52" fill="#fff">+1</text>
+          <text x="95" y="215" text-anchor="middle" font-family="Bricolage Grotesque" font-weight="800" font-size="58" fill="#fff">$0</text>
+        </svg>
+      </section>
+
+      <!-- 4 · cierre circular: un solo recibo alzado como cinturón + CTA (todo dentro de y 240–1400) -->
+      <section class="scene" id="s-cierre">
+        <div class="hl" style="font-size:78px">5 personas, 5 buzones,<br><em>un solo precio</em>.</div>
+        <div class="poster" id="ciPoster" style="height:590px"><img src="assets/s3-campeon.png" style="top:-170px" /></div>
+        <div class="total good" id="ciPrice" style="left:732px; top:540px; visibility:hidden; transform: rotate(5deg)">$99<small>/mes</small></div>
+        <div class="abs" id="ciSub" style="left:752px; top:668px; visibility:hidden; background:var(--ink); color:#fff; font-family:'JetBrains Mono'; font-weight:700; font-size:26px; letter-spacing:.08em; text-transform:uppercase; border-radius:12px; padding:6px 14px; transform:rotate(3deg)">por dominio</div>
+        <div id="confetti" class="abs" style="left:0; top:0; width:1080px; height:1920px; pointer-events:none"></div>
+        <div class="cta" id="ciCta" style="left:120px; top:1104px"><span class="m"><svg width="62" height="62"><use href="#mask"/></svg></span>Actívalo en mailmask.studio</div>
+      </section>
+
+      <div id="cap"></div>
+      <div id="measure"></div>
+      <div id="wipe"></div>
+      <svg id="seal" viewBox="0 0 80 80"><use href="#mask"/></svg>
+      <div class="airmail" id="amT"></div><div class="airmail" id="amB"></div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const SC = window.SCORE, T = SC.T, $ = (s) => document.querySelector(s);
+      const S = Object.fromEntries(SC.scenes.map((s) => [s.id, s]));
+
+      const build = () => {
+        const tl = gsap.timeline({ paused: true });
+        const vis = (el, t) => tl.set(el, { visibility: "visible" }, t);
+        const hide = (el, t) => tl.set(el, { visibility: "hidden" }, t);
+        const pop = (el, t, from = 0.6, dur = 0.32, s = 2) => { vis(el, t); tl.fromTo(el, { scale: from }, { scale: 1, duration: dur, ease: `back.out(${s})`, immediateRender: false }, t); };
+        const bump = (el, t, k = 1.15) => tl.fromTo(el, { scale: 1 }, { scale: k, duration: 0.12, yoyo: true, repeat: 1, ease: "power2.out", immediateRender: false }, t);
+
+        // fondo y bordes en movimiento lento, sin bucle infinito: recorren exactamente un módulo en todo el video
+        tl.fromTo("#stripes", { x: 0 }, { x: 56.57, duration: SC.duration, ease: "none" }, 0);
+        tl.fromTo("#amT", { x: 0 }, { x: -120, duration: SC.duration, ease: "none" }, 0);
+        tl.fromTo("#amB", { x: -120 }, { x: 0, duration: SC.duration, ease: "none" }, 0);
+
+        // ---- qué escena se ve ----
+        SC.scenes.forEach((s, i) => { if (i) { tl.set("#s-" + SC.scenes[i - 1].id, { display: "none" }, s.t0); tl.set("#s-" + s.id, { display: "block" }, s.t0); } });
+
+        // ---- 1 · gancho (todo ya está en el fotograma 0; aquí sólo hay movimiento) ----
+        tl.fromTo("#hkImg", { y: 0 }, { y: -10, duration: 0.18, yoyo: true, repeat: 5, ease: "sine.inOut", immediateRender: false }, T["hook.wobble"]);
+        bump("#hkHl", T["hook.people"], 1.04);
+        // la torre se mece todo el gancho (bucle finito) y el total cuenta $195 → $975 cuando la voz lo dice
+        gsap.set("#hkImg", { transformOrigin: "50% 100%" });
+        tl.fromTo("#hkImg", { rotation: -1.2 }, { rotation: 1.2, duration: 0.9, yoyo: true, repeat: 7, ease: "sine.inOut", immediateRender: false }, 1.0);
+        T["hook.steps"].forEach((x, i) => { tl.set("#hkNum", { textContent: String(195 * (i + 1)) }, x); bump("#hk195", x, 1.18); if (i < 4) bump("#hkTotal", x, 1.08); });
+        tl.fromTo("#hkTotal", { scale: 1.9, rotation: -14 }, { scale: 1, rotation: -4, duration: 0.3, ease: "back.out(1.8)", immediateRender: false }, T["hook.total"]);
+        tl.fromTo("#hkPoster", { x: 0 }, { x: 8, duration: 0.05, yoyo: true, repeat: 5, ease: "sine.inOut", immediateRender: false }, T["hook.total"] + 0.11);
+        bump("#hkOurs", T["hook.ours"], 1.3); bump("#hkRcpt", T["hook.ours"] + 0.1, 1.1);
+
+        // ---- 2 · buzón ----
+        tl.fromTo("#bzPoster", { y: 120, rotation: -4 }, { y: 0, rotation: 0, duration: 0.45, ease: "back.out(1.6)", immediateRender: false }, T["buzon.card"]);
+        bump("#bzPoster", T["buzon.brand"], 1.03);
+        pop("#bzDom", T["buzon.dom"], 0.4, 0.35, 2.2);
+        // un sobre sale del casillero y vuela a cada app justo antes de que la voz la nombre
+        [["apple", "#bzApple", 420, -300], ["outlook", "#bzOutlook", 440, -180], ["phone", "#bzPhone", 420, -50]].forEach(([k, el, x, y], i) => {
+          const at = T["buzon." + k], fe = "#fe" + i;
+          vis(fe, at - 0.38);
+          tl.fromTo(fe, { x: 0, y: 0, scale: 0.4, rotation: -20 }, { x, y, scale: 1, rotation: 12, duration: 0.36, ease: "power2.out", immediateRender: false }, at - 0.38);
+          hide(fe, at);
+          pop(el, at, 0.3, 0.38, 2.4);
+          tl.fromTo(el, { y: 0 }, { y: -10, duration: 0.5, yoyo: true, repeat: 3, ease: "sine.inOut", immediateRender: false }, at + 0.4);
+        });
+        tl.fromTo("#bzPoster img", { scale: 1 }, { scale: 1.07, duration: S.buzon.t1 - S.buzon.t0, ease: "none", immediateRender: false }, S.buzon.t0);
+
+        // ---- 3 · ilimitados ----
+        ["a0", "a1", "a2", "a3", "a4", "a5"].forEach((k, i) => { vis("#ad" + i, T["ilim." + k]); tl.fromTo("#ad" + i, { x: -700 }, { x: 0, duration: 0.32, ease: "back.out(1.6)", immediateRender: false }, T["ilim." + k]); });
+        gsap.set("#ilTag", { transformOrigin: "50% 0%" });
+        vis("#ilTag", T["ilim.tag"]);
+        tl.fromTo("#ilTag", { y: -500, rotation: -30 }, { y: 0, rotation: 10, duration: 0.5, ease: "back.out(1.5)", immediateRender: false }, T["ilim.tag"]);
+        // la etiqueta queda columpiándose y las direcciones flotan (bucles finitos)
+        tl.to("#ilTag", { keyframes: [{ rotation: -8, duration: 0.35 }, { rotation: 5, duration: 0.3 }, { rotation: -2, duration: 0.25 }, { rotation: 0, duration: 0.2 }], ease: "sine.inOut" }, T["ilim.tag"] + 0.5);
+        [0, 1, 2, 3, 4, 5].forEach((i) => tl.fromTo("#ad" + i, { y: 0 }, { y: i % 2 ? 8 : -8, duration: 0.7, yoyo: true, repeat: 3, ease: "sine.inOut", immediateRender: false }, T["ilim.a5"] + 0.4 + i * 0.06));
+
+        // ---- 4 · cierre: zoom-punch al entrar, precio y CTA cuando la voz los nombra ----
+        tl.fromTo("#ciPoster", { scale: 1.15 }, { scale: 1, duration: 0.5, ease: "back.out(1.6)", immediateRender: false }, T["cierre.card"]);
+        bump("#ciPoster", T["cierre.belt"], 1.04);
+        tl.fromTo("#ciPoster img", { scale: 1 }, { scale: 1.06, duration: S.cierre.t1 - S.cierre.t0, ease: "none", immediateRender: false }, S.cierre.t0);
+        // confeti de sobres, estrellas y tiras que sale del recibo alzado (posiciones fijas: determinista)
+        const conf = $("#confetti"), COLS = ["#d7263d", "#f2b705", "#1c1917", "#fffdf9"];
+        for (let i = 0; i < 22; i++) {
+          const kind = i % 3, el = document.createElement("div"); el.className = "conf";
+          const c = COLS[i % 4], a = (i / 22) * Math.PI * 2, r = 220 + (i * 37) % 160;
+          el.style.left = "340px"; el.style.top = "660px";
+          el.innerHTML = kind === 0 ? '<svg width="44" height="31"><use href="#envelope"/></svg>'
+            : kind === 1 ? `<svg width="34" height="34" viewBox="0 0 24 24"><path d="M12 1l3.2 7 7.6.8-5.7 5.1 1.6 7.5L12 17.6 5.3 21.4l1.6-7.5L1.2 8.8l7.6-.8z" fill="${c === "#fffdf9" ? "#f2b705" : c}" stroke="#1c1917" stroke-width="1.6"/></svg>`
+            : `<div style="width:14px;height:34px;background:${c};border:3px solid #1c1917;border-radius:4px"></div>`;
+          conf.appendChild(el);
+          const at = T["cierre.belt"] + (i % 5) * 0.02;
+          vis(el, at);
+          tl.fromTo(el, { x: 0, y: 0, rotation: 0, scale: 0.3 }, { x: Math.cos(a) * r, y: Math.sin(a) * r * 0.8 - 120, rotation: (i % 2 ? 1 : -1) * 200, scale: 1, duration: 0.55, ease: "power3.out", immediateRender: false }, at);
+          tl.to(el, { y: "+=520", rotation: (i % 2 ? 1 : -1) * 420, duration: 1.3, ease: "power1.in" }, at + 0.55);
+          hide(el, at + 1.85);
+        }
+        vis("#ciPrice", T["cierre.price"]);
+        tl.fromTo("#ciPrice", { scale: 2, rotation: -10 }, { scale: 1, rotation: 5, duration: 0.3, ease: "back.out(1.8)", immediateRender: false }, T["cierre.price"]);
+        pop("#ciSub", T["cierre.price"] + 0.3, 0.6);
+        pop("#ciCta", T["cierre.cta"], 0.5, 0.35, 2.2);
+        bump("#ciCta", T["cierre.url"], 1.06);
+        // el botón respira y la máscara del botón guiña mientras se sostiene el final
+        tl.fromTo("#ciCta", { scale: 1 }, { scale: 1.05, duration: 0.45, yoyo: true, repeat: 3, ease: "sine.inOut", immediateRender: false }, T["cierre.url"] + 0.5);
+        tl.fromTo("#ciCta .m svg", { rotation: 0 }, { rotation: 14, duration: 0.18, yoyo: true, repeat: 3, ease: "sine.inOut", immediateRender: false }, T["cierre.url"] + 0.7);
+
+        // ---- titulares cinéticos (escenas 2–4) ----
+        ["buzon", "ilim", "cierre"].forEach((id) => {
+          const hl = $("#s-" + id + " .hl");
+          const wrap = (node) => [...node.childNodes].forEach((n) => {
+            if (n.nodeType === 3) { const f = document.createDocumentFragment(); n.textContent.split(/(\s+)/).forEach((w) => { if (!w) return; if (/^\s+$/.test(w)) f.append(w); else { const sp = document.createElement("span"); sp.className = "kw"; sp.style.display = "inline-block"; sp.textContent = w; f.append(sp); } }); n.replaceWith(f); }
+            else if (n.nodeType === 1 && n.tagName !== "BR") wrap(n);
+          });
+          wrap(hl);
+          tl.fromTo(hl.querySelectorAll(".kw"), { y: -90, rotation: -8, opacity: 0 }, { y: 0, rotation: 0, opacity: 1, duration: 0.42, stagger: 0.06, ease: "back.out(2)", immediateRender: false }, S[id].t0 + 0.05);
+        });
+
+        // ---- karaoke: una sola línea; se parte en puntuación, en pausas > 0.6 s y en lo que cabe (≤ 800 px) ----
+        const meas = $("#measure");
+        const width = (ws) => { meas.textContent = ws.map((w) => w.w).join(" "); return meas.offsetWidth + 18 * (ws.length - 1); };
+        const chunks = [];
+        T.words.forEach(({ words }) => {
+          let cur = [];
+          words.forEach((w, i) => {
+            if (cur.length && width([...cur, w]) > 800) { chunks.push(cur); cur = []; }
+            cur.push(w);
+            const gap = words[i + 1] ? words[i + 1].s - w.e : 0;
+            if (/[,.:?!]$/.test(w.w) || gap > 0.6) { chunks.push(cur); cur = []; }
+          });
+          if (cur.length) chunks.push(cur);
+        });
+        const cap = $("#cap");
+        const sceneOf = (t) => SC.scenes.find((s) => s.t0 <= t && t < s.t1) || SC.scenes.at(-1);
+        chunks.forEach((ws, k) => {
+          const row = document.createElement("div"); row.className = "capPill";
+          row.innerHTML = ws.map((w) => `<b>${w.w}</b>`).join("");
+          cap.appendChild(row);
+          const bs = [...row.querySelectorAll("b")];
+          const start = k === 0 ? 0 : ws[0].s - 0.1;
+          vis(row, start);
+          if (k) tl.fromTo(row, { scale: 0.94 }, { scale: 1, duration: 0.14, ease: "back.out(2)", immediateRender: false }, start);
+          ws.forEach((w, i) => { tl.set(bs[i], { color: "#f2b705" }, w.s); tl.set(bs[i], { color: "#ffffff" }, w.e + 0.02); });
+          const next = chunks[k + 1], last = ws.at(-1).e, sc = sceneOf(ws[0].s);
+          const hideAt = Math.min(next ? next[0].s - 0.1 : Infinity, last + 1.2, sc.id === "cierre" ? Infinity : sc.t1 - 0.62);
+          if (hideAt < Infinity) hide(row, hideAt);
+        });
+
+        // ---- cortinillas: rebanadas sesgadas con back.out y la máscara enorme que sella el corte ----
+        const COLORS = { buzon: ["#1c1917", "#d7263d", "#fffdf9"], ilim: ["#d7263d", "#1c1917", "#f2ecdf"], cierre: ["#1c1917", "#d7263d", "#fffdf9"] };
+        const wipe = $("#wipe");
+        Object.entries(COLORS).forEach(([id, cols], n) => {
+          const t = S[id].t0, dir = n % 2 ? -1 : 1;
+          cols.forEach((col, k) => {
+            const p = document.createElement("div"); p.className = "slice"; p.style.background = col; wipe.appendChild(p);
+            const inAt = t - 0.6 + k * 0.06;
+            tl.set(p, { visibility: "visible", x: 1800 * dir, skewX: -14 * dir }, inAt);
+            tl.to(p, { x: 0, duration: 0.36, ease: "back.out(1.3)" }, inAt);
+            tl.to(p, { x: -2900 * dir, duration: 0.34, ease: "power3.in" }, t + 0.14 + (2 - k) * 0.05);
+            hide(p, t + 0.6);
+          });
+          const sealAt = T.seal[id];
+          vis("#seal", sealAt);
+          tl.fromTo("#seal", { scale: 0.3, rotation: -12, opacity: 1 }, { scale: 1, rotation: 0, duration: 0.3, ease: "back.out(1.8)", immediateRender: false }, sealAt);
+          tl.to("#seal", { scale: 1.8, opacity: 0, duration: 0.22, ease: "power2.in" }, t + 0.2);
+          hide("#seal", t + 0.45);
+        });
+
+        window.__timelines["main"] = tl;
+      };
+      document.fonts.ready.then(build);
+    </script>
+  </body>
+</html>

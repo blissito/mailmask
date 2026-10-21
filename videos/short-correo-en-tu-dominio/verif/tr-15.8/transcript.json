@@ -1,0 +1,98 @@
+[
+  {
+    "text": "Tu",
+    "start": 0,
+    "end": 0.12,
+    "id": "w0"
+  },
+  {
+    "text": "cliente",
+    "start": 0.19,
+    "end": 0.58,
+    "id": "w1"
+  },
+  {
+    "text": "escribe",
+    "start": 0.58,
+    "end": 1.03,
+    "id": "w2"
+  },
+  {
+    "text": "a",
+    "start": 1.03,
+    "end": 1.09,
+    "id": "w3"
+  },
+  {
+    "text": "hola",
+    "start": 1.09,
+    "end": 1.34,
+    "id": "w4"
+  },
+  {
+    "text": "arroba",
+    "start": 1.34,
+    "end": 1.73,
+    "id": "w5"
+  },
+  {
+    "text": "tu",
+    "start": 1.73,
+    "end": 1.86,
+    "id": "w6"
+  },
+  {
+    "text": "estudio",
+    "start": 1.86,
+    "end": 2.36,
+    "id": "w7"
+  },
+  {
+    "text": "punto",
+    "start": 2.36,
+    "end": 2.93,
+    "id": "w8"
+  },
+  {
+    "text": "MX",
+    "start": 2.93,
+    "end": 3.04,
+    "id": "w9"
+  },
+  {
+    "text": "y",
+    "start": 3.16,
+    "end": 3.24,
+    "id": "w10"
+  },
+  {
+    "text": "tú",
+    "start": 3.24,
+    "end": 3.36,
+    "id": "w11"
+  },
+  {
+    "text": "respondes",
+    "start": 3.6,
+    "end": 4.09,
+    "id": "w12"
+  },
+  {
+    "text": "desde",
+    "start": 4.13,
+    "end": 4.52,
+    "id": "w13"
+  },
+  {
+    "text": "la",
+    "start": 4.52,
+    "end": 4.68,
+    "id": "w14"
+  },
+  {
+    "text": "bandeja.",
+    "start": 4.68,
+    "end": 5.26,
+    "id": "w15"
+  }
+]

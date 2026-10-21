@@ -1,0 +1,32 @@
+[
+  {
+    "text": "Sube",
+    "start": 0.03,
+    "end": 0.3,
+    "id": "w0"
+  },
+  {
+    "text": "la",
+    "start": 0.3,
+    "end": 0.45,
+    "id": "w1"
+  },
+  {
+    "text": "cortina",
+    "start": 0.45,
+    "end": 0.99,
+    "id": "w2"
+  },
+  {
+    "text": "en",
+    "start": 0.99,
+    "end": 1.14,
+    "id": "w3"
+  },
+  {
+    "text": "Mailmask.studio.",
+    "start": 1.14,
+    "end": 2.52,
+    "id": "w4"
+  }
+]

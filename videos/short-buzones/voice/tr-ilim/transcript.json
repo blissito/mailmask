@@ -1,0 +1,56 @@
+[
+  {
+    "text": "Buzones",
+    "start": 0.03,
+    "end": 0.49,
+    "id": "w0"
+  },
+  {
+    "text": "ilimitados",
+    "start": 0.49,
+    "end": 1.11,
+    "id": "w1"
+  },
+  {
+    "text": "suma",
+    "start": 1.33,
+    "end": 1.47,
+    "id": "w2"
+  },
+  {
+    "text": "a",
+    "start": 1.47,
+    "end": 1.54,
+    "id": "w3"
+  },
+  {
+    "text": "quien",
+    "start": 1.54,
+    "end": 1.88,
+    "id": "w4"
+  },
+  {
+    "text": "quiera",
+    "start": 1.99,
+    "end": 2.31,
+    "id": "w5"
+  },
+  {
+    "text": "sin",
+    "start": 2.31,
+    "end": 2.48,
+    "id": "w6"
+  },
+  {
+    "text": "pagar",
+    "start": 2.55,
+    "end": 2.87,
+    "id": "w7"
+  },
+  {
+    "text": "más.",
+    "start": 2.87,
+    "end": 3.14,
+    "id": "w8"
+  }
+]

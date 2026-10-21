@@ -1,0 +1,86 @@
+[
+  {
+    "text": "Tu",
+    "start": 0.03,
+    "end": 0.15,
+    "id": "w0"
+  },
+  {
+    "text": "tarjeta",
+    "start": 0.16,
+    "end": 0.69,
+    "id": "w1"
+  },
+  {
+    "text": "y",
+    "start": 0.77,
+    "end": 0.78,
+    "id": "w2"
+  },
+  {
+    "text": "tu",
+    "start": 0.78,
+    "end": 0.94,
+    "id": "w3"
+  },
+  {
+    "text": "correo",
+    "start": 0.94,
+    "end": 1.4,
+    "id": "w4"
+  },
+  {
+    "text": "ya",
+    "start": 1.4,
+    "end": 1.56,
+    "id": "w5"
+  },
+  {
+    "text": "dicen",
+    "start": 1.56,
+    "end": 1.94,
+    "id": "w6"
+  },
+  {
+    "text": "tuestudio.mx",
+    "start": 2.03,
+    "end": 3.12,
+    "id": "w7"
+  },
+  {
+    "text": "y",
+    "start": 3.12,
+    "end": 3.18,
+    "id": "w8"
+  },
+  {
+    "text": "un",
+    "start": 3.18,
+    "end": 3.43,
+    "id": "w9"
+  },
+  {
+    "text": "agente",
+    "start": 3.43,
+    "end": 3.88,
+    "id": "w10"
+  },
+  {
+    "text": "administra",
+    "start": 3.96,
+    "end": 4.52,
+    "id": "w11"
+  },
+  {
+    "text": "tu",
+    "start": 4.52,
+    "end": 4.59,
+    "id": "w12"
+  },
+  {
+    "text": "dominio.",
+    "start": 4.68,
+    "end": 5.19,
+    "id": "w13"
+  }
+]

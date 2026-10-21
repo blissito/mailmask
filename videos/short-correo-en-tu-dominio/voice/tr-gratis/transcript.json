@@ -1,0 +1,74 @@
+[
+  {
+    "text": "Recibir",
+    "start": 0.03,
+    "end": 0.46,
+    "id": "w0"
+  },
+  {
+    "text": "y",
+    "start": 0.46,
+    "end": 0.5,
+    "id": "w1"
+  },
+  {
+    "text": "responder",
+    "start": 0.52,
+    "end": 1.12,
+    "id": "w2"
+  },
+  {
+    "text": "es",
+    "start": 1.12,
+    "end": 1.21,
+    "id": "w3"
+  },
+  {
+    "text": "gratis",
+    "start": 1.29,
+    "end": 1.65,
+    "id": "w4"
+  },
+  {
+    "text": "con",
+    "start": 1.65,
+    "end": 1.84,
+    "id": "w5"
+  },
+  {
+    "text": "hasta",
+    "start": 1.98,
+    "end": 2.18,
+    "id": "w6"
+  },
+  {
+    "text": "5",
+    "start": 2.18,
+    "end": 2.33,
+    "id": "w7"
+  },
+  {
+    "text": "direcciones",
+    "start": 2.44,
+    "end": 3.12,
+    "id": "w8"
+  },
+  {
+    "text": "en",
+    "start": 3.12,
+    "end": 3.25,
+    "id": "w9"
+  },
+  {
+    "text": "tu",
+    "start": 3.25,
+    "end": 3.38,
+    "id": "w10"
+  },
+  {
+    "text": "dominio.",
+    "start": 3.38,
+    "end": 4.09,
+    "id": "w11"
+  }
+]

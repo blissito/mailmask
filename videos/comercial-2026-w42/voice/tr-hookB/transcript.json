@@ -1,0 +1,50 @@
+[
+  {
+    "text": "Pero",
+    "start": 0.03,
+    "end": 0.19,
+    "id": "w0"
+  },
+  {
+    "text": "tu",
+    "start": 0.27,
+    "end": 0.34,
+    "id": "w1"
+  },
+  {
+    "text": "página",
+    "start": 0.45,
+    "end": 0.75,
+    "id": "w2"
+  },
+  {
+    "text": "sigue",
+    "start": 0.75,
+    "end": 1.06,
+    "id": "w3"
+  },
+  {
+    "text": "con",
+    "start": 1.06,
+    "end": 1.23,
+    "id": "w4"
+  },
+  {
+    "text": "la",
+    "start": 1.33,
+    "end": 1.38,
+    "id": "w5"
+  },
+  {
+    "text": "cortina",
+    "start": 1.38,
+    "end": 1.72,
+    "id": "w6"
+  },
+  {
+    "text": "abajo.",
+    "start": 1.82,
+    "end": 2.26,
+    "id": "w7"
+  }
+]

@@ -1,0 +1,1018 @@
+{
+ "duration": 46.12,
+ "scenes": [
+  {
+   "id": "hook",
+   "t0": 0,
+   "t1": 6.89
+  },
+  {
+   "id": "plan",
+   "t0": 6.89,
+   "t1": 23.62
+  },
+  {
+   "id": "bandeja",
+   "t0": 23.62,
+   "t1": 29.75
+  },
+  {
+   "id": "gratis",
+   "t0": 29.75,
+   "t1": 34.99
+  },
+  {
+   "id": "cierre",
+   "t0": 34.99,
+   "t1": 46.12
+  }
+ ],
+ "T": {
+  "hook.underline": 1.32,
+  "hook.quote": 1.52,
+  "hook.circle": 4.65,
+  "hook.stamp": 5.74,
+  "plan.panel": 6.89,
+  "plan.typeA": 7.95,
+  "plan.typeB": 8.64,
+  "plan.tags": 10.15,
+  "plan.checks": 12.21,
+  "plan.agent": 12.4,
+  "plan.dns": 14.21,
+  "plan.mail": 16.35,
+  "plan.web": 18.51,
+  "plan.agentOk": 20.14,
+  "plan.badge": 20.81,
+  "bandeja.tray": 23.62,
+  "bandeja.env": 24.5,
+  "bandeja.to": 25.01,
+  "bandeja.reply": 27.46,
+  "bandeja.plane": 28.44,
+  "gratis.ring": 29.75,
+  "gratis.tag": 31.34,
+  "gratis.badges": 32.03,
+  "gratis.badgesEnd": 33.17,
+  "cierre.card": 34.99,
+  "cierre.rewrite": 36.28,
+  "cierre.underline": 37.37,
+  "cierre.sticker": 38.77,
+  "cierre.cta": 40.87,
+  "cierre.url": 42.23,
+  "cierre.postit": 44.22,
+  "words": [
+   {
+    "line": "hookA",
+    "words": [
+     {
+      "w": "Tu",
+      "s": 0.25,
+      "e": 0.32
+     },
+     {
+      "w": "tarjeta",
+      "s": 0.38,
+      "e": 0.97
+     },
+     {
+      "w": "dice",
+      "s": 0.97,
+      "e": 1.32
+     },
+     {
+      "w": "tuestudio.mx,",
+      "s": 1.32,
+      "e": 2.62
+     }
+    ]
+   },
+   {
+    "line": "hookB",
+    "words": [
+     {
+      "w": "pero",
+      "s": 2.77,
+      "e": 2.9
+     },
+     {
+      "w": "tus",
+      "s": 2.98,
+      "e": 3.16
+     },
+     {
+      "w": "cotizaciones",
+      "s": 3.16,
+      "e": 3.88
+     },
+     {
+      "w": "salen",
+      "s": 3.88,
+      "e": 4.2
+     },
+     {
+      "w": "desde",
+      "s": 4.2,
+      "e": 4.65
+     },
+     {
+      "w": "gmail.com.",
+      "s": 4.65,
+      "e": 5.64
+     }
+    ]
+   },
+   {
+    "line": "plan1",
+    "words": [
+     {
+      "w": "Escribes",
+      "s": 7.22,
+      "e": 7.71
+     },
+     {
+      "w": "tu",
+      "s": 7.82,
+      "e": 7.95
+     },
+     {
+      "w": "dominio",
+      "s": 7.95,
+      "e": 8.47
+     },
+     {
+      "w": "en",
+      "s": 8.54,
+      "e": 8.64
+     },
+     {
+      "w": "MailMask.",
+      "s": 8.64,
+      "e": 9.33
+     }
+    ]
+   },
+   {
+    "line": "plan2",
+    "words": [
+     {
+      "w": "Cambias",
+      "s": 9.61,
+      "e": 9.9
+     },
+     {
+      "w": "tus",
+      "s": 10,
+      "e": 10.1
+     },
+     {
+      "w": "nameservers",
+      "s": 10.15,
+      "e": 10.75
+     },
+     {
+      "w": "a",
+      "s": 10.75,
+      "e": 10.79
+     },
+     {
+      "w": "los",
+      "s": 10.8,
+      "e": 10.97
+     },
+     {
+      "w": "de",
+      "s": 10.97,
+      "e": 11.06
+     },
+     {
+      "w": "MailMask.",
+      "s": 11.13,
+      "e": 11.76
+     },
+     {
+      "w": "Ahora",
+      "s": 12.21,
+      "e": 12.26
+     },
+     {
+      "w": "el",
+      "s": 12.26,
+      "e": 12.4
+     },
+     {
+      "w": "asistente",
+      "s": 12.4,
+      "e": 13.05
+     },
+     {
+      "w": "de",
+      "s": 13.05,
+      "e": 13.19
+     },
+     {
+      "w": "IA",
+      "s": 13.19,
+      "e": 13.33
+     },
+     {
+      "w": "configura",
+      "s": 13.33,
+      "e": 13.99
+     },
+     {
+      "w": "tus",
+      "s": 13.99,
+      "e": 14.21
+     },
+     {
+      "w": "registros",
+      "s": 14.21,
+      "e": 14.87
+     },
+     {
+      "w": "DNS",
+      "s": 14.87,
+      "e": 15.08
+     },
+     {
+      "w": "por",
+      "s": 15.08,
+      "e": 15.36
+     },
+     {
+      "w": "ti,",
+      "s": 15.36,
+      "e": 15.56
+     },
+     {
+      "w": "da",
+      "s": 15.56,
+      "e": 15.735
+     },
+     {
+      "w": "de",
+      "s": 15.735,
+      "e": 15.91
+     },
+     {
+      "w": "alta",
+      "s": 15.91,
+      "e": 16.13
+     },
+     {
+      "w": "tus",
+      "s": 16.13,
+      "e": 16.35
+     },
+     {
+      "w": "correos",
+      "s": 16.35,
+      "e": 16.86
+     },
+     {
+      "w": "nuevos",
+      "s": 16.86,
+      "e": 17.34
+     },
+     {
+      "w": "y",
+      "s": 17.34,
+      "e": 17.36
+     },
+     {
+      "w": "hasta",
+      "s": 17.43,
+      "e": 17.77
+     },
+     {
+      "w": "publica",
+      "s": 17.77,
+      "e": 18.25
+     },
+     {
+      "w": "tu",
+      "s": 18.36,
+      "e": 18.4
+     },
+     {
+      "w": "landing",
+      "s": 18.51,
+      "e": 18.91
+     },
+     {
+      "w": "page",
+      "s": 18.91,
+      "e": 19.22
+     },
+     {
+      "w": "en",
+      "s": 19.22,
+      "e": 19.32
+     },
+     {
+      "w": "un",
+      "s": 19.32,
+      "e": 19.42
+     },
+     {
+      "w": "subdominio.",
+      "s": 19.42,
+      "e": 20.14
+     }
+    ]
+   },
+   {
+    "line": "plan3",
+    "words": [
+     {
+      "w": "Y",
+      "s": 20.44,
+      "e": 20.46
+     },
+     {
+      "w": "creas",
+      "s": 20.46,
+      "e": 20.8
+     },
+     {
+      "w": "hola@tuestudio.mx.",
+      "s": 20.81,
+      "e": 22.77
+     }
+    ]
+   },
+   {
+    "line": "bandeja",
+    "words": [
+     {
+      "w": "Tu",
+      "s": 23.95,
+      "e": 24.01
+     },
+     {
+      "w": "cliente",
+      "s": 24.1,
+      "e": 24.5
+     },
+     {
+      "w": "escribe",
+      "s": 24.5,
+      "e": 24.95
+     },
+     {
+      "w": "a",
+      "s": 24.95,
+      "e": 25.01
+     },
+     {
+      "w": "hola@tuestudio.mx",
+      "s": 25.01,
+      "e": 26.66
+     },
+     {
+      "w": "y",
+      "s": 26.78,
+      "e": 26.97
+     },
+     {
+      "w": "tú",
+      "s": 27.22,
+      "e": 27.46
+     },
+     {
+      "w": "respondes",
+      "s": 27.46,
+      "e": 28.01
+     },
+     {
+      "w": "desde",
+      "s": 28.01,
+      "e": 28.32
+     },
+     {
+      "w": "la",
+      "s": 28.32,
+      "e": 28.44
+     },
+     {
+      "w": "Bandeja.",
+      "s": 28.44,
+      "e": 28.9
+     }
+    ]
+   },
+   {
+    "line": "gratis",
+    "words": [
+     {
+      "w": "Recibir",
+      "s": 30.08,
+      "e": 30.51
+     },
+     {
+      "w": "y",
+      "s": 30.51,
+      "e": 30.55
+     },
+     {
+      "w": "responder",
+      "s": 30.57,
+      "e": 31.17
+     },
+     {
+      "w": "es",
+      "s": 31.17,
+      "e": 31.26
+     },
+     {
+      "w": "gratis,",
+      "s": 31.34,
+      "e": 31.7
+     },
+     {
+      "w": "con",
+      "s": 31.7,
+      "e": 31.89
+     },
+     {
+      "w": "hasta",
+      "s": 32.03,
+      "e": 32.23
+     },
+     {
+      "w": "5",
+      "s": 32.23,
+      "e": 32.38
+     },
+     {
+      "w": "direcciones",
+      "s": 32.49,
+      "e": 33.17
+     },
+     {
+      "w": "en",
+      "s": 33.17,
+      "e": 33.3
+     },
+     {
+      "w": "tu",
+      "s": 33.3,
+      "e": 33.43
+     },
+     {
+      "w": "dominio.",
+      "s": 33.43,
+      "e": 34.14
+     }
+    ]
+   },
+   {
+    "line": "cierre",
+    "words": [
+     {
+      "w": "Tu",
+      "s": 35.37,
+      "e": 35.49
+     },
+     {
+      "w": "tarjeta",
+      "s": 35.5,
+      "e": 36.03
+     },
+     {
+      "w": "y",
+      "s": 36.11,
+      "e": 36.12
+     },
+     {
+      "w": "tu",
+      "s": 36.12,
+      "e": 36.28
+     },
+     {
+      "w": "correo",
+      "s": 36.28,
+      "e": 36.74
+     },
+     {
+      "w": "ya",
+      "s": 36.74,
+      "e": 36.9
+     },
+     {
+      "w": "dicen",
+      "s": 36.9,
+      "e": 37.28
+     },
+     {
+      "w": "tuestudio.mx,",
+      "s": 37.37,
+      "e": 38.46
+     },
+     {
+      "w": "y",
+      "s": 38.46,
+      "e": 38.52
+     },
+     {
+      "w": "un",
+      "s": 38.52,
+      "e": 38.77
+     },
+     {
+      "w": "agente",
+      "s": 38.77,
+      "e": 39.22
+     },
+     {
+      "w": "administra",
+      "s": 39.3,
+      "e": 39.86
+     },
+     {
+      "w": "tu",
+      "s": 39.86,
+      "e": 39.93
+     },
+     {
+      "w": "dominio.",
+      "s": 40.02,
+      "e": 40.53
+     }
+    ]
+   },
+   {
+    "line": "cta",
+    "words": [
+     {
+      "w": "Crea",
+      "s": 40.87,
+      "e": 41.09
+     },
+     {
+      "w": "tu",
+      "s": 41.18,
+      "e": 41.23
+     },
+     {
+      "w": "correo",
+      "s": 41.32,
+      "e": 41.63
+     },
+     {
+      "w": "gratis",
+      "s": 41.69,
+      "e": 42.09
+     },
+     {
+      "w": "en",
+      "s": 42.09,
+      "e": 42.23
+     },
+     {
+      "w": "mailmask.studio",
+      "s": 42.23,
+      "e": 43.67
+     }
+    ]
+   }
+  ],
+  "plan.letters": [
+   7.95,
+   8.013,
+   8.075,
+   8.138,
+   8.201,
+   8.264,
+   8.326,
+   8.389,
+   8.452,
+   8.515,
+   8.577,
+   8.64
+  ],
+  "gratis.badgeAt": [
+   32.03,
+   32.24,
+   32.45,
+   32.66,
+   32.87
+  ],
+  "seal": {
+   "plan": 6.73,
+   "bandeja": 23.46,
+   "gratis": 29.59,
+   "cierre": 34.83
+  }
+ },
+ "sfx": [
+  {
+   "t": 1.32,
+   "file": "bubble",
+   "gain": 0.6,
+   "what": "gancho: tuestudio.mx late en la tarjeta"
+  },
+  {
+   "t": 1.52,
+   "file": "paper",
+   "gain": 0.55,
+   "what": "gancho: la cotización se levanta (papel)"
+  },
+  {
+   "t": 4.65,
+   "file": "bubble2",
+   "gain": 0.6,
+   "what": "gancho: gmail.com se enciende en rojo (tarjeta)"
+  },
+  {
+   "t": 4.9,
+   "file": "bubble3",
+   "gain": 0.6,
+   "what": "gancho: gmail.com se enciende en rojo (cotización)"
+  },
+  {
+   "t": 5.89,
+   "file": "stamp",
+   "gain": 0.7,
+   "what": "gancho: cae el sello «¿ES REAL?»"
+  },
+  {
+   "t": 6.39,
+   "file": "riser",
+   "gain": 0.5,
+   "what": "cortinilla hacia plan"
+  },
+  {
+   "t": 6.837,
+   "file": "hit-sub",
+   "gain": 0.6,
+   "what": "cortinilla hacia plan"
+  },
+  {
+   "t": 6.99,
+   "file": "card",
+   "gain": 0.55,
+   "what": "plan: entra el panel (tarjeta)"
+  },
+  {
+   "t": 7.95,
+   "file": "key",
+   "gain": 0.5,
+   "what": "plan: se teclea tuestudio.mx"
+  },
+  {
+   "t": 8.013,
+   "file": "key2",
+   "gain": 0.5,
+   "what": "plan: se teclea tuestudio.mx"
+  },
+  {
+   "t": 8.075,
+   "file": "key",
+   "gain": 0.5,
+   "what": "plan: se teclea tuestudio.mx"
+  },
+  {
+   "t": 8.138,
+   "file": "key2",
+   "gain": 0.5,
+   "what": "plan: se teclea tuestudio.mx"
+  },
+  {
+   "t": 8.201,
+   "file": "key",
+   "gain": 0.5,
+   "what": "plan: se teclea tuestudio.mx"
+  },
+  {
+   "t": 8.264,
+   "file": "key2",
+   "gain": 0.5,
+   "what": "plan: se teclea tuestudio.mx"
+  },
+  {
+   "t": 8.326,
+   "file": "key",
+   "gain": 0.5,
+   "what": "plan: se teclea tuestudio.mx"
+  },
+  {
+   "t": 8.389,
+   "file": "key2",
+   "gain": 0.5,
+   "what": "plan: se teclea tuestudio.mx"
+  },
+  {
+   "t": 8.452,
+   "file": "key",
+   "gain": 0.5,
+   "what": "plan: se teclea tuestudio.mx"
+  },
+  {
+   "t": 8.515,
+   "file": "key2",
+   "gain": 0.5,
+   "what": "plan: se teclea tuestudio.mx"
+  },
+  {
+   "t": 8.577,
+   "file": "key",
+   "gain": 0.5,
+   "what": "plan: se teclea tuestudio.mx"
+  },
+  {
+   "t": 8.64,
+   "file": "key2",
+   "gain": 0.5,
+   "what": "plan: se teclea tuestudio.mx"
+  },
+  {
+   "t": 10.15,
+   "file": "tape",
+   "gain": 0.6,
+   "what": "plan: etiqueta NS con cinta"
+  },
+  {
+   "t": 12.21,
+   "file": "bubble",
+   "gain": 0.55,
+   "what": "plan: palomita de NS"
+  },
+  {
+   "t": 12.4,
+   "file": "tape2",
+   "gain": 0.6,
+   "what": "plan: etiqueta Agente con cinta"
+  },
+  {
+   "t": 14.358,
+   "file": "card",
+   "gain": 0.6,
+   "what": "plan: fichero de tarjetas (Registros DNS)"
+  },
+  {
+   "t": 14.51,
+   "file": "bubble2",
+   "gain": 0.4,
+   "what": "plan: fichero de tarjetas (Registros DNS)"
+  },
+  {
+   "t": 16.498,
+   "file": "bubble3",
+   "gain": 0.55,
+   "what": "plan: buzón suelta sobres (Correos nuevos)"
+  },
+  {
+   "t": 16.7,
+   "file": "whoosh-short",
+   "gain": 0.45,
+   "what": "plan: buzón suelta sobres (Correos nuevos)"
+  },
+  {
+   "t": 18.658,
+   "file": "paper",
+   "gain": 0.6,
+   "what": "plan: navegador se arma (Landing)"
+  },
+  {
+   "t": 18.86,
+   "file": "bubble",
+   "gain": 0.4,
+   "what": "plan: navegador se arma (Landing)"
+  },
+  {
+   "t": 20.14,
+   "file": "bubble2",
+   "gain": 0.55,
+   "what": "plan: palomita del Agente"
+  },
+  {
+   "t": 20.958,
+   "file": "bubble3",
+   "gain": 0.65,
+   "what": "plan: cae el gafete hola@"
+  },
+  {
+   "t": 21.16,
+   "file": "jingle",
+   "gain": 0.4,
+   "dur": 0.6,
+   "what": "plan: cae el gafete hola@"
+  },
+  {
+   "t": 23.12,
+   "file": "whoosh-fly",
+   "gain": 0.5,
+   "what": "cortinilla hacia bandeja"
+  },
+  {
+   "t": 23.567,
+   "file": "hit-low",
+   "gain": 0.6,
+   "what": "cortinilla hacia bandeja"
+  },
+  {
+   "t": 23.77,
+   "file": "land",
+   "gain": 0.6,
+   "what": "bandeja: la charola rebota"
+  },
+  {
+   "t": 24.8,
+   "file": "paper",
+   "gain": 0.6,
+   "what": "bandeja: cae el sobre a la charola"
+  },
+  {
+   "t": 24.92,
+   "file": "block",
+   "gain": 0.35,
+   "what": "bandeja: cae el sobre a la charola"
+  },
+  {
+   "t": 25.01,
+   "file": "bubble",
+   "gain": 0.5,
+   "what": "bandeja: hola@ del sobre se enciende en rojo"
+  },
+  {
+   "t": 27.46,
+   "file": "pencil",
+   "gain": 0.55,
+   "dur": 1.1,
+   "what": "bandeja: se escribe la respuesta"
+  },
+  {
+   "t": 28.44,
+   "file": "whoosh-short",
+   "gain": 0.55,
+   "what": "bandeja: sale el avión de papel"
+  },
+  {
+   "t": 28.94,
+   "file": "8bit-pickup",
+   "gain": 0.4,
+   "what": "bandeja: sale el avión de papel"
+  },
+  {
+   "t": 29.25,
+   "file": "riser",
+   "gain": 0.5,
+   "what": "cortinilla hacia gratis"
+  },
+  {
+   "t": 29.697,
+   "file": "hit-sub",
+   "gain": 0.6,
+   "what": "cortinilla hacia gratis"
+  },
+  {
+   "t": 29.85,
+   "file": "jingle",
+   "gain": 0.45,
+   "dur": 0.5,
+   "what": "gratis: gira el aro"
+  },
+  {
+   "t": 31.34,
+   "file": "turn",
+   "gain": 0.5,
+   "what": "gratis: cae la etiqueta $0"
+  },
+  {
+   "t": 32.13,
+   "file": "jingle",
+   "gain": 0.35,
+   "dur": 0.35,
+   "what": "gratis: gafetes al aro"
+  },
+  {
+   "t": 32.34,
+   "file": "jingle2",
+   "gain": 0.38999999999999996,
+   "dur": 0.38,
+   "what": "gratis: gafetes al aro"
+  },
+  {
+   "t": 32.55,
+   "file": "jingle",
+   "gain": 0.43,
+   "dur": 0.41,
+   "what": "gratis: gafetes al aro"
+  },
+  {
+   "t": 32.76,
+   "file": "jingle2",
+   "gain": 0.47,
+   "dur": 0.43999999999999995,
+   "what": "gratis: gafetes al aro"
+  },
+  {
+   "t": 32.97,
+   "file": "jingle",
+   "gain": 0.51,
+   "dur": 0.47,
+   "what": "gratis: gafetes al aro"
+  },
+  {
+   "t": 34.49,
+   "file": "whoosh-fly",
+   "gain": 0.5,
+   "what": "cortinilla hacia cierre"
+  },
+  {
+   "t": 34.937,
+   "file": "glitch",
+   "gain": 0.6,
+   "what": "cortinilla hacia cierre"
+  },
+  {
+   "t": 35.09,
+   "file": "card",
+   "gain": 0.5,
+   "what": "cierre: entra la tarjeta"
+  },
+  {
+   "t": 36.28,
+   "file": "whoosh-short",
+   "gain": 0.45,
+   "what": "cierre: el correo viejo se va y entra hola@"
+  },
+  {
+   "t": 37.37,
+   "file": "bubble2",
+   "gain": 0.5,
+   "what": "cierre: tuestudio.mx en rojo en los dos renglones"
+  },
+  {
+   "t": 37.52,
+   "file": "bubble3",
+   "gain": 0.45,
+   "what": "cierre: tuestudio.mx en rojo en los dos renglones"
+  },
+  {
+   "t": 38.903,
+   "file": "stamp",
+   "gain": 0.65,
+   "what": "cierre: se pega la calcomanía"
+  },
+  {
+   "t": 40.979,
+   "file": "bubble",
+   "gain": 0.65,
+   "what": "cierre: botón «Crea tu correo gratis»"
+  },
+  {
+   "t": 42.23,
+   "file": "ding",
+   "gain": 0.5,
+   "what": "cierre: aparece la URL"
+  },
+  {
+   "t": 44.22,
+   "file": "slap",
+   "gain": 0.6,
+   "what": "cierre: se pega el pósit"
+  }
+ ],
+ "voice": [
+  {
+   "t": 0.2,
+   "file": "voice/hookA.wav"
+  },
+  {
+   "t": 2.74,
+   "file": "voice/hookB.wav"
+  },
+  {
+   "t": 7.19,
+   "file": "voice/plan1.wav"
+  },
+  {
+   "t": 9.58,
+   "file": "voice/plan2.wav"
+  },
+  {
+   "t": 20.39,
+   "file": "voice/plan3.wav"
+  },
+  {
+   "t": 23.92,
+   "file": "voice/bandeja.wav"
+  },
+  {
+   "t": 30.05,
+   "file": "voice/gratis.wav"
+  },
+  {
+   "t": 35.34,
+   "file": "voice/cierre.wav"
+  },
+  {
+   "t": 40.83,
+   "file": "voice/cta.wav"
+  }
+ ],
+ "music": {
+  "drop": 40.87
+ }
+}

@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="es" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,600..800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="score.gen.js"></script>
+    <style>
+      /* Comercial semanal MailMask · semana 42 · v2 «la cortina». Piel del sitio público: crema + rojo de máscara,
+         dorado sólo en la máscara, Bricolage 800; caricatura plana (contorno de tinta, sombra dura, sin gradientes).
+         Objeto conductor: el local de tunegocio.com. El buzón ya recibe correo; la cortina metálica está abajo.
+         Al cerrar, la misma fachada con la cortina arriba y la tienda abierta. */
+      :root {
+        --bg: #faf6ee; --elev: #fffdf9; --inset: #f2ecdf; --line: #e4dccd;
+        --ink: #1c1917; --muted: #57534e; --subtle: #78716c;
+        --red: #d7263d; --red-dk: #a0182c; --gold: #f2b705; --ok: #10b981; --ok-dk: #047857;
+        --hard: 8px 8px 0 var(--ink);
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); font-family: "Inter", sans-serif; color: var(--ink); }
+      #root { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); }
+      /* fondo: cuadrícula de papel milimétrico que recorre un módulo en todo el video */
+      #grid { position: absolute; left: -80px; top: -80px; width: 1240px; height: 2080px;
+        background-image: linear-gradient(var(--line) 3px, transparent 3px), linear-gradient(90deg, var(--line) 3px, transparent 3px);
+        background-size: 80px 80px; }
+      .scene { position: absolute; inset: 0; display: none; }
+      #s-hook { display: block; }
+      .abs { position: absolute; }
+      .hl { position: absolute; left: 70px; right: 70px; top: 262px; font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 84px; line-height: 1.0; letter-spacing: -.03em; font-variation-settings: "wdth" 92, "opsz" 72; }
+      .hl em { font-style: normal; color: var(--red); }
+      .eyebrow { font-family: "JetBrains Mono"; font-weight: 700; font-size: 24px; letter-spacing: .14em; text-transform: uppercase; color: var(--subtle); }
+      .mono { font-family: "JetBrains Mono"; font-weight: 700; }
+
+      /* el local: fachada 840×640 con letrero, aparador (con cortina) y puerta con buzón */
+      .front { position: absolute; left: 76px; top: 480px; width: 840px; height: 616px; background: var(--inset); border: 8px solid var(--ink); border-radius: 22px; box-shadow: 14px 14px 0 var(--ink); }
+      .brick { position: absolute; height: 6px; border-radius: 3px; background: var(--line); }
+      .sign { position: absolute; left: 32px; top: 26px; width: 760px; height: 104px; background: var(--ink); border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 20px; color: var(--elev); font-family: "JetBrains Mono"; font-weight: 700; font-size: 52px; }
+      .opening { position: absolute; left: 32px; top: 154px; width: 500px; height: 424px; border: 8px solid var(--ink); border-radius: 10px; overflow: hidden; background: var(--elev); }
+      .shutter { position: absolute; left: 0; top: 0; width: 484px; height: 424px; }
+      .rent { position: absolute; left: 92px; top: 120px; width: 300px; background: #fff; border: 6px solid var(--ink); border-radius: 10px; box-shadow: 6px 6px 0 var(--ink); text-align: center; padding: 14px 0 10px; transform: rotate(-5deg); }
+      .rent b { display: block; font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 60px; color: var(--red); letter-spacing: -.02em; line-height: 1; }
+      .rent span { display: block; font-family: "JetBrains Mono"; font-weight: 700; font-size: 22px; color: var(--muted); margin-top: 6px; }
+      .door { position: absolute; left: 566px; top: 154px; width: 210px; height: 424px; background: var(--red-dk); border: 8px solid var(--ink); border-radius: 10px; }
+      .knob { position: absolute; left: 160px; top: 230px; width: 26px; height: 26px; border-radius: 50%; background: var(--line); border: 5px solid var(--ink); }
+      .mbox { position: absolute; left: 22px; top: 60px; width: 150px; height: 110px; background: var(--elev); border: 6px solid var(--ink); border-radius: 14px 14px 8px 8px; box-shadow: 6px 6px 0 var(--ink); }
+      .slot { position: absolute; left: 22px; top: 28px; width: 94px; height: 14px; border-radius: 7px; background: var(--ink); }
+      .flag { position: absolute; left: 150px; top: 20px; width: 70px; height: 90px; }
+      .env { position: absolute; left: 30px; top: -40px; width: 90px; height: 63px; visibility: hidden; }
+
+      /* panel «Sitio web» */
+      .panel { position: absolute; left: 70px; width: 860px; background: var(--elev); border: 6px solid var(--ink); border-radius: 28px; box-shadow: 12px 12px 0 var(--ink); overflow: hidden; }
+      .phead { height: 78px; background: var(--ink); color: #fff; display: flex; align-items: center; gap: 18px; padding: 0 28px; font-weight: 800; font-size: 32px; }
+      .phead .mono { color: #f2ecdf; font-size: 26px; margin-left: auto; }
+      .prow { position: relative; height: 92px; display: flex; align-items: center; gap: 18px; padding: 0 28px; border-top: 4px solid var(--line); font-family: "JetBrains Mono"; font-weight: 700; font-size: 34px; visibility: hidden; }
+      .prow:first-of-type { border-top: none; }
+      .prow .arr { color: var(--subtle); }
+      .st { position: absolute; right: 26px; top: 18px; height: 56px; display: inline-flex; align-items: center; gap: 10px; padding: 0 20px; border: 4px solid var(--ink); border-radius: 999px; font-family: "Inter"; font-weight: 800; font-size: 26px; white-space: nowrap; }
+      .st.off { background: var(--inset); color: var(--muted); }
+      .st.on { background: var(--ok-dk); color: #fff; visibility: hidden; }
+      .logo { position: absolute; width: 270px; height: 104px; background: #fff; border: 5px solid var(--ink); border-radius: 22px; box-shadow: 6px 6px 0 var(--ink); display: grid; place-items: center; visibility: hidden; }
+      .logo img { max-width: 210px; max-height: 58px; }
+      .logo.sel { box-shadow: 6px 6px 0 var(--red); border-color: var(--red); }
+      .preview { position: absolute; left: 70px; width: 860px; background: #fff; border: 5px solid var(--ink); border-radius: 24px; box-shadow: var(--hard); padding: 18px 26px; visibility: hidden; }
+      .preview .ln { font-family: "JetBrains Mono"; font-weight: 700; font-size: 28px; line-height: 1.55; white-space: pre; }
+      .preview .add { color: var(--ok-dk); }
+      .preview .keep { color: var(--subtle); }
+      .btn { position: absolute; display: inline-flex; align-items: center; background: var(--red); color: #fff; border: 5px solid var(--ink); border-radius: 999px; padding: 10px 34px; font-weight: 800; font-size: 34px; box-shadow: 6px 6px 0 var(--ink); white-space: nowrap; }
+
+      .cta { position: absolute; display: inline-flex; align-items: center; gap: 18px; background: var(--red); color: #fff; border: 5px solid var(--ink); border-radius: 999px; padding: 18px 40px 18px 22px; font-weight: 800; font-size: 37px; box-shadow: var(--hard); white-space: nowrap; visibility: hidden; }
+      .cta .m { width: 74px; height: 74px; border-radius: 50%; background: var(--elev); border: 4px solid var(--ink); display: grid; place-items: center; }
+
+      /* cursor propio: triángulo rojo con contorno de tinta */
+      .cursor { position: absolute; left: 0; top: 0; width: 70px; height: 84px; z-index: 40; visibility: hidden; }
+
+      /* subtítulo karaoke: una sola línea a la vez, 72 px; actual en dorado, dichas en blanco, por decir en gris */
+      #cap { position: absolute; left: 60px; width: 860px; top: 1262px; height: 118px; z-index: 50; }
+      .capPill { position: absolute; left: 0; top: 0; width: 860px; height: 118px; visibility: hidden; background: var(--ink); border-radius: 28px; display: flex; align-items: center; justify-content: center; gap: 18px; font-weight: 800; font-size: 72px; letter-spacing: -.02em; line-height: 1; white-space: nowrap; box-shadow: 8px 8px 0 var(--red); }
+      .capPill b { font-weight: 800; color: #8a827b; }
+      #measure { position: absolute; left: 0; top: 0; visibility: hidden; font-weight: 800; font-size: 72px; letter-spacing: -.02em; white-space: nowrap; }
+
+      /* cortinillas: lienzo WebGPU (celdas planas con contorno y sombra dura); el glifo sella el corte */
+      #gpu { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; z-index: 90; pointer-events: none; }
+      .glyph { position: absolute; left: 190px; top: 610px; width: 700px; height: 700px; z-index: 95; visibility: hidden; border-radius: 50%; background: var(--elev); border: 14px solid var(--ink); box-shadow: 18px 18px 0 var(--ink); display: grid; place-items: center; font-family: "Bricolage Grotesque"; font-weight: 800; font-variation-settings: "wdth" 85, "opsz" 96; color: var(--red); letter-spacing: -.04em; line-height: 1; }
+      #gWww { font-size: 250px; }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position:absolute">
+      <!-- máscara oficial (public/favicon.svg) -->
+      <symbol id="mask" viewBox="0 0 80 80">
+        <ellipse cx="40" cy="42" rx="28" ry="24" fill="#a0182c"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="#d7263d"/>
+        <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/>
+        <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/>
+        <circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
+        <circle cx="30.2" cy="34.9" r="1.9" fill="#fff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#fff"/>
+        <circle cx="26.7" cy="38.9" r="1.15" fill="#fff" opacity=".85"/><circle cx="50.7" cy="38.9" r="1.15" fill="#fff" opacity=".85"/>
+        <path d="M40 18 L40 26" stroke="#f2b705" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="#f2b705" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="envelope" viewBox="0 0 200 140">
+        <rect x="6" y="6" width="188" height="128" rx="14" fill="#fff" stroke="#1c1917" stroke-width="10"/>
+        <path d="M10 14 L100 84 L190 14" fill="none" stroke="#1c1917" stroke-width="10" stroke-linejoin="round"/>
+      </symbol>
+      <!-- cortina metálica: lámina ondulada (franjas con canal de tinta), barra inferior y candado -->
+      <symbol id="shutterSym" viewBox="0 0 484 424">
+        <rect x="0" y="0" width="484" height="424" fill="#d9d0c2"/>
+        <g stroke="#1c1917" stroke-width="5">
+          <path d="M0 30 H484 M0 66 H484 M0 102 H484 M0 138 H484 M0 174 H484 M0 210 H484 M0 246 H484 M0 282 H484 M0 318 H484 M0 354 H484"/>
+        </g>
+        <g fill="#efe8dc"><rect x="0" y="34" width="484" height="10"/><rect x="0" y="70" width="484" height="10"/><rect x="0" y="106" width="484" height="10"/><rect x="0" y="142" width="484" height="10"/><rect x="0" y="178" width="484" height="10"/><rect x="0" y="214" width="484" height="10"/><rect x="0" y="250" width="484" height="10"/><rect x="0" y="286" width="484" height="10"/><rect x="0" y="322" width="484" height="10"/><rect x="0" y="358" width="484" height="10"/></g>
+        <rect x="0" y="384" width="484" height="40" fill="#57534e" stroke="#1c1917" stroke-width="6"/>
+        <path d="M228 384 V370 a14 14 0 0 1 28 0 V384" fill="none" stroke="#1c1917" stroke-width="6"/>
+        <rect x="218" y="380" width="48" height="36" rx="6" fill="#d7263d" stroke="#1c1917" stroke-width="5"/>
+      </symbol>
+      <!-- la tienda abierta: toldo rayado, repisas con cajas y letrero ABIERTO -->
+      <symbol id="shopSym" viewBox="0 0 484 424">
+        <rect x="0" y="0" width="484" height="424" fill="#fffdf9"/>
+        <g stroke="#1c1917" stroke-width="5">
+          <path d="M0 0 H484 V70 H0 Z" fill="#fffdf9"/>
+          <path d="M0 0 H60 V70 H0 Z M120 0 H180 V70 H120 Z M240 0 H300 V70 H240 Z M360 0 H420 V70 H360 Z" fill="#d7263d"/>
+          <path d="M0 70 q30 30 60 0 q30 30 60 0 q30 30 60 0 q30 30 60 0 q30 30 60 0 q30 30 60 0 q30 30 60 0 q30 30 60 0" fill="#fffdf9"/>
+        </g>
+        <g stroke="#1c1917" stroke-width="5">
+          <rect x="34" y="250" width="70" height="60" rx="6" fill="#d7263d"/><rect x="114" y="270" width="54" height="40" rx="6" fill="#e4dccd"/>
+          <rect x="178" y="236" width="60" height="74" rx="6" fill="#a0182c"/>
+          <rect x="34" y="350" width="54" height="44" rx="6" fill="#e4dccd"/><rect x="98" y="336" width="80" height="58" rx="6" fill="#d7263d"/>
+          <rect x="188" y="352" width="50" height="42" rx="6" fill="#fffdf9"/>
+        </g>
+        <path d="M20 310 H260 M20 394 H260" stroke="#1c1917" stroke-width="8" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="cursorSym" viewBox="0 0 70 84">
+        <path d="M6 6 L6 70 L24 54 L36 80 L48 74 L36 49 L62 48 Z" fill="#d7263d" stroke="#1c1917" stroke-width="6" stroke-linejoin="round"/>
+      </symbol>
+    </svg>
+
+    <div id="root" data-composition-id="main" data-start="0" data-width="1080" data-height="1920" data-duration="28.849" data-requires-webgpu>
+      <div id="grid"></div>
+
+      <!-- 1 · gancho: el buzón recibe, la cortina está abajo (fotograma 0 completo) -->
+      <section class="scene" id="s-hook">
+        <div class="hl" id="hkHl">Tu correo ya llega.<br>Tu página, <em>cerrada</em>.</div>
+        <div class="front" id="hkFront" data-front="hk"></div>
+      </section>
+
+      <!-- 2 · pestaña «Sitio web»: a dónde lleva cada parte, elegir plataforma, vista previa y aplicar -->
+      <section class="scene" id="s-web">
+        <div class="hl">A dónde lleva<br>cada parte de tu <em>dominio</em>.</div>
+        <div class="panel" id="wbPanel" style="top:470px">
+          <div class="phead"><svg width="44" height="44"><use href="#mask"/></svg>Sitio web<span class="mono">tunegocio.com</span></div>
+          <div class="prow" id="wr0">@ raíz <span class="arr">→</span><span class="st off" id="wo0">sin sitio</span><span class="st on" id="wn0">Vercel ✓</span></div>
+          <div class="prow" id="wr1">www <span class="arr">→</span><span class="st off" id="wo1">sin sitio</span><span class="st on" id="wn1">Vercel ✓</span></div>
+          <div class="prow" id="wr2">blog <span class="arr">→</span><span class="st off" id="wo2">sin sitio</span></div>
+        </div>
+        <div class="logo" id="lgVercel" style="left:70px; top:870px"><img src="assets/logos/Vercel_logo_black.svg" style="max-width:200px" /></div>
+        <div class="logo" id="lgNetlify" style="left:365px; top:870px"><img src="assets/logos/Netlify_logo.svg" /></div>
+        <div class="logo" id="lgEasy" style="left:660px; top:870px"><img src="assets/logos/easybits.png" style="max-width:240px; max-height:72px" /></div>
+        <div class="preview" id="wbPrev" style="top:1010px; height:230px">
+          <div class="eyebrow" style="font-size:22px">Vista previa · nada se escribe aún</div>
+          <div class="ln add">+ A     @    76.76.21.21</div>
+          <div class="ln add">+ CNAME www  cname.vercel-dns.com</div>
+          <div class="ln keep">= MX    @    tu correo se queda</div>
+        </div>
+        <div class="btn" id="wbApply" style="left:690px; top:1150px; visibility:hidden">Aplicar</div>
+        <svg class="cursor" id="wbCursor"><use href="#cursorSym"/></svg>
+      </section>
+
+      <!-- 3 · cierre circular: la misma fachada, la cortina sube y la tienda abre + CTA -->
+      <section class="scene" id="s-cierre">
+        <div class="hl" style="font-size:80px">Correo y página,<br>en la <em>misma dirección</em>.</div>
+        <div class="front" id="ciFront" data-front="ci"></div>
+        <div class="cta" id="ciCta" style="left:76px; top:1124px"><span class="m"><svg width="62" height="62"><use href="#mask"/></svg></span>Sube la cortina en mailmask.studio</div>
+      </section>
+
+      <div id="cap"></div>
+      <div id="measure"></div>
+      <canvas id="gpu" width="1080" height="1920" data-layout-allow-occlusion></canvas>
+      <div class="glyph" id="gWww">www</div>
+      <div class="glyph" id="gMask"><svg width="520" height="520"><use href="#mask"/></svg></div>
+    </div>
+
+    <script>
+      // ---- cortinilla WebGPU: celdas de Voronoi planas que crecen desde el centro ----
+      // Sin gradientes ni glow: cada celda es un color sólido de la paleta, contorno de tinta por la distancia al
+      // segundo vecino y sombra dura (lo que cae 12 px abajo-derecha de una celda visible se pinta de tinta).
+      // Se dibuja SÓLO desde el tiempo de HyperFrames (hf-seek), nunca con reloj propio.
+      (async () => {
+        if (!navigator.gpu) return;
+        const adapter = await navigator.gpu.requestAdapter();
+        if (!adapter) return;
+        const device = await adapter.requestDevice();
+        const canvas = document.getElementById("gpu");
+        const ctx = canvas.getContext("webgpu");
+        const format = navigator.gpu.getPreferredCanvasFormat();
+        ctx.configure({ device, format, alphaMode: "premultiplied" });
+        const code = /* wgsl */ `
+          struct U { a: vec4f, b: vec4f };   // a = (ancho, alto, cubre, descubre) · b = (semilla, -, -, -)
+          @group(0) @binding(0) var<uniform> u: U;
+          struct Vo { @builtin(position) pos: vec4f };
+          @vertex fn vs(@builtin(vertex_index) vi: u32) -> Vo {
+            let ps = array<vec2f, 3>(vec2f(-1., -1.), vec2f(3., -1.), vec2f(-1., 3.));
+            return Vo(vec4f(ps[vi], 0., 1.));
+          }
+          const N: i32 = 30;
+          fn h2(i: f32, s: f32) -> vec2f { return fract(sin(vec2f(i * 127.1 + s * 311.7, i * 269.5 + s * 183.3)) * 43758.5453); }
+          fn center(i: i32) -> vec2f { return (h2(f32(i), u.b.x) * 1.16 - 0.08) * u.a.xy; }
+          // (d1, d2, id) del punto p
+          fn cell(p: vec2f) -> vec3f {
+            var d1 = 1e9; var d2 = 1e9; var id = 0.0;
+            for (var i = 0; i < N; i++) {
+              let d = distance(p, center(i));
+              if (d < d1) { d2 = d1; d1 = d; id = f32(i); } else if (d < d2) { d2 = d; }
+            }
+            return vec3f(d1, d2, id);
+          }
+          fn shown(id: f32) -> bool {
+            let r = distance(center(i32(id)), u.a.xy * 0.5) / (0.5 * length(u.a.xy));
+            return u.a.z * 1.45 > r + 0.001 && !(u.a.w * 1.45 > r + 0.001);
+          }
+          fn paint(id: f32) -> vec3f {
+            let k = i32(floor(h2(id + 50.0, u.b.x).x * 5.0));
+            if (k == 0) { return vec3f(0.843, 0.149, 0.239); }   // rojo máscara
+            if (k == 1) { return vec3f(0.980, 0.965, 0.933); }   // crema
+            if (k == 2) { return vec3f(0.627, 0.094, 0.173); }   // rojo oscuro
+            if (k == 3) { return vec3f(0.949, 0.925, 0.875); }   // crema hundida
+            return vec3f(0.843, 0.149, 0.239);
+          }
+          @fragment fn fs(v: Vo) -> @location(0) vec4f {
+            let p = v.pos.xy;
+            let c = cell(p);
+            let ink = vec3f(0.110, 0.098, 0.090);
+            if (shown(c.z)) {
+              if (c.y - c.x < 10.0) { return vec4f(ink, 1.0); }
+              return vec4f(paint(c.z), 1.0);
+            }
+            let q = cell(p - vec2f(14.0, 14.0));
+            if (shown(q.z)) { return vec4f(ink, 1.0); }
+            return vec4f(0.0);
+          }`;
+        const mod = device.createShaderModule({ code });
+        const pipeline = device.createRenderPipeline({ layout: "auto", vertex: { module: mod, entryPoint: "vs" }, fragment: { module: mod, entryPoint: "fs", targets: [{ format }] }, primitive: { topology: "triangle-list" } });
+        const ubuf = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        const bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ubuf } }] });
+        const clamp = (x) => Math.min(1, Math.max(0, x));
+        const ease = (x) => 1 - Math.pow(1 - x, 3);
+        const CUTS = window.SCORE.T.cuts.filter((c) => c.kind === "gpu");
+        const render = (t) => {
+          const cut = CUTS.find((c) => t >= c.c - 0.65 && t <= c.c + 0.5);
+          const cover = cut ? ease(clamp((t - (cut.c - 0.65)) / 0.5)) : 0;
+          const uncover = cut ? ease(clamp((t - (cut.c + 0.05)) / 0.45)) : 0;
+          device.queue.writeBuffer(ubuf, 0, new Float32Array([1080, 1920, cover, uncover, cut ? cut.seed : 0, 0, 0, 0]));
+          const enc = device.createCommandEncoder();
+          const pass = enc.beginRenderPass({ colorAttachments: [{ view: ctx.getCurrentTexture().createView(), loadOp: "clear", clearValue: { r: 0, g: 0, b: 0, a: 0 }, storeOp: "store" }] });
+          if (cut) { pass.setPipeline(pipeline); pass.setBindGroup(0, bind); pass.draw(3); }
+          pass.end();
+          device.queue.submit([enc.finish()]);
+        };
+        render(window.__hfTypegpuTime || 0);
+        window.addEventListener("hf-seek", (e) => { render(e.detail.time); e.detail.waitUntil(device.queue.onSubmittedWorkDone()); });
+      })();
+
+
+      // ---- la fachada del local, idéntica en el gancho y en el cierre (se arma antes de la línea de tiempo) ----
+      document.querySelectorAll("[data-front]").forEach((el) => {
+        const p = el.dataset.front;
+        el.innerHTML = `
+          <div class="brick" style="left:560px; top:140px; width:60px"></div><div class="brick" style="left:800px; top:300px; width:24px"></div>
+          <div class="brick" style="left:790px; top:520px; width:36px"></div>
+          <div class="sign"><svg width="64" height="64"><use href="#mask"/></svg>tunegocio.com</div>
+          <div class="opening">
+            <svg class="abs" style="left:0; top:0" width="484" height="424" id="${p}Shop"><use href="#shopSym"/></svg>
+            <div class="abs" id="${p}ShopName" style="left:300px; top:96px; width:170px; text-align:center; font-family:'Bricolage Grotesque'; font-weight:800; font-size:44px; line-height:.95; letter-spacing:-.02em">Tu<br>Negocio</div>
+            <div class="abs" id="${p}Open" style="left:304px; top:250px; width:160px; height:62px; background:var(--ok-dk); color:#fff; border:5px solid var(--ink); border-radius:12px; display:grid; place-items:center; font-weight:800; font-size:28px; letter-spacing:.06em">ABIERTO</div>
+            <div class="shutter" id="${p}Shutter" data-layout-allow-occlusion>
+              <svg width="484" height="424"><use href="#shutterSym"/></svg>
+              <div class="rent" id="${p}Rent"><b>SE RENTA</b><span>sin sitio web</span></div>
+            </div>
+          </div>
+          <div class="door"><span class="knob"></span>
+            <div class="mbox" id="${p}Box"><span class="slot"></span>
+              <svg class="env" id="${p}Env"><use href="#envelope"/></svg>
+              <svg class="flag" id="${p}Flag" viewBox="0 0 70 90"><path d="M8 88 V10" stroke="#1c1917" stroke-width="8" stroke-linecap="round"/><path d="M8 10 H58 L46 28 L58 46 H8 Z" fill="#d7263d" stroke="#1c1917" stroke-width="6" stroke-linejoin="round"/></svg>
+            </div>
+          </div>`;
+      });
+
+      window.__timelines = window.__timelines || {};
+      const SC = window.SCORE, T = SC.T, $ = (s) => document.querySelector(s);
+      const S = Object.fromEntries(SC.scenes.map((s) => [s.id, s]));
+
+      const build = () => {
+        const tl = gsap.timeline({ paused: true });
+        const vis = (el, t) => tl.set(el, { visibility: "visible" }, t);
+        const hide = (el, t) => tl.set(el, { visibility: "hidden" }, t);
+        const pop = (el, t, from = 0.6, dur = 0.32, s = 2) => { vis(el, t); tl.fromTo(el, { scale: from }, { scale: 1, duration: dur, ease: `back.out(${s})`, immediateRender: false }, t); };
+        const bump = (el, t, k = 1.15) => tl.fromTo(el, { scale: 1 }, { scale: k, duration: 0.12, yoyo: true, repeat: 1, ease: "power2.out", immediateRender: false }, t);
+        // el cursor vuela a un punto y da un clic (se hunde y vuelve)
+        const point = (cur, t, x, y, dur = 0.4) => tl.to(cur, { x, y, duration: dur, ease: "power3.inOut" }, t - dur);
+        const click = (cur, t) => tl.fromTo(cur, { scale: 1 }, { scale: 0.8, duration: 0.08, yoyo: true, repeat: 1, ease: "power2.out", immediateRender: false }, t);
+        // el sobre cae por la ranura y el buzón levanta la bandera (bandera abajo = rotada 90° hacia la puerta)
+        const mail = (p, at, flagAt) => {
+          vis(`#${p}Env`, at - 0.3);
+          tl.fromTo(`#${p}Env`, { y: -260, rotation: -25 }, { y: 0, rotation: 0, duration: 0.3, ease: "power2.in", immediateRender: false }, at - 0.3);
+          tl.to(`#${p}Env`, { y: 30, duration: 0.12, ease: "power1.out" }, at);
+          bump(`#${p}Box`, at, 1.08);
+          tl.fromTo(`#${p}Flag`, { rotation: 90 }, { rotation: 0, duration: 0.4, ease: "back.out(2.2)", immediateRender: false, svgOrigin: "8 88" }, flagAt);
+        };
+
+        // fondo en movimiento lento, sin bucle infinito: recorre exactamente un módulo en todo el video
+        tl.fromTo("#grid", { x: 0, y: 0 }, { x: 80, y: 80, duration: SC.duration, ease: "none" }, 0);
+
+        // ---- qué escena se ve ----
+        SC.scenes.forEach((s, i) => { if (i) { tl.set("#s-" + SC.scenes[i - 1].id, { display: "none" }, s.t0); tl.set("#s-" + s.id, { display: "block" }, s.t0); } });
+
+        // ---- 1 · gancho (la fachada ya está completa en el fotograma 0) ----
+        tl.set(["#hkFlag", "#ciFlag"], { rotation: 90, svgOrigin: "8 88" }, 0);
+        tl.set(["#hkEnv", "#ciEnv"], { y: -260 }, 0);
+        mail("hk", T["hook.env"], T["hook.flag"]);
+        // «la cortina abajo»: la lámina traquetea y el letrero se columpia (bucles finitos)
+        tl.fromTo("#hkShutter", { y: 0 }, { y: -8, duration: 0.06, yoyo: true, repeat: 7, ease: "sine.inOut", immediateRender: false }, T["hook.shake"]);
+        tl.to("#hkRent", { keyframes: [{ rotation: 6, duration: 0.18 }, { rotation: -9, duration: 0.22 }, { rotation: 2, duration: 0.2 }, { rotation: -5, duration: 0.2 }], ease: "sine.inOut" }, T["hook.sign"]);
+        bump("#hkHl em", T["hook.shake"], 1.14);
+
+        // ---- 2 · sitio web ----
+        tl.fromTo("#wbPanel", { y: 140, rotation: -3 }, { y: 0, rotation: 0, duration: 0.45, ease: "back.out(1.6)", immediateRender: false }, T["web.card"]);
+        ["r0", "r1", "r2"].forEach((k, i) => { vis("#wr" + i, T["web." + k]); tl.fromTo("#wr" + i, { x: -880 }, { x: 0, duration: 0.32, ease: "back.out(1.5)", immediateRender: false }, T["web." + k]); });
+        pop("#lgVercel", T["web.vercel"], 0.4, 0.34, 2.2); pop("#lgNetlify", T["web.netlify"], 0.4, 0.34, 2.2); pop("#lgEasy", T["web.easybits"], 0.4, 0.34, 2.2);
+        const wc = "#wbCursor";
+        tl.set(wc, { x: 980, y: 1080, visibility: "visible" }, T["web.vercel"]);
+        point(wc, T["web.tap"], 190, 920, 0.45); click(wc, T["web.tap"]);
+        tl.set("#lgVercel", { className: "logo sel" }, T["web.tap"]); bump("#lgVercel", T["web.tap"], 1.08);
+        pop("#wbPrev", T["web.preview"], 0.85, 0.3, 1.8);
+        pop("#wbApply", T["web.preview"] + 0.25, 0.5, 0.3, 2.2);
+        point(wc, T["web.apply"], 790, 1180, 0.5); click(wc, T["web.apply"]); bump("#wbApply", T["web.apply"], 1.1);
+        [0, 1].forEach((i) => { const at = T["web.done"] + i * 0.12; hide("#wo" + i, at); pop("#wn" + i, at, 0.4, 0.3, 2.4); });
+        tl.to(wc, { x: 1000, y: 1500, duration: 0.5, ease: "power2.in" }, T["web.done"] + 0.5); hide(wc, T["web.done"] + 1.0);
+
+        // ---- 3 · cierre: la misma fachada; el correo llega, la cortina sube y la tienda abre ----
+        tl.fromTo("#ciFront", { scale: 1.1 }, { scale: 1, duration: 0.5, ease: "back.out(1.6)", immediateRender: false }, T["cierre.card"]);
+        mail("ci", T["cierre.card"] + 0.45, T["cierre.card"] + 0.6);
+        // la cortina sube a tirones (cinco jalones, 0.9 s) y se queda arriba
+        tl.to("#ciShutter", { keyframes: [{ y: -70, duration: 0.14 }, { y: -150, duration: 0.16 }, { y: -240, duration: 0.18 }, { y: -330, duration: 0.18 }, { y: -440, duration: 0.24 }], ease: "power2.out" }, T["cierre.up"]);
+        tl.fromTo("#ciShop", { y: 16 }, { y: 0, duration: 0.3, ease: "back.out(2)", immediateRender: false }, T["cierre.up"] + 0.8);
+        hide("#ciShopName", 0); pop("#ciShopName", T["cierre.shop"], 0.5, 0.32, 2.2);
+        tl.fromTo("#ciOpen", { rotation: -14 }, { keyframes: [{ rotation: 10, duration: 0.2 }, { rotation: -6, duration: 0.2 }, { rotation: 0, duration: 0.2 }], ease: "sine.inOut", immediateRender: false }, T["cierre.shop"]);
+        bump("#ciFront .sign", T["cierre.env"], 1.05);
+        pop("#ciCta", T["cierre.cta"], 0.5, 0.35, 2.2);
+        bump("#ciCta", T["cierre.url"], 1.06);
+        tl.fromTo("#ciCta", { scale: 1 }, { scale: 1.05, duration: 0.45, yoyo: true, repeat: 3, ease: "sine.inOut", immediateRender: false }, T["cierre.url"] + 0.5);
+        tl.fromTo("#ciCta .m svg", { rotation: 0 }, { rotation: 14, duration: 0.18, yoyo: true, repeat: 3, ease: "sine.inOut", immediateRender: false }, T["cierre.url"] + 0.7);
+
+        // ---- titulares cinéticos (escenas 2–3) ----
+        ["web", "cierre"].forEach((id) => {
+          const hl = $("#s-" + id + " .hl");
+          const wrap = (node) => [...node.childNodes].forEach((n) => {
+            if (n.nodeType === 3) { const f = document.createDocumentFragment(); n.textContent.split(/(\s+)/).forEach((w) => { if (!w) return; if (/^\s+$/.test(w)) f.append(w); else { const sp = document.createElement("span"); sp.className = "kw"; sp.style.display = "inline-block"; sp.textContent = w; f.append(sp); } }); n.replaceWith(f); }
+            else if (n.nodeType === 1 && n.tagName !== "BR") wrap(n);
+          });
+          wrap(hl);
+          tl.fromTo(hl.querySelectorAll(".kw"), { y: -90, rotation: -8, opacity: 0 }, { y: 0, rotation: 0, opacity: 1, duration: 0.42, stagger: 0.06, ease: "back.out(2)", immediateRender: false }, S[id].t0 + 0.05);
+        });
+
+        // ---- karaoke: una sola línea; se parte en puntuación, en pausas > 0.6 s y en lo que cabe (≤ 800 px),
+        //      con partición pareja (la que minimiza la línea más larga) para no dejar huérfanas ----
+        const meas = $("#measure");
+        const width = (ws) => { meas.textContent = ws.map((w) => w.w).join(" "); return meas.offsetWidth + 18 * (ws.length - 1); };
+        const balance = (ws) => {
+          if (width(ws) <= 800) return [ws];
+          let best = null;
+          for (let n = 2; n <= ws.length && !best; n++) {
+            const rec = (rest, k) => {
+              if (k === 1) return width(rest) <= 800 ? { parts: [rest], max: width(rest) } : null;
+              let b = null;
+              for (let i = 1; i <= rest.length - k + 1; i++) {
+                const head = rest.slice(0, i); const hw = width(head); if (hw > 800) break;
+                const r = rec(rest.slice(i), k - 1); if (!r) continue;
+                const m = Math.max(hw, r.max); if (!b || m < b.max) b = { parts: [head, ...r.parts], max: m };
+              }
+              return b;
+            };
+            best = rec(ws, n);
+          }
+          return best ? best.parts : [ws];
+        };
+        const chunks = [];
+        T.words.forEach(({ words }) => {
+          let cur = [];
+          words.forEach((w, i) => {
+            cur.push(w);
+            const gap = words[i + 1] ? words[i + 1].s - w.e : 0;
+            if (/[,.:?!]$/.test(w.w) || gap > 0.6) { chunks.push(...balance(cur)); cur = []; }
+          });
+          if (cur.length) chunks.push(...balance(cur));
+        });
+        const cap = $("#cap");
+        const sceneOf = (t) => SC.scenes.find((s) => s.t0 <= t && t < s.t1) || SC.scenes.at(-1);
+        chunks.forEach((ws, k) => {
+          const row = document.createElement("div"); row.className = "capPill";
+          row.innerHTML = ws.map((w) => `<b>${w.w}</b>`).join("");
+          cap.appendChild(row);
+          const bs = [...row.querySelectorAll("b")];
+          const start = k === 0 ? 0 : ws[0].s - 0.1;
+          vis(row, start);
+          if (k) tl.fromTo(row, { scale: 0.94 }, { scale: 1, duration: 0.14, ease: "back.out(2)", immediateRender: false }, start);
+          ws.forEach((w, i) => { tl.set(bs[i], { color: "#f2b705" }, w.s); tl.set(bs[i], { color: "#ffffff" }, w.e + 0.02); });
+          // la siguiente entra justo cuando se apaga ésta: nunca dos a la vez
+          const next = chunks[k + 1], last = ws.at(-1).e, sc = sceneOf(ws[0].s);
+          const hideAt = Math.min(next ? next[0].s - 0.1 : Infinity, last + 1.2, sc.id === "cierre" ? Infinity : sc.t1 - 0.65);
+          if (hideAt < Infinity) hide(row, hideAt);
+        });
+
+        // ---- cortinillas: el glifo enorme sella el corte encima del lienzo WebGPU ----
+        const GLYPH = { www: "#gWww", mask: "#gMask" };
+        T.cuts.forEach((c) => {
+          const g = GLYPH[c.glyph];
+          vis(g, c.sealAt);
+          tl.fromTo(g, { scale: 0.3, rotation: -12, opacity: 1 }, { scale: 1, rotation: 0, duration: 0.3, ease: "back.out(1.8)", immediateRender: false }, c.sealAt);
+          tl.to(g, { scale: 1.8, opacity: 0, duration: 0.22, ease: "power2.in" }, c.c + 0.12);
+          hide(g, c.c + 0.36);
+        });
+
+        window.__timelines["main"] = tl;
+      };
+      document.fonts.ready.then(build);
+    </script>
+  </body>
+</html>

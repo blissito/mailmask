@@ -1,0 +1,68 @@
+[
+  {
+    "text": "Le",
+    "start": 0.03,
+    "end": 0.13,
+    "id": "w0"
+  },
+  {
+    "text": "das",
+    "start": 0.13,
+    "end": 0.33,
+    "id": "w1"
+  },
+  {
+    "text": "a",
+    "start": 0.33,
+    "end": 0.37,
+    "id": "w2"
+  },
+  {
+    "text": "aplicar",
+    "start": 0.43,
+    "end": 0.81,
+    "id": "w3"
+  },
+  {
+    "text": "y",
+    "start": 0.81,
+    "end": 0.95,
+    "id": "w4"
+  },
+  {
+    "text": "Mailmask",
+    "start": 0.95,
+    "end": 1.43,
+    "id": "w5"
+  },
+  {
+    "text": "escribe",
+    "start": 1.43,
+    "end": 1.84,
+    "id": "w6"
+  },
+  {
+    "text": "los",
+    "start": 1.94,
+    "end": 2.08,
+    "id": "w7"
+  },
+  {
+    "text": "registros",
+    "start": 2.09,
+    "end": 2.65,
+    "id": "w8"
+  },
+  {
+    "text": "por",
+    "start": 2.74,
+    "end": 2.87,
+    "id": "w9"
+  },
+  {
+    "text": "ti.",
+    "start": 2.97,
+    "end": 3.3,
+    "id": "w10"
+  }
+]

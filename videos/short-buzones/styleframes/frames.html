@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,600..800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  /* Style frames del short «Buzones» de MailMask. Piel del sitio público (crema + rojo de máscara,
+     dorado sólo en la máscara, Bricolage 800) con acabado de caricatura plana: contorno de tinta,
+     rellenos sólidos, sombra dura. Composición: dos columnas verticales que se comparan por altura. */
+  :root {
+    --bg: #faf6ee; --elev: #fffdf9; --inset: #f2ecdf; --line: #e4dccd;
+    --ink: #1c1917; --muted: #57534e; --subtle: #78716c;
+    --red: #d7263d; --red-dk: #a0182c; --gold: #f2b705; --ok: #10b981; --ok-dk: #047857;
+    --gray: #a8a29e; --hard: 8px 8px 0 var(--ink);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; font-family: "Inter", sans-serif; color: var(--ink); background: var(--bg); }
+  .f { position: absolute; inset: 0; display: none; overflow: hidden; background: var(--bg); }
+  .f.on { display: block; }
+  /* fondo: borde de correo aéreo arriba y abajo + rayado fino diagonal (nunca plano) */
+  .bgstripe { position: absolute; inset: 0; background-image: repeating-linear-gradient(-45deg, transparent 0 34px, var(--inset) 34px 40px); }
+  .airmail { position: absolute; left: 0; right: 0; height: 26px; background: repeating-linear-gradient(-45deg, var(--red) 0 30px, var(--elev) 30px 60px, #2b59c3 60px 90px, var(--elev) 90px 120px); }
+  .airmail.t { top: 0; } .airmail.b { bottom: 0; }
+  .abs { position: absolute; }
+  .hl { position: absolute; left: 70px; right: 70px; top: 262px; font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 86px; line-height: 1.0; letter-spacing: -.03em; font-variation-settings: "wdth" 92, "opsz" 72; }
+  .hl em { font-style: normal; color: var(--red); }
+  .eyebrow { font-family: "JetBrains Mono"; font-weight: 700; font-size: 26px; letter-spacing: .14em; text-transform: uppercase; color: var(--subtle); }
+
+  /* columnas de comparación */
+  .col { position: absolute; bottom: 700px; width: 400px; display: flex; flex-direction: column-reverse; align-items: center; gap: 0; }
+  .colhead { position: absolute; width: 400px; text-align: center; }
+  .colhead .name { font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 44px; }
+  .total { display: inline-block; font-family: "Bricolage Grotesque"; font-weight: 800; font-size: 76px; padding: 0 24px; border: 5px solid var(--ink); border-radius: 22px; box-shadow: var(--hard); transform: rotate(-3deg); }
+  .total.bad { background: var(--red); color: #fff; }
+  .total.good { background: var(--ok); color: #fff; transform: rotate(3deg); }
+  .total small { font-size: 36px; }
+
+  /* recibo: papel con dientes abajo */
+  .rcpt { position: relative; width: 360px; background: var(--elev); border: 4px solid var(--ink); border-bottom: none; padding: 16px 22px 10px; margin-bottom: 30px; box-shadow: 8px 0 0 var(--ink); }
+  .rcpt::after { content: ""; position: absolute; left: -4px; right: -4px; bottom: -22px; height: 22px;
+    background: linear-gradient(-45deg, transparent 15px, var(--ink) 15px 19px, transparent 19px) 0 0 / 22px 22px repeat-x,
+                linear-gradient(45deg, transparent 15px, var(--ink) 15px 19px, transparent 19px) 0 0 / 22px 22px repeat-x; }
+  .rcpt .row { display: flex; align-items: center; gap: 14px; font-size: 30px; font-weight: 600; }
+  .rcpt .row b { margin-left: auto; font-family: "JetBrains Mono"; font-size: 34px; }
+  .rcpt .dash { border-top: 3px dashed var(--line); margin: 8px 0 0; }
+  .rcpt.g { background: #f4f1ec; }
+  .rcpt.g .row b { color: var(--red); }
+  .rcpt.m { width: 380px; border-color: var(--ink); background: #fff; }
+  .rcpt.m .row b { color: var(--ok-dk); }
+  .av { flex: none; width: 54px; height: 54px; border-radius: 50%; border: 4px solid var(--ink); position: relative; overflow: hidden; }
+  .av::before { content: ""; position: absolute; left: 50%; top: 10px; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; background: var(--elev); border: 3px solid var(--ink); }
+  .av::after { content: ""; position: absolute; left: 50%; bottom: -16px; width: 38px; height: 30px; margin-left: -19px; border-radius: 50% 50% 0 0; background: var(--elev); border: 3px solid var(--ink); }
+  .c1 { background: #f9a8d4; } .c2 { background: #93c5fd; } .c3 { background: #fcd34d; } .c4 { background: #86efac; } .c5 { background: #c4b5fd; }
+  .env { flex: none; width: 50px; height: 36px; border: 4px solid var(--ink); border-radius: 6px; background: #fff; position: relative; }
+  .env::before { content: ""; position: absolute; left: 4px; top: -6px; width: 30px; height: 30px; border-right: 4px solid var(--ink); border-bottom: 4px solid var(--ink); transform: rotate(45deg) scaleY(.6); transform-origin: center; }
+  .floor { position: absolute; left: 60px; right: 60px; top: 1220px; height: 6px; background: var(--ink); border-radius: 3px; }
+
+  /* subtítulo karaoke: pastilla de tinta, una línea */
+  .sub { position: absolute; left: 60px; width: 860px; top: 1262px; height: 118px; background: var(--ink); border-radius: 26px; display: block; text-align: center; line-height: 118px; white-space: nowrap; font-weight: 800; font-size: 56px; letter-spacing: -.01em; color: #fff; box-shadow: 8px 8px 0 var(--red); }
+  .sub .now { color: var(--gold); } .sub .next { color: #8a827b; }
+
+  /* celular */
+  .phone { position: absolute; background: var(--ink); border-radius: 76px; padding: 18px; box-shadow: 14px 14px 0 var(--red); }
+  .screen { position: relative; width: 100%; height: 100%; background: #fff; border-radius: 60px; overflow: hidden; }
+  .island { position: absolute; left: 50%; top: 18px; width: 150px; height: 40px; margin-left: -75px; border-radius: 22px; background: var(--ink); }
+  .mailhdr { padding: 86px 34px 10px; }
+  .mailhdr .back { color: #0a7cff; font-size: 30px; font-weight: 600; }
+  .mailhdr h3 { font-size: 60px; font-weight: 800; letter-spacing: -.02em; margin-top: 8px; }
+  .mailhdr .acct { font-size: 26px; color: var(--subtle); font-family: "JetBrains Mono"; margin-top: 4px; }
+  .mrow { display: flex; gap: 16px; padding: 22px 34px; border-top: 2px solid #ece8e1; }
+  .mrow .dot { flex: none; width: 18px; height: 18px; border-radius: 50%; background: #0a7cff; margin-top: 10px; }
+  .mrow .dot.off { background: transparent; }
+  .mrow .who { font-weight: 800; font-size: 30px; display: flex; } .mrow .who span { margin-left: auto; font-weight: 500; font-size: 24px; color: var(--subtle); }
+  .mrow .subj { font-size: 27px; font-weight: 600; margin-top: 2px; }
+  .mrow .prev { font-size: 25px; color: var(--subtle); margin-top: 2px; }
+  .mrow.new { background: #fff6d6; }
+  .chip { position: absolute; display: inline-flex; align-items: center; gap: 12px; background: var(--elev); border: 4px solid var(--ink); border-radius: 999px; padding: 10px 26px; font-weight: 800; font-size: 34px; box-shadow: 6px 6px 0 var(--ink); }
+
+  /* sobre grande que vuela */
+  .bigenv { position: absolute; }
+
+  /* direcciones */
+  .addr { position: absolute; display: flex; align-items: center; gap: 18px; background: var(--elev); border: 4px solid var(--ink); border-radius: 22px; padding: 16px 26px; font-family: "JetBrains Mono"; font-weight: 700; font-size: 38px; box-shadow: var(--hard); white-space: nowrap; }
+  .addr i { font-style: normal; color: var(--red); }
+  .gauge { position: absolute; }
+
+  .cta { position: absolute; display: inline-flex; align-items: center; gap: 18px; background: var(--red); color: #fff; border: 5px solid var(--ink); border-radius: 999px; padding: 22px 44px; font-weight: 800; font-size: 50px; box-shadow: var(--hard); }
+  .stamp { position: absolute; font-family: "Bricolage Grotesque"; font-weight: 800; color: var(--red); border: 7px solid var(--red); border-radius: 18px; padding: 4px 22px; font-size: 64px; transform: rotate(-12deg); background: rgba(250,246,238,.9); }
+</style>
+</head>
+<body>
+
+<!-- máscara oficial (favicon.svg), reutilizada -->
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="mask" viewBox="0 0 80 80">
+    <ellipse cx="40" cy="42" rx="28" ry="24" fill="#a0182c"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="#d7263d"/>
+    <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/>
+    <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/>
+    <circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
+    <circle cx="30.2" cy="34.9" r="1.9" fill="#fff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#fff"/>
+    <circle cx="26.7" cy="38.9" r="1.15" fill="#fff" opacity=".85"/><circle cx="50.7" cy="38.9" r="1.15" fill="#fff" opacity=".85"/>
+    <path d="M40 18 L40 26" stroke="#f2b705" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="#f2b705" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="envelope" viewBox="0 0 200 140">
+    <rect x="6" y="6" width="188" height="128" rx="14" fill="#fff" stroke="#1c1917" stroke-width="10"/>
+    <path d="M10 14 L100 84 L190 14" fill="none" stroke="#1c1917" stroke-width="10" stroke-linejoin="round"/>
+  </symbol>
+</svg>
+
+<!-- SF1 · 0 s: el gancho. Dos columnas, la altura es el precio. -->
+<section class="f" id="f1">
+  <div class="bgstripe"></div><div class="airmail t"></div>
+  <div class="hl">Correo para <em>5 personas</em>.<br>¿Cuánto pagas?</div>
+
+  <div class="colhead" style="left:60px; top:470px"><div class="total bad">$975<small>/mes</small></div></div>
+  <div class="col" style="left:60px">
+    <div class="rcpt g"><div class="row"><span class="av c1"></span>Ana<b>$195</b></div><div class="dash"></div></div>
+    <div class="rcpt g"><div class="row"><span class="av c2"></span>Beto<b>$195</b></div><div class="dash"></div></div>
+    <div class="rcpt g"><div class="row"><span class="av c3"></span>Caro<b>$195</b></div><div class="dash"></div></div>
+    <div class="rcpt g"><div class="row"><span class="av c4"></span>Dani<b>$195</b></div><div class="dash"></div></div>
+    <div class="rcpt g"><div class="row"><span class="av c5"></span>Eli<b>$195</b></div><div class="dash"></div></div>
+  </div>
+  <div class="colhead eyebrow" style="left:60px; top:1236px">Google Workspace</div>
+
+  <div class="colhead" style="left:520px; top:910px"><div class="total good">$99<small>/mes</small></div></div>
+  <div class="col" style="left:520px">
+    <div class="rcpt m">
+      <div class="row"><svg width="64" height="64"><use href="#mask"/></svg>5 buzones<b>$99</b></div>
+      <div class="row" style="gap:10px; margin-top:10px"><svg width="54" height="38"><use href="#envelope"/></svg><svg width="54" height="38"><use href="#envelope"/></svg><svg width="54" height="38"><use href="#envelope"/></svg><svg width="54" height="38"><use href="#envelope"/></svg><svg width="54" height="38"><use href="#envelope"/></svg></div>
+      <div class="dash"></div>
+    </div>
+  </div>
+  <div class="colhead eyebrow" style="left:520px; top:1236px">MailMask</div>
+  <div class="floor"></div>
+  <div class="sub" style="top:1300px">Google te cobra <span class="now">cinco</span> <span class="next">veces</span></div>
+  <div class="airmail b"></div>
+</section>
+
+<!-- SF2 · 8 s: el buzón llega al Mail nativo -->
+<section class="f" id="f2">
+  <div class="bgstripe"></div><div class="airmail t"></div>
+  <div class="hl" style="font-size:80px">Tu buzón,<br>con <em>tu dominio</em>.</div>
+  <div class="phone" style="left:70px; top:500px; width:540px; height:700px; transform: rotate(-4deg)">
+    <div class="screen">
+      <div class="island"></div>
+      <div class="mailhdr"><div class="back">‹ Buzones</div><h3>Entrada</h3><div class="acct">ana@tunegocio.com</div></div>
+      <div class="mrow new"><span class="dot"></span><div style="flex:1"><div class="who">Cliente nuevo<span>ahora</span></div><div class="subj">Cotización para el lunes</div><div class="prev">Hola Ana, ¿me compartes…</div></div></div>
+      <div class="mrow"><span class="dot off"></span><div style="flex:1"><div class="who">Proveedor<span>9:41</span></div><div class="subj">Factura de octubre</div><div class="prev">Te adjunto el PDF…</div></div></div>
+      <div class="mrow"><span class="dot off"></span><div style="flex:1"><div class="who">Beto<span>ayer</span></div><div class="subj">Junta del jueves</div><div class="prev">¿Nos vemos a las 10?</div></div></div>
+    </div>
+  </div>
+  <svg class="bigenv" style="left:660px; top:500px; transform: rotate(14deg)" width="230" height="161"><use href="#envelope"/></svg>
+  <div class="chip" style="left:660px; top:740px; transform: rotate(4deg)">Apple Mail</div>
+  <div class="chip" style="left:680px; top:850px; transform: rotate(-3deg)">Outlook</div>
+  <div class="chip" style="left:665px; top:960px; transform: rotate(3deg)">iPhone</div>
+  <div class="sub">cada quien su <span class="now">buzón</span></div>
+  <div class="airmail b"></div>
+</section>
+
+<!-- SF3 · 14 s: direcciones que se multiplican; agregar a alguien cuesta $0 -->
+<section class="f" id="f3">
+  <div class="bgstripe"></div><div class="airmail t"></div>
+  <div class="hl">Buzones <em>ilimitados</em>.<br>Suma a quien quieras.</div>
+  <div class="addr" style="left:70px; top:520px; transform: rotate(-2deg)"><svg width="46" height="32"><use href="#envelope"/></svg>ana<i>@</i>tunegocio.com</div>
+  <div class="addr" style="left:110px; top:640px; transform: rotate(2deg)"><svg width="46" height="32"><use href="#envelope"/></svg>beto<i>@</i>tunegocio.com</div>
+  <div class="addr" style="left:60px; top:760px; transform: rotate(-1deg)"><svg width="46" height="32"><use href="#envelope"/></svg>ventas<i>@</i>tunegocio.com</div>
+  <div class="addr" style="left:130px; top:880px; transform: rotate(3deg)"><svg width="46" height="32"><use href="#envelope"/></svg>hola<i>@</i>tunegocio.com</div>
+  <div class="addr" style="left:80px; top:1000px; transform: rotate(-2deg)"><svg width="46" height="32"><use href="#envelope"/></svg>facturas<i>@</i>tunegocio.com</div>
+  <div class="addr" style="left:150px; top:1120px; transform: rotate(1deg); opacity:.55">…<i>@</i>tunegocio.com</div>
+  <!-- etiqueta de precio colgando: sumar una persona = $0 -->
+  <svg class="gauge" style="left:730px; top:470px; transform: rotate(10deg)" width="190" height="250" viewBox="0 0 190 250">
+    <path d="M95 0 V40" stroke="#1c1917" stroke-width="6"/>
+    <path d="M20 70 L95 40 L170 70 V230 Q170 244 156 244 H34 Q20 244 20 230 Z" fill="#10b981" stroke="#1c1917" stroke-width="8" stroke-linejoin="round"/>
+    <circle cx="95" cy="70" r="12" fill="#faf6ee" stroke="#1c1917" stroke-width="6"/>
+    <text x="95" y="150" text-anchor="middle" font-family="Bricolage Grotesque" font-weight="800" font-size="52" fill="#fff">+1</text>
+    <text x="95" y="215" text-anchor="middle" font-family="Bricolage Grotesque" font-weight="800" font-size="58" fill="#fff">$0</text>
+  </svg>
+  <div class="sub">buzones <span class="now">ilimitados</span></div>
+  <div class="airmail b"></div>
+</section>
+
+<!-- SF4 · 22 s: cierre circular + CTA (todo dentro de y 240–1400) -->
+<section class="f" id="f4">
+  <div class="bgstripe"></div><div class="airmail t"></div>
+  <div class="hl" style="font-size:78px">5 personas, 5 buzones,<br><em>un solo precio</em>.</div>
+  <!-- la pila de Google se derrumba en el suelo -->
+  <div class="rcpt g" style="position:absolute; left:20px; top:1150px; width:300px; transform: rotate(-9deg); opacity:.55"><div class="row"><span class="av c1"></span>Ana<b>$195</b></div></div>
+  <div class="rcpt g" style="position:absolute; left:60px; top:1120px; width:300px; transform: rotate(6deg); opacity:.55"><div class="row"><span class="av c3"></span>Caro<b>$195</b></div></div>
+  <!-- las 5 personas, cada una con su sobre -->
+  <div class="abs" style="left:250px; top:520px; display:flex; gap:22px">
+    <div style="text-align:center"><span class="av c1" style="display:block; width:100px; height:100px"></span><svg width="80" height="56" style="margin-top:10px"><use href="#envelope"/></svg></div>
+    <div style="text-align:center"><span class="av c2" style="display:block; width:100px; height:100px"></span><svg width="80" height="56" style="margin-top:10px"><use href="#envelope"/></svg></div>
+    <div style="text-align:center"><span class="av c3" style="display:block; width:100px; height:100px"></span><svg width="80" height="56" style="margin-top:10px"><use href="#envelope"/></svg></div>
+    <div style="text-align:center"><span class="av c4" style="display:block; width:100px; height:100px"></span><svg width="80" height="56" style="margin-top:10px"><use href="#envelope"/></svg></div>
+    <div style="text-align:center"><span class="av c5" style="display:block; width:100px; height:100px"></span><svg width="80" height="56" style="margin-top:10px"><use href="#envelope"/></svg></div>
+  </div>
+  <div class="rcpt m" style="position:absolute; left:250px; top:730px; width:560px; transform: rotate(-2deg)">
+    <div class="row" style="font-size:40px"><svg width="90" height="90"><use href="#mask"/></svg>MailMask<b style="font-size:56px">$99</b></div>
+    <div class="row" style="font-size:28px; color:var(--muted); font-weight:600">al mes · por dominio</div>
+    <div class="dash"></div>
+  </div>
+  <div class="cta" style="left:140px; top:990px">Actívalo en mailmask.studio</div>
+  <div class="stamp" style="left:70px; top:800px; font-size:52px">−90%</div>
+  <div class="sub"><span class="now">noventa y nueve</span> <span class="next">pesos al mes</span></div>
+  <div class="airmail b"></div>
+</section>
+
+<script>
+  const n = new URLSearchParams(location.search).get("f") || "1";
+  document.getElementById("f" + n).classList.add("on");
+</script>
+</body>
+</html>

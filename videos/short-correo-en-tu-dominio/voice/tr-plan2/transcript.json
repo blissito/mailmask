@@ -1,0 +1,200 @@
+[
+  {
+    "text": "Cambias",
+    "start": 0.03,
+    "end": 0.32,
+    "id": "w0"
+  },
+  {
+    "text": "tus",
+    "start": 0.42,
+    "end": 0.52,
+    "id": "w1"
+  },
+  {
+    "text": "nameservers",
+    "start": 0.57,
+    "end": 1.17,
+    "id": "w2"
+  },
+  {
+    "text": "a",
+    "start": 1.17,
+    "end": 1.21,
+    "id": "w3"
+  },
+  {
+    "text": "los",
+    "start": 1.22,
+    "end": 1.39,
+    "id": "w4"
+  },
+  {
+    "text": "de",
+    "start": 1.39,
+    "end": 1.48,
+    "id": "w5"
+  },
+  {
+    "text": "Mailmask.",
+    "start": 1.55,
+    "end": 2.18,
+    "id": "w6"
+  },
+  {
+    "text": "Ahora",
+    "start": 2.63,
+    "end": 2.68,
+    "id": "w7"
+  },
+  {
+    "text": "el",
+    "start": 2.68,
+    "end": 2.82,
+    "id": "w8"
+  },
+  {
+    "text": "asistente",
+    "start": 2.82,
+    "end": 3.47,
+    "id": "w9"
+  },
+  {
+    "text": "de",
+    "start": 3.47,
+    "end": 3.61,
+    "id": "w10"
+  },
+  {
+    "text": "IA",
+    "start": 3.61,
+    "end": 3.75,
+    "id": "w11"
+  },
+  {
+    "text": "configura",
+    "start": 3.75,
+    "end": 4.41,
+    "id": "w12"
+  },
+  {
+    "text": "tus",
+    "start": 4.41,
+    "end": 4.63,
+    "id": "w13"
+  },
+  {
+    "text": "registros",
+    "start": 4.63,
+    "end": 5.29,
+    "id": "w14"
+  },
+  {
+    "text": "DNS",
+    "start": 5.29,
+    "end": 5.5,
+    "id": "w15"
+  },
+  {
+    "text": "por",
+    "start": 5.5,
+    "end": 5.78,
+    "id": "w16"
+  },
+  {
+    "text": "ti,",
+    "start": 5.78,
+    "end": 5.98,
+    "id": "w17"
+  },
+  {
+    "text": "da",
+    "start": 5.98,
+    "end": 6.155,
+    "id": "w18"
+  },
+  {
+    "text": "de",
+    "start": 6.155,
+    "end": 6.33,
+    "id": "w19"
+  },
+  {
+    "text": "alta",
+    "start": 6.33,
+    "end": 6.55,
+    "id": "w20"
+  },
+  {
+    "text": "tus",
+    "start": 6.55,
+    "end": 6.77,
+    "id": "w21"
+  },
+  {
+    "text": "correos",
+    "start": 6.77,
+    "end": 7.28,
+    "id": "w22"
+  },
+  {
+    "text": "nuevos",
+    "start": 7.28,
+    "end": 7.76,
+    "id": "w23"
+  },
+  {
+    "text": "y",
+    "start": 7.76,
+    "end": 7.78,
+    "id": "w24"
+  },
+  {
+    "text": "hasta",
+    "start": 7.85,
+    "end": 8.19,
+    "id": "w25"
+  },
+  {
+    "text": "publica",
+    "start": 8.19,
+    "end": 8.67,
+    "id": "w26"
+  },
+  {
+    "text": "tu",
+    "start": 8.78,
+    "end": 8.82,
+    "id": "w27"
+  },
+  {
+    "text": "landing",
+    "start": 8.93,
+    "end": 9.33,
+    "id": "w28"
+  },
+  {
+    "text": "page",
+    "start": 9.33,
+    "end": 9.64,
+    "id": "w29"
+  },
+  {
+    "text": "en",
+    "start": 9.64,
+    "end": 9.74,
+    "id": "w30"
+  },
+  {
+    "text": "un",
+    "start": 9.74,
+    "end": 9.84,
+    "id": "w31"
+  },
+  {
+    "text": "subdominio.",
+    "start": 9.84,
+    "end": 10.56,
+    "id": "w32"
+  }
+]

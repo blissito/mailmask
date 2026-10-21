@@ -1,0 +1,44 @@
+[
+  {
+    "text": "Cinco",
+    "start": 0.06,
+    "end": 0.32,
+    "id": "w0"
+  },
+  {
+    "text": "personas,",
+    "start": 0.39,
+    "end": 0.89,
+    "id": "w1"
+  },
+  {
+    "text": "cinco",
+    "start": 1.03,
+    "end": 1.35,
+    "id": "w2"
+  },
+  {
+    "text": "buzones,",
+    "start": 1.35,
+    "end": 1.94,
+    "id": "w3"
+  },
+  {
+    "text": "un",
+    "start": 1.94,
+    "end": 2.03,
+    "id": "w4"
+  },
+  {
+    "text": "solo",
+    "start": 2.07,
+    "end": 2.33,
+    "id": "w5"
+  },
+  {
+    "text": "precio.",
+    "start": 2.42,
+    "end": 2.84,
+    "id": "w6"
+  }
+]

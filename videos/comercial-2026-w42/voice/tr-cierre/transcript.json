@@ -1,0 +1,44 @@
+[
+  {
+    "text": "Correo",
+    "start": 0.06,
+    "end": 0.38,
+    "id": "w0"
+  },
+  {
+    "text": "y",
+    "start": 0.38,
+    "end": 0.44,
+    "id": "w1"
+  },
+  {
+    "text": "página",
+    "start": 0.44,
+    "end": 0.83,
+    "id": "w2"
+  },
+  {
+    "text": "en",
+    "start": 0.83,
+    "end": 0.96,
+    "id": "w3"
+  },
+  {
+    "text": "la",
+    "start": 0.96,
+    "end": 1.03,
+    "id": "w4"
+  },
+  {
+    "text": "misma",
+    "start": 1.16,
+    "end": 1.42,
+    "id": "w5"
+  },
+  {
+    "text": "dirección.",
+    "start": 1.42,
+    "end": 2.25,
+    "id": "w6"
+  }
+]

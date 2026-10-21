@@ -1,0 +1,38 @@
+[
+  {
+    "text": "Crea",
+    "start": 0.04,
+    "end": 0.26,
+    "id": "w0"
+  },
+  {
+    "text": "tu",
+    "start": 0.35,
+    "end": 0.4,
+    "id": "w1"
+  },
+  {
+    "text": "correo",
+    "start": 0.49,
+    "end": 0.8,
+    "id": "w2"
+  },
+  {
+    "text": "gratis",
+    "start": 0.86,
+    "end": 1.26,
+    "id": "w3"
+  },
+  {
+    "text": "en",
+    "start": 1.26,
+    "end": 1.4,
+    "id": "w4"
+  },
+  {
+    "text": "mailmask.studio.",
+    "start": 1.4,
+    "end": 2.84,
+    "id": "w5"
+  }
+]

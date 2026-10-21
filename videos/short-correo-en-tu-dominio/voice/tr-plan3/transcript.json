@@ -1,0 +1,50 @@
+[
+  {
+    "text": "y",
+    "start": 0.05,
+    "end": 0.07,
+    "id": "w0"
+  },
+  {
+    "text": "creas",
+    "start": 0.07,
+    "end": 0.41,
+    "id": "w1"
+  },
+  {
+    "text": "hola",
+    "start": 0.42,
+    "end": 0.7,
+    "id": "w2"
+  },
+  {
+    "text": "arroba",
+    "start": 0.7,
+    "end": 1.12,
+    "id": "w3"
+  },
+  {
+    "text": "tu",
+    "start": 1.12,
+    "end": 1.26,
+    "id": "w4"
+  },
+  {
+    "text": "estudio",
+    "start": 1.26,
+    "end": 1.73,
+    "id": "w5"
+  },
+  {
+    "text": "punto",
+    "start": 1.82,
+    "end": 2.1,
+    "id": "w6"
+  },
+  {
+    "text": "MX.",
+    "start": 2.1,
+    "end": 2.38,
+    "id": "w7"
+  }
+]

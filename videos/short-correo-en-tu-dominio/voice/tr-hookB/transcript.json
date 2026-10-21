@@ -1,0 +1,38 @@
+[
+  {
+    "text": "pero",
+    "start": 0.03,
+    "end": 0.16,
+    "id": "w0"
+  },
+  {
+    "text": "tus",
+    "start": 0.24,
+    "end": 0.42,
+    "id": "w1"
+  },
+  {
+    "text": "cotizaciones",
+    "start": 0.42,
+    "end": 1.14,
+    "id": "w2"
+  },
+  {
+    "text": "salen",
+    "start": 1.14,
+    "end": 1.46,
+    "id": "w3"
+  },
+  {
+    "text": "desde",
+    "start": 1.46,
+    "end": 1.91,
+    "id": "w4"
+  },
+  {
+    "text": "gmail.com.",
+    "start": 1.91,
+    "end": 2.9,
+    "id": "w5"
+  }
+]

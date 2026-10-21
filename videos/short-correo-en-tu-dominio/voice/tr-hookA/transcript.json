@@ -1,0 +1,26 @@
+[
+  {
+    "text": "Tu",
+    "start": 0.05,
+    "end": 0.12,
+    "id": "w0"
+  },
+  {
+    "text": "tarjeta",
+    "start": 0.18,
+    "end": 0.77,
+    "id": "w1"
+  },
+  {
+    "text": "dice",
+    "start": 0.77,
+    "end": 1.12,
+    "id": "w2"
+  },
+  {
+    "text": "tuestudio.mx.",
+    "start": 1.12,
+    "end": 2.42,
+    "id": "w3"
+  }
+]

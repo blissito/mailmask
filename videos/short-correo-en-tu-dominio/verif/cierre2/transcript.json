@@ -1,0 +1,122 @@
+[
+  {
+    "text": "Tu",
+    "start": 0.04,
+    "end": 0.18,
+    "id": "w0"
+  },
+  {
+    "text": "tarjeta",
+    "start": 0.18,
+    "end": 0.83,
+    "id": "w1"
+  },
+  {
+    "text": "y",
+    "start": 0.83,
+    "end": 0.89,
+    "id": "w2"
+  },
+  {
+    "text": "tu",
+    "start": 0.98,
+    "end": 1.1,
+    "id": "w3"
+  },
+  {
+    "text": "correo",
+    "start": 1.1,
+    "end": 1.7,
+    "id": "w4"
+  },
+  {
+    "text": "ya",
+    "start": 1.7,
+    "end": 1.86,
+    "id": "w5"
+  },
+  {
+    "text": "dicen",
+    "start": 1.86,
+    "end": 2.31,
+    "id": "w6"
+  },
+  {
+    "text": "tuestudio.mx",
+    "start": 2.31,
+    "end": 3.58,
+    "id": "w7"
+  },
+  {
+    "text": "y",
+    "start": 3.58,
+    "end": 3.62,
+    "id": "w8"
+  },
+  {
+    "text": "un",
+    "start": 3.64,
+    "end": 3.77,
+    "id": "w9"
+  },
+  {
+    "text": "agente",
+    "start": 3.79,
+    "end": 4.16,
+    "id": "w10"
+  },
+  {
+    "text": "administra",
+    "start": 4.16,
+    "end": 4.82,
+    "id": "w11"
+  },
+  {
+    "text": "tu",
+    "start": 4.82,
+    "end": 4.94,
+    "id": "w12"
+  },
+  {
+    "text": "dominio.",
+    "start": 4.95,
+    "end": 5.65,
+    "id": "w13"
+  },
+  {
+    "text": "Crea",
+    "start": 5.98,
+    "end": 5.99,
+    "id": "w14"
+  },
+  {
+    "text": "tu",
+    "start": 6.02,
+    "end": 6.16,
+    "id": "w15"
+  },
+  {
+    "text": "correo",
+    "start": 6.16,
+    "end": 6.66,
+    "id": "w16"
+  },
+  {
+    "text": "gratis",
+    "start": 6.67,
+    "end": 7.12,
+    "id": "w17"
+  },
+  {
+    "text": "en",
+    "start": 7.2,
+    "end": 7.25,
+    "id": "w18"
+  },
+  {
+    "text": "mailmask.studio.",
+    "start": 7.34,
+    "end": 8.8,
+    "id": "w19"
+  }
+]

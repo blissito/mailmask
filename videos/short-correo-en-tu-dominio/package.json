@@ -1,0 +1,2 @@
+{ "name": "mailmask-short-correo-en-tu-dominio", "private": true, "type": "module",
+  "scripts": { "score": "node score.mjs", "render": "npx --yes hyperframes@0.8.145 render --experimental-fast-capture=false" } }

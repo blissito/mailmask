@@ -1,0 +1,44 @@
+[
+  {
+    "text": "Correo",
+    "start": 0.06,
+    "end": 0.39,
+    "id": "w0"
+  },
+  {
+    "text": "para",
+    "start": 0.39,
+    "end": 0.62,
+    "id": "w1"
+  },
+  {
+    "text": "5",
+    "start": 0.68,
+    "end": 0.86,
+    "id": "w2"
+  },
+  {
+    "text": "personas",
+    "start": 0.86,
+    "end": 1.41,
+    "id": "w3"
+  },
+  {
+    "text": "en",
+    "start": 1.41,
+    "end": 1.53,
+    "id": "w4"
+  },
+  {
+    "text": "tu",
+    "start": 1.53,
+    "end": 1.67,
+    "id": "w5"
+  },
+  {
+    "text": "negocio.",
+    "start": 1.67,
+    "end": 2.4,
+    "id": "w6"
+  }
+]

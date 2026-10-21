@@ -1,0 +1,44 @@
+[
+  {
+    "text": "Tu",
+    "start": 0.03,
+    "end": 0.11,
+    "id": "w0"
+  },
+  {
+    "text": "correo",
+    "start": 0.21,
+    "end": 0.57,
+    "id": "w1"
+  },
+  {
+    "text": "ya",
+    "start": 0.57,
+    "end": 0.71,
+    "id": "w2"
+  },
+  {
+    "text": "llega",
+    "start": 0.71,
+    "end": 1.07,
+    "id": "w3"
+  },
+  {
+    "text": "a",
+    "start": 1.07,
+    "end": 1.13,
+    "id": "w4"
+  },
+  {
+    "text": "tu",
+    "start": 1.2,
+    "end": 1.28,
+    "id": "w5"
+  },
+  {
+    "text": "dominio.",
+    "start": 1.28,
+    "end": 1.96,
+    "id": "w6"
+  }
+]

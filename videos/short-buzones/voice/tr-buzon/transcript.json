@@ -1,0 +1,104 @@
+[
+  {
+    "text": "Con",
+    "start": 0.05,
+    "end": 0.18,
+    "id": "w0"
+  },
+  {
+    "text": "Mailmask",
+    "start": 0.18,
+    "end": 0.66,
+    "id": "w1"
+  },
+  {
+    "text": "cada",
+    "start": 0.84,
+    "end": 0.92,
+    "id": "w2"
+  },
+  {
+    "text": "quien",
+    "start": 0.92,
+    "end": 1.23,
+    "id": "w3"
+  },
+  {
+    "text": "tiene",
+    "start": 1.23,
+    "end": 1.54,
+    "id": "w4"
+  },
+  {
+    "text": "su",
+    "start": 1.54,
+    "end": 1.66,
+    "id": "w5"
+  },
+  {
+    "text": "buzón",
+    "start": 1.66,
+    "end": 2,
+    "id": "w6"
+  },
+  {
+    "text": "con",
+    "start": 2,
+    "end": 2.21,
+    "id": "w7"
+  },
+  {
+    "text": "tu",
+    "start": 2.3,
+    "end": 2.36,
+    "id": "w8"
+  },
+  {
+    "text": "dominio,",
+    "start": 2.36,
+    "end": 2.99,
+    "id": "w9"
+  },
+  {
+    "text": "en",
+    "start": 3.12,
+    "end": 3.13,
+    "id": "w10"
+  },
+  {
+    "text": "Apple",
+    "start": 3.13,
+    "end": 3.45,
+    "id": "w11"
+  },
+  {
+    "text": "Mail,",
+    "start": 3.45,
+    "end": 3.82,
+    "id": "w12"
+  },
+  {
+    "text": "Outlook",
+    "start": 3.83,
+    "end": 4.19,
+    "id": "w13"
+  },
+  {
+    "text": "o",
+    "start": 4.3,
+    "end": 4.33,
+    "id": "w14"
+  },
+  {
+    "text": "el",
+    "start": 4.33,
+    "end": 4.41,
+    "id": "w15"
+  },
+  {
+    "text": "teléfono.",
+    "start": 4.5,
+    "end": 5.21,
+    "id": "w16"
+  }
+]

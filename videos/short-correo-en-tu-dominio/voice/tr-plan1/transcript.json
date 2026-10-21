@@ -1,0 +1,32 @@
+[
+  {
+    "text": "Escribes",
+    "start": 0.03,
+    "end": 0.52,
+    "id": "w0"
+  },
+  {
+    "text": "tu",
+    "start": 0.63,
+    "end": 0.76,
+    "id": "w1"
+  },
+  {
+    "text": "dominio",
+    "start": 0.76,
+    "end": 1.28,
+    "id": "w2"
+  },
+  {
+    "text": "en",
+    "start": 1.35,
+    "end": 1.45,
+    "id": "w3"
+  },
+  {
+    "text": "Mailmask.",
+    "start": 1.45,
+    "end": 2.14,
+    "id": "w4"
+  }
+]
