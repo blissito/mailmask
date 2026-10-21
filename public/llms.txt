@@ -155,6 +155,8 @@ dominio por API o SMTP.
   Registra tu dominio nuevo o trae el que ya tienes: revisamos los requisitos antes de cobrar, el DNS sólo se mueve con tu visto bueno y tu correo queda andando.
 - Alternativa a Google Workspace: https://www.mailmask.studio/alternativa-google-workspace
   Google Workspace cobra una licencia por cada persona; en MailMask pagas $99 MXN al mes por dominio, con las personas que sean. La comparativa, citada.
+- Correo en el dominio que ya tienes: https://www.mailmask.studio/correo-en-tu-dominio
+  Tu web ya vive en tu dominio y tu correo puede vivir ahí también: crea hola@tudominio gratis, sin tarjeta y sin mover tu página. Listo en unos minutos.
 - Documentación (Skills, SDK, CLI, API REST, SMTP y MCP): https://www.mailmask.studio/docs
 - Blog: https://www.mailmask.studio/blog
 - Términos: https://www.mailmask.studio/terms

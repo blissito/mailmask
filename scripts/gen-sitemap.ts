@@ -30,6 +30,7 @@ const paginas: { ruta: string; archivo: string; freq: string; prio: string }[] =
   { ruta: "/bandeja-compartida", archivo: "bandeja-compartida.html", freq: "monthly", prio: "0.8" },
   { ruta: "/dominios", archivo: "dominios.html", freq: "monthly", prio: "0.8" },
   { ruta: "/alternativa-google-workspace", archivo: "alternativa-google-workspace.html", freq: "monthly", prio: "0.8" },
+  { ruta: "/correo-en-tu-dominio", archivo: "correo-en-tu-dominio.html", freq: "monthly", prio: "0.8" },
   { ruta: "/docs", archivo: "docs.html", freq: "weekly", prio: "0.9" },
   { ruta: "/blog", archivo: "blog/index.html", freq: "weekly", prio: "0.8" },
   { ruta: "/register", archivo: "register.html", freq: "monthly", prio: "0.6" },

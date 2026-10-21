@@ -72,6 +72,7 @@ test("Enlaces incluye las landings públicas, cada una con su descripción", () 
     ["Bandeja compartida", "https://www.mailmask.studio/bandeja-compartida"],
     ["Dominios (registrar o transferir)", "https://www.mailmask.studio/dominios"],
     ["Alternativa a Google Workspace", "https://www.mailmask.studio/alternativa-google-workspace"],
+    ["Correo en el dominio que ya tienes", "https://www.mailmask.studio/correo-en-tu-dominio"],
   ];
   for (const [etiqueta, url] of landings) {
     const i = lineas.indexOf(`- ${etiqueta}: ${url}`);
@@ -83,7 +84,7 @@ test("Enlaces incluye las landings públicas, cada una con su descripción", () 
 test("la descripción de cada landing en Enlaces es la de su página", () => {
   const enlaces = llms.split("## Enlaces")[1]?.split(/\n## /)[0] ?? "";
   const lineas = enlaces.split("\n");
-  for (const slug of ["bandeja-compartida", "dominios", "alternativa-google-workspace"]) {
+  for (const slug of ["bandeja-compartida", "dominios", "alternativa-google-workspace", "correo-en-tu-dominio"]) {
     const html = readFileSync(new URL(`./public/${slug}.html`, import.meta.url), "utf8");
     const meta = html.match(/<meta\s+name="description"\s+content="([^"]+)"/);
     assert.ok(meta, `public/${slug}.html no trae meta description`);
