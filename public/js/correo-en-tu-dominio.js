@@ -143,7 +143,10 @@ document.documentElement.classList.add("js-anim");
       video.muted = !on;
       if (on) { video.currentTime = 0; video.play(); }
       btn.setAttribute("aria-pressed", on ? "true" : "false");
-      btn.textContent = on ? "Silenciar" : "Activar sonido";
+      btn.querySelector("span").textContent = on ? "Silenciar" : "Activar sonido";
+      btn.querySelector("svg").innerHTML = on
+        ? '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19.5 5.5a9 9 0 0 1 0 13"/>'
+        : '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/>';
     });
   }
 
