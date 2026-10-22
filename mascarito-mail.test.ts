@@ -7,10 +7,12 @@ import assert from "node:assert/strict";
 type Sent = { from: string; to: string; subject: string; text: string; opts: Record<string, unknown> };
 const sent: Sent[] = [];
 let ghostyCalls = 0;
+let lastTurn: Record<string, unknown> = {};
 let ghostyReply = '{"template":"pricing","firstName":"Ana"}';
 
-const fakeGhosty = (async () => {
+const fakeGhosty = (async (_url: string, init: RequestInit) => {
   ghostyCalls++;
+  lastTurn = JSON.parse(String(init.body));
   const frame = `data: ${JSON.stringify({ type: "done", value: ghostyReply })}\n\n`;
   return new Response(new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(frame)); c.close(); } }),
     { headers: { "content-type": "text/event-stream" } });
@@ -27,7 +29,7 @@ describe("Mascarito IA contesta su correo", () => {
   before(async () => {
     process.env.GHOSTY_PARTNER_KEY = "gpk_test";
     process.env.GHOSTY_PARTNER_SECRET = "gps_secret";
-    process.env.GHOSTY_MAIL_AGENT_ID = "mail-agent";
+    process.env.GHOSTY_AGENT_ID = "mask-agent";
     process.env.GHOSTY_BASE_URL = "https://ghosty.test";
     const realSes = await import("./ses.ts");
     mock.module("./ses.ts", { namedExports: {
@@ -101,6 +103,9 @@ describe("Mascarito IA contesta su correo", () => {
     assert.match(last.text, /no una persona/);
     assert.deepEqual(last.opts.extraHeaders, { "Auto-Submitted": "auto-replied", "X-Auto-Response-Suppress": "All" });
     assert.equal(last.opts.inReplyTo, "<in@gmail.com>");
+    // es Mask (el agente del panel) con las instrucciones del canal y sin un token que abra su MCP
+    assert.equal(lastTurn.appendSystemPrompt, mm.MAIL_INSTRUCTIONS);
+    assert.ok(!String(lastTurn.turnToken).startsWith("mt_"));
   });
 
   it("un id fuera del enum se vuelve traspaso: asigna al dueño y deja nota", async () => {

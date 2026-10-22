@@ -1090,8 +1090,8 @@ tiene agente**, así que a ella sólo se le dice que aparece al activar el domin
 - [ ] Mascarito dentro de `/bandeja` (hoy el dock sólo vive en `/app`).
 - [x] Avatar de Mascarito en la lista de la Bandeja (`bandeja.js`, 22-oct).
 - [x] Contesta su correo (22-oct): `processInbound` → `answerMascaritoMail` (`mascarito-mail.ts`). Puertas sin modelo
-  (DMARC, autorespondedores, listas, supresión, 1 cada 4 días por remitente, 200/día), agente de Ghosty **sin MCP**
-  (`GHOSTY_MAIL_AGENT_ID`, prompt `ghosty/mascarito-correo.md`) que sólo elige plantilla, y plantillas fijas
+  (DMARC, autorespondedores, listas, supresión, 1 cada 4 días por remitente, 200/día), el mismo agente del panel
+  (Mascarito, `GHOSTY_AGENT_ID`) con `MAIL_INSTRUCTIONS` y un `turnToken` que su MCP rechaza, que sólo elige plantilla, y plantillas fijas
   (`mascarito-templates.ts`). Traspaso → asignado al dueño + nota. Reglas y fuentes: `docs/agents/mascarito-correo-seguridad.md`.
 
 ### Apps conectadas (OAuth)

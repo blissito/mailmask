@@ -3,6 +3,6 @@
  * no se desincronice entre el dock, el trigger de la cabecera y los botones de
  * "Pídeselo al asistente".
  */
-export const ASSISTANT_NAME = "Mask"
+export const ASSISTANT_NAME = "Mascarito"
 /** La máscara de la marca (la misma del favicon). */
 export const ASSISTANT_ICON = "/favicon.svg"

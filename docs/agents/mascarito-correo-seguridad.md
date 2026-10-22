@@ -6,8 +6,9 @@ darle órdenes al modelo. El código es `mascarito-mail.ts` + `mascarito-templat
 
 ## Arquitectura
 - **Action-selector** — el modelo sólo devuelve `{template, firstName}`; el servidor arma el correo. https://arxiv.org/abs/2506.08837
-- **Cuarentena / dual-LLM** — el agente de Ghosty del correo (`GHOSTY_MAIL_AGENT_ID`) no tiene MCP, ni historial,
-  ni datos de clientes: aunque lo engañen no tiene nada que leer ni que ejecutar (se rompe la «trifecta letal»).
+- **Cuarentena / dual-LLM** — el modelo es Mascarito, el mismo agente de Ghosty del panel (`GHOSTY_AGENT_ID`),
+  pero este canal le manda `MAIL_INSTRUCTIONS` como `appendSystemPrompt` y un `turnToken` que no es un `mt_`: su MCP
+  contesta 401, así que no puede leer ni tocar ninguna cuenta aunque lo engañen (se rompe la «trifecta letal»).
   https://simonwillison.net/2023/Apr/25/dual-llm-pattern/ · https://arxiv.org/abs/2503.18813 · https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/
 - **Spotlighting** — el correo entra en texto plano, delimitado como dato no confiable y sin caracteres invisibles. https://arxiv.org/abs/2403.14720
 - **Sin URLs ni texto del atacante** — EchoLeak (CVE-2025-32711) exfiltró por URLs; Gemini en Gmail cayó con texto oculto.
@@ -28,5 +29,6 @@ darle órdenes al modelo. El código es `mascarito-mail.ts` + `mascarito-templat
 - Nunca revela si el remitente tiene cuenta, dominios o pagos: la respuesta es idéntica con o sin cuenta (OWASP).
 
 ## Operación
-- Agente en Ghosty: prompt en `ghosty/mascarito-correo.md`, creado con `ghosty agents create … --prompt-file`, sin MCP.
-- Env: `GHOSTY_MAIL_AGENT_ID`. Sin ella, todo correo recibe la plantilla de traspaso.
+- No hay agente aparte: es Mascarito (`cmuq2rfma0008gewlanomot6g`) con un canal más. Las instrucciones del canal viven
+  en `MAIL_INSTRUCTIONS` (`mascarito-mail.ts`) porque `ghosty/` no viaja en la imagen.
+- Sin `GHOSTY_AGENT_ID`, todo correo recibe la plantilla de traspaso.
