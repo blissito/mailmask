@@ -8305,7 +8305,8 @@ const app = new Elysia({ adapter: node() })
         log("error", "route53", "No se pudo leer la zona al confirmar", { domain: d.domain, error: String(err) });
         return jsonErr("No pudimos leer tu zona. Intenta de nuevo en un momento.", 502);
       }
-      updateDomain(d.id, { dnsZoneStatus: "pending_delegation", dnsPreSnapshot: snapshot });
+      // dnsCheckedAt marca desde cuándo espera los NS: el panel enseña «lleva 3 h»
+      updateDomain(d.id, { dnsZoneStatus: "pending_delegation", dnsPreSnapshot: snapshot, dnsCheckedAt: new Date().toISOString() });
       log("info", "route53", "Zona revisada por el dueño", { domain: d.domain, actor: user.email, records: snapshot.length });
     }
 

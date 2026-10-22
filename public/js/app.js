@@ -1069,6 +1069,14 @@ function renderDomains() {
   empty.classList.add("hidden");
   if (header) header.classList.remove("hidden");
 
+  // «lleva 3 h de 48» si sabemos desde cuándo espera; si no, el rango típico
+  const waitingFor = (since) => {
+    const ms = since ? Date.now() - Date.parse(since) : NaN;
+    if (!(ms >= 0)) return "1 a 48 h";
+    const min = Math.floor(ms / 60000);
+    const elapsed = min < 60 ? `${min} min` : `${Math.floor(min / 60)} h`;
+    return min >= 48 * 60 ? `lleva ${elapsed}: revisa tus NS en el registrador` : `lleva ${elapsed} (hasta 48 h)`;
+  };
   const aliasCount = (id) => (currentUser?.usage?.aliasesPerDomain ?? []).find(a => a.domainId === id)?.current;
   list.innerHTML = `<div class="dom-list">${domains.map(d => {
     const verified = d.verified;
@@ -1081,7 +1089,7 @@ function renderDomains() {
     const detalle = verified
       ? `${n != null ? `<em>${n} ${n === 1 ? "dirección" : "direcciones"}</em> · ` : ""}${estado === "bloqueado" ? "guarda, no reenvía" : "verificado"}`
       // con la zona en MailMask el dominio no está «sin configurar»: espera la revisión o a que propaguen los NS
-      : d.dnsZoneStatus === "pending_delegation" ? `<em>Esperando tus nameservers</em> · 1 a 48 h`
+      : d.dnsZoneStatus === "pending_delegation" ? `<em>Esperando tus nameservers</em> · ${waitingFor(d.dnsCheckedAt)}`
       : d.dnsZoneStatus === "pending_review" ? `<em>Revisa tu DNS antes de mudarlo</em>`
       : `<em>Falta configurar DNS</em>`;
     return `
