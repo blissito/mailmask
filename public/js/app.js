@@ -1080,6 +1080,9 @@ function renderDomains() {
     const chip = estado === "activado" ? `<span class="tag">Activado</span>` : estado === "bloqueado" ? `<span class="tag !bg-amber-500/15 !text-amber-600">Sin activar</span>` : `<span class="tag">Gratis</span>`;
     const detalle = verified
       ? `${n != null ? `<em>${n} ${n === 1 ? "dirección" : "direcciones"}</em> · ` : ""}${estado === "bloqueado" ? "guarda, no reenvía" : "verificado"}`
+      // con la zona en MailMask el dominio no está «sin configurar»: espera la revisión o a que propaguen los NS
+      : d.dnsZoneStatus === "pending_delegation" ? `<em>Esperando tus nameservers</em> · 1 a 48 h`
+      : d.dnsZoneStatus === "pending_review" ? `<em>Revisa tu DNS antes de mudarlo</em>`
       : `<em>Falta configurar DNS</em>`;
     return `
     <div class="dom" data-action="select-domain" data-domain-id="${esc(d.id)}">
