@@ -81,13 +81,13 @@ describe("Presupuesto de Mascarito por dominio", () => {
     assert.deepEqual([u.threads, u.panelTurns, u.toolCalls, u.costUsd], [0, 0, 0, 0]);
   });
 
-  it("el add-on multiplica el presupuesto y la semana nunca pasa del 20 % del ingreso", () => {
+  it("el add-on multiplica el presupuesto y la semana nunca pasa del 40 % del dominio + 20 % del add-on", () => {
     const base = q.domainLimits(false), plus = q.domainLimits(true);
     assert.ok(Math.abs(plus.window5hUsd - base.window5hUsd * q.AGENT_ADDON_MULTIPLIER) < 1e-9);
     assert.ok(plus.weekUsd > base.weekUsd);
     const fx = 21; // sin lecturas en fx_rates, tipoDeCambio() usa su respaldo
-    assert.ok(base.weekUsd <= (99 * 0.2) / Math.min(fx, 18) / (52 / 12) + 1e-9);
-    assert.ok(plus.weekUsd <= ((99 + 199) * 0.2) / Math.min(fx, 18) / (52 / 12) + 1e-9);
+    assert.ok(base.weekUsd <= (99 * 0.4) / Math.min(fx, 18) / (52 / 12) + 1e-9);
+    assert.ok(plus.weekUsd <= (99 * 0.4 + 199 * 0.2) / Math.min(fx, 18) / (52 / 12) + 1e-9);
     const id = newDomain();
     assert.equal(q.agentBudgetStatus(id, "panel").hasAgentAddon, false);
     giveAddon(id);

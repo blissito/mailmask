@@ -22,15 +22,18 @@ import { tipoDeCambio } from "./fx.js";
 import { AGENT_ADDON } from "./plans.js";
 import { log } from "./logger.js";
 
-// --- Constantes provisionales hasta el bench (fase 3 del plan) ---
+// --- Constantes medidas con el bench del 22-oct-2026 ---
+// Tarea del panel con herramientas ≈ $0.021 USD (Haiku, 3–6 llamadas); pregunta sin herramientas ≈ $0.004.
 
-/** Presupuesto base de la ventana de 5 h, en USD. */
-export const BASE_5H_USD = 0.06;
-/** Presupuesto base de la semana, en USD (el tope interno lo recorta si hace falta). */
-export const BASE_WEEK_USD = 0.22;
+/** Presupuesto base de la ventana de 5 h, en USD (≈ 10 tareas). */
+export const BASE_5H_USD = 0.2;
+/** Presupuesto base de la semana, en USD (≈ 24 tareas; el tope interno lo recorta si hace falta). */
+export const BASE_WEEK_USD = 0.5;
 /** Cuánto sube el presupuesto con el add-on `agent`. */
-export const AGENT_ADDON_MULTIPLIER = 3;
-/** Parte del ingreso del dominio que puede irse en modelo. */
+export const AGENT_ADDON_MULTIPLIER = 2;
+/** Parte de los $99 del dominio que puede irse en modelo (decisión de bliss: casi nadie llena el tope). */
+export const DOMAIN_COST_SHARE = 0.4;
+/** Parte del add-on que puede irse en modelo. */
 export const INTERNAL_COST_SHARE = 0.2;
 export const DOMAIN_PRICE_MXN = 99;
 export const AGENT_ADDON_PRICE_MXN = AGENT_ADDON.price / 100;
@@ -124,11 +127,11 @@ export function hasAgentAddon(domainId: string): boolean {
   return listEffectiveAddonsForDomain(domainId).some((a) => a.kind === AGENT_ADDON.kind);
 }
 
-/** Topes en USD del dominio: base × multiplicador, y la semana recortada al 20 % del ingreso. */
+/** Topes en USD del dominio: base × multiplicador, y la semana recortada al 40 % del dominio + 20 % del add-on. */
 export function domainLimits(withAddon: boolean): { window5hUsd: number; weekUsd: number } {
   const mult = withAddon ? AGENT_ADDON_MULTIPLIER : 1;
-  const revenueMxn = DOMAIN_PRICE_MXN + (withAddon ? AGENT_ADDON_PRICE_MXN : 0);
-  const internalWeekUsd = (revenueMxn * INTERNAL_COST_SHARE) / fxRate() / WEEKS_PER_MONTH;
+  const costMxn = DOMAIN_PRICE_MXN * DOMAIN_COST_SHARE + (withAddon ? AGENT_ADDON_PRICE_MXN * INTERNAL_COST_SHARE : 0);
+  const internalWeekUsd = costMxn / fxRate() / WEEKS_PER_MONTH;
   return { window5hUsd: BASE_5H_USD * mult, weekUsd: Math.min(BASE_WEEK_USD * mult, internalWeekUsd) };
 }
 
