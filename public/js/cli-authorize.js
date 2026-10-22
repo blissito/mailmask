@@ -23,6 +23,9 @@
 
   loading.classList.add("hidden");
   if (!me) {
+    // Al iniciar sesión hay que volver aquí con el mismo código; sin `next` el login terminaba en /app
+    // y el CLI se quedaba esperando una autorización que nunca llegaba.
+    anon.querySelector("a").href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
     anon.classList.remove("hidden");
     return;
   }

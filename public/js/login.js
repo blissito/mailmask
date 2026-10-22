@@ -3,7 +3,7 @@
 const RECEIPT_PATH = /^\/recibo\/[A-Za-z0-9-]{1,40}$/;
 // La liga que da el agente para publicar en EasyBits (`/app?domain=…&easybits=1`) sobrevive al login.
 const EASYBITS_DEEP_LINK = /^\/app\?domain=[a-z0-9.-]{1,253}&easybits=1$/i;
-const safeNext = (next) => next && (next.startsWith("/oauth/authorize?") || RECEIPT_PATH.test(next) || EASYBITS_DEEP_LINK.test(next) || next === "/app#pagos") ? next : null;
+const safeNext = (next) => next && (next.startsWith("/oauth/authorize?") || next.startsWith("/cli/authorize?") || RECEIPT_PATH.test(next) || EASYBITS_DEEP_LINK.test(next) || next === "/app#pagos") ? next : null;
 
 function afterLogin() {
   const params = new URLSearchParams(location.search);
