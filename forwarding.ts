@@ -472,7 +472,8 @@ function setupNotificationDomain(receipt: SesMailNotification["receipt"] | undef
 
 export function welcomeBody(domainName: string): string {
   return [
-    `Hola, soy Mascarito, el agente de IA de MailMask.`,
+    `Hola, soy Mascarito IA, el agente de inteligencia artificial de MailMask.`,
+    `Este mensaje lo escribió una IA, no una persona.`,
     ``,
     `Tu dominio ${domainName} ya está conectado: todo el correo que llegue a cualquier dirección @${domainName} aparece aquí, en tu Bandeja.`,
     ``,
@@ -481,9 +482,9 @@ export function welcomeBody(domainName: string): string {
     `2. Mándale un correo de prueba desde tu correo de siempre y míralo llegar aquí.`,
     `3. Contéstalo desde la Bandeja: quien lo reciba verá hola@${domainName}, no tu correo personal.`,
     ``,
-    `Si algo no cuadra, responde este correo y te ayudamos.`,
+    `Si algo no cuadra, responde este correo y una persona del equipo te ayuda.`,
     ``,
-    `— Mascarito · MailMask`,
+    `— Mascarito IA · agente de inteligencia artificial de MailMask`,
   ].join("\n");
 }
 
