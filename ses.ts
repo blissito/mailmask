@@ -681,7 +681,7 @@ export function threadRefsFor(sent: SentEmail): string[] {
     : [sent.messageId];
 }
 
-export async function sendFromDomain(from: string, to: string, subject: string, body: string, opts?: { html?: string; replyTo?: string; configSet?: string; inReplyTo?: string; references?: string; inlineImages?: InlineImage[]; attachments?: Attachment[]; cc?: string[]; bcc?: string[] }): Promise<SentEmail> {
+export async function sendFromDomain(from: string, to: string, subject: string, body: string, opts?: { html?: string; replyTo?: string; configSet?: string; inReplyTo?: string; references?: string; inlineImages?: InlineImage[]; attachments?: Attachment[]; cc?: string[]; bcc?: string[]; extraHeaders?: Record<string, string> }): Promise<SentEmail> {
   // El header From conserva el display name si viene ("MailMask <alertas@...>"); el
   // sobre de SES necesita la dirección pelada.
   const fromAddr = normalizeAddress(from);
@@ -729,6 +729,10 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
   if (opts?.replyTo) headers.push(`Reply-To: ${normalizeAddress(opts.replyTo)}`);
   if (opts?.inReplyTo) headers.push(`In-Reply-To: ${stripHeaderInjection(opts.inReplyTo)}`);
   if (opts?.references) headers.push(`References: ${stripHeaderInjection(opts.references)}`);
+  // Encabezados de respuesta automática (Auto-Submitted, X-Auto-Response-Suppress…): sólo nombres simples.
+  for (const [name, value] of Object.entries(opts?.extraHeaders ?? {})) {
+    if (/^[A-Za-z][A-Za-z0-9-]*$/.test(name)) headers.push(`${name}: ${stripHeaderInjection(value)}`);
+  }
 
   // base64: el cuerpo es UTF-8 y declararlo 7bit es mentira — se corrompe en tránsito.
   const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64").replace(/(.{76})/g, "$1\r\n");

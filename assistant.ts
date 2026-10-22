@@ -201,6 +201,8 @@ export type TurnInput = {
   appendSystemPrompt?: string;
   turnToken: string;
   signal?: AbortSignal;
+  /** Otro agente de la flota (p. ej. Mascarito correo); sin él, GHOSTY_AGENT_ID. */
+  agentId?: string;
 };
 
 export function buildTurnRequest(t: TurnInput): { url: string; body: Record<string, unknown> } {
@@ -218,14 +220,14 @@ export function buildTurnRequest(t: TurnInput): { url: string; body: Record<stri
     body.parts = t.attachments.map((a) => ({ kind: "file", file: { name: a.name, mimeType: a.contentType || "application/octet-stream", uri: a.url } }));
   }
   if (t.appendSystemPrompt) body.appendSystemPrompt = t.appendSystemPrompt;
-  return { url: `${ghostyBaseUrl()}/api/v2/fleet-agents/${encodeURIComponent(process.env.GHOSTY_AGENT_ID ?? "")}/message-stream`, body };
+  return { url: `${ghostyBaseUrl()}/api/v2/fleet-agents/${encodeURIComponent(t.agentId ?? process.env.GHOSTY_AGENT_ID ?? "")}/message-stream`, body };
 }
 
 export async function openGhostyTurn(t: TurnInput): Promise<{ ok: true; body: ReadableStream<Uint8Array> } | { ok: false; reason: string }> {
   const keyId = process.env.GHOSTY_PARTNER_KEY;
   const secret = process.env.GHOSTY_PARTNER_SECRET;
   if (!keyId || !secret) return { ok: false, reason: "GHOSTY_PARTNER_KEY/GHOSTY_PARTNER_SECRET sin configurar" };
-  if (ghostyRuntime() === "fleet" && !process.env.GHOSTY_AGENT_ID) return { ok: false, reason: "GHOSTY_AGENT_ID sin configurar" };
+  if (ghostyRuntime() === "fleet" && !(t.agentId ?? process.env.GHOSTY_AGENT_ID)) return { ok: false, reason: "GHOSTY_AGENT_ID sin configurar" };
   const { url, body } = buildTurnRequest(t);
   const raw = JSON.stringify(body);
   try {
@@ -341,6 +343,14 @@ export function relayTurn(
       finish("stopped");
     },
   });
+}
+
+/** Lee el turno completo sin re-emitirlo a nadie (turnos que no vienen del dock). */
+export async function collectTurn(upstream: ReadableStream<Uint8Array>, abort: AbortController): Promise<TurnOutcome> {
+  let outcome: TurnOutcome = { reply: "", status: "failed", error: "sin respuesta" };
+  const reader = relayTurn(upstream, abort, (o) => { outcome = o; }).getReader();
+  while (!(await reader.read()).done) { /* sólo drena */ }
+  return outcome;
 }
 
 // --- Historial del dock ---

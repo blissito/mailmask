@@ -11,6 +11,7 @@ import { emitEvent } from "./webhooks.js";
 import { dmarcReportAddress, ingestDmarcReport } from "./dmarc-reports.js";
 import { sandboxBlockedFromDomain } from "./sandbox.js";
 import { canUseAssistant } from "./assistant.js";
+import { answerMascaritoMail, MASCARITO_ADDRESS } from "./mascarito-mail.js";
 
 // --- SNS notification types ---
 
@@ -49,7 +50,7 @@ interface SesMailNotification {
 
 // --- Email header parsing helpers ---
 
-function extractHeader(raw: string, name: string): string {
+export function extractHeader(raw: string, name: string): string {
   const re = new RegExp(`^${name}:\\s*(.+)$`, "mi");
   const match = raw.match(re);
   return match?.[1]?.trim() ?? "";
@@ -779,6 +780,18 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
         notifyInbox(domain.id, mesa.isNew ? "new_conversation" : "new_message", {
           conversationId: mesa.conversationId, from, subject,
         });
+        // Mascarito IA contesta su propio correo con plantillas; sin esperarlo (llama a un modelo).
+        if (recipient === MASCARITO_ADDRESS) {
+          void answerMascaritoMail({
+            domainId: domain.id, conversationId: mesa.conversationId, from, subject,
+            returnPath: notification.mail.source ?? "", text: extractPlainBody(rawContent), dmarc: receipt.dmarcVerdict?.status,
+            headers: {
+              autoSubmitted: extractHeader(rawContent, "Auto-Submitted"), precedence: extractHeader(rawContent, "Precedence"),
+              listId: extractHeader(rawContent, "List-Id"), listUnsubscribe: extractHeader(rawContent, "List-Unsubscribe"),
+            },
+            messageId: extractHeader(rawContent, "Message-ID"), references: extractReferences(rawContent),
+          });
+        }
       } catch (err) {
         log("error", "forwarding", "Failed to save to Mesa", { error: String(err), domainId: domain.id });
       }

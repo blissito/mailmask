@@ -1088,8 +1088,11 @@ escribió un agente de IA. La línea del chat del panel depende de `canUseAssist
 tiene agente**, así que a ella sólo se le dice que aparece al activar el dominio.
 
 - [ ] Mascarito dentro de `/bandeja` (hoy el dock sólo vive en `/app`).
-- [ ] Que conteste solo: webhook `email.received` de `mascarito@` → Ghosty → turno → `inbox_reply`.
-- [ ] Avatar de Mascarito en la lista de la Bandeja (hoy salen iniciales).
+- [x] Avatar de Mascarito en la lista de la Bandeja (`bandeja.js`, 22-oct).
+- [x] Contesta su correo (22-oct): `processInbound` → `answerMascaritoMail` (`mascarito-mail.ts`). Puertas sin modelo
+  (DMARC, autorespondedores, listas, supresión, 1 cada 4 días por remitente, 200/día), agente de Ghosty **sin MCP**
+  (`GHOSTY_MAIL_AGENT_ID`, prompt `ghosty/mascarito-correo.md`) que sólo elige plantilla, y plantillas fijas
+  (`mascarito-templates.ts`). Traspaso → asignado al dueño + nota. Reglas y fuentes: `docs/agents/mascarito-correo-seguridad.md`.
 
 ### Apps conectadas (OAuth)
 
