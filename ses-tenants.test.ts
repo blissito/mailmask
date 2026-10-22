@@ -232,6 +232,27 @@ describe("SES Tenants", () => {
       assert.equal(v1.filter((c) => c.tipo === "SendRawEmail").length, 0);
     });
 
+    it("SES_TENANTS_DOMAINS lo enciende sólo para los dominios de la lista", async () => {
+      delete process.env.SES_TENANTS;
+      process.env.SES_TENANTS_DOMAINS = " Fixter.org , otro.com ";
+      try {
+        assert.equal(ses.sesTenantsEnabled("fixter.org"), true);
+        assert.equal(ses.sesTenantsEnabled("cliente.com"), false);
+        assert.equal(ses.sesTenantsEnabled(), false);
+        await ses.forwardEmail("From: a@b.com\r\nSubject: x\r\n\r\ny", "a@b.com", "dueno@gmail.com", "fixter.org");
+        assert.equal(v2.find((c) => c.tipo === "SendEmail")!.input.TenantName, "mailmask-fixter_org");
+        v2.length = 0;
+        await ses.forwardEmail("From: a@b.com\r\nSubject: x\r\n\r\ny", "a@b.com", "dueno@gmail.com", "cliente.com");
+        assert.equal(v2.length, 0, "un dominio fuera de la lista no va por tenant");
+        // Vacía: manda la bandera global.
+        process.env.SES_TENANTS_DOMAINS = "";
+        process.env.SES_TENANTS = "1";
+        assert.equal(ses.sesTenantsEnabled("cliente.com"), true);
+      } finally {
+        delete process.env.SES_TENANTS_DOMAINS;
+      }
+    });
+
     it("el reenvío sin bandera no cambia: SendRawEmail sin config set", async () => {
       delete process.env.SES_TENANTS;
       await ses.forwardEmail("From: a@b.com\r\nSubject: x\r\n\r\ny", "a@b.com", "dueno@gmail.com", "cliente.com");

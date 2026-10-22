@@ -225,6 +225,13 @@
       "when": 1788901300000,
       "tag": "0031_easybits_publications",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1788901400000,
+      "tag": "0032_dns_connect_keep_mail",
+      "breakpoints": true
     }
   ]
 }

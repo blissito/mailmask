@@ -72,7 +72,7 @@ transfer_out manda el código EPP por correo al dueño, nunca al chat. lock_doma
 Borrar dominio, máscara, buzón o registro DNS, sacar a un miembro, transferir fuera o cancelar un add-on o una renovación (cancel_addon, cancel_renewal) son irreversibles: confírmalo con el usuario antes. Algunas responden que necesitan confirmación: el usuario la aprueba en la app; no reintentes ni busques otra vía.
 
 ## DNS administrado por MailMask
-Con zona propia (create_dns_zone + nameservers en el registrador) puedes editar registros; enseña \`imported\` antes de que cambie los nameservers. list_dns_records antes de escribir; set_dns_record reemplaza el conjunto; point_domain_to para Vercel, Netlify y similares (website_status: a dónde apunta hoy). EasyBits: easybits_site_status → publish_easybits_site (dryRun primero); unpublish_easybits_site lo revierte. Los registros de correo están protegidos.
+Con zona propia (create_dns_zone + NS en el registrador) puedes editar registros; enseña \`imported\`; MX intacto, NS tras confirmar en el panel. list_dns_records antes de escribir; set_dns_record reemplaza el conjunto; point_domain_to para Vercel, Netlify y similares (website_status: a dónde apunta hoy). EasyBits: easybits_site_status → publish_easybits_site (dryRun primero); unpublish_easybits_site lo revierte. Los registros de correo están protegidos.
 
 ## Bandeja: el correo de la máscara
 Cada máscara recibe en la Bandeja del dominio; desde ahí se lee y se contesta como esa máscara.
@@ -382,7 +382,7 @@ Algunas funciones (máscaras ilimitadas, equipo, envío, reglas, webhooks) piden
 Borrar dominio, máscara, buzón o registro DNS y sacar a un miembro son irreversibles: confírmalo con el usuario antes. Algunas responden que necesitan confirmación: el usuario la aprueba en la app; no reintentes ni busques otra vía.
 
 ## DNS administrado por MailMask
-Con zona propia (create_dns_zone y cambiar los nameservers en el registrador) puedes editar registros; enseña la lista \`imported\` antes de que cambie los nameservers: list_dns_records antes de escribir; set_dns_record reemplaza el conjunto completo; point_domain_to para Vercel, Netlify y similares (website_status dice a dónde apunta hoy). Los registros de correo están protegidos.
+Con zona propia (create_dns_zone y cambiar los nameservers en el registrador) puedes editar registros; enseña la lista \`imported\` (el MX de su correo actual no se toca; los nameservers los ve el dueño al confirmar la revisión en el panel): list_dns_records antes de escribir; set_dns_record reemplaza el conjunto completo; point_domain_to para Vercel, Netlify y similares (website_status dice a dónde apunta hoy). Los registros de correo están protegidos.
 
 ## Bandeja: el correo de la máscara
 Cada máscara recibe en la Bandeja del dominio; desde ahí se lee y se contesta como esa máscara.
@@ -552,7 +552,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
     { domainId }, (a) => sdk.dns.list(a.domainId));
 
   tool("create_dns_zone",
-    "Creates a MailMask-managed DNS zone for a domain registered elsewhere. Copies the records it finds at the current provider (returned as `imported`) and returns the nameservers to set at the registrar; edits take effect only after the nameservers change.",
+    "Creates a MailMask-managed DNS zone for a domain registered elsewhere. Copies the records it finds at the current provider (returned as `imported`) and keeps the existing MX untouched. The zone starts in review (`status: pending_review`, empty `nameservers`); the owner confirms the review in the MailMask app to see the nameservers. Edits take effect only after the nameservers change.",
     { domainId }, (a) => sdk.dns.createZone(a.domainId));
 
   tool("dns_delegation_status",

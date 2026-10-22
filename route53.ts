@@ -395,13 +395,49 @@ export class MxAjenoError extends Error {
 
 const SPF_MAILMASK = "include:amazonses.com";
 
-/** Fusiona nuestro SPF con el que ya tuviera el apex, en un solo registro. */
-export function fusionarSpf(existentes: string[]): string[] {
+/**
+ * Proveedores de correo que se reconocen por su MX, con el `include:` de SPF que publican.
+ * Sirve para un caso concreto: el dominio conserva su correo en Google/Microsoft/Zoho
+ * (conectar sin mudarse) y **no tiene SPF**. Un SPF nuevo sólo con amazonses.com haría que
+ * el correo que el cliente manda desde Gmail falle SPF; con el include de su proveedor, no.
+ */
+export const SPF_BY_MX: { id: string; label: string; match: RegExp; include: (mx: string) => string }[] = [
+  { id: "google", label: "Google Workspace", match: /(^|\.)(google\.com|googlemail\.com)$/, include: () => "include:_spf.google.com" },
+  { id: "microsoft", label: "Microsoft 365", match: /\.protection\.outlook\.com$/, include: () => "include:spf.protection.outlook.com" },
+  {
+    id: "zoho", label: "Zoho Mail", match: /(^|\.)zoho(mail)?\.[a-z.]+$/,
+    // Zoho publica un SPF por región: zohomail.com, zohomail.eu, zohomail.in…
+    include: (mx) => `include:zohomail.${/\.zoho(?:mail)?\.([a-z.]+)$/.exec(mx)?.[1] ?? "com"}`,
+  },
+];
+
+/** El proveedor de correo que hay detrás de unos valores MX (`"10 aspmx.l.google.com."`), si se reconoce. */
+export function mailProviderFromMx(mxValues: string[]): { id: string; label: string; spfInclude: string } | null {
+  for (const v of mxValues) {
+    const host = (v.trim().split(/\s+/).pop() ?? "").toLowerCase().replace(/\.$/, "");
+    const p = SPF_BY_MX.find((x) => x.match.test(host));
+    if (p) return { id: p.id, label: p.label, spfInclude: p.include(host) };
+  }
+  return null;
+}
+
+/**
+ * Fusiona nuestro SPF con el que ya tuviera el apex, en un solo registro.
+ *
+ * `foreignMx` = los MX que no son nuestros. Si no hay SPF previo y el correo sigue en otro
+ * proveedor: con uno conocido el SPF nuevo lleva su include además del nuestro; con uno
+ * desconocido **no se crea SPF** (devuelve lo mismo): mejor ninguno que uno que le haga
+ * fallar al cliente el correo que manda desde su proveedor.
+ */
+export function fusionarSpf(existentes: string[], foreignMx: string[] = []): string[] {
   const spfPrevio = existentes.find((v) => v.replace(/"/g, "").trim().toLowerCase().startsWith("v=spf1"));
   const resto = existentes.filter((v) => v !== spfPrevio);
 
   if (!spfPrevio) {
-    return [...resto, `"v=spf1 ${SPF_MAILMASK} ~all"`];
+    if (!foreignMx.length) return [...resto, `"v=spf1 ${SPF_MAILMASK} ~all"`];
+    const provider = mailProviderFromMx(foreignMx);
+    if (!provider) return existentes;
+    return [...resto, `"v=spf1 ${provider.spfInclude} ${SPF_MAILMASK} ~all"`];
   }
 
   const crudo = spfPrevio.replace(/"/g, "").trim();
@@ -430,7 +466,7 @@ export async function configureDnsRecords(
   verificationToken: string,
   dkimTokens: string[],
   opts: { preserveMx?: boolean; keepForeignMx?: boolean } = {},
-): Promise<{ mxOurs: boolean }> {
+): Promise<{ mxOurs: boolean; spf: "created" | "merged" | "kept" | "skipped"; mailProvider: string | null }> {
   const existentes = await listRecordSets(hostedZoneId);
   const apex = domain.toLowerCase();
   const buscar = (name: string, type: string) => existentes.find((r) => r.name === name && r.type === type);
@@ -458,11 +494,21 @@ export async function configureDnsRecords(
     : [mxNuestro];
 
   const txtApexPrevio = buscar(apex, "TXT")?.values ?? [];
+  const txtApex = fusionarSpf(txtApexPrevio, mxAjenos);
+  const hasSpf = (vs: string[]) => vs.some((v) => v.replace(/"/g, "").trim().toLowerCase().startsWith("v=spf1"));
+  const spf = !hasSpf(txtApex) ? "skipped"
+    : !hasSpf(txtApexPrevio) ? "created"
+    : txtApex === txtApexPrevio ? "kept" : "merged";
+  const mailProvider = mailProviderFromMx(mxAjenos)?.label ?? null;
 
   const cambios: CambioDns[] = [
     ...(keepMx ? [] : [{ action: "UPSERT" as const, rrset: { name: apex, type: "MX" as const, ttl: 300, values: mxValores } }]),
     { action: "UPSERT", rrset: { name: `_amazonses.${apex}`, type: "TXT", ttl: 300, values: [`"${verificationToken}"`] } },
-    { action: "UPSERT", rrset: { name: apex, type: "TXT", ttl: 300, values: fusionarSpf(txtApexPrevio) } },
+    // Sin SPF que escribir (proveedor desconocido) y sin TXT previo no hay nada que mandar:
+    // un RRSet sin valores lo rechaza Route 53.
+    ...(txtApex.length
+      ? [{ action: "UPSERT" as const, rrset: { name: apex, type: "TXT" as const, ttl: 300, values: txtApex } }]
+      : []),
   ];
 
   for (const token of dkimTokens) {
@@ -474,9 +520,12 @@ export async function configureDnsRecords(
 
   await applyRecordChanges(hostedZoneId, cambios, `MailMask email setup for ${domain}`);
   log("info", "route53", "DNS records configured", {
-    domain, hostedZoneId, records: cambios.length, mxPreservados: mxAjenos.length, mxIntacto: keepMx,
+    domain, hostedZoneId, records: cambios.length, mxPreservados: mxAjenos.length, mxIntacto: keepMx, spf,
   });
-  return { mxOurs: !keepMx };
+  if (spf === "skipped" && mxAjenos.length) {
+    log("warn", "route53", "Sin SPF: proveedor de correo desconocido", { domain, mx: mxAjenos });
+  }
+  return { mxOurs: !keepMx, spf, mailProvider };
 }
 
 // --- Update nameservers (point registered domain to hosted zone NS) ---

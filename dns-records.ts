@@ -537,3 +537,55 @@ export function dropCnameConflicts<T extends { name: string; type: string }>(rec
   const conCname = new Set(records.filter((r) => r.type === "CNAME").map((r) => r.name));
   return records.filter((r) => r.type === "CNAME" || !conCname.has(r.name));
 }
+
+// --- Respaldo descargable (archivo de zona estándar) ---
+
+/** Un valor tal como va en el archivo: los hosts con punto final para que sean absolutos. */
+function zoneRdata(type: string, value: string): string {
+  const v = value.trim();
+  const fqdn = (h: string) => (h.endsWith(".") ? h : `${h}.`);
+  switch (type) {
+    case "CNAME":
+    case "NS":
+      return fqdn(v);
+    case "MX": {
+      const [priority, host] = v.split(/\s+/);
+      return `${priority} ${fqdn(host ?? "")}`;
+    }
+    case "SRV": {
+      const p = v.split(/\s+/);
+      return `${p[0]} ${p[1]} ${p[2]} ${fqdn(p[3] ?? "")}`;
+    }
+    case "TXT":
+      // Route 53 ya lo guarda entrecomillado (y partido en cadenas de 255): va tal cual.
+      return v.startsWith('"') ? v : `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    default:
+      return v;
+  }
+}
+
+/**
+ * Escribe la zona como archivo BIND estándar (`$ORIGIN`, `@`, nombres absolutos), que
+ * importan GoDaddy, Cloudflare y cualquier proveedor: es el respaldo que el cliente se
+ * lleva antes de cambiar los nameservers. Los NS y el SOA de la raíz se omiten: son del
+ * proveedor de turno y al importar los pone el nuevo.
+ */
+export function toZoneFile(domain: string, records: RRSet[], note = ""): string {
+  const origin = domain.trim().toLowerCase().replace(/\.$/, "");
+  const lines = [
+    `; Zona DNS de ${origin}`,
+    `; Exportada por MailMask el ${new Date().toISOString()}${note ? ` (${note})` : ""}`,
+    `$ORIGIN ${origin}.`,
+    `$TTL 300`,
+    "",
+  ];
+  const sorted = records
+    .map((r) => ({ ...r, name: r.name.toLowerCase().replace(/\.$/, "") }))
+    .filter((r) => !(r.name === origin && (r.type === "NS" || (r.type as string) === "SOA")))
+    .sort((a, b) => a.name.localeCompare(b.name) || a.type.localeCompare(b.type));
+  for (const r of sorted) {
+    const label = r.name === origin ? "@" : `${r.name}.`;
+    for (const v of r.values) lines.push(`${label}\t${r.ttl}\tIN\t${r.type}\t${zoneRdata(r.type, v)}`);
+  }
+  return lines.join("\n") + "\n";
+}

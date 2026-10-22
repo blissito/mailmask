@@ -228,8 +228,17 @@ export function getConfigSetName(domain: string): string {
  * destino del cliente. Hoy el reenvío no lleva config set y así se queda su efecto. */
 export const FORWARDING_CONFIG_SET = "mailmask-forwarding";
 
-export function sesTenantsEnabled(): boolean {
-  return process.env.SES_TENANTS === "1";
+/**
+ * `SES_TENANTS=1` lo enciende para todos. `SES_TENANTS_DOMAINS` (lista por comas) lo enciende
+ * sólo para esos dominios, para probarlo con uno antes de abrirlo (fixter.org primero).
+ * Sin `domain` sólo cuenta la bandera global.
+ */
+export function sesTenantsEnabled(domain?: string | null): boolean {
+  if (process.env.SES_TENANTS === "1") return true;
+  if (!domain) return false;
+  const lista = (process.env.SES_TENANTS_DOMAINS ?? "")
+    .split(",").map((x) => x.trim().toLowerCase().replace(/\.$/, "")).filter(Boolean);
+  return lista.includes(domain.trim().toLowerCase().replace(/\.$/, ""));
 }
 
 let _sesV2: any;
@@ -540,7 +549,7 @@ export async function ensureDomainInbound(domain: string): Promise<{ ruleCreated
 
   // Después del config set: el tenant se asocia a él. Un fallo aquí no tumba la
   // reconciliación; el envío cae a v1 mientras el tenant no exista.
-  if (sesTenantsEnabled()) {
+  if (sesTenantsEnabled(domain)) {
     try {
       await ensureDomainTenant(domain);
     } catch (err) {
@@ -616,7 +625,7 @@ export async function deleteConfigurationSet(domain: string): Promise<void> {
   // Va primero: SES no borra un config set (ni la identidad, que main.ts borra justo
   // después) mientras siga asociado a un tenant. Si la bandera se apaga con tenants
   // vivos, borrar un dominio deja su identidad huérfana: hay que limpiarla a mano.
-  if (sesTenantsEnabled()) await removeDomainTenant(domain);
+  if (sesTenantsEnabled(domain)) await removeDomainTenant(domain);
   try {
     const ses = await getSesOutbound();
     const { DeleteConfigurationSetCommand } = await import("@aws-sdk/client-ses");
@@ -813,7 +822,7 @@ export async function forwardEmail(originalRaw: string, from: string, to: string
   };
   // El reenvío es la mayor parte del volumen: con tenants va en el del dominio de la
   // máscara, con el config set compartido de reenvío (sin eventos, ver FORWARDING_CONFIG_SET).
-  if (sesTenantsEnabled()) {
+  if (sesTenantsEnabled(aliasDomain)) {
     const id = await trySendWithTenant(cmd, tenantNameFor(aliasDomain), FORWARDING_CONFIG_SET);
     if (id !== null) return;
   }
@@ -1074,7 +1083,7 @@ async function sendRawCommand(cmd: any, domain: string, configSet?: string): Pro
   // Sólo lleva tenant el envío con el config set de su propio dominio: eso excluye el
   // transaccional (SES_CONFIG_SET o ninguno) y a Mascarito, que firma como MailMask con el
   // config set del cliente. Ver la nota de "SES Tenants" arriba.
-  if (sesTenantsEnabled() && domain && configSet && configSet === configSetName(domain.toLowerCase())) {
+  if (sesTenantsEnabled(domain) && domain && configSet && configSet === configSetName(domain.toLowerCase())) {
     const id = await trySendWithTenant(cmd, tenantNameFor(domain), configSet);
     if (id !== null) return id;
   }

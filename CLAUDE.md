@@ -276,6 +276,21 @@ MCP: 7 herramientas, con `point_domain_to` de alto nivel. Un LLM sabe que Vercel
 CNAME, pero se inventa el destino y confunde apex con www; esa herramienta convierte tres
 llamadas frágiles en una determinista.
 
+### Conectar sin mudarte (22-oct-2026)
+
+Delegar los NS a MailMask sin tocar el correo actual (fixter.org: Workspace + GoDaddy). `POST /dns/zone`
+pasa a `snapshotDns` nuestros DKIM y los selectores grandes, y si hay MX ajeno usa `keepForeignMx`
+(antes `preserveMx` nos ponía delante de Google y Gmail dejaba de recibir). `fusionarSpf` con MX ajeno y
+sin SPF: Google/Microsoft/Zoho (`SPF_BY_MX`) → SPF con su include + amazonses; desconocido → **sin SPF**
+y `spfWarning`. La zona nace `pending_review` y **no devuelve NS** (`nameservers: []`, vacío y no
+ausente porque el CLI publicado lo recorre); `POST /dns/zone/confirm {checked:true}` guarda
+`dns_pre_snapshot`, pasa a `pending_delegation` y da los NS (migración 0032: `dns_previous_ns`,
+`dns_pre_snapshot`). `GET /dns/export?which=current|pre` = archivo de zona (`toZoneFile`). `POST
+/dns/rollback {confirm:true}` sólo con sesión y sólo con registro vivo en `domain_registrations`: llama
+`UpdateDomainNameservers`, marca `rolled_back` y **no borra la zona**; si no, 409 con los NS para
+copiar. En `rolled_back` y `pending_review` no se sondea la delegación. Pruebas:
+`dns-zone-keep-mail.test.ts`. El SDK no tiene `confirm`/`rollback` a propósito: la revisión es humana.
+
 ### Transferencias (`domain-transfer.ts`)
 
 **Transfer-in.** Los requisitos se comprueban **antes de cobrar** (`CheckDomainTransferability`

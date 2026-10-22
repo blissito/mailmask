@@ -68,9 +68,13 @@ export interface Domain {
   registeredViaMailmask?: boolean;
   /** Hosted zone de Route 53, si MailMask le gestiona el DNS. */
   hostedZoneId?: string | null;
-  dnsZoneStatus?: "none" | "pending_delegation" | "active";
+  dnsZoneStatus?: "none" | "pending_review" | "pending_delegation" | "active" | "rolled_back";
   dnsNameservers?: string[] | null;
   dnsDelegatedAt?: string | null;
+  /** Los NS de antes de delegar: el plan de regreso («Conectar sin mudarte»). */
+  dnsPreviousNs?: string[] | null;
+  /** Inventario revisado al confirmar; contra él compara el vigía de 48 h. */
+  dnsPreSnapshot?: { name: string; type: string; ttl: number; values: string[] }[] | null;
   dnsCheckedAt?: string | null;
   /** Cuándo se midieron `verified` y `mxConfigured` en vivo; null = nunca (ver domain-flags.ts). */
   healthCheckedAt?: string | null;
@@ -265,6 +269,8 @@ function rowToDomain(r: typeof domains.$inferSelect): Domain {
     dnsZoneStatus: r.dnsZoneStatus ?? "none",
     dnsNameservers: r.dnsNameservers ?? null,
     dnsDelegatedAt: r.dnsDelegatedAt ?? null,
+    dnsPreviousNs: r.dnsPreviousNs ?? null,
+    dnsPreSnapshot: r.dnsPreSnapshot ?? null,
     dnsCheckedAt: r.dnsCheckedAt ?? null,
     healthCheckedAt: r.healthCheckedAt ?? null,
     signature: r.signature ?? null,
@@ -502,7 +508,7 @@ export function listUserDomains(email: string): Domain[] {
 const CAMPOS_DOMINIO = [
   "verified", "mxConfigured", "signature", "signatureLogoKey", "registeredViaMailmask",
   "hostedZoneId", "dnsZoneStatus", "dnsNameservers", "dnsDelegatedAt", "dnsCheckedAt",
-  "healthCheckedAt",
+  "dnsPreviousNs", "dnsPreSnapshot", "healthCheckedAt",
 ] as const;
 
 export function updateDomain(

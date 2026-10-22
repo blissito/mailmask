@@ -54,7 +54,7 @@ describe("MCP: agentes contra la app", () => {
           return { changeId: "C1" };
         },
         ensureHostedZone: async () => ({ hostedZoneId: "ZMCP", nameservers: ["ns-1.awsdns-01.com"], created: true }),
-        configureDnsRecords: async () => undefined,
+        configureDnsRecords: async () => ({ mxOurs: true, spf: "created", mailProvider: null }),
         deleteHostedZone: async () => undefined,
       },
     });
@@ -235,10 +235,12 @@ describe("MCP: agentes contra la app", () => {
     assert.equal(sinZona.json.result.structuredContent.zone.status, "none");
     assert.match(sinZona.json.result.structuredContent.hint, /dns\/zone/);
 
-    // 2. Crea la zona y recibe los nameservers para el registrador.
+    // 2. Crea la zona. Nace en revisión: los nameservers los ve el dueño al confirmar en el
+    // panel, no el agente («Conectar sin mudarte»).
     const zona = await call("create_dns_zone", { domainId: dom.id });
     assert.ok(!zona.json.result.isError, JSON.stringify(zona.json.result));
-    assert.deepEqual(zona.json.result.structuredContent.nameservers, ["ns-1.awsdns-01.com"]);
+    assert.equal(zona.json.result.structuredContent.status, "pending_review");
+    assert.deepEqual(zona.json.result.structuredContent.nameservers, []);
 
     // 3. Apunta el dominio a Vercel con una sola herramienta.
     const vercel = await call("point_domain_to", { domainId: dom.id, provider: "vercel", target: "mi-proyecto.vercel.app" });
