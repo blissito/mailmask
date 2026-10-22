@@ -2629,6 +2629,15 @@ const app = new Elysia({ adapter: node() })
     // 2. MX records
     const mx = await checkInboundMx(d);
     checks.mx = { ok: mx.ok, detail: mx.detail };
+    // «Conectar sin mudarte»: con la zona en MailMask el MX ajeno se deja a propósito (route53.ts,
+    // keepForeignMx). Marcarlo como error hacía creer al cliente que su correo se había roto.
+    const keepsMail = !mx.ok && mx.resolved && !!domain.hostedZoneId
+      && ["pending_review", "pending_delegation", "active"].includes(domain.dnsZoneStatus ?? "")
+      && !/ninguno$/.test(mx.detail);
+    if (keepsMail) {
+      const provider = /google\.com/i.test(mx.detail) ? "Google" : /outlook\.com/i.test(mx.detail) ? "Microsoft" : /zoho\./i.test(mx.detail) ? "Zoho" : "tu proveedor actual";
+      checks.mx = { ok: true, detail: `Tu correo sigue en ${provider}, a propósito: MailMask no movió tu MX. Si algún día quieres recibir aquí, se cambia desde esta pestaña.` };
+    }
 
     // Lo medido se guarda: `list_domains` lee estas banderas. Antes `mxConfigured`
     // sólo se escribía al comprar el dominio y la lista mentía (7-oct-2026).
