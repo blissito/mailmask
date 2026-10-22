@@ -144,6 +144,84 @@ describe("Asistente: Ghosty, turn token y confirmaciones", () => {
     assert.equal(last2[1].status, "ok");
   });
 
+  // --- Consumo del agente (agent-quota.ts) ---
+
+  const sseOf = (events: unknown[]) => {
+    const enc = new TextEncoder();
+    return new ReadableStream<Uint8Array>({ start(c) { for (const e of events) c.enqueue(enc.encode(`data: ${JSON.stringify(e)}\n\n`)); c.close(); } });
+  };
+
+  it("collectTurn cuenta los eventos `tool` y captura `done.usage`", async () => {
+    const usage = { inputTokens: 1200, cacheReadTokens: 900, cacheWriteTokens: 0, outputTokens: 80, toolCalls: 2, model: "claude-x", costUsd: 0.0123 };
+    const o = await asis.collectTurn(sseOf([
+      { type: "tool", name: "a" }, { type: "chunk", value: "x" }, { type: "tool", name: "b" },
+      { type: "done", value: "listo", usage },
+    ]), new AbortController());
+    assert.equal(o.status, "ok");
+    assert.equal(o.reply, "listo");
+    assert.equal(o.toolCalls, 2);
+    assert.deepEqual(o.usage, usage);
+    const q = await import("./agent-quota.ts");
+    assert.equal(q.turnCostUsd(o, "panel"), 0.0123, "con usage manda el costo real");
+  });
+
+  it("sin `done.usage` (Ghosty viejo) se estima por las tool calls contadas", async () => {
+    const o = await asis.collectTurn(sseOf([{ type: "tool", name: "a" }, { type: "tool", name: "b" }, { type: "tool", name: "c" }, { type: "done", value: "ok" }]), new AbortController());
+    assert.equal(o.toolCalls, 3);
+    assert.equal(o.usage, undefined);
+    const q = await import("./agent-quota.ts");
+    assert.ok(Math.abs(q.turnCostUsd(o, "panel") - (q.EST_PANEL_BASE_USD + 3 * q.EST_PANEL_PER_TOOL_USD)) < 1e-9);
+    // usage basura se ignora
+    const bad = await asis.collectTurn(sseOf([{ type: "done", value: "ok", usage: { costUsd: -1, inputTokens: "mucho" } }]), new AbortController());
+    assert.equal(bad.usage, undefined);
+  });
+
+  it("stream: el turno se le carga al dominio en pantalla (turnos, tool calls y costo)", async () => {
+    const q = await import("./agent-quota.ts");
+    const before = q.getAgentUsage(domainId);
+    sseFrames = [
+      `data: ${JSON.stringify({ type: "tool", name: "mcp__mailmask__list_domains" })}\n\n`,
+      `data: ${JSON.stringify({ type: "done", value: "ok", usage: { costUsd: 0.02, toolCalls: 1 } })}\n\n`,
+    ];
+    const res = await postJson("/api/asistente/stream", { text: "lista", attachments: [], screen: { domainId } }, withSession());
+    await res.text();
+    const after = q.getAgentUsage(domainId);
+    assert.equal(after.turns - before.turns, 1);
+    assert.equal(after.toolCalls - before.toolCalls, 1);
+    assert.equal(after.threads, before.threads, "un turno del panel no es un hilo");
+    assert.ok(Math.abs(after.costUsd - before.costUsd - 0.02) < 1e-6);
+
+    // La lectura del panel: sin costo para quien no es admin.
+    const read = await (await req(`/api/domains/${domainId}/agent-usage`, { headers: { cookie: session.cookie } })).json();
+    assert.equal(read.turns, after.turns);
+    assert.equal(read.toolCalls, after.toolCalls);
+    assert.equal(read.includedThreads, q.AGENT_INCLUDED_THREADS);
+    assert.equal(read.mode, "auto");
+    assert.equal(typeof read.internalPct, "number");
+    assert.ok(!("costUsd" in read), "el costo en USD es sólo para admins");
+    const ajeno = await req(`/api/domains/no-existe/agent-usage`, { headers: { cookie: session.cookie } });
+    assert.equal(ajeno.status, 404);
+  });
+
+  it("stream: con el agente en pausa contesta claro y no llama a Ghosty", async () => {
+    const q = await import("./agent-quota.ts");
+    q.setAgentQuotaNotifiers({ alert: () => {}, owner: () => {} });
+    try {
+      const pausedId = dbmod.createDomain(email, `pausa-${suffix}.com`, ["d1"], "vt").id;
+      q.recordAgentUsage({ domainId: pausedId, turns: 1, toolCalls: 0, costUsd: q.internalCapUsd() + 1 });
+      lastCall = null;
+      const res = await postJson("/api/asistente/stream", { text: "hola", attachments: [], screen: { domainId: pausedId } }, withSession());
+      assert.equal(res.status, 200);
+      const out = await res.text();
+      assert.match(out, /"type":"done"/);
+      assert.match(out, /pausa/);
+      assert.equal(lastCall, null, "no se abrió turno en Ghosty");
+      assert.equal(q.getAgentUsage(pausedId).turns, 1, "un turno que no se hizo no se cobra");
+    } finally {
+      q.setAgentQuotaNotifiers(null);
+    }
+  });
+
   it("stream: sin cambio de pantalla igual viaja una línea con el dominio en pantalla", async () => {
     sseFrames = [`data: ${JSON.stringify({ type: "done", value: "ok" })}\n\n`];
     const res = await postJson("/api/asistente/stream", { text: "subdominio contador", attachments: [], screen: { domainId, tab: "dns" }, screenChanged: false }, withSession());

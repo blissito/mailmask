@@ -225,7 +225,9 @@ import {
   type AssistantAttachment,
   canUseAssistant,
   isAdminEmail,
+  assistantUsageDomainId,
 } from "./assistant.js";
+import { checkAgentBudget, recordAgentUsage, turnCostUsd, getAgentUsage, agentBudgetStatus, AGENT_INCLUDED_THREADS } from "./agent-quota.js";
 import { checkRateLimit } from "./rate-limit.js";
 import {
   verifyDomain,
@@ -2593,6 +2595,29 @@ const app = new Elysia({ adapter: node() })
     });
   }, {
     detail: { tags: ["Domains", "SDK"], summary: "Get a single domain by ID", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  // Consumo del agente en el mes (agent-quota.ts). El costo en USD es dato interno: sólo admins.
+  .get("/api/domains/:id/agent-usage", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const row = getAgentUsage(access.domain.id);
+    const status = agentBudgetStatus(row);
+    return Response.json({
+      month: row.month,
+      threads: row.threads,
+      turns: row.turns,
+      toolCalls: row.toolCalls,
+      includedThreads: AGENT_INCLUDED_THREADS,
+      threadsPct: status.threadsPct,
+      internalPct: status.internalPct,
+      mode: status.mode,
+      ...(isAdminEmail(user.email) ? { costUsd: row.costUsd } : {}),
+    });
+  }, {
+    detail: { tags: ["Domains"], summary: "Consumo del agente Mascarito en el mes", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
   .get("/api/domains/:id/health", async ({ request, params }) => {
@@ -8822,6 +8847,18 @@ const app = new Elysia({ adapter: node() })
     // Los adjuntos van como markdown, igual que los re-hidrata el dock.
     const saved = saveAssistantMessage(auth.email, "user", [text, ...files.map(attachmentMarkdown)].filter(Boolean).join("\n"));
 
+    // Presupuesto del agente (agent-quota.ts): el turno se le carga al dominio en pantalla o al
+    // activado más antiguo. En pausa no se llama a Ghosty; se contesta con un SSE propio.
+    const usageDomainId = assistantUsageDomainId(auth.email, b.screen);
+    if (usageDomainId && checkAgentBudget(usageDomainId).mode === "paused") {
+      const msg = "Mascarito llegó al límite de uso de este mes en este dominio y está en pausa hasta el día 1. Puedes hacer el cambio desde el panel, o escríbenos a soporte si necesitas más.";
+      saveAssistantMessage(auth.email, "assistant", msg, "ok");
+      const sse = `data: ${JSON.stringify({ type: "done", value: msg })}\n\n`;
+      return new Response(sse, {
+        headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", "x-message-id": saved.id },
+      });
+    }
+
     const pantalla = buildScreenContext(auth.email, b.screen);
     const appendSystemPrompt = [ASSISTANT_BASE_PROMPT, pantalla ? `Contexto de pantalla:\n${pantalla}` : null].filter(Boolean).join("\n\n");
     // El append sólo se aplica cuando Ghosty CREA la conversación (es sticky por groupId,
@@ -8854,6 +8891,13 @@ const app = new Elysia({ adapter: node() })
       if (o.status === "failed") log("warn", "assistant", "Turno fallido", { email: auth.email, error: o.error });
       const content = o.reply || (o.status === "failed" ? "No pude completar la respuesta. Intenta de nuevo." : "");
       if (content) saveAssistantMessage(auth.email, "assistant", content, o.status);
+      if (usageDomainId) {
+        try {
+          recordAgentUsage({ domainId: usageDomainId, turns: 1, toolCalls: o.toolCalls, costUsd: turnCostUsd(o, "panel") });
+        } catch (err) {
+          log("error", "assistant", "No se pudo anotar el consumo del turno", { domainId: usageDomainId, error: String(err) });
+        }
+      }
     });
     return new Response(stream, {
       headers: {

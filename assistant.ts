@@ -11,6 +11,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { sqlite } from "./pg.js";
 import { getDomain, getUser, getAgentByEmail, derechosDeDominio, listUserDomains } from "./db.js";
+import type { AgentTurnUsage } from "./agent-quota.js";
 
 // --- Quién puede usar el asistente ---
 
@@ -177,6 +178,23 @@ export function buildScreenContext(email: string, screen: unknown): string | nul
 }
 
 /**
+ * A qué dominio se le carga un turno del panel: el que está en pantalla (si el usuario tiene
+ * acceso) o, si no hay, el activado más antiguo del usuario. `null` = no se cuenta (cuenta
+ * sin dominios activados, p. ej. un admin probando).
+ */
+export function assistantUsageDomainId(email: string, screen: unknown): string | null {
+  const s = screen && typeof screen === "object" ? (screen as { domainId?: unknown }) : {};
+  if (typeof s.domainId === "string" && /^[A-Za-z0-9-]{1,64}$/.test(s.domainId)) {
+    const domain = getDomain(s.domainId);
+    if (domain && (domain.ownerEmail === email || getAgentByEmail(domain.id, email))) return domain.id;
+  }
+  const owner = getUser(email);
+  if (!owner) return null;
+  // listUserDomains ya viene ordenada por fecha de alta
+  return listUserDomains(email).find((d) => derechosDeDominio(d, owner).activado)?.id ?? null;
+}
+
+/**
  * Recordatorio de una línea para los turnos en que la pantalla NO cambió. Sin él, el
  * agente seguía el dominio del hilo y no el de la pantalla: con fancyfiles.app abierto,
  * «subdominio contador» se creó en hectorbliss.com porque de ahí venía la charla.
@@ -272,7 +290,21 @@ function frameEvent(frame: string): Record<string, unknown> | null {
   }
 }
 
-export type TurnOutcome = { reply: string; status: "ok" | "failed" | "stopped"; error?: string };
+/** `toolCalls` cuenta los eventos `tool`; `usage` es `done.usage` de Ghosty, si lo mandó. */
+export type TurnOutcome = { reply: string; status: "ok" | "failed" | "stopped"; error?: string; toolCalls: number; usage?: AgentTurnUsage };
+
+/** `done.usage` validado: sólo números finitos no negativos y un `model` corto. */
+export function parseTurnUsage(raw: unknown): AgentTurnUsage | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const out: AgentTurnUsage = {};
+  for (const k of ["inputTokens", "cacheReadTokens", "cacheWriteTokens", "outputTokens", "toolCalls", "costUsd"] as const) {
+    const v = o[k];
+    if (typeof v === "number" && Number.isFinite(v) && v >= 0) out[k] = v;
+  }
+  if (typeof o.model === "string") out.model = o.model.slice(0, 100);
+  return Object.keys(out).length ? out : undefined;
+}
 
 /**
  * Re-emite el SSE de Ghosty frame por frame (un `enqueue` por evento, sin esperar a
@@ -292,20 +324,27 @@ export function relayTurn(
   let chunks = "";
   let final = "";
   let error: string | undefined;
+  let toolCalls = 0;
+  let usage: AgentTurnUsage | undefined;
   let finished = false;
   const finish = (status: TurnOutcome["status"]) => {
     if (finished) return;
     finished = true;
     const reply = (final || chunks).trim();
-    onFinish({ reply, status: error && status === "ok" ? "failed" : status, error });
+    // Si Ghosty reporta sus tool calls, manda sobre los eventos contados (pudo no emitirlos todos).
+    const tools = usage?.toolCalls !== undefined ? Math.max(toolCalls, Math.round(usage.toolCalls)) : toolCalls;
+    onFinish({ reply, status: error && status === "ok" ? "failed" : status, error, toolCalls: tools, ...(usage ? { usage } : {}) });
   };
   const handle = (frame: string, controller: ReadableStreamDefaultController<Uint8Array>) => {
     controller.enqueue(encoder.encode(`${frame}\n\n`));
     const evt = frameEvent(frame);
     if (!evt) return;
     if (evt.type === "chunk" && typeof evt.value === "string") chunks += evt.value;
-    else if (evt.type === "done" && typeof evt.value === "string") final = evt.value;
-    else if (evt.type === "error") error = typeof evt.message === "string" ? evt.message : "error";
+    else if (evt.type === "tool") toolCalls++;
+    else if (evt.type === "done") {
+      if (typeof evt.value === "string") final = evt.value;
+      usage = parseTurnUsage(evt.usage) ?? usage;
+    } else if (evt.type === "error") error = typeof evt.message === "string" ? evt.message : "error";
   };
 
   return new ReadableStream<Uint8Array>({
@@ -347,7 +386,7 @@ export function relayTurn(
 
 /** Lee el turno completo sin re-emitirlo a nadie (turnos que no vienen del dock). */
 export async function collectTurn(upstream: ReadableStream<Uint8Array>, abort: AbortController): Promise<TurnOutcome> {
-  let outcome: TurnOutcome = { reply: "", status: "failed", error: "sin respuesta" };
+  let outcome: TurnOutcome = { reply: "", status: "failed", error: "sin respuesta", toolCalls: 0 };
   const reader = relayTurn(upstream, abort, (o) => { outcome = o; }).getReader();
   while (!(await reader.read()).done) { /* sólo drena */ }
   return outcome;

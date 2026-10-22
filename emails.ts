@@ -1133,6 +1133,47 @@ export function forwardCapReached(d: { cap: number; plan: string }): Email {
   };
 }
 
+/** Aviso al 80 % de los hilos que Mascarito atiende solo en el mes (`agent-quota.ts`). */
+export function agentQuotaWarning(d: { domain: string; used: number; cap: number }): Email {
+  const pct = Math.round((d.used / d.cap) * 100);
+  return {
+    subject: cleanSubject(`Mascarito lleva ${pct}% de sus hilos del mes en ${d.domain}`),
+    html: layout({
+      preheader: `${d.used.toLocaleString("es-MX")} de ${d.cap.toLocaleString("es-MX")} hilos atendidos este mes.`,
+      heading: "Mascarito va alto este mes",
+      body: p(`Tu agente en ${d.domain} incluye ${d.cap.toLocaleString("es-MX")} hilos atendidos al mes y ya lleva ${d.used.toLocaleString("es-MX")}.`)
+        + p("Si llega al tope, Mascarito deja de contestar solo: prepara la respuesta como borrador para que tú la revises y la mandes, hasta el día 1 del mes siguiente."),
+      cta: { label: "Ver el uso de Mascarito", url: `${baseUrl()}/app` },
+      footerNote: "¿Necesitas más hilos? Contesta este correo y te ofrecemos un bloque extra.",
+    }),
+    text: textBlock([
+      `Tu agente en ${d.domain} incluye ${d.cap} hilos atendidos al mes y ya lleva ${d.used}.`,
+      "Si llega al tope, Mascarito prepara las respuestas como borrador para que tú las revises, hasta el día 1 del mes siguiente.",
+      `Ver el uso: ${baseUrl()}/app`,
+    ]),
+  };
+}
+
+/** Aviso al 100 %: desde aquí el automático baja a borrador hasta el día 1. */
+export function agentQuotaReached(d: { domain: string; cap: number }): Email {
+  return {
+    subject: cleanSubject(`Mascarito llegó a sus hilos del mes en ${d.domain}`),
+    html: layout({
+      preheader: "Desde ahora prepara borradores; vuelve a contestar solo el día 1.",
+      heading: "Mascarito pasó a modo borrador",
+      body: p(`Tu agente en ${d.domain} ya atendió los ${d.cap.toLocaleString("es-MX")} hilos incluidos este mes.`)
+        + p("Desde ahora Mascarito no contesta solo: deja la respuesta como borrador en la Bandeja para que tú la revises y la mandes. Vuelve a contestar solo el día 1 del mes siguiente."),
+      cta: { label: "Abrir la Bandeja", url: `${baseUrl()}/bandeja` },
+      footerNote: "¿Necesitas más hilos este mes? Contesta este correo y te ofrecemos un bloque extra.",
+    }),
+    text: textBlock([
+      `Tu agente en ${d.domain} ya atendió los ${d.cap} hilos incluidos este mes.`,
+      "Desde ahora Mascarito deja la respuesta como borrador en la Bandeja para que tú la revises. Vuelve a contestar solo el día 1 del mes siguiente.",
+      `Abrir la Bandeja: ${baseUrl()}/bandeja`,
+    ]),
+  };
+}
+
 // --- Envío ---
 
 /**
