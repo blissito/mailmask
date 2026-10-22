@@ -180,7 +180,9 @@ describe("API de DNS", () => {
     const r = await pedir(`/api/domains/${domainId}/dns/zone`, { method: "POST" });
     assert.equal(r.status, 200);
     const j = await r.json();
-    assert.equal(j.nameservers.length, 2);
+    // Nace en revisión: los NS salen al confirmar (dns-zone-keep-mail.test.ts).
+    assert.equal(j.status, "pending_review");
+    assert.deepEqual(j.nameservers, []);
     assert.equal(j.imported.length, 1);
 
     // Lo del cliente tiene que estar en la zona ANTES de que delegue, o su web muere.

@@ -47,9 +47,15 @@ export const domains = sqliteTable("domains", {
   // Zona DNS en Route 53. Vive aquí y no en `domain_registrations` porque un dominio de
   // fuera puede delegar sus nameservers sin haberse comprado con nosotros.
   hostedZoneId: text("hosted_zone_id"),
-  dnsZoneStatus: text("dns_zone_status").$type<"none" | "pending_delegation" | "active">().notNull().default("none"),
+  // `pending_review`: la zona ya existe pero el dueño no ha confirmado que revisó su web y su
+  // correo; hasta entonces no se le enseñan los nameservers («Conectar sin mudarte»).
+  dnsZoneStatus: text("dns_zone_status").$type<"none" | "pending_review" | "pending_delegation" | "active" | "rolled_back">().notNull().default("none"),
   dnsNameservers: text("dns_nameservers", { mode: "json" }).$type<string[]>(),
   dnsDelegatedAt: text("dns_delegated_at"),
+  /** Los NS que tenía el dominio antes de delegar: el plan de regreso si algo falla. */
+  dnsPreviousNs: text("dns_previous_ns", { mode: "json" }).$type<string[]>(),
+  /** El inventario revisado al confirmar; el vigía de 48 h (`dns-watch.ts`) compara contra él. */
+  dnsPreSnapshot: text("dns_pre_snapshot", { mode: "json" }).$type<{ name: string; type: string; ttl: number; values: string[] }[]>(),
   dnsCheckedAt: text("dns_checked_at"),
   /** Última vez que health/verify/arranque midieron `verified` y `mxConfigured` en vivo (ver domain-flags.ts). */
   healthCheckedAt: text("health_checked_at"),

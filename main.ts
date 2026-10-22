@@ -1279,6 +1279,17 @@ function jsonErr(error: string, status: number): Response {
   return new Response(JSON.stringify({ error }), { status, headers: { "content-type": "application/json" } });
 }
 
+/**
+ * ¿Podemos regresarle los nameservers con un clic? Sólo si guardamos los anteriores y el
+ * registro del dominio vive en nuestra cuenta de AWS (Route 53 Domains); si lo tiene otro
+ * registrador, el cambio se hace allá y sólo le podemos dar los NS para copiar.
+ */
+function rollbackAvailable(d: { domain: string; ownerEmail: string; dnsPreviousNs?: string[] | null }): boolean {
+  if (!d.dnsPreviousNs?.length) return false;
+  const reg = getDomainRegistrationByDomainName(d.domain);
+  return !!reg && reg.status === "registered" && reg.ownerEmail === d.ownerEmail;
+}
+
 // --- EasyBits (Sitios): lo común a publicar, quitar y `point_domain_to` ---
 
 /** Sin cuenta de EasyBits conectada: el agente no puede conectarla (es OAuth en navegador). */
@@ -7928,7 +7939,10 @@ const app = new Elysia({ adapter: node() })
     const registros = await listRecordSets(d.hostedZoneId);
 
     let delegated = d.dnsZoneStatus === "active";
-    if (!delegated && d.dnsNameservers?.length) {
+    // En revisión no se comprueba (aún no tiene los NS) y tras un rollback tampoco: durante la
+    // propagación todavía se verían los nuestros y lo daríamos por activo otra vez.
+    const skipProbe = d.dnsZoneStatus === "pending_review" || d.dnsZoneStatus === "rolled_back";
+    if (!delegated && !skipProbe && d.dnsNameservers?.length) {
       const { getDelegationStatus } = await import("./dns-import.js");
       const estado = await getDelegationStatus(d.domain, d.dnsNameservers);
       delegated = estado.delegated;
@@ -7941,8 +7955,13 @@ const app = new Elysia({ adapter: node() })
       zone: {
         status: delegated ? "active" : d.dnsZoneStatus,
         hostedZoneId: d.hostedZoneId,
-        nameservers: d.dnsNameservers ?? [],
+        // Los NS no se enseñan hasta confirmar la revisión («Conectar sin mudarte»).
+        nameservers: d.dnsZoneStatus === "pending_review" ? [] : (d.dnsNameservers ?? []),
         delegated,
+        previousNameservers: d.dnsPreviousNs ?? [],
+        hasPreSnapshot: !!d.dnsPreSnapshot?.length,
+        // El rollback de un clic sólo existe si el registro del dominio vive en nuestra cuenta.
+        rollbackAvailable: rollbackAvailable(d),
       },
       records: anotarRegistros(registros as never, {
         domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens,
@@ -8175,8 +8194,25 @@ const app = new Elysia({ adapter: node() })
     const { snapshotDns } = await import("./dns-import.js");
 
     // El inventario se toma ANTES de crear nada: en cuanto el cliente delegue, esta consulta
-    // ya no devolvería su zona vieja.
-    const inventario = await snapshotDns(d.domain).catch(() => ({ found: [], nameservers: [], warning: "No se pudo leer tu DNS actual; revisa tus registros a mano antes de cambiar los nameservers." }));
+    // ya no devolvería su zona vieja. Los nombres que ya conocemos (nuestros DKIM, que llevan
+    // un token aleatorio) y los selectores DKIM de los proveedores grandes van aparte: la
+    // heurística no los adivina.
+    const extraNames = [
+      ...(d.dkimTokens ?? []).map((t) => `${t}._domainkey`),
+      "google._domainkey", "selector1._domainkey", "selector2._domainkey", "zmail._domainkey",
+    ];
+    const inventario: { found: { name: string; type: string; ttl: number; values: string[] }[]; nameservers: string[]; warning: string; truncado?: boolean } =
+      await snapshotDns(d.domain, extraNames).catch(() => ({ found: [], nameservers: [], warning: "No se pudo leer tu DNS actual; revisa tus registros a mano antes de cambiar los nameservers.", truncado: true }));
+
+    // «Conectar sin mudarte»: el MX ajeno NUNCA se mueve. Ponernos delante (lo que hacía
+    // `preserveMx`) dejaba a Gmail sin correo nuevo en cuanto el cliente delegaba. Si el
+    // dominio no tiene MX, no hay correo que romper y el nuestro entra solo.
+    const apex = d.domain.toLowerCase();
+    const foreignMx = inventario.found
+      .filter((r) => r.name === apex && r.type === "MX")
+      .flatMap((r) => r.values)
+      .filter((v) => !v.includes("inbound-smtp."));
+    let configured: { mxOurs: boolean; spf: string; mailProvider: string | null } = { mxOurs: true, spf: "kept", mailProvider: null };
 
     const zona = await ensureHostedZone(d.domain);
     try {
@@ -8189,7 +8225,10 @@ const app = new Elysia({ adapter: node() })
         );
       }
       // 2. Y encima lo nuestro, fusionando en vez de pisar.
-      await configureDnsRecords(zona.hostedZoneId, d.domain, d.verificationToken, d.dkimTokens, { preserveMx: true });
+      configured = await configureDnsRecords(
+        zona.hostedZoneId, d.domain, d.verificationToken, d.dkimTokens,
+        foreignMx.length ? { keepForeignMx: true } : { preserveMx: true },
+      );
     } catch (err) {
       // Media zona es peor que ninguna: se deshace lo que acabamos de crear.
       if (zona.created) await deleteHostedZone(zona.hostedZoneId).catch(() => {});
@@ -8197,21 +8236,158 @@ const app = new Elysia({ adapter: node() })
       return jsonErr("No se pudo preparar la zona DNS. No cambiamos nada; inténtalo de nuevo.", 500);
     }
 
+    // La zona nace en revisión: los nameservers no se enseñan hasta que el dueño confirme
+    // que su web y su correo están (`/dns/zone/confirm`). Los NS de antes se guardan como
+    // plan de regreso.
     updateDomain(d.id, {
       hostedZoneId: zona.hostedZoneId,
-      dnsZoneStatus: "pending_delegation",
+      dnsZoneStatus: "pending_review",
       dnsNameservers: zona.nameservers,
+      dnsPreviousNs: inventario.nameservers?.length ? inventario.nameservers : null,
       dnsCheckedAt: new Date().toISOString(),
     });
 
+    const spfWarning = configured.spf === "skipped" && foreignMx.length
+      ? "No reconocemos a tu proveedor de correo y tu dominio no tiene SPF, así que no creamos uno: uno incompleto haría fallar el correo que mandas desde tu proveedor. Agrega el SPF que te indique tu proveedor e incluye include:amazonses.com."
+      : null;
+
     return Response.json({
       hostedZoneId: zona.hostedZoneId,
-      nameservers: zona.nameservers,
+      status: "pending_review",
+      // Vacío a propósito (y no ausente: el CLI publicado lo recorre): los NS salen al confirmar.
+      nameservers: [],
       imported: inventario.found,
       importWarning: inventario.warning,
+      truncado: !!inventario.truncado,
+      mailKept: !!foreignMx.length,
+      mailProvider: configured.mailProvider,
+      spf: configured.spf,
+      spfWarning,
+      previousNameservers: inventario.nameservers ?? [],
+      next: "Revisa que estén tu web y tu correo (o compáralos contra la exportación de tu zona). Los nameservers se ven al confirmar la revisión en el panel de MailMask.",
     });
   }, {
-    detail: { tags: ["DNS", "SDK"], summary: "Create (or adopt) the Route 53 hosted zone", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+    detail: { tags: ["DNS", "SDK"], summary: "Create (or adopt) the Route 53 hosted zone, in review: the foreign MX is kept and the nameservers come after confirming", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .post("/api/domains/:id/dns/zone/confirm", async ({ request, params, body }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+    if (!d.hostedZoneId) return jsonErr("Este dominio todavía no tiene zona DNS en MailMask.", 409);
+
+    if ((body as { checked?: unknown } | undefined)?.checked !== true) {
+      return jsonErr("Confirma que revisaste que estén tu web y tu correo (checked: true) antes de ver los nameservers.", 400);
+    }
+
+    // Idempotente: confirmar dos veces devuelve lo mismo.
+    if (d.dnsZoneStatus === "pending_review") {
+      const { listRecordSets } = await import("./route53.js");
+      let snapshot: { name: string; type: string; ttl: number; values: string[] }[] = [];
+      try {
+        snapshot = (await listRecordSets(d.hostedZoneId)).filter((r) =>
+          !(r.name === d.domain.toLowerCase() && (r.type === "NS" || (r.type as string) === "SOA")));
+      } catch (err) {
+        log("error", "route53", "No se pudo leer la zona al confirmar", { domain: d.domain, error: String(err) });
+        return jsonErr("No pudimos leer tu zona. Intenta de nuevo en un momento.", 502);
+      }
+      updateDomain(d.id, { dnsZoneStatus: "pending_delegation", dnsPreSnapshot: snapshot });
+      log("info", "route53", "Zona revisada por el dueño", { domain: d.domain, actor: user.email, records: snapshot.length });
+    }
+
+    return Response.json({
+      status: d.dnsZoneStatus === "active" ? "active" : "pending_delegation",
+      nameservers: d.dnsNameservers ?? [],
+      previousNameservers: d.dnsPreviousNs ?? [],
+    });
+  }, {
+    detail: { tags: ["DNS"], summary: "Confirm the imported zone was reviewed and reveal the nameservers to set at the registrar", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .get("/api/domains/:id/dns/export", async ({ request, params, query }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 20, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+    const which = (query as { which?: string }).which === "pre" ? "pre" : "current";
+
+    const { toZoneFile } = await import("./dns-records.js");
+    let zoneRecords: { name: string; type: string; ttl: number; values: string[] }[];
+    if (which === "pre") {
+      if (!d.dnsPreSnapshot?.length) return jsonErr("Todavía no hay un respaldo de la zona revisada: se guarda al confirmar la revisión.", 409);
+      zoneRecords = d.dnsPreSnapshot;
+    } else {
+      if (!d.hostedZoneId) return jsonErr("Este dominio todavía no tiene zona DNS en MailMask.", 409);
+      const { listRecordSets } = await import("./route53.js");
+      try {
+        zoneRecords = await listRecordSets(d.hostedZoneId);
+      } catch (err) {
+        log("error", "route53", "Exportación de zona falló", { domain: d.domain, error: String(err) });
+        return jsonErr("No pudimos leer tu zona. Intenta de nuevo.", 502);
+      }
+    }
+
+    const zoneText = toZoneFile(d.domain, zoneRecords as never, which === "pre" ? "la zona que revisaste antes de cambiar los nameservers" : "la zona actual en MailMask");
+    const suffix = which === "pre" ? "-antes" : "";
+    return new Response(zoneText, {
+      headers: {
+        "content-type": "text/plain; charset=utf-8",
+        "content-disposition": `attachment; filename="${d.domain}${suffix}.zone"`,
+      },
+    });
+  }, {
+    detail: { tags: ["DNS"], summary: "Download the zone as a standard zone file (which=current from Route 53, which=pre the reviewed snapshot)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .post("/api/domains/:id/dns/rollback", async ({ request, params, body }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    // Regresar los nameservers cambia a dónde apunta todo el dominio: sólo desde el panel,
+    // con sesión. Un agente con una llave no lo hace (mismo criterio que el candado).
+    if (user.via !== "session") return jsonErr("Regresar a tus nameservers anteriores sólo se puede desde el panel, con tu sesión.", 403);
+    const limited = await rateLimitGuard(`dns-rollback:${user.email}`, 3, 300_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+
+    if ((body as { confirm?: unknown } | undefined)?.confirm !== true) {
+      return jsonErr("Confirma que quieres regresar a tus nameservers anteriores (confirm: true).", 400);
+    }
+    const previousNs = d.dnsPreviousNs ?? [];
+    if (!previousNs.length) return jsonErr("No tenemos guardados los nameservers anteriores de este dominio.", 409);
+
+    // Sólo podemos cambiar los NS de un dominio cuyo registro vive en nuestra cuenta de AWS.
+    if (!rollbackAvailable(d)) {
+      return Response.json({
+        error: `${d.domain} está registrado en otro proveedor: los nameservers se cambian allá. Vuelve a poner estos en tu registrador.`,
+        previousNameservers: previousNs,
+      }, { status: 409 });
+    }
+
+    try {
+      const { updateNameservers } = await import("./route53.js");
+      await updateNameservers(d.domain, previousNs);
+    } catch (err) {
+      log("error", "route53", "Rollback de nameservers falló", { domain: d.domain, error: String(err) });
+      return jsonErr("No pudimos regresar los nameservers. Intenta de nuevo o escríbenos.", 502);
+    }
+    // La zona NO se borra: si quiere volver, todo sigue ahí.
+    updateDomain(d.id, { dnsZoneStatus: "rolled_back" });
+    log("warn", "route53", "Nameservers regresados al proveedor anterior", { domain: d.domain, actor: user.email, ns: previousNs });
+    return Response.json({ ok: true, status: "rolled_back", nameservers: previousNs });
+  }, {
+    detail: { tags: ["DNS"], summary: "Put the previous nameservers back (only domains registered through MailMask; session only)", security: [{ cookieAuth: [] }] },
   })
 
   .get("/api/domains/:id/dns/delegation", async ({ request, params }) => {
@@ -8224,6 +8400,8 @@ const app = new Elysia({ adapter: node() })
     if (!access) return jsonErr("Dominio no encontrado", 404);
     const d = access.domain;
     if (!d.dnsNameservers?.length) return jsonErr("Este dominio todavía no tiene zona DNS en MailMask.", 409);
+    // En revisión el dueño todavía no ve los nameservers: no hay delegación que comprobar.
+    if (d.dnsZoneStatus === "pending_review") return jsonErr("Primero confirma en el panel que revisaste tu zona.", 409);
 
     const { getDelegationStatus } = await import("./dns-import.js");
     const estado = await getDelegationStatus(d.domain, d.dnsNameservers);

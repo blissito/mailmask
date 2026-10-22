@@ -88,7 +88,7 @@ describe("SDK ↔ servidor: contrato", () => {
           return { changeId: "C1" };
         },
         ensureHostedZone: async () => ({ hostedZoneId: "ZSDK", nameservers: ["ns-1.awsdns-01.com"], created: true }),
-        configureDnsRecords: async () => undefined,
+        configureDnsRecords: async () => ({ mxOurs: true, spf: "created", mailProvider: null }),
         deleteHostedZone: async () => undefined,
         // Registro y transferencia: sólo interesa que las rutas existan y su forma.
         checkAvailability: async (d: string) => ({ domain: d, available: !d.startsWith("ocupado") }),
@@ -601,11 +601,16 @@ describe("SDK ↔ servidor: contrato", () => {
 
     const z = await mm.dns.createZone(domainId);
     assert.equal(z.hostedZoneId, "ZSDK");
-    assert.deepEqual(z.nameservers, ["ns-1.awsdns-01.com"]);
+    // «Conectar sin mudarte»: los NS no salen hasta que el dueño confirma la revisión.
+    assert.deepEqual(z.nameservers, []);
     assert.ok(z.importWarning, "hay que avisar de que la importación puede no ser completa");
 
     const r = await mm.dns.list(domainId);
-    assert.equal(r.zone.status, "pending_delegation");
+    assert.equal(r.zone.status as string, "pending_review");
+    assert.deepEqual(r.zone.nameservers, []);
+    // La confirmación es del panel; aquí se simula para seguir con el resto del contrato.
+    dbmod.updateDomain(domainId, { dnsZoneStatus: "pending_delegation" });
+    assert.deepEqual((await mm.dns.list(domainId)).zone.nameservers, ["ns-1.awsdns-01.com"]);
   });
 
   it("dns: upsert, list y delete de un registro propio", async () => {

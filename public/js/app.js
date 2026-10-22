@@ -2403,8 +2403,171 @@ async function loadDns() {
 
   const estado = _dnsEstado.zone.status;
   if (estado === "none") renderDnsSinZona(cont);
+  else if (estado === "pending_review") renderDnsRevision(cont);
   else if (estado === "pending_delegation") renderDnsDelegacion(cont);
+  else if (estado === "rolled_back") renderDnsRegresado(cont);
   else renderDnsTabla(cont);
+}
+
+// --- Conectar sin mudarte: revisión, respaldo y plan de regreso ---
+
+const DNS_COPY_ICON = `<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>`;
+
+function dnsListaNs(ns) {
+  return ns.map(n => `
+    <div class="flex items-center gap-2">
+      <code class="text-xs font-mono text-fg break-all select-all">${esc(n)}</code>
+      <button type="button" data-action="copy" data-copy-value="${esc(n)}" class="text-fg-subtle hover:text-fg p-1 rounded hover:bg-line" title="Copiar">${DNS_COPY_ICON}</button>
+    </div>`).join("");
+}
+
+// El proveedor de correo que hay detrás del MX (misma tabla que SPF_BY_MX en route53.ts).
+function dnsProveedorCorreo(values) {
+  const hosts = (values || []).map(v => String(v).trim().split(/\s+/).pop().toLowerCase().replace(/\.$/, ""));
+  if (hosts.some(h => /(^|\.)(google\.com|googlemail\.com)$/.test(h))) return "Google";
+  if (hosts.some(h => /\.protection\.outlook\.com$/.test(h))) return "Microsoft 365";
+  if (hosts.some(h => /(^|\.)zoho(mail)?\.[a-z.]+$/.test(h))) return "Zoho";
+  return null;
+}
+
+function dnsBotonRespaldo(which, texto) {
+  return `<a href="/api/domains/${encodeURIComponent(selectedDomain.id)}/dns/export?which=${which}" download
+    class="inline-flex items-center gap-1.5 bg-bg-inset hover:bg-line text-fg text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors">${esc(texto)}</a>`;
+}
+
+function renderDnsRevision(cont) {
+  const apex = selectedDomain.domain.toLowerCase();
+  const mx = (_dnsEstado.records || []).find(r => r.type === "MX" && r.name === apex);
+  const ajeno = mx && !mx.values.some(v => v.includes("inbound-smtp."));
+  const proveedor = ajeno ? dnsProveedorCorreo(mx.values) : null;
+  cont.innerHTML = `
+    <div class="p-4 space-y-4">
+      <div class="border-2 border-amber-500/60 bg-amber-500/10 rounded-lg p-4">
+        <h4 class="font-bold text-fg text-base mb-1">Revisa antes de cambiar nada</h4>
+        <p class="text-sm text-fg">
+          Sin acceso a tu proveedor no vemos todos tus registros. Revisa que estén tu web y tu
+          correo, o sube la exportación de tu zona. <strong>Lo que no esté aquí dejará de
+          funcionar</strong> cuando cambies los nameservers.
+        </p>
+      </div>
+      ${ajeno ? `
+      <div class="border border-mask-500/40 bg-mask-500/15 rounded-lg p-3 text-sm text-fg">
+        <strong>Tu correo se queda igual${proveedor ? ` (${esc(proveedor)})` : ""}.</strong>
+        No movemos tu registro MX: sigues recibiendo donde recibes hoy.
+      </div>` : ""}
+      <div>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <p class="text-sm text-fg-muted">Esto es lo que copiamos. Puedes añadir o corregir registros.</p>
+          <div class="flex flex-wrap gap-2">
+            ${dnsBotonRespaldo("current", "Descargar respaldo de mi DNS")}
+            <button type="button" data-action="dns-nuevo" class="bg-accent hover:bg-accent/90 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors">+ Añadir registro</button>
+          </div>
+        </div>
+        <div class="border border-line rounded-lg overflow-hidden" id="dns-tabla"></div>
+      </div>
+      <div id="dns-compare-slot"></div>
+      <div class="border border-line rounded-lg p-4 bg-bg-elev space-y-3">
+        <label class="flex items-start gap-2 text-sm text-fg cursor-pointer">
+          <input type="checkbox" id="dns-revise" class="mt-0.5">
+          <span>Revisé que estén mi web y mi correo</span>
+        </label>
+        <button type="button" data-action="dns-confirmar" disabled class="bg-accent hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+          Ver mis nameservers
+        </button>
+      </div>
+    </div>`;
+
+  renderDnsFilas(document.getElementById("dns-tabla"));
+  // En revisión el MX ajeno se explica con su proveedor, no como «correo de MailMask».
+  if (ajeno) {
+    cont.querySelectorAll("#dns-tabla .divide-y > div").forEach((fila, i) => {
+      const r = (_dnsEstado.records || [])[i];
+      if (r === mx) {
+        const nota = fila.querySelector(".sm\\:col-span-5");
+        if (nota) nota.textContent = `Se queda igual${proveedor ? ` (${proveedor})` : ""}: tu correo sigue llegando donde llega hoy.`;
+      }
+    });
+  }
+  const casilla = document.getElementById("dns-revise");
+  const btn = cont.querySelector('[data-action="dns-confirmar"]');
+  casilla.addEventListener("change", () => { btn.disabled = !casilla.checked; });
+  btn.addEventListener("click", dnsConfirmarRevision);
+  cont.querySelector('[data-action="dns-nuevo"]').addEventListener("click", () => dnsFormulario(null));
+}
+
+async function dnsConfirmarRevision() {
+  const btn = document.querySelector('[data-action="dns-confirmar"]');
+  btn.disabled = true;
+  const res = await fetch(`/api/domains/${selectedDomain.id}/dns/zone/confirm`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ checked: true }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    btn.disabled = false;
+    showToast(data.error || "No se pudo confirmar la revisión.", true);
+    return;
+  }
+  playSound("success");
+  loadDns();
+}
+
+// Plan de regreso: un clic si el dominio se registró aquí; si no, los NS para copiar.
+function dnsBloqueRegreso() {
+  const previos = _dnsEstado.zone.previousNameservers || [];
+  if (!previos.length) return "";
+  return `
+    <div class="border border-line rounded-lg p-4 bg-bg-elev">
+      <h4 class="font-semibold text-fg mb-1">Si algo falla, vuelve a poner estos</h4>
+      <p class="text-sm text-fg-muted mb-2">Son los nameservers que tenía tu dominio antes.</p>
+      <div class="space-y-1 mb-3">${dnsListaNs(previos)}</div>
+      ${_dnsEstado.zone.rollbackAvailable
+        ? `<button type="button" data-action="dns-rollback" class="bg-bg-inset hover:bg-line text-fg text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors">Regresar a mis nameservers anteriores</button>`
+        : `<p class="text-sm text-fg font-semibold">No borres tu zona en tu proveedor anterior durante 30 días: es tu respaldo.</p>`}
+    </div>`;
+}
+
+function dnsEngancharRegreso(cont) {
+  const b = cont.querySelector('[data-action="dns-rollback"]');
+  if (b) b.addEventListener("click", dnsRegresar);
+}
+
+async function dnsRegresar() {
+  const ok = await confirmar({
+    titulo: "Regresar a tus nameservers anteriores",
+    mensaje: `${selectedDomain.domain} volverá a usar su DNS anterior. Tu zona en MailMask se conserva por si quieres volver.`,
+    accion: "Regresar",
+  });
+  if (!ok) return;
+  const res = await fetch(`/api/domains/${selectedDomain.id}/dns/rollback`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ confirm: true }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { showToast(data.error || "No se pudo regresar.", true); return; }
+  showToast("Listo: regresamos tus nameservers anteriores.");
+  loadDns();
+}
+
+function renderDnsRegresado(cont) {
+  cont.innerHTML = `
+    <div class="p-4 space-y-4">
+      <div class="border border-line rounded-lg p-4 bg-bg-elev">
+        <h4 class="font-semibold text-fg mb-1">Regresaste a tu DNS anterior</h4>
+        <p class="text-sm text-fg-muted mb-3">
+          Tu zona en MailMask sigue aquí. Si quieres volver, pon de nuevo estos nameservers en tu registrador.
+        </p>
+        <div class="space-y-1 mb-3">${dnsListaNs(_dnsEstado.zone.nameservers || [])}</div>
+        <div class="flex items-center gap-3">
+          <button type="button" data-action="dns-comprobar" class="bg-bg-inset hover:bg-line text-fg text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors">Ya los volví a poner</button>
+          <span id="dns-delegacion-estado" class="text-xs text-fg-subtle"></span>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2">${dnsBotonRespaldo("current", "Descargar respaldo de mi DNS")}</div>
+    </div>`;
+  cont.querySelector('[data-action="dns-comprobar"]').addEventListener("click", dnsComprobarDelegacion);
 }
 
 function renderDnsSinZona(cont) {
@@ -2413,8 +2576,9 @@ function renderDnsSinZona(cont) {
       <div class="border border-line rounded-lg p-4 bg-bg-elev">
         <h4 class="font-semibold text-fg mb-1">Deja que MailMask lleve tu DNS</h4>
         <p class="text-sm text-fg-muted mb-3">
-          Copiamos los registros que encontremos de tu proveedor actual y te damos los
-          nameservers que hay que cambiar. Tu sitio sigue funcionando: sólo cambia quién
+          Copiamos los registros que encontremos de tu proveedor actual, los revisas y te
+          damos los nameservers que hay que cambiar. Tu correo se queda donde está y tu sitio
+          sigue funcionando: sólo cambia quién
           responde las preguntas sobre <strong>${esc(selectedDomain.domain)}</strong>.
         </p>
         <button type="button" data-action="dns-crear-zona" class="bg-accent hover:bg-accent/90 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
@@ -2446,6 +2610,7 @@ async function dnsCrearZona() {
     return;
   }
   playSound("success");
+  if (data.spfWarning) showToast(data.spfWarning, true);
   loadDns();
 }
 
@@ -2475,6 +2640,10 @@ function renderDnsDelegacion(cont) {
           <span id="dns-delegacion-estado" class="text-xs text-fg-subtle"></span>
         </div>
       </div>
+      ${dnsBloqueRegreso()}
+      <div class="flex flex-wrap gap-2">
+        ${_dnsEstado.zone.hasPreSnapshot ? dnsBotonRespaldo("pre", "Descargar respaldo de mi DNS") : dnsBotonRespaldo("current", "Descargar respaldo de mi DNS")}
+      </div>
       <div>
         <p class="text-sm text-fg-muted mb-2">
           Esto es lo que hay en tu zona. Revísalo: <strong>lo que no esté aquí dejará de
@@ -2486,6 +2655,7 @@ function renderDnsDelegacion(cont) {
 
   renderDnsFilas(document.getElementById("dns-tabla"));
   cont.querySelector('[data-action="dns-comprobar"]').addEventListener("click", dnsComprobarDelegacion);
+  dnsEngancharRegreso(cont);
   // Mientras la pestaña esté a la vista, se pregunta solo.
   _dnsTimer = setInterval(dnsComprobarDelegacion, 60_000);
 }
@@ -2906,9 +3076,15 @@ function renderDnsTabla(cont) {
         </button>
       </div>
       <div class="border border-line rounded-lg overflow-hidden" id="dns-tabla"></div>
+      ${_dnsEstado.zone.previousNameservers?.length ? `
+      <div class="mt-4 space-y-3">
+        ${dnsBloqueRegreso()}
+        <div class="flex flex-wrap gap-2">${dnsBotonRespaldo("current", "Descargar respaldo de mi DNS")}</div>
+      </div>` : ""}
     </div>`;
   renderDnsFilas(document.getElementById("dns-tabla"));
   cont.querySelector('[data-action="dns-nuevo"]').addEventListener("click", () => dnsFormulario(null));
+  dnsEngancharRegreso(cont);
 }
 
 function renderDnsFilas(tabla) {
