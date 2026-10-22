@@ -8348,6 +8348,62 @@ const app = new Elysia({ adapter: node() })
     detail: { tags: ["DNS"], summary: "Download the zone as a standard zone file (which=current from Route 53, which=pre the reviewed snapshot)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
+  // Compara la exportación de la zona del proveedor anterior (GoDaddy, Cloudflare…) contra la zona de MailMask.
+  // Con `apply: true` crea sólo lo que falta: nunca pisa un registro que ya está (eso lo decide el cliente en el editor).
+  .post("/api/domains/:id/dns/zone/compare", async ({ request, params, body }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    if (limited) return limited;
+    const access = await checkDomainAccess(user.email, params.id, "admin");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+    if (!d.hostedZoneId) return jsonErr("Este dominio todavía no tiene zona DNS en MailMask.", 409);
+    const { text, apply } = (body ?? {}) as { text?: unknown; apply?: unknown };
+    if (typeof text !== "string" || !text.trim()) return jsonErr("Pega o sube el archivo de zona que exportaste de tu proveedor.", 400);
+    if (text.length > 200_000) return jsonErr("El archivo de zona es demasiado grande (máximo 200 KB).", 413);
+
+    const { parseZoneFile, compareZones } = await import("./zone-file.js");
+    const { listRecordSets, applyRecordChanges } = await import("./route53.js");
+    const { validarRRSet } = await import("./dns-records.js");
+    const exported = parseZoneFile(text, d.domain).filter((r) => r.name === d.domain || r.name.endsWith(`.${d.domain}`));
+    if (!exported.length) return jsonErr(`No encontramos registros de ${d.domain} en ese archivo.`, 400);
+    let current;
+    try {
+      current = await listRecordSets(d.hostedZoneId);
+    } catch (err) {
+      log("error", "route53", "Comparación de zona: no se pudo leer la zona", { domain: d.domain, error: String(err) });
+      return jsonErr("No pudimos leer tu zona. Intenta de nuevo.", 502);
+    }
+    const diff = compareZones(exported, current as never);
+    if (apply !== true) return { ...diff, exported: exported.length };
+
+    const added: string[] = [];
+    const skipped: { name: string; type: string; reason: string }[] = [];
+    const cambios = [];
+    for (const r of diff.missing) {
+      try {
+        // UPSERT de un (nombre, tipo) que no existe en la zona = crearlo; los que ya están no entran aquí
+        cambios.push({ action: "UPSERT" as const, rrset: validarRRSet(r, d.domain) });
+        added.push(`${r.name} ${r.type}`);
+      } catch (err) {
+        skipped.push({ name: r.name, type: r.type, reason: (err as Error).message });
+      }
+    }
+    if (cambios.length) {
+      try {
+        await applyRecordChanges(d.hostedZoneId, cambios, "MailMask: registros que faltaban de la exportación del proveedor");
+      } catch (err) {
+        log("error", "route53", "Comparación de zona: no se pudieron agregar los faltantes", { domain: d.domain, error: String(err) });
+        return jsonErr("No pudimos agregar los registros que faltan. Intenta de nuevo.", 502);
+      }
+    }
+    log("info", "route53", "Faltantes agregados desde la exportación del proveedor", { domain: d.domain, added: added.length, skipped: skipped.length });
+    return { added, skipped, different: diff.different };
+  }, {
+    detail: { tags: ["DNS"], summary: "Compare an exported zone file from the previous DNS provider against the MailMask zone; apply=true creates only what is missing", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
   .post("/api/domains/:id/dns/rollback", async ({ request, params, body }) => {
     const user = await getAuthUser(request);
     if (!user) return jsonErr("No autenticado", 401);

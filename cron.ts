@@ -555,3 +555,25 @@ schedule("0 15 * * 1", async () => {
     log("error", "cron", "Resumen DMARC semanal falló", { error: String(err) });
   }
 });
+
+// Vigía de las 48 h tras mudar los NS a MailMask («conectar sin mudarte»): si el correo o la web
+// dejan de resolver como en el inventario aprobado, avisa al equipo y al dueño (una vez por registro).
+schedule("17 * * * *", async () => {
+  try {
+    const { runDnsWatch } = await import("./dns-watch.js");
+    const { listAllDomains, claimOnce } = await import("./db.js");
+    const { escHtml } = await import("./emails.js");
+    const recent = listAllDomains().filter((d) => d.dnsDelegatedAt && d.dnsPreSnapshot?.length);
+    if (!recent.length) return;
+    const alerts = await runDnsWatch({
+      domains: recent as never,
+      claimOnce,
+      notify: (to, subject, text) => to === "team"
+        ? sendAlert(`dns-watch:${subject}`, text)
+        : sendTemplate(to, { subject, text, html: `<p>${escHtml(text)}</p>` }),
+    });
+    if (alerts) log("warn", "cron", "Vigía de DNS: cambios tras delegar", { alerts });
+  } catch (err) {
+    log("error", "cron", "Vigía de DNS falló", { error: String(err) });
+  }
+});

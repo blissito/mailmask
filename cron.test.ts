@@ -1,4 +1,4 @@
-// Smoke test de cron.ts: los 25 jobs que agenda al importarse, cada uno una vez, sobre una base
+// Smoke test de cron.ts: los 26 jobs que agenda al importarse, cada uno una vez, sobre una base
 // recién migrada y vacía. Nada lo ejercía: scheduler.test.ts sólo vigila que importarlo no agende
 // nada. Un job que truene, o que llame a AWS o a MercadoPago de verdad, se descubría en producción,
 // a la hora que le tocaba.
@@ -29,7 +29,7 @@ process.env.STALWART_ADMIN_USER = "admin";
 process.env.STALWART_ADMIN_PASSWORD = "test";
 delete process.env.PREVIEW;
 
-/** Expresiones de los 25 jobs de cron.ts, en el orden en que los agenda. */
+/** Expresiones de los 26 jobs de cron.ts, en el orden en que los agenda. */
 const EXPRESIONES = [
   "* * * * *",
   "*/5 * * * *",
@@ -56,6 +56,7 @@ const EXPRESIONES = [
   "30 3 * * *",
   "0 15 * * *",
   "0 15 * * 1",
+  "17 * * * *", // vigía de 48 h tras mudar los NS (dns-watch.ts)
 ];
 
 /**
@@ -163,7 +164,7 @@ describe("cron.ts: cada job corre una vez sin lanzar ni salir a la red", () => {
     rmSync(DIR_BASE, { recursive: true, force: true });
   });
 
-  it("agenda exactamente los 25 jobs de hoy, con sus expresiones en orden", () => {
+  it("agenda exactamente los 26 jobs de hoy, con sus expresiones en orden", () => {
     assert.deepEqual(capturados.map((c) => c.expr), EXPRESIONES);
   });
 

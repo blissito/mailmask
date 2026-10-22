@@ -38,3 +38,23 @@ describe("checkDomain", () => {
     assert.deepEqual(f, []);
   });
 });
+
+describe("runDnsWatch", () => {
+  it("avisa una sola vez por registro y sólo dentro de las 48 h", async () => {
+    const claimed = new Set<string>();
+    const sent: string[] = [];
+    const deps = {
+      domains: [
+        { id: "d1", domain: "ejemplo.org", ownerEmail: "dueno@ejemplo.org", dnsDelegatedAt: new Date(Date.now() - 3600_000).toISOString(), dnsPreSnapshot: PRE },
+        { id: "d2", domain: "viejo.org", ownerEmail: "x@viejo.org", dnsDelegatedAt: new Date(Date.now() - 72 * 3600_000).toISOString(), dnsPreSnapshot: PRE },
+      ],
+      live: live({ mx: { "ejemplo.org": [] } }),
+      claimOnce: (k: string, t: string) => (claimed.has(k + t) ? false : (claimed.add(k + t), true)),
+      notify: async (to: string) => { sent.push(to); },
+    };
+    const { runDnsWatch } = await import("./dns-watch.ts");
+    assert.equal(await runDnsWatch(deps), 1);
+    assert.deepEqual(sent, ["team", "dueno@ejemplo.org"]);
+    assert.equal(await runDnsWatch(deps), 0, "la segunda corrida no repite el aviso");
+  });
+});

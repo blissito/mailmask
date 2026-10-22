@@ -65,3 +65,31 @@ export function describeFinding(f: WatchFinding): string {
   const obs = f.observed.length ? f.observed.join(", ") : "nada";
   return `Cambió ${what} de ${f.name}: antes ${f.expected.join(", ")}, ahora ${obs}.`;
 }
+
+/**
+ * Corre el vigía sobre los dominios delegados hace menos de 48 h. Avisa una vez por registro cambiado
+ * (`claimOnce`), al equipo y al dueño. Las dependencias se pasan para poder probarlo sin red ni base.
+ */
+export async function runDnsWatch(deps: {
+  domains: { id: string; domain: string; ownerEmail: string; dnsDelegatedAt?: string | null; dnsPreSnapshot?: RRSet[] | null }[];
+  live?: LiveResolver;
+  claimOnce: (kind: string, token: string, ttlDays?: number) => boolean;
+  notify: (to: "team" | string, subject: string, text: string) => Promise<unknown>;
+  now?: number;
+}): Promise<number> {
+  const now = deps.now ?? Date.now();
+  const live = deps.live ?? publicResolver();
+  let alerts = 0;
+  for (const d of deps.domains) {
+    if (!d.dnsDelegatedAt || !d.dnsPreSnapshot?.length) continue;
+    if (now - Date.parse(d.dnsDelegatedAt) > WATCH_HOURS * 3600_000) continue;
+    for (const f of await checkDomain(d.domain, d.dnsPreSnapshot, live)) {
+      if (!deps.claimOnce("dns-watch", `${d.id}:${f.name}:${f.type}`, 7)) continue;
+      const text = `${describeFinding(f)} Revisa tu DNS en MailMask; si algo dejó de funcionar, puedes volver a tus nameservers anteriores desde la pestaña DNS.`;
+      await deps.notify("team", `DNS cambió tras mudar NS: ${d.domain}`, text);
+      await deps.notify(d.ownerEmail, `Revisa el DNS de ${d.domain}`, text);
+      alerts++;
+    }
+  }
+  return alerts;
+}
