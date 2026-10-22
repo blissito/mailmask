@@ -202,6 +202,224 @@ export function getConfigSetName(domain: string): string {
   return configSetName(domain);
 }
 
+// --- SES Tenants (aislamiento de reputación por dominio) ---
+//
+// Sin tenants la reputación de SES es de la cuenta entera: un cliente con rebotes o
+// quejas puede pausar el envío de TODOS. Con `SES_TENANTS=1` cada dominio de cliente
+// tiene su tenant (identidad + su config set + el config set compartido de reenvío) y
+// sus envíos salen por sesv2 con `TenantName`; SES pausa sólo al tenant que se porta mal.
+// Sin la bandera nada de esto se ejecuta y todo sale por la API v1 como siempre.
+//
+// La política de reputación no se fija aquí: SES le asigna Standard a todo tenant al
+// crearlo (doc de tenants, "Configuring reputation policies"), que es la recomendada.
+// Cambiarla exigiría `UpdateReputationEntityPolicy` y otro permiso de IAM.
+//
+// Correo transaccional (noreply@mailmask.studio: recibos, contraseñas) y `sendAlert`
+// salen SIN tenant, a nivel de cuenta. Razones: (1) usan `SES_CONFIG_SET` o ninguno, no
+// el config set del dominio, y un tenant exige un config set asociado; (2) son correo
+// nuestro, de volumen mínimo y a destinatarios que lo pidieron, así que no es el riesgo
+// que los tenants aíslan; (3) si un tenant se pausara, el aviso de que se pausó y el
+// "olvidé mi contraseña" no deben depender de ese tenant. La regla es mecánica: sólo
+// lleva tenant un envío cuyo config set es el del dominio remitente (ver `sendRawCommand`).
+
+/** Config set compartido por todos los tenants para el reenvío. Sin event destination a
+ * propósito: si el reenvío usara el config set del dominio, cada correo reenviado
+ * dispararía `email.delivered` y una queja sobre spam reenviado suprimiría el propio
+ * destino del cliente. Hoy el reenvío no lleva config set y así se queda su efecto. */
+export const FORWARDING_CONFIG_SET = "mailmask-forwarding";
+
+export function sesTenantsEnabled(): boolean {
+  return process.env.SES_TENANTS === "1";
+}
+
+let _sesV2: any;
+async function getSesV2() {
+  assertNoPreview("ses");
+  if (!_sesV2) {
+    const { SESv2Client } = await import("@aws-sdk/client-sesv2");
+    _sesV2 = new SESv2Client({ region: AWS_REGION });
+  }
+  return _sesV2;
+}
+
+/**
+ * Nombre del tenant de un dominio. La API acepta hasta 64 caracteres de letras, números,
+ * `-` y `_`. El punto pasa a `_` (no a `-` como en el config set) porque `_` no puede
+ * aparecer en un hostname: así `a-b.com` y `a.b-com` no chocan. Determinista y sin
+ * `Date.now()`: un reintento debe encontrar el mismo tenant, no crear otro (la lección de
+ * `createHostedZone`). Si no cabe, se recorta y se agrega un hash del dominio.
+ */
+export function tenantNameFor(domain: string): string {
+  const d = domain.trim().toLowerCase();
+  const base = `mailmask-${d.replace(/\./g, "_").replace(/[^a-z0-9_-]/g, "-")}`;
+  if (base.length <= 64) return base;
+  // FNV-1a de 32 bits: basta para desambiguar recortes, sin depender de node:crypto.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < d.length; i++) {
+    h ^= d.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `${base.slice(0, 55)}-${h.toString(16).padStart(8, "0")}`;
+}
+
+function isAlreadyExists(err: any): boolean {
+  return err?.name === "AlreadyExistsException" || String(err).includes("AlreadyExists");
+}
+
+function isNotFound(err: any): boolean {
+  return err?.name === "NotFoundException" || String(err).includes("NotFound");
+}
+
+let forwardingConfigSetReady = false;
+async function ensureForwardingConfigSet(): Promise<void> {
+  if (forwardingConfigSetReady) return;
+  const ses = await getSesOutbound();
+  const { CreateConfigurationSetCommand } = await import("@aws-sdk/client-ses");
+  try {
+    await ses.send(new CreateConfigurationSetCommand({ ConfigurationSet: { Name: FORWARDING_CONFIG_SET } }));
+  } catch (err) {
+    if (!isAlreadyExists(err)) throw err;
+  }
+  forwardingConfigSetReady = true;
+}
+
+/**
+ * Garantiza el tenant del dominio y sus tres asociaciones: identidad, config set del
+ * dominio y config set de reenvío. Idempotente: "ya existe" no es error en ningún paso.
+ * Las ARN de los recursos necesitan el número de cuenta, que se lee de la ARN del propio
+ * tenant (así no hace falta `sts:GetCallerIdentity`).
+ */
+export async function ensureDomainTenant(domain: string): Promise<{ tenantName: string; created: boolean; associated: number }> {
+  const ses = await getSesV2();
+  const { CreateTenantCommand, GetTenantCommand, CreateTenantResourceAssociationCommand } =
+    await import("@aws-sdk/client-sesv2");
+  const tenantName = tenantNameFor(domain);
+
+  let tenantArn = "";
+  let created = false;
+  try {
+    const res = await ses.send(new CreateTenantCommand({
+      TenantName: tenantName,
+      Tags: [{ Key: "mailmask:domain", Value: domain }],
+    }));
+    tenantArn = res?.TenantArn ?? "";
+    created = true;
+  } catch (err) {
+    if (!isAlreadyExists(err)) throw err;
+  }
+  if (!tenantArn) {
+    const res = await ses.send(new GetTenantCommand({ TenantName: tenantName }));
+    tenantArn = res?.Tenant?.TenantArn ?? "";
+  }
+  // arn:aws:ses:us-east-1:<cuenta>:tenant/<nombre>/<id>
+  const account = tenantArn.split(":")[4];
+  if (!account) throw new Error(`No se pudo leer la cuenta de la ARN del tenant: "${tenantArn}"`);
+
+  await ensureForwardingConfigSet();
+
+  const prefix = `arn:aws:ses:${AWS_REGION}:${account}`;
+  const resources = [
+    `${prefix}:identity/${domain}`,
+    `${prefix}:configuration-set/${configSetName(domain)}`,
+    `${prefix}:configuration-set/${FORWARDING_CONFIG_SET}`,
+  ];
+  let associated = 0;
+  for (const resourceArn of resources) {
+    try {
+      await ses.send(new CreateTenantResourceAssociationCommand({ TenantName: tenantName, ResourceArn: resourceArn }));
+      associated++;
+    } catch (err) {
+      if (!isAlreadyExists(err)) throw err;
+    }
+  }
+  if (created || associated) log("info", "ses", "Tenant de SES asegurado", { domain, tenantName, created, associated });
+  return { tenantName, created, associated };
+}
+
+/**
+ * Quita las asociaciones del dominio y borra su tenant. SES se niega a borrar una
+ * identidad o un config set asociados a un tenant, así que esto va ANTES de
+ * `deleteConfigurationSet`/`deleteDomainIdentity`. El config set de reenvío es
+ * compartido: sólo se desasocia. Best effort, nunca lanza.
+ */
+async function removeDomainTenant(domain: string): Promise<void> {
+  try {
+    const ses = await getSesV2();
+    const { GetTenantCommand, DeleteTenantResourceAssociationCommand, DeleteTenantCommand } =
+      await import("@aws-sdk/client-sesv2");
+    const tenantName = tenantNameFor(domain);
+    let tenantArn = "";
+    try {
+      const res = await ses.send(new GetTenantCommand({ TenantName: tenantName }));
+      tenantArn = res?.Tenant?.TenantArn ?? "";
+    } catch (err) {
+      if (isNotFound(err)) return;
+      throw err;
+    }
+    const account = tenantArn.split(":")[4];
+    if (account) {
+      const prefix = `arn:aws:ses:${AWS_REGION}:${account}`;
+      for (const resourceArn of [
+        `${prefix}:identity/${domain}`,
+        `${prefix}:configuration-set/${configSetName(domain)}`,
+        `${prefix}:configuration-set/${FORWARDING_CONFIG_SET}`,
+      ]) {
+        try {
+          await ses.send(new DeleteTenantResourceAssociationCommand({ TenantName: tenantName, ResourceArn: resourceArn }));
+        } catch (err) {
+          if (!isNotFound(err)) throw err;
+        }
+      }
+    }
+    await ses.send(new DeleteTenantCommand({ TenantName: tenantName }));
+  } catch (err) {
+    log("warn", "ses", "No se pudo borrar el tenant del dominio", { domain, error: String(err) });
+  }
+}
+
+// Errores en los que SES SÍ procesó la petición y la rechaza por política. No se cae a
+// v1 con ellos: con el tenant pausado, reenviar sin tenant se saltaría la pausa, que es
+// justo el aislamiento que se busca; y un MessageRejected o un MAIL FROM sin verificar
+// fallarían igual por v1. El llamador ve el error como hoy (el reenvío tiene su cola de
+// reintentos).
+const TENANT_POLICY_ERRORS = new Set([
+  "SendingPausedException",
+  "AccountSuspendedException",
+  "MessageRejected",
+  "MailFromDomainNotVerifiedException",
+]);
+
+/**
+ * Envía un MIME crudo por sesv2 con `TenantName`. El MIME viaja byte por byte igual que
+ * en `SendRawEmail` (`Content.Raw.Data`) y los destinatarios como sobre en
+ * `Destination.ToAddresses`, así que Bcc sigue sin aparecer en los headers.
+ * Devuelve el MessageId de SES, o `null` si hay que caer a v1: tenant inexistente,
+ * asociación faltante, IAM sin permisos, red… El correo no se pierde por un tenant.
+ */
+// deno-lint-ignore no-explicit-any
+async function trySendWithTenant(cmd: any, tenantName: string, configSet: string): Promise<string | null> {
+  try {
+    const ses = await getSesV2();
+    const { SendEmailCommand } = await import("@aws-sdk/client-sesv2");
+    const res = await ses.send(new SendEmailCommand({
+      FromEmailAddress: cmd.Source,
+      Destination: { ToAddresses: cmd.Destinations },
+      Content: { Raw: { Data: cmd.RawMessage.Data } },
+      ConfigurationSetName: configSet,
+      TenantName: tenantName,
+    }));
+    return res?.MessageId ?? "";
+  } catch (err: any) {
+    if (TENANT_POLICY_ERRORS.has(err?.name)) throw err;
+    log("warn", "ses", "Envío con tenant falló; sale por SES v1 sin tenant", {
+      tenantName,
+      configSet,
+      error: String(err),
+    });
+    return null;
+  }
+}
+
 /**
  * Estado real del dominio en SES.
  *
@@ -320,6 +538,16 @@ export async function ensureDomainInbound(domain: string): Promise<{ ruleCreated
     log("warn", "ses", "Could not ensure configuration set", { domain, error: String(err) });
   }
 
+  // Después del config set: el tenant se asocia a él. Un fallo aquí no tumba la
+  // reconciliación; el envío cae a v1 mientras el tenant no exista.
+  if (sesTenantsEnabled()) {
+    try {
+      await ensureDomainTenant(domain);
+    } catch (err) {
+      log("warn", "ses", "Could not ensure SES tenant", { domain, error: String(err) });
+    }
+  }
+
   return { ruleCreated };
 }
 
@@ -385,6 +613,10 @@ export async function deleteDomainIdentity(domain: string): Promise<void> {
 }
 
 export async function deleteConfigurationSet(domain: string): Promise<void> {
+  // Va primero: SES no borra un config set (ni la identidad, que main.ts borra justo
+  // después) mientras siga asociado a un tenant. Si la bandera se apaga con tenants
+  // vivos, borrar un dominio deja su identidad huérfana: hay que limpiarla a mano.
+  if (sesTenantsEnabled()) await removeDomainTenant(domain);
   try {
     const ses = await getSesOutbound();
     const { DeleteConfigurationSetCommand } = await import("@aws-sdk/client-ses");
@@ -574,11 +806,18 @@ export async function forwardEmail(originalRaw: string, from: string, to: string
     ? rewrittenRaw.slice(0, firstNewline) + "\r\n" + extraHeaders + rewrittenRaw.slice(firstNewline)
     : extraHeaders + "\r\n" + rewrittenRaw;
 
-  await ses.send(new SendRawEmailCommand({
+  const cmd = {
     RawMessage: { Data: new TextEncoder().encode(rewrittenRaw) },
     Source: forwardingAddress,
     Destinations: [to],
-  }));
+  };
+  // El reenvío es la mayor parte del volumen: con tenants va en el del dominio de la
+  // máscara, con el config set compartido de reenvío (sin eventos, ver FORWARDING_CONFIG_SET).
+  if (sesTenantsEnabled()) {
+    const id = await trySendWithTenant(cmd, tenantNameFor(aliasDomain), FORWARDING_CONFIG_SET);
+    if (id !== null) return;
+  }
+  await ses.send(new SendRawEmailCommand(cmd));
 }
 
 // --- Send from domain (SMTP outbound) ---
@@ -832,6 +1071,13 @@ export async function sendFromDomain(from: string, to: string, subject: string, 
  */
 // deno-lint-ignore no-explicit-any
 async function sendRawCommand(cmd: any, domain: string, configSet?: string): Promise<string> {
+  // Sólo lleva tenant el envío con el config set de su propio dominio: eso excluye el
+  // transaccional (SES_CONFIG_SET o ninguno) y a Mascarito, que firma como MailMask con el
+  // config set del cliente. Ver la nota de "SES Tenants" arriba.
+  if (sesTenantsEnabled() && domain && configSet && configSet === configSetName(domain.toLowerCase())) {
+    const id = await trySendWithTenant(cmd, tenantNameFor(domain), configSet);
+    if (id !== null) return id;
+  }
   const ses = await getSesOutbound();
   const { SendRawEmailCommand } = await import("@aws-sdk/client-ses");
   if (configSet) cmd.ConfigurationSetName = configSet;

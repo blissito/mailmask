@@ -548,6 +548,34 @@ aws s3 mb s3://mailmask-backups --region us-east-1   # Daily DB backups (cron + 
 ```
 Override with env vars `S3_BUCKET` and `S3_BACKUP_BUCKET` respectively.
 
+## SES Tenants (`ses.ts`, 22-oct-2026, apagado por defecto)
+
+Aísla la reputación por dominio: sin tenants, un cliente con rebotes o quejas puede pausar el envío
+de la cuenta entera. Con `SES_TENANTS=1`, `ensureDomainInbound` (arranque y verify) llama a
+`ensureDomainTenant`: tenant `mailmask-<dominio con . → _>` (determinista, ≤64, sin `Date.now()`),
+asociado a la identidad, al config set del dominio y al compartido `mailmask-forwarding` (sin event
+destination, para que el reenvío no dispare `email.delivered` ni suprima el destino del cliente).
+Política Standard: la pone SES al crear el tenant. Lleva tenant (sesv2 `SendEmail` con `Content.Raw`,
+mismo MIME byte por byte) todo envío con el config set de su propio dominio (`sendFromDomain`,
+`sendRawFromDomain`) y el reenvío. **El transaccional y `sendAlert` van sin tenant** (a nivel cuenta):
+son nuestros, mínimos, y el aviso de un tenant pausado no puede depender de ese tenant. Si el envío
+con tenant falla (tenant inexistente, IAM, red) cae a v1 con `warn`; `SendingPaused`,
+`MessageRejected`, `AccountSuspended` y MAIL FROM sin verificar **suben** (saltarse la pausa por v1
+anularía el aislamiento). Borrar un dominio quita antes sus asociaciones y el tenant (SES no borra
+recursos asociados); si apagas la bandera con tenants vivos, esa limpieza ya no corre.
+Pruebas: `ses-tenants.test.ts`.
+
+**Para activarlo:** IAM con `ses:CreateTenant`, `ses:GetTenant`, `ses:CreateTenantResourceAssociation`,
+`ses:DeleteTenantResourceAssociation`, `ses:DeleteTenant` y `ses:SendEmail` (sesv2, sobre la ARN del
+tenant además de identidad y config set; confirmar en la doc de IAM de SES qué recursos exige) →
+`SES_TENANTS=1` → reiniciar → `aws sesv2 list-tenants --region us-east-1` y
+`aws sesv2 list-tenant-resources --tenant-name mailmask-<dominio>` (3 recursos) → buscar en logs
+`Envío con tenant falló`. Sin verificar contra AWS real: que sesv2 acepte `Destination` como sobre
+con `Content.Raw` (Bcc). **Falta:** regla de EventBridge (`Sending Status Disabled`,
+`Advisor Recommendation Status Open`) → alerta y pausar el dominio en la app; el 465 de Stalwart ya
+pasa por la app (relay), así que queda cubierto; tenant del dominio propio `mailmask.studio` sólo
+si está en la tabla de dominios.
+
 ## Docs & Formmy Agent
 - Public docs page: `public/docs.html` (SDK, API, SMTP, MCP — serves as both user-facing docs AND source for AI agent knowledge base)
 - Formmy host: **`https://www.formmy.app`** — el apex `formmy.app` no tiene certificado TLS, nunca usarlo como `baseUrl`
