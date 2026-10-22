@@ -42,6 +42,7 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
       const data = await res.json();
       errEl.textContent = data.error || "Error al iniciar sesión";
       errEl.classList.remove("hidden");
+      window.Mascarito?.react("no");
       btn.disabled = false;
       btn.textContent = "Entrar";
     }

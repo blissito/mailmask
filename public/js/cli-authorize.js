@@ -31,6 +31,10 @@
   }
   auth.classList.remove("hidden");
   auth.querySelector("[data-email]").textContent = me.email;
+  // `mailmask login` abre la página con ?code=: así no hay que copiarlo de la terminal (que puede ir en segundo plano)
+  const prefill = new URLSearchParams(location.search).get("code")?.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 9);
+  if (prefill) input.value = prefill;
+  input.addEventListener("focus", () => window.Mascarito?.react("lookDown"));
   input.focus();
 
   btn.addEventListener("click", async () => {
@@ -49,10 +53,12 @@
       if (res.ok) {
         auth.classList.add("hidden");
         done.classList.remove("hidden");
+        window.Mascarito?.react("celebrate");
       } else {
         const data = await res.json().catch(() => ({}));
         errEl.textContent = data.error || "Código inválido o vencido";
         errEl.classList.remove("hidden");
+        window.Mascarito?.react("no");
         btn.disabled = false;
         btn.textContent = "Autorizar";
       }

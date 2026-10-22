@@ -15,27 +15,7 @@
 <body class="site bg-bg text-fg antialiased min-h-screen flex items-center justify-center px-4 py-10">
   <div class="w-full max-w-sm card p-7 sm:p-9">
     <div class="text-center mb-6">
-      <!-- Mascarito: la máscara de la marca, animada con SMIL (sin estilos ni scripts en línea: la CSP los bloquea) -->
-      <svg class="mx-auto mb-3" width="88" height="88" viewBox="10 6 60 66" role="img" aria-label="Mascarito, la mascota de MailMask">
-        <g>
-          <animateTransform attributeName="transform" type="translate" values="0 0;0 -2.5;0 0" dur="2.4s" repeatCount="indefinite" calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1"/>
-          <ellipse cx="40" cy="42" rx="28" ry="24" fill="#a0182c"/>
-          <ellipse cx="40" cy="38" rx="28" ry="22" fill="#d7263d"/>
-          <ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/>
-          <ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#fff" stroke="#f2b705" stroke-width="1.8"/>
-          <g>
-            <animateTransform attributeName="transform" type="translate" values="0 0;0 0;2 0;2 0;-2 0;-2 0;0 0" keyTimes="0;.3;.38;.55;.63;.85;1" dur="5s" repeatCount="indefinite"/>
-            <circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/>
-            <circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/>
-            <circle cx="30.2" cy="34.9" r="1.9" fill="#fff"/><circle cx="54.2" cy="34.9" r="1.9" fill="#fff"/>
-          </g>
-          <!-- parpadeo: los párpados bajan un instante -->
-          <ellipse cx="28" cy="36" rx="8.4" ry="0" fill="#d7263d"><animate attributeName="ry" values="0;0;6.8;0" keyTimes="0;.92;.96;1" dur="4s" repeatCount="indefinite"/></ellipse>
-          <ellipse cx="52" cy="36" rx="8.4" ry="0" fill="#d7263d"><animate attributeName="ry" values="0;0;6.8;0" keyTimes="0;.92;.96;1" dur="4s" repeatCount="indefinite"/></ellipse>
-          <path d="M40 18 L40 26" stroke="#f2b705" stroke-width="2" stroke-linecap="round"/>
-          <path d="M36 19 L40 26 L44 19" stroke="#f2b705" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-        </g>
-      </svg>
+      <div data-mascarito class="flex justify-center mb-3"></div>
       <h1 class="text-2xl font-semibold tracking-tight">Autorizar CLI</h1>
       <p class="text-sm text-fg-muted mt-2">Confirma que este código aparece en tu terminal.</p>
     </div>
@@ -62,6 +42,7 @@
       Listo. Vuelve a tu terminal.
     </div>
   </div>
+  <script src="/js/mascarito.js"></script>
   <script src="/js/cli-authorize.js"></script>
 </body>
 </html>

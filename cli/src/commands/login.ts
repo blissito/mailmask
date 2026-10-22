@@ -46,7 +46,7 @@ async function loginWithDeviceCode(baseUrl: string, explicitBaseUrl: string | un
   // autoriza tiene que copiar a mano el código de arriba — un link de otra
   // sesión no se autoriza solo con un clic distraído.
   process.stdout.write("Si no se abre solo, entra tú con ese link y escribe el código.\n");
-  openBrowser(start.verificationUri);
+  openBrowser(start.verificationUriComplete ?? start.verificationUri);
 
   const deadline = Date.now() + start.expiresIn * 1000;
   const intervalMs = Math.max(start.interval, 1) * 1000;

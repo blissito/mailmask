@@ -500,13 +500,12 @@ function page(title: string, inner: string, status = 200): Response {
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap" />
   <link rel="stylesheet" href="/css/styles.css">
   <script src="/js/theme.js"></script>
+  <script src="/js/mascarito.js" defer></script>
 </head>
 <body class="site bg-bg text-fg antialiased min-h-screen flex items-center justify-center px-4 py-10">
   <div class="w-full max-w-sm card p-7 sm:p-9">
     <div class="text-center mb-6">
-      <a href="/" class="inline-block">
-        <svg class="w-12 h-12 mx-auto" viewBox="0 0 80 80" fill="none" aria-hidden="true"><ellipse cx="40" cy="42" rx="28" ry="24" fill="rgb(var(--mascara-sombra))"/><ellipse cx="40" cy="38" rx="28" ry="22" fill="rgb(var(--mascara))"/><ellipse cx="28" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><ellipse cx="52" cy="36" rx="8" ry="6.3" fill="#ffffff" stroke="rgb(var(--gold))" stroke-width="1.8"/><circle cx="28.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="52.6" cy="36.4" r="5.2" fill="#a97142"/><circle cx="28.6" cy="36.4" r="2.6" fill="#3b2412"/><circle cx="52.6" cy="36.4" r="2.6" fill="#3b2412"/><path d="M40 18 L40 26" stroke="rgb(var(--gold))" stroke-width="2" stroke-linecap="round"/><path d="M36 19 L40 26 L44 19" stroke="rgb(var(--gold))" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
-      </a>
+      <a href="/" class="inline-block" data-mascarito aria-label="MailMask"></a>
       <h1 class="text-2xl font-semibold tracking-tight mt-4">${esc(title)}</h1>
     </div>
     ${inner}

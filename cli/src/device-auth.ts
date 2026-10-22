@@ -2,6 +2,8 @@ export interface DeviceStart {
   deviceCode: string;
   userCode: string;
   verificationUri: string;
+  /** La misma página con ?code= ya puesto (servidores nuevos). */
+  verificationUriComplete?: string;
   expiresIn: number;
   interval: number;
 }
