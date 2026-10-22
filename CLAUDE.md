@@ -1078,6 +1078,19 @@ Objetivo: solidificar el tronco del servicio. Blindar seguridad, rendimiento y r
 - [ ] Evaluar pattern de almacenamiento de mensajes en Bandeja: ¿leer body de S3 on demand vs duplicar en SQLite? Investigar otros patterns (cache intermedio, pre-procesado a formato ligero, CDN/signed URLs). Concluir cuál es el mejor approach antes de implementar. **Ya no es teórico**: el 6-sep-2026 se perdieron los objetos de S3 de un dominio entero y el único rescate fue el texto plano del índice FTS (32 KB, sin formato ni adjuntos). Depender de S3 como fuente única del cuerpo tiene un costo demostrado.
 - [ ] **Radar de Actividad por Alias**: Dashboard analítico por alias — volumen de emails por día/semana, horas pico, ratio legítimo vs marketing/spam, aliases "muertos" (30+ días sin actividad) con sugerencia de desactivarlos. Layer de IA (via formmy.app) que genera resumen semanal en lenguaje natural ("Tu alias newsletter@ recibió 47 emails esta semana, 82% son marketing — considera desactivarlo"). El 90% son queries SQL sobre datos existentes (logs/mensajes), la IA solo genera el resumen. Email semanal via SES con cron. Implementación: 3-4 días. Disponible en todos los planes como feature de retención.
 
+### Mascarito IA (bienvenida, 22-oct-2026)
+
+`seedWelcomeConversation` (`forwarding.ts`) reemplaza el aviso de prueba de SES («Amazon SES Setup
+Notification», objeto `AMAZON_SES_SETUP_NOTIFICATION` que SES deja al crear la regla): una vez por dominio
+(`claimOnce("welcome-conv")`) siembra en la Bandeja un correo de `mascarito@mailmask.studio` a
+`bienvenida@<dominio>` con `/mascot.png` (la máscara del encabezado de la Bandeja). Dice siempre que lo
+escribió un agente de IA. La línea del chat del panel depende de `canUseAssistant`: **la cuenta gratis no
+tiene agente**, así que a ella sólo se le dice que aparece al activar el dominio.
+
+- [ ] Mascarito dentro de `/bandeja` (hoy el dock sólo vive en `/app`).
+- [ ] Que conteste solo: webhook `email.received` de `mascarito@` → Ghosty → turno → `inbox_reply`.
+- [ ] Avatar de Mascarito en la lista de la Bandeja (hoy salen iniciales).
+
 ### Apps conectadas (OAuth)
 
 - [ ] **Pantalla de «apps conectadas» en `/app`** (anotado 19-oct-2026). El consentimiento de
