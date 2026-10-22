@@ -494,7 +494,7 @@ export async function seedWelcomeConversation(domainId: string, domainName: stri
   if (!claimOnce("welcome-conv", domainId, 3650)) return false;
   const now = new Date().toISOString();
   const messageId = `<welcome-${domainId}@mailmask.studio>`;
-  const subject = `Tu Bandeja de ${domainName} ya recibe correo`;
+  const subject = `Tu bandeja ${domainName} está lista. ✅`;
   const body = welcomeBody(domainName);
   const conv = await createConversation({
     domainId,
