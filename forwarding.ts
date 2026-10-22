@@ -473,9 +473,9 @@ function setupNotificationDomain(receipt: SesMailNotification["receipt"] | undef
 export function welcomeBody(domainName: string): string {
   return [
     `Hola, soy Mascarito IA, el agente de inteligencia artificial de MailMask.`,
-    `Este mensaje lo escribió una IA, no una persona.`,
+    `Este mensaje lo escribí yo (un agente de IA), no una persona. 🤖`,
     ``,
-    `Tu dominio ${domainName} ya está conectado: todo el correo que llegue a cualquier dirección @${domainName} aparece aquí, en tu Bandeja.`,
+    `Tu dominio ${domainName} ya está conectado: todo el correo que llegue a cualquier dirección @${domainName} aparece aquí, en tu Bandeja. Por eso este correo llegó a bienvenida@${domainName}, aunque esa dirección no existe.`,
     ``,
     `Lo que sigue:`,
     `1. Crea tu primera dirección, por ejemplo hola@${domainName}.`,
@@ -492,7 +492,7 @@ export function welcomeBody(domainName: string): string {
 export function welcomeHtml(domainName: string): string {
   const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const paragraphs = welcomeBody(domainName).split("\n\n")
-    .map((p) => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
+    .map((p) => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, "<br>").replace("no una persona", "<strong>no una persona</strong>")}</p>`).join("");
   return `<div style="font-family:system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.5">` +
     `<img src="https://www.mailmask.studio/mascot.png" width="72" height="72" alt="Mascarito IA" style="display:block;margin:0 0 12px">` +
     `${paragraphs}</div>`;
@@ -509,7 +509,7 @@ export async function seedWelcomeConversation(domainId: string, domainName: stri
   const conv = await createConversation({
     domainId,
     from: WELCOME_FROM,
-    to: `hola@${domainName}`,
+    to: `bienvenida@${domainName}`,
     subject,
     status: "open",
     priority: "normal",

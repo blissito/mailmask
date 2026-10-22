@@ -292,7 +292,7 @@ describe("processInbound", () => {
     assert.equal(convs.filter((c) => c.from === "no-reply-aws@amazon.com").length, 0);
     const welcome = convs.filter((c) => c.from === WELCOME_FROM);
     assert.equal(welcome.length, 1, "la bienvenida se siembra una vez por dominio");
-    assert.equal(welcome[0].to, `hola@${fwdDomain}`);
+    assert.equal(welcome[0].to, `bienvenida@${fwdDomain}`);
     assert.equal(listForwardQueue().find((q) => q.from === "no-reply-aws@amazon.com"), undefined);
   });
 
@@ -300,7 +300,8 @@ describe("processInbound", () => {
     const html = welcomeHtml("x.com");
     assert.match(html, /mascot\.png/);
     assert.match(html, /Mascarito IA/);
-    assert.match(welcomeBody("x.com"), /lo escribió una IA/);
+    assert.match(html, /<strong>no una persona<\/strong>/);
+    assert.match(welcomeBody("x.com"), /un agente de IA\), no una persona/);
   });
 
   it("reconoce el aviso de SES por la llave del objeto", () => {
