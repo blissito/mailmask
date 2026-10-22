@@ -1,7 +1,7 @@
 import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
 
-import { evaluateRules, processInbound, extractPlainBody, extractHtmlBody, extractAttachments, resolveCidImages } from "./forwarding.ts";
+import { evaluateRules, processInbound, isSesSetupNotification, WELCOME_FROM, extractPlainBody, extractHtmlBody, extractAttachments, resolveCidImages } from "./forwarding.ts";
 import {
   enqueueForward, dequeueForward, listForwardQueue, moveToDeadLetter,
   getQueueDepth, getDeadLetterCount,
@@ -275,6 +275,30 @@ describe("processInbound", () => {
 
     assert.equal(result.action, "skipped");
     assert.equal(result.details, "Duplicate SNS delivery");
+  });
+
+  it("cambia el aviso de prueba de SES por la bienvenida de Mascarito, una sola vez", async () => {
+    const setup = () => processInbound(makeSnsNotification({
+      from: "no-reply-aws@amazon.com",
+      to: `recipient@${fwdDomain}`,
+      subject: "Amazon SES Setup Notification",
+      messageId: `setup-${crypto.randomUUID()}`,
+    }));
+    const first = await setup();
+    assert.equal(first.action, "ignored");
+    await setup();
+
+    const convs = listConversations(fwdDomainId, {});
+    assert.equal(convs.filter((c) => c.from === "no-reply-aws@amazon.com").length, 0);
+    const welcome = convs.filter((c) => c.from === WELCOME_FROM);
+    assert.equal(welcome.length, 1, "la bienvenida se siembra una vez por dominio");
+    assert.equal(welcome[0].to, `hola@${fwdDomain}`);
+    assert.equal(listForwardQueue().find((q) => q.from === "no-reply-aws@amazon.com"), undefined);
+  });
+
+  it("reconoce el aviso de SES por la llave del objeto", () => {
+    assert.ok(isSesSetupNotification("inbound/x.com/AMAZON_SES_SETUP_NOTIFICATION", "otro@x.com", "otro"));
+    assert.ok(!isSesSetupNotification("inbound/x.com/abc123", "cliente@x.com", "Hola"));
   });
 
   it("catch-all matches when specific alias doesn't exist", async () => {

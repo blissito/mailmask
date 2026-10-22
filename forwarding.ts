@@ -451,6 +451,75 @@ async function saveToMesa(rawContent: string, from: string, recipient: string, s
   }
 }
 
+// --- Bienvenida (reemplaza el aviso de prueba de SES) ---
+
+export const WELCOME_FROM = "mascarito@mailmask.studio";
+const SES_SETUP_KEY = "AMAZON_SES_SETUP_NOTIFICATION";
+
+export function isSesSetupNotification(objectKey: string | undefined, from: string, subject: string): boolean {
+  if (objectKey?.endsWith(SES_SETUP_KEY)) return true;
+  return from.toLowerCase() === "no-reply-aws@amazon.com" && subject === "Amazon SES Setup Notification";
+}
+
+// El dominio sale del destinatario y, si no viene, del prefijo `inbound/<dominio>/`
+// que pone createReceiptRule.
+function setupNotificationDomain(receipt: SesMailNotification["receipt"] | undefined): string | null {
+  const recipient = receipt?.recipients?.[0]?.toLowerCase();
+  if (recipient?.includes("@")) return recipient.split("@")[1];
+  const match = receipt?.action?.objectKey?.match(/^inbound\/([^/]+)\//);
+  return match?.[1] ?? null;
+}
+
+export function welcomeBody(domainName: string): string {
+  return [
+    `Hola, soy Mascarito, el agente de MailMask.`,
+    ``,
+    `Tu dominio ${domainName} ya está conectado: todo el correo que llegue a cualquier dirección @${domainName} aparece aquí, en tu Bandeja.`,
+    ``,
+    `Lo que sigue:`,
+    `1. Crea tu primera dirección, por ejemplo hola@${domainName}.`,
+    `2. Mándale un correo de prueba desde tu correo de siempre y míralo llegar aquí.`,
+    `3. Contéstalo desde la Bandeja: quien lo reciba verá hola@${domainName}, no tu correo personal.`,
+    ``,
+    `Si algo no cuadra, responde este correo y te ayudamos.`,
+    ``,
+    `— Mascarito · MailMask`,
+  ].join("\n");
+}
+
+// Una sola vez por dominio: la regla se vuelve a crear al reparar (ensureDomainInbound)
+// y SES manda otro aviso de prueba cada vez.
+export async function seedWelcomeConversation(domainId: string, domainName: string): Promise<boolean> {
+  if (!claimOnce("welcome-conv", domainId, 3650)) return false;
+  const now = new Date().toISOString();
+  const messageId = `<welcome-${domainId}@mailmask.studio>`;
+  const subject = `Tu Bandeja de ${domainName} ya recibe correo`;
+  const body = welcomeBody(domainName);
+  const conv = await createConversation({
+    domainId,
+    from: WELCOME_FROM,
+    to: `hola@${domainName}`,
+    subject,
+    status: "open",
+    priority: "normal",
+    lastMessageAt: now,
+    messageCount: 1,
+    tags: [],
+    threadReferences: [messageId],
+  });
+  const msg = await addMessage({
+    conversationId: conv.id,
+    from: WELCOME_FROM,
+    body,
+    direction: "inbound",
+    createdAt: now,
+    messageId,
+  });
+  indexMessage({ messageId: msg.id, conversationId: conv.id, domainId, from: WELCOME_FROM, subject, text: body });
+  notifyInbox(domainId, "new_conversation", { conversationId: conv.id, from: WELCOME_FROM, subject });
+  return true;
+}
+
 // --- Rebuild conversations from S3 ---
 
 export async function rebuildConversationsFromS3(domainId: string, domainName: string): Promise<number> {
@@ -565,6 +634,19 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
   const headerFrom = notification.mail.commonHeaders?.from?.[0];
   const from = (headerFrom?.match(/<([^>]+)>/)?.[1] ?? headerFrom ?? notification.mail.source).trim();
   const subject = notification.mail.commonHeaders?.subject ?? "(sin asunto)";
+
+  // Al crear la regla de recepción, SES deja un objeto de prueba en el bucket y lo
+  // anuncia por SNS. No es correo de nadie: era lo primero que el cliente veía en su
+  // Bandeja («Amazon SES Setup Notification» de no-reply-aws). En su lugar sembramos
+  // la bienvenida de Mascarito.
+  if (isSesSetupNotification(receipt?.action?.objectKey, from, subject)) {
+    const domainName = setupNotificationDomain(receipt);
+    const domain = domainName ? await getDomainByName(domainName) : null;
+    if (domain) await seedWelcomeConversation(domain.id, domain.domain);
+    if (messageId) await markMessageProcessed(messageId);
+    log("info", "forwarding", "SES setup notification replaced by welcome", { domain: domainName });
+    return { action: "ignored", details: "SES setup notification" };
+  }
 
   if (receipt?.spamVerdict?.status === "FAIL" || receipt?.virusVerdict?.status === "FAIL") {
     log("warn", "forwarding", "Spam/virus rejected", {
