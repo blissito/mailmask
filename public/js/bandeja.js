@@ -550,9 +550,15 @@ function renderList() {
  * o moverse con j/k no debe reconstruir la lista entera: hacerlo borraba y volvía
  * a insertar los treinta elementos y todos parpadeaban a la vez.
  */
+const MASCARITO_EMAIL = "mascarito@mailmask.studio";
+
 function convRowHtml(c, i) {
   {
     const initials = c.from.split("@")[0].slice(0, 2);
+    // Mascarito IA (la bienvenida y su correo) lleva su cara en vez de iniciales.
+    const avatar = c.from === MASCARITO_EMAIL
+      ? `<div class="mesa-avatar"><img src="/mascot.png" alt="Mascarito IA"></div>`
+      : `<div class="mesa-avatar">${esc(initials)}</div>`;
     const time = formatTime(c.lastMessageAt);
     const isActive = activeConv?.id === c.id;
     const isSelected = i === selectedIdx;
@@ -588,7 +594,7 @@ function convRowHtml(c, i) {
       <label class="mesa-conv-check" title="Marcar (x)">
         <input type="checkbox" ${seleccionadas.has(c.id) ? "checked" : ""} tabindex="-1">
       </label>
-      <div class="mesa-avatar">${esc(initials)}</div>
+      ${avatar}
       <div class="mesa-conv-body">
         <div class="mesa-conv-header">
           <span class="mesa-conv-from">${esc(c.from)}</span>
