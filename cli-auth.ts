@@ -92,7 +92,11 @@ export function createDeviceAuthStore(opts: {
 
     async confirm(userCode: string, email: string): Promise<boolean> {
       sweep();
-      const deviceCode = byUserCode.get(userCode.toUpperCase().trim());
+      // Se acepta escrito con o sin guion, con espacios o minúsculas: la página lo mostraba sin guion
+      // y el mismo código daba «inválido».
+      const bare = userCode.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const normalized = bare.length === 8 ? `${bare.slice(0, 4)}-${bare.slice(4)}` : userCode.toUpperCase().trim();
+      const deviceCode = byUserCode.get(normalized);
       if (!deviceCode) return false;
       const rec = byDeviceCode.get(deviceCode);
       if (!rec || rec.status !== "pending") return false;

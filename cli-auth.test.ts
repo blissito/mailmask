@@ -28,6 +28,14 @@ describe("cli-auth: device code", () => {
     assert.equal(start.verificationUri, "https://www.mailmask.studio/cli/authorize");
   });
 
+  it("acepta el código sin guion, con espacios o en minúsculas", async () => {
+    const { store: s, created } = store();
+    const start = s.start("https://www.mailmask.studio");
+    const sinGuion = ` ${start.userCode.replace("-", "").toLowerCase()} `;
+    assert.equal(await s.confirm(sinGuion, "ana@example.com"), true);
+    assert.deepEqual(created, ["ana@example.com"]);
+  });
+
   it("queda pending hasta que alguien confirma con su email", async () => {
     const { store: s, created } = store();
     const start = s.start("https://www.mailmask.studio");

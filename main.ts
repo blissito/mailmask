@@ -325,7 +325,7 @@ const EASYBITS_DEEP_LINK = /^\/app\?domain=[a-z0-9.-]{1,253}&easybits=1$/i;
 /** `next` del login: sólo de vuelta al consentimiento OAuth o a un recibo (nada de redirecciones abiertas). */
 function safeNext(v: unknown): string | undefined {
   if (typeof v !== "string" || v.length > 4000) return undefined;
-  return v.startsWith("/oauth/authorize?") || v.startsWith("/cli/authorize?") || RECEIPT_PATH.test(v) || EASYBITS_DEEP_LINK.test(v) || v === "/app#pagos" ? v : undefined;
+  return v.startsWith("/oauth/authorize?") || v === "/cli/authorize" || v.startsWith("/cli/authorize?") || RECEIPT_PATH.test(v) || EASYBITS_DEEP_LINK.test(v) || v === "/app#pagos" ? v : undefined;
 }
 
 function getMainDomainUrl(): string {
