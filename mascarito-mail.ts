@@ -25,6 +25,7 @@ const FROM_HEADER = `Mascarito IA <${MASCARITO_ADDRESS}>`;
 const SENDER_COOLDOWN_DAYS = 4; // Gmail usa 4 días; RFC 3834 recomienda 7
 const DAILY_CAP = 200;
 const MAX_TEXT = 4000;
+export const MAIL_TURN_TOKEN = "mail-channel-no-access";
 // Instrucciones del canal de correo: van en cada turno porque Mask atiende también el panel.
 export const MAIL_INSTRUCTIONS = [
   "CANAL CORREO DE MASCARITO. En este turno no eres el asistente del panel: eres el clasificador del correo de",
@@ -110,7 +111,8 @@ async function classify(m: MascaritoInbound): Promise<{ template: TemplateId; fi
       email: `mascarito-mail:${m.from.toLowerCase()}`,
       text: quarantineText(m.subject, m.text),
       attachments: [],
-      turnToken: "none", // no es un mt_: el MCP de Mask contesta 401, así que este canal no toca cuentas
+      // Ghosty pide ≥ 8 caracteres; no es un mt_, así que el MCP de Mascarito contesta 401 y este canal no toca cuentas
+      turnToken: MAIL_TURN_TOKEN,
       appendSystemPrompt: MAIL_INSTRUCTIONS,
       signal: abort.signal,
       agentId,

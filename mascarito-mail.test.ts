@@ -106,6 +106,7 @@ describe("Mascarito IA contesta su correo", () => {
     // es Mask (el agente del panel) con las instrucciones del canal y sin un token que abra su MCP
     assert.equal(lastTurn.appendSystemPrompt, mm.MAIL_INSTRUCTIONS);
     assert.ok(!String(lastTurn.turnToken).startsWith("mt_"));
+    assert.ok(String(lastTurn.turnToken).length >= 8, "Ghosty rechaza tokens de menos de 8 caracteres");
   });
 
   it("un id fuera del enum se vuelve traspaso: asigna al dueño y deja nota", async () => {
