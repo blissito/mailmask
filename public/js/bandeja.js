@@ -140,6 +140,17 @@ let unreadCount = 0;
 // Presencia de los compañeros en el dominio, tal como llega por SSE.
 let presences = [];
 
+// --- Celular (diseño B) ---
+// El corte de 767 px es el mismo de bandeja.css: ahí la lista y el hilo dejan de
+// convivir y aparecen la cabecera, los segmentos y la cápsula de abajo.
+const movil = window.matchMedia("(max-width: 767px)");
+// Segmento por persona: "mine", "none" (sin asignar) o "" (todas). Sólo filtra en el
+// celular y sólo con equipo: en escritorio no hay control que lo muestre, y un filtro
+// invisible escondería conversaciones sin explicación.
+let segmento = "";
+try { segmento = localStorage.getItem("bandeja.segmento") || ""; } catch {}
+const segmentoActivo = () => movil.matches && team.size > 1 ? segmento : "";
+
 // --- Init ---
 document.addEventListener("DOMContentLoaded", async () => {
   await checkAuth();
@@ -149,6 +160,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   engancharClicksLista();
   mountComposers();
   iniciarLatidoPresencia();
+  engancharMovil();
+  registrarServiceWorker();
 
   // Cerrar la pestaña siempre aborta el SSE y el servidor limpia la presencia ahí;
   // el beacon sólo adelanta el aviso para que el compañero no espere 35 segundos.
@@ -174,6 +187,8 @@ async function checkAuth() {
   const miFoto = document.getElementById("user-avatar");
   if (miFoto) miFoto.outerHTML = avatarHtml(currentUser.email, "mesa-avatar", { displayName: currentUser.displayName, avatarUrl: currentUser.avatarUrl });
   if (currentUser.isAdmin) { const al = document.getElementById("admin-link"); if (al) al.style.display = ""; }
+  const nombre = String(currentUser.displayName || "").trim().split(/\s+/)[0];
+  document.getElementById("m-hello").textContent = nombre ? `Hola, ${nombre}` : "Bandeja";
 
   canDoActions = true;
 }
@@ -208,6 +223,9 @@ async function loadDomains() {
   recordado = new URLSearchParams(location.search).get("domainId") || recordado;
   selectedDomainId = domains.some(d => d.id === recordado) ? recordado : domains[0].id;
   sel.value = selectedDomainId;
+  const selMovil = document.getElementById("m-domain-select");
+  selMovil.innerHTML = sel.innerHTML;
+  selMovil.value = selectedDomainId;
   await loadAliasesForCompose();
   loadTeam();
   await loadConversations();
@@ -234,9 +252,14 @@ async function loadTeam() {
     }
   } catch {}
   if (domainId !== selectedDomainId) return; // cambió de dominio mientras cargaba
+  const habiaSegmento = !!segmentoActivo();
   team = next;
   for (const c of conversations) if (c.assignedTo) renderConvRow(c.id);
   renderPresence();
+  pintarEquipoMovil();
+  // El equipo llega después de la primera página: si el segmento recordado ahora sí
+  // aplica (o deja de aplicar), la lista que se pintó no es la que corresponde.
+  if (habiaSegmento !== !!segmentoActivo()) loadConversations();
 }
 
 function personName(email) {
@@ -384,6 +407,9 @@ function paramsDeFiltros() {
   if (status) p.set("status", status);
   if (alias) p.set("to", alias);
   if (q) p.set("q", q);
+  const seg = segmentoActivo();
+  if (seg === "mine" && currentUser?.email) p.set("assignedTo", currentUser.email);
+  else if (seg === "none") p.set("assignedTo", "none");
   return p;
 }
 
@@ -411,6 +437,7 @@ async function loadConversations(opts = {}) {
       if (c.unread) unreadIds.add(c.id); else unreadIds.delete(c.id);
     }
     if (typeof data.unreadCount === "number") { unreadCount = data.unreadCount; updateTitle(); }
+    if (data.segments) pintarSegmentos(data.segments);
     if (Array.isArray(data.presence)) { presences = data.presence; renderPresence(); }
     mostrarAvisoIndexado(data);
     renderList();
@@ -476,7 +503,7 @@ function renderList() {
 
   if (filtered.length === 0) {
     // Clear any rendered items but keep the empty state
-    container.querySelectorAll(".mesa-conv").forEach(el => el.remove());
+    container.querySelectorAll(".mesa-conv, .mm-day").forEach(el => el.remove());
     // "No hay nada" y "tu búsqueda no encontró nada" son mensajes distintos: el
     // primero desorienta cuando acabas de buscar algo que no existe.
     const consulta = document.getElementById("search-input")?.value.trim();
@@ -497,10 +524,17 @@ function renderList() {
   }
 
   empty.classList.add("mesa-hidden");
-  const html = filtered.map((c, i) => convRowHtml(c, i)).join("");
+  // Encabezados por día ("Hoy", "Ayer", "lun 13 oct"). En escritorio los oculta el CSS.
+  let diaPrevio = null;
+  const html = filtered.map((c, i) => {
+    const dia = etiquetaDia(c.lastMessageAt);
+    const cabecera = dia !== diaPrevio ? `<div class="mm-day">${esc(dia)}</div>` : "";
+    diaPrevio = dia;
+    return cabecera + convRowHtml(c, i);
+  }).join("");
 
   // Replace only conversation items, preserve empty state element
-  container.querySelectorAll(".mesa-conv").forEach(el => el.remove());
+  container.querySelectorAll(".mesa-conv, .mm-day").forEach(el => el.remove());
   container.insertAdjacentHTML("beforeend", html);
 
   // El botón va siempre al final de la lista, después de las filas.
@@ -541,8 +575,14 @@ function convRowHtml(c, i) {
     }
     if (c.assignedTo) meta += `<span class="mesa-tag mesa-tag-assigned" title="${esc(c.assignedTo)}">${avatarHtml(c.assignedTo, "mesa-avatar-xs")}${esc(personName(c.assignedTo))}</span>`;
 
-    const puntoPresencia = presences.some(p => p.conversationId === c.id && p.email !== currentUser?.email)
+    const otrosAqui = presences.filter(p => p.conversationId === c.id && p.email !== currentUser?.email);
+    const puntoPresencia = otrosAqui.length
       ? `<span class="mesa-presence-dot" title="Alguien más está en este hilo"></span>` : "";
+    // En el celular el punto no basta: la tarjeta dice quién y qué está haciendo.
+    const quienEscribe = otrosAqui.find(p => p.state === "typing");
+    const quien = quienEscribe || otrosAqui[0];
+    const lineaPresencia = quien
+      ? `<div class="mesa-conv-presence">${esc(personName(quien.email))} está ${quienEscribe ? "respondiendo…" : "viendo esta conversación"}</div>` : "";
     if (seleccionadas.has(c.id)) classes += " mesa-conv--marcada";
     return `<div class="${classes}" data-idx="${i}" data-id="${esc(c.id)}">
       <label class="mesa-conv-check" title="Marcar (x)">
@@ -557,6 +597,7 @@ function convRowHtml(c, i) {
         <div class="mesa-conv-subject">${esc(c.subject)}</div>
         ${c.snippet ? `<div class="mesa-conv-snippet">${resaltar(c.snippet)}</div>` : ""}
         <div class="mesa-conv-meta">${meta}</div>
+        ${lineaPresencia}
       </div>
     </div>`;
   }
@@ -2039,7 +2080,10 @@ function renderConvRow(id) {
   if (!c) return;
   const filtroEstado = document.getElementById("status-filter")?.value || "";
   const fuera = filtroEstado && filtroEstado !== "unread" && filtroEstado !== "deleted" && c.status !== filtroEstado;
-  if (fuera) { removerFila(id); return; }
+  // Lo mismo con el segmento del celular: reasignada a otra persona ya no es «Mías».
+  const seg = segmentoActivo();
+  const fueraDeSegmento = (seg === "mine" && c.assignedTo !== currentUser?.email) || (seg === "none" && !!c.assignedTo);
+  if (fuera || fueraDeSegmento) { removerFila(id); return; }
 
   const el = document.querySelector(`#conv-list .mesa-conv[data-id="${CSS.escape(id)}"]`);
   if (!el) { renderList(); return; }
@@ -2083,17 +2127,20 @@ function iniciarLatidoPresencia() {
 // Conversaciones donde ahora mismo hay OTRA persona. Se recuerda entre eventos
 // para repintar sólo lo que cambió: el latido llega cada 15 s y casi siempre trae
 // lo mismo, así que repintar por recibirlo hacía parpadear la lista sola.
-let convsConPresencia = new Set();
+// id → "correo:estado,…": la tarjeta del celular dice si están viendo o respondiendo,
+// así que pasar de uno a otro también es un cambio que hay que pintar.
+let convsConPresencia = new Map();
 
 function aplicarPresenciaEnLista() {
-  const ahora = new Set(
-    presences
-      .filter(p => p.conversationId && p.email !== currentUser?.email)
-      .map(p => p.conversationId)
-  );
-  const cambiadas = new Set([...ahora, ...convsConPresencia]);
+  const ahora = new Map();
+  for (const p of presences) {
+    if (!p.conversationId || p.email === currentUser?.email) continue;
+    const previo = ahora.get(p.conversationId);
+    ahora.set(p.conversationId, (previo ? previo + "," : "") + `${p.email}:${p.state}`);
+  }
+  const cambiadas = new Set([...ahora.keys(), ...convsConPresencia.keys()]);
   for (const id of cambiadas) {
-    if (ahora.has(id) !== convsConPresencia.has(id)) renderConvRow(id);
+    if (ahora.get(id) !== convsConPresencia.get(id)) renderConvRow(id);
   }
   convsConPresencia = ahora;
 }
@@ -2447,4 +2494,114 @@ function connectSSE(domainId) {
     // Reconnect after 5s
     setTimeout(() => { if (selectedDomainId) connectSSE(selectedDomainId); }, 5000);
   };
+}
+
+// --- Celular (diseño B): cabecera, segmentos, cápsula ---
+
+function etiquetaDia(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const hoy = new Date();
+  const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
+  const mismoDia = (a, b) => a.toDateString() === b.toDateString();
+  if (mismoDia(d, hoy)) return "Hoy";
+  if (mismoDia(d, ayer)) return "Ayer";
+  return d.toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
+}
+
+/** Tu foto y la de hasta dos compañeros; el resto, "+n". Es también el botón del menú. */
+function pintarEquipoMovil() {
+  const btn = document.getElementById("m-menu-btn");
+  if (!btn || !currentUser) return;
+  const otros = [...team.keys()].filter(e => e !== currentUser.email);
+  const yo = avatarHtml(currentUser.email, "mm-face", { displayName: currentUser.displayName, avatarUrl: currentUser.avatarUrl });
+  const caras = otros.slice(0, 2).map(e => avatarHtml(e, "mm-face")).join("");
+  const resto = otros.length > 2 ? `<span class="mm-face">+${otros.length - 2}</span>` : "";
+  btn.innerHTML = yo + caras + resto;
+  document.getElementById("m-seg").classList.toggle("mesa-hidden", team.size <= 1);
+  pintarSegmentoActivo();
+}
+
+function pintarSegmentos(conteos) {
+  const poner = (clave, n) => {
+    const el = document.querySelector(`[data-seg-count="${clave}"]`);
+    if (el) el.textContent = n > 0 ? `· ${n}` : "";
+  };
+  poner("mine", conteos.mine);
+  poner("none", conteos.unassigned);
+}
+
+function pintarSegmentoActivo() {
+  document.querySelectorAll("#m-seg [data-seg]").forEach(b => {
+    const activo = b.dataset.seg === segmento;
+    b.classList.toggle("active", activo);
+    b.setAttribute("aria-pressed", String(activo));
+  });
+}
+
+function engancharMovil() {
+  // Dominio: el selector del celular sólo reenvía al real, que tiene toda la lógica.
+  const real = document.getElementById("domain-select");
+  const selMovil = document.getElementById("m-domain-select");
+  selMovil.addEventListener("change", () => {
+    real.value = selMovil.value;
+    real.dispatchEvent(new Event("change"));
+  });
+  real.addEventListener("change", () => { selMovil.value = real.value; });
+
+  document.querySelectorAll("#m-seg [data-seg]").forEach(b => b.addEventListener("click", () => {
+    segmento = b.dataset.seg;
+    try { localStorage.setItem("bandeja.segmento", segmento); } catch {}
+    pintarSegmentoActivo();
+    loadConversations();
+  }));
+
+  // Menú de la cuenta: cada entrada dispara el botón real, igual que el menú ⋯.
+  const btnMenu = document.getElementById("m-menu-btn");
+  const menu = document.getElementById("m-menu");
+  btnMenu.addEventListener("click", (ev) => { ev.stopPropagation(); menu.classList.toggle("mesa-hidden"); });
+  menu.querySelectorAll("[data-proxy]").forEach(b => b.addEventListener("click", () => {
+    menu.classList.add("mesa-hidden");
+    document.getElementById(b.dataset.proxy)?.click();
+  }));
+  document.addEventListener("click", (ev) => { if (!ev.target.closest(".mm-mhead-menu-wrap")) menu.classList.add("mesa-hidden"); });
+
+  // Cápsula: Bandeja, Buscar (abre la barra de búsqueda y filtros) y Métricas.
+  const navInbox = document.getElementById("m-nav-inbox");
+  const navSearch = document.getElementById("m-nav-search");
+  const navMetrics = document.getElementById("m-nav-metrics");
+  const marcar = (activo) => [navInbox, navSearch, navMetrics].forEach(b => b.classList.toggle("active", b === activo));
+  // Sólo se vuelve a la lista si se estaba en Métricas: mostrarPestana("bandeja") sin
+  // haber salido destapa la barra de selección y el aviso del índice aunque no toquen.
+  const aLaLista = () => {
+    if (!document.getElementById("metrics-pane").classList.contains("mesa-hidden")) mostrarPestana("bandeja");
+  };
+  navInbox.addEventListener("click", () => {
+    document.body.classList.remove("mm-buscando");
+    aLaLista();
+    marcar(navInbox);
+    document.getElementById("conv-list").scrollTo({ top: 0, behavior: "smooth" });
+  });
+  navSearch.addEventListener("click", () => {
+    const abrir = !document.body.classList.contains("mm-buscando");
+    document.body.classList.toggle("mm-buscando", abrir);
+    aLaLista();
+    marcar(abrir ? navSearch : navInbox);
+    if (abrir) document.getElementById("search-input").focus();
+  });
+  navMetrics.addEventListener("click", () => {
+    document.body.classList.remove("mm-buscando");
+    mostrarPestana("metrics");
+    marcar(navMetrics);
+  });
+  document.getElementById("m-compose").addEventListener("click", () => document.getElementById("btn-compose").click());
+
+  // Girar el teléfono o cambiar el ancho de la ventana activa o apaga el segmento.
+  movil.addEventListener("change", () => { if (team.size > 1 && segmento) loadConversations(); });
+}
+
+// Sin service worker el navegador no ofrece instalarla. No guarda correo (ver sw.js).
+function registrarServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.register("/sw.js").catch((err) => console.warn("SW:", err));
 }

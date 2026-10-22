@@ -1823,3 +1823,121 @@ body.mm-composer-locked { overflow: hidden; }
 :root[data-theme="dark"] .mesa-ico-luna { display: none; }
 :root[data-theme="light"] .mesa-ico-sol { display: none; }
 :root[data-theme="light"] .mesa-ico-luna { display: inline; }
+
+/* --- Celular, diseño B (21-oct-2026) ---
+   Cabecera con dominio y saludo, segmentos por persona, conversaciones en tarjeta
+   agrupadas por día y una cápsula flotante abajo. Va al final del archivo a
+   propósito: pisa reglas móviles de más arriba (.mesa-conv, .mesa-conv--unread). */
+
+.mm-mhead, .mm-seg, .mm-dock, .mm-day, .mesa-conv-presence { display: none; }
+.mm-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 767px) {
+  /* La PWA instalada dibuja bajo la barra de estado del iPhone. */
+  body { padding-top: env(safe-area-inset-top); }
+
+  /* La cabecera y la cápsula sustituyen a la barra de arriba y a las pestañas. */
+  .mesa-nav, .mesa-tabs { display: none; }
+  /* La toolbar sólo aparece al tocar «Buscar»: búsqueda, estado y dirección. */
+  body:not(.mm-buscando) .mesa-toolbar { display: none; }
+  .mesa-toolbar #domain-select, .mesa-toolbar #btn-compose, .mesa-toolbar .mesa-more-wrap { display: none; }
+  .mesa-toolbar .mesa-search-wrap { order: -1; flex-basis: 100%; }
+
+  .mm-mhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px 2px; flex-shrink: 0; }
+  .mm-mhead-text { min-width: 0; display: flex; flex-direction: column; }
+  .mm-mhead-domain { position: relative; display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; color: var(--mesa-text-3); }
+  /* 16 px: con menos, iOS hace zoom al tocar el selector. */
+  .mm-mhead-select {
+    appearance: none; -webkit-appearance: none;
+    max-width: 62vw; padding: 4px 0; border: 0; background: transparent; color: inherit;
+    font: 16px ui-monospace, 'SF Mono', monospace; text-overflow: ellipsis; cursor: pointer;
+  }
+  .mm-mhead-domain svg { pointer-events: none; flex-shrink: 0; }
+  .mm-mhead-hello {
+    margin: 0; font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-weight: 800;
+    font-size: 30px; line-height: 1.1; letter-spacing: -0.02em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .mm-mhead-team { display: flex; align-items: center; min-height: 44px; padding: 4px; border: 0; background: none; cursor: pointer; }
+  .mm-face {
+    width: 34px; height: 34px; border-radius: 999px; border: 2px solid var(--mesa-bg);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    background: var(--mesa-surface-2); color: var(--mesa-text-2); font-size: 12px; font-weight: 600;
+  }
+  .mm-face + .mm-face { margin-left: -10px; }
+  .mm-face img { width: 100%; height: 100%; object-fit: cover; }
+  .mm-mhead-menu-wrap .mesa-snooze-menu { left: auto; right: 0; min-width: 220px; }
+  #m-menu a, #m-menu button { display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 6px; color: var(--mesa-text); font-size: 15px; text-decoration: none; }
+  #m-menu a:hover { background: var(--mesa-surface); }
+
+  .mm-seg {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;
+    margin: 10px 16px 2px; padding: 4px; border-radius: 14px; background: var(--mesa-surface-2); flex-shrink: 0;
+  }
+  .mm-seg button {
+    min-height: 40px; border: 0; border-radius: 10px; background: transparent;
+    color: var(--mesa-text); font: inherit; font-size: 14px; white-space: nowrap; cursor: pointer;
+  }
+  .mm-seg button.active { background: var(--mesa-text); color: var(--mesa-bg); font-weight: 600; }
+
+  /* Dentro de un hilo, la pantalla es para leer y responder. */
+  body.mesa-mobile-detail .mm-mhead,
+  body.mesa-mobile-detail .mm-seg,
+  body.mesa-mobile-detail .mm-dock { display: none; }
+
+  /* Tarjetas agrupadas por día. El relleno de abajo deja ver la última sobre la cápsula. */
+  .mesa-list { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
+  .mm-day {
+    display: block; padding: 14px 20px 6px;
+    font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--mesa-text-3);
+  }
+  .mesa-conv {
+    margin: 0 12px 10px; padding: 14px;
+    border: 1px solid var(--mesa-border); border-radius: 16px; background: var(--mesa-surface);
+  }
+  .mesa-conv .mesa-avatar { display: none; }
+  .mesa-conv-from { font-size: 15px; }
+  .mesa-conv-snippet { font-size: 14px; }
+  /* Sin leer: contorno grueso y sombra dura en rojo, la que manda en la lista. */
+  .mesa-conv--unread { border: 2px solid var(--mesa-text); box-shadow: 4px 4px 0 var(--mesa-accent); }
+  .mesa-conv-presence {
+    display: block; margin-top: 8px; padding: 8px 10px; border-radius: 10px;
+    background: rgb(180 83 9 / .16); color: var(--mesa-attention); font-size: 13px;
+  }
+
+  /* Cápsula flotante: Bandeja, Buscar, Métricas + Redactar. */
+  .mm-dock {
+    display: flex; position: fixed; left: 0; right: 0; bottom: calc(18px + env(safe-area-inset-bottom));
+    z-index: 40; justify-content: center; align-items: center; gap: 12px; pointer-events: none;
+  }
+  .mm-dock > * { pointer-events: auto; }
+  .mm-dock-nav {
+    display: flex; gap: 4px; padding: 6px; border: 2px solid var(--mesa-text); border-radius: 999px;
+    background: var(--mesa-surface-2); box-shadow: 4px 4px 0 #000;
+  }
+  .mm-dock-nav button {
+    width: 48px; height: 44px; border: 0; border-radius: 999px; background: transparent;
+    color: var(--mesa-text); display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .mm-dock-nav button.active { background: var(--mesa-text); color: var(--mesa-bg); }
+  .mm-dock-compose {
+    width: 60px; height: 60px; border-radius: 999px; border: 2px solid var(--mesa-text);
+    background: var(--mesa-accent); color: #fff; box-shadow: 4px 4px 0 #000;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .mesa-metrics { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
+  .mesa-toast { bottom: calc(100px + env(safe-area-inset-bottom)); }
+
+  /* Hilo: asunto grande y compositor en hoja que sube desde abajo. */
+  .mesa-detail-subject { font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-weight: 800; font-size: 22px; letter-spacing: -0.01em; }
+  .mesa-presence { border-color: transparent; border-radius: 10px; background: rgb(180 83 9 / .16); font-size: 13px; }
+  .mesa-composer {
+    position: relative; padding-top: 20px; border-top: 2px solid var(--mesa-text);
+    border-radius: 22px 22px 0 0; background: var(--mesa-surface);
+  }
+  .mesa-composer::before {
+    content: ""; position: absolute; top: 8px; left: 50%; width: 40px; height: 5px; margin-left: -20px;
+    border-radius: 5px; background: var(--mesa-border-active);
+  }
+  .mesa-send-btn { min-height: 44px; border-radius: 999px; border: 2px solid var(--mesa-text); box-shadow: 3px 3px 0 var(--mesa-text); }
+}

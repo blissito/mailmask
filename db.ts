@@ -2854,7 +2854,9 @@ export function searchConversations(
   const filtros: string[] = [];
   const extra: any[] = [];
   if (opts?.status) { filtros.push(`AND c.status = ?`); extra.push(opts.status); }
-  if (opts?.assignedTo) { filtros.push(`AND c.assigned_to = ?`); extra.push(opts.assignedTo); }
+  // "none" = sin asignar (el segmento «Sin asignar» de la Bandeja en el celular).
+  if (opts?.assignedTo === "none") filtros.push(`AND c.assigned_to IS NULL`);
+  else if (opts?.assignedTo) { filtros.push(`AND c.assigned_to = ?`); extra.push(opts.assignedTo); }
   if (opts?.to) { filtros.push(`AND c."to" = ?`); extra.push(opts.to); }
   // Sin este corte, buscar devolvería con snippet los hilos que la lista oculta: una
   // fuga del contenido que se supone fuera de la ventana gratis.
@@ -3006,7 +3008,8 @@ export function listConversationsPage(
       filtros.push(`AND c.status = ?`); params.push(opts.status);
     }
   }
-  if (opts?.assignedTo) { filtros.push(`AND c.assigned_to = ?`); params.push(opts.assignedTo); }
+  if (opts?.assignedTo === "none") filtros.push(`AND c.assigned_to IS NULL`);
+  else if (opts?.assignedTo) { filtros.push(`AND c.assigned_to = ?`); params.push(opts.assignedTo); }
   if (opts?.to) { filtros.push(`AND c."to" = ?`); params.push(opts.to); }
 
   if (opts?.cursor) {
@@ -3217,6 +3220,23 @@ export function countUnread(domainId: string, agentEmail: string): number {
       ${corte ? "AND c.last_message_at >= ?" : ""}
   `).get(...(corte ? [agentEmail, domainId, corte] : [agentEmail, domainId])) as { n: number };
   return row?.n ?? 0;
+}
+
+/**
+ * Conversaciones abiertas mías y sin asignar: los contadores de los segmentos
+ * «Mías» y «Sin asignar» de la Bandeja en el celular. Mismo corte que la lista.
+ */
+export function countAssignmentSegments(domainId: string, agentEmail: string): { mine: number; unassigned: number } {
+  const corte = corteRetencion(domainId);
+  const row = sqlite.prepare(`
+    SELECT
+      SUM(CASE WHEN c.assigned_to = ? THEN 1 ELSE 0 END) AS mine,
+      SUM(CASE WHEN c.assigned_to IS NULL THEN 1 ELSE 0 END) AS unassigned
+    FROM conversations c
+    WHERE c.domain_id = ? AND c.deleted_at IS NULL AND c.status = 'open'
+      ${corte ? "AND c.last_message_at >= ?" : ""}
+  `).get(...(corte ? [agentEmail, domainId, corte] : [agentEmail, domainId])) as { mine: number | null; unassigned: number | null };
+  return { mine: row?.mine ?? 0, unassigned: row?.unassigned ?? 0 };
 }
 
 /**

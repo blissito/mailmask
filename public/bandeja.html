@@ -3,12 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- PWA: se instala desde Safari/Chrome ("Agregar a pantalla de inicio"). -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/img/pwa/apple-touch-icon.png">
+  <meta name="theme-color" content="#faf6ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#16120f" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Bandeja">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <title>Bandeja — MailMask</title>
   <meta name="robots" content="noindex, nofollow">
   <!-- Sin defer a propósito: aplica el tema guardado antes del primer pintado.
        Con defer se vería un fogonazo del tema equivocado en cada carga. -->
   <script src="/js/theme.js"></script>
+  <!-- Bricolage sólo para el saludo y el asunto en el celular (diseño B). -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&display=swap">
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/bandeja.css">
 </head>
@@ -35,6 +46,34 @@
       <button id="btn-logout" class="mesa-nav-link">Salir</button>
     </div>
   </nav>
+
+  <!-- Cabecera del celular (diseño B): dominio, saludo y el equipo. En escritorio no se ve. -->
+  <header class="mm-mhead">
+    <div class="mm-mhead-text">
+      <label class="mm-mhead-domain">
+        <span class="mm-sr">Dominio</span>
+        <select id="m-domain-select" class="mm-mhead-select"></select>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </label>
+      <h1 class="mm-mhead-hello" id="m-hello">Bandeja</h1>
+    </div>
+    <div class="mesa-snooze-wrap mm-mhead-menu-wrap">
+      <button type="button" class="mm-mhead-team" id="m-menu-btn" aria-label="Tu cuenta y opciones" aria-haspopup="menu"></button>
+      <div class="mesa-snooze-menu mesa-hidden" id="m-menu" role="menu">
+        <a role="menuitem" href="/app">Panel de MailMask</a>
+        <button type="button" role="menuitem" data-proxy="btn-signature">Firma</button>
+        <button type="button" role="menuitem" data-proxy="btn-canned">Respuestas guardadas</button>
+        <button type="button" role="menuitem" data-theme-toggle>Cambiar tema</button>
+        <button type="button" role="menuitem" data-proxy="btn-logout">Salir</button>
+      </div>
+    </div>
+  </header>
+  <!-- Segmentos por persona. Sólo aparecen si el dominio tiene equipo (2+ personas). -->
+  <div class="mm-seg mesa-hidden" id="m-seg" role="group" aria-label="Filtrar por persona">
+    <button type="button" data-seg="mine">Mías <span data-seg-count="mine"></span></button>
+    <button type="button" data-seg="none">Sin asignar <span data-seg-count="none"></span></button>
+    <button type="button" data-seg="">Todas</button>
+  </div>
 
   <!-- Toolbar -->
   <div class="mesa-toolbar">
@@ -123,7 +162,7 @@
       </div>
 
       <!-- Loaded conversation detail (hidden by default) -->
-      <div id="detail-loaded" class="mesa-detail-loaded">
+      <div id="detail-loaded" class="mesa-detail-loaded mesa-hidden">
         <div class="mesa-detail-header">
           <button class="mesa-back-btn" id="btn-back" type="button" aria-label="Volver a la lista">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
@@ -310,6 +349,24 @@
     <div class="mesa-chart" id="metrics-chart"></div>
     <h3 class="mesa-metrics-title">Por persona</h3>
     <div id="metrics-agents"></div>
+  </div>
+
+  <!-- Navegación del celular: cápsula flotante + Redactar. Se oculta dentro de un hilo. -->
+  <div class="mm-dock">
+    <nav class="mm-dock-nav" aria-label="Secciones">
+      <button type="button" class="active" id="m-nav-inbox" aria-label="Bandeja">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 2h6l1-2h5"/></svg>
+      </button>
+      <button type="button" id="m-nav-search" aria-label="Buscar y filtrar">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      </button>
+      <button type="button" id="m-nav-metrics" aria-label="Métricas">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>
+      </button>
+    </nav>
+    <button type="button" class="mm-dock-compose" id="m-compose" aria-label="Redactar">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>
+    </button>
   </div>
 
   <div class="mesa-toast" id="toast"></div>

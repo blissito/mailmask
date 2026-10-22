@@ -607,6 +607,17 @@ Es lo que justifica el plan Equipo frente a Front/Help Scout ($25 USD por asient
 - **Métricas** (`getBandejaMetrics`): los percentiles se calculan en TS (SQLite no los tiene) y los días vacíos se rellenan con cero. El reparto por persona usa `assignedTo` y **no** `messages.from`, que en un saliente es el alias del dominio. La duración se etiqueta "duración del hilo", no "tiempo hasta el cierre": no existe `closed_at`.
 - **Atajos**: el guardia mira `isContentEditable`, no sólo `tagName` — el compositor es Tiptap y con `tagName` los atajos se disparaban mientras escribías.
 
+### Bandeja en el celular y PWA (21-oct-2026)
+
+Bajo 768 px la Bandeja usa el diseño B (lienzo «Bandeja móvil — propuestas»): cabecera con dominio y
+«Hola, <nombre>», segmentos **Mías / Sin asignar / Todas** (sólo con 2+ personas; `assignedTo=none` y
+`segments` en `GET /api/bandeja/conversations`), tarjetas por día con la presencia escrita, y una
+cápsula abajo (Bandeja, Buscar = abre la toolbar con búsqueda y filtros, Métricas) más Redactar. Todo
+en el bloque final de `bandeja.css` y las funciones `*Movil`/`engancharMovil` de `bandeja.js`; el
+escritorio no cambia. Se instala como PWA: `manifest.webmanifest`, íconos en `img/pwa/` (fuente
+`img/app-icon.svg`, se regeneran con `rsvg-convert`) y `sw.js`, que **no guarda correo** (sólo da una
+pantalla de «Sin conexión»). Push todavía no: es la fase 2.
+
 ### Cuerpo del entrante y S3
 
 El cuerpo del correo entrante **no se guarda en `messages.body` a propósito**: vive en S3 y su texto plano en el índice FTS. `fetchEmailFromS3` clasifica el fallo (`NOT_FOUND` / `DENIED` / `OTHER`, `S3FetchError` en `ses.ts`) y el detalle degrada en tres estados distintos — rescatado del índice, ya no disponible, o error de verdad.

@@ -516,3 +516,31 @@ describe("Borrado en lote", () => {
     assert.equal(res.status, 403);
   });
 });
+
+describe("Segmentos por persona (Bandeja en el celular)", () => {
+  it("assignedTo=none devuelve sólo las sin asignar y `segments` cuenta las abiertas", async () => {
+    const e = await escenario();
+    const otra = await createConversation({
+      domainId: e.dom.id,
+      from: "otro@fuera.com",
+      to: `hola@${e.dom.domain}`,
+      subject: "Asignada",
+      status: "open",
+      priority: "normal",
+      lastMessageAt: new Date().toISOString(),
+      messageCount: 1,
+      tags: [],
+      threadReferences: [],
+    });
+    await updateConversation(e.dom.id, otra.id, { assignedTo: e.agente.email });
+
+    const res = await get(`/api/bandeja/conversations?domainId=${e.dom.id}&assignedTo=none`, e.agente);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.deepEqual(data.items.map((c: any) => c.id), [e.conv.id]);
+    assert.deepEqual(data.segments, { mine: 1, unassigned: 1 });
+
+    const mias = await (await get(`/api/bandeja/conversations?domainId=${e.dom.id}&assignedTo=${encodeURIComponent(e.agente.email)}`, e.agente)).json();
+    assert.deepEqual(mias.items.map((c: any) => c.id), [otra.id]);
+  });
+});
