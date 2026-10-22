@@ -1488,7 +1488,7 @@ const app = new Elysia({ adapter: node() })
              "Export", "Bandeja", "Agents", "Domain Registration", "Assistant"],
       paths: [
         "/", "/login", "/register", "/app", "/composer-demo", "/cli/authorize", "/css/*", "/js/*", "/img/*", "/video/*",
-        "/favicon.svg", "/manifest.webmanifest", "/sw.js", "/landing", "/pricing", "/bandeja", "/bandeja-compartida", "/dominios", "/alternativa-google-workspace", "/correo-en-tu-dominio", "/admin",
+        "/favicon.svg", "/mascot.png", "/manifest.webmanifest", "/sw.js", "/landing", "/pricing", "/bandeja", "/bandeja-compartida", "/dominios", "/alternativa-google-workspace", "/correo-en-tu-dominio", "/admin",
         "/set-password", "/forgot-password", "/terms", "/privacy",
         "/blog", "/blog/blog.css", "/blog/sounds-demo.js", "/blog/img/*",
         "/blog/:slug", "/robots.txt", "/sitemap.xml", "/llms.txt", "/skills/*", "/.well-known/agent-skills/index.json", "/.well-known/skills/index.json", "/.well-known/mcp-registry-auth", "/.well-known/openai-apps-challenge", "/health", "/healthz", "/docs", "/mcp", "/mcp/directory", "/api/internal/outbound",
@@ -1751,6 +1751,7 @@ const app = new Elysia({ adapter: node() })
   .get("/img/*", ({ params }) => serveStatic(`/img/${params["*"]}`))
   .get("/video/*", ({ params, request }) => serveVideo(`/video/${params["*"]}`, request))
   .get("/favicon.svg", () => serveStatic("/favicon.svg"))
+  .get("/mascot.png", () => serveStatic("/mascot.png"))
   // PWA de la Bandeja. El service worker va en la raíz: su alcance es la carpeta donde vive.
   .get("/manifest.webmanifest", () => serveStatic("/manifest.webmanifest"))
   .get("/sw.js", () => serveStatic("/sw.js"))

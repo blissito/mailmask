@@ -1,7 +1,7 @@
 import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
 
-import { evaluateRules, processInbound, isSesSetupNotification, WELCOME_FROM, extractPlainBody, extractHtmlBody, extractAttachments, resolveCidImages } from "./forwarding.ts";
+import { evaluateRules, processInbound, isSesSetupNotification, WELCOME_FROM, welcomeBody, welcomeHtml, extractPlainBody, extractHtmlBody, extractAttachments, resolveCidImages } from "./forwarding.ts";
 import {
   enqueueForward, dequeueForward, listForwardQueue, moveToDeadLetter,
   getQueueDepth, getDeadLetterCount,
@@ -294,6 +294,13 @@ describe("processInbound", () => {
     assert.equal(welcome.length, 1, "la bienvenida se siembra una vez por dominio");
     assert.equal(welcome[0].to, `hola@${fwdDomain}`);
     assert.equal(listForwardQueue().find((q) => q.from === "no-reply-aws@amazon.com"), undefined);
+  });
+
+  it("la bienvenida en HTML lleva la cara de Mascarito y avisa que es IA", () => {
+    const html = welcomeHtml("x.com");
+    assert.match(html, /mascot\.png/);
+    assert.match(html, /Mascarito IA/);
+    assert.match(welcomeBody("x.com"), /lo escribió una IA/);
   });
 
   it("reconoce el aviso de SES por la llave del objeto", () => {

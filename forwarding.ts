@@ -488,6 +488,16 @@ export function welcomeBody(domainName: string): string {
   ].join("\n");
 }
 
+// La misma bienvenida en HTML, con la cara de Mascarito arriba.
+export function welcomeHtml(domainName: string): string {
+  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const paragraphs = welcomeBody(domainName).split("\n\n")
+    .map((p) => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
+  return `<div style="font-family:system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.5">` +
+    `<img src="https://www.mailmask.studio/mascot.png" width="72" height="72" alt="Mascarito IA" style="display:block;margin:0 0 12px">` +
+    `${paragraphs}</div>`;
+}
+
 // Una sola vez por dominio: la regla se vuelve a crear al reparar (ensureDomainInbound)
 // y SES manda otro aviso de prueba cada vez.
 export async function seedWelcomeConversation(domainId: string, domainName: string): Promise<boolean> {
@@ -512,6 +522,7 @@ export async function seedWelcomeConversation(domainId: string, domainName: stri
     conversationId: conv.id,
     from: WELCOME_FROM,
     body,
+    html: welcomeHtml(domainName),
     direction: "inbound",
     createdAt: now,
     messageId,
