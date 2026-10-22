@@ -301,6 +301,8 @@ describe("processInbound", () => {
     assert.match(html, /mascot\.png/);
     assert.match(html, /Mascarito IA/);
     assert.match(html, /<strong>no una persona<\/strong>/);
+    assert.match(welcomeBody("x.com", true), /siempre estoy cerca/);
+    assert.match(welcomeBody("x.com"), /Cuando actives tu dominio/);
     assert.match(welcomeBody("x.com"), /un agente de IA\), no una persona/);
   });
 

@@ -10,6 +10,7 @@ import { depositarEnImap, imapHabilitado } from "./imap-store.js";
 import { emitEvent } from "./webhooks.js";
 import { dmarcReportAddress, ingestDmarcReport } from "./dmarc-reports.js";
 import { sandboxBlockedFromDomain } from "./sandbox.js";
+import { canUseAssistant } from "./assistant.js";
 
 // --- SNS notification types ---
 
@@ -470,7 +471,7 @@ function setupNotificationDomain(receipt: SesMailNotification["receipt"] | undef
   return match?.[1] ?? null;
 }
 
-export function welcomeBody(domainName: string): string {
+export function welcomeBody(domainName: string, assistantAvailable = false): string {
   return [
     `Hola, soy Mascarito IA, el agente de inteligencia artificial de MailMask.`,
     `Este mensaje lo escribí yo (un agente de IA), no una persona. 🤖`,
@@ -482,6 +483,12 @@ export function welcomeBody(domainName: string): string {
     `2. Mándale un correo de prueba desde tu correo de siempre y míralo llegar aquí.`,
     `3. Contéstalo desde la Bandeja: quien lo reciba verá hola@${domainName}, no tu correo personal.`,
     ``,
+    // El chat del panel sólo aparece con un dominio activado (canUseAssistant): al
+    // gratis no se le promete lo que no ve.
+    assistantAvailable
+      ? `Recuerda que siempre estoy cerca: búscame en el chat de tu panel, en mailmask.studio/app.`
+      : `Cuando actives tu dominio, me encuentras siempre en el chat de tu panel, en mailmask.studio/app.`,
+    ``,
     `Si algo no cuadra, responde este correo y una persona del equipo te ayuda.`,
     ``,
     `— Mascarito IA · agente de inteligencia artificial de MailMask`,
@@ -489,9 +496,9 @@ export function welcomeBody(domainName: string): string {
 }
 
 // La misma bienvenida en HTML, con la cara de Mascarito arriba.
-export function welcomeHtml(domainName: string): string {
+export function welcomeHtml(domainName: string, assistantAvailable = false): string {
   const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const paragraphs = welcomeBody(domainName).split("\n\n")
+  const paragraphs = welcomeBody(domainName, assistantAvailable).split("\n\n")
     .map((p) => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, "<br>").replace("no una persona", "<strong>no una persona</strong>")}</p>`).join("");
   return `<div style="font-family:system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.5">` +
     `<img src="https://www.mailmask.studio/mascot.png" width="72" height="72" alt="Mascarito IA" style="display:block;margin:0 0 12px">` +
@@ -500,12 +507,12 @@ export function welcomeHtml(domainName: string): string {
 
 // Una sola vez por dominio: la regla se vuelve a crear al reparar (ensureDomainInbound)
 // y SES manda otro aviso de prueba cada vez.
-export async function seedWelcomeConversation(domainId: string, domainName: string): Promise<boolean> {
+export async function seedWelcomeConversation(domainId: string, domainName: string, assistantAvailable = false): Promise<boolean> {
   if (!claimOnce("welcome-conv", domainId, 3650)) return false;
   const now = new Date().toISOString();
   const messageId = `<welcome-${domainId}@mailmask.studio>`;
   const subject = `Tu bandeja ${domainName} está lista. ✅`;
-  const body = welcomeBody(domainName);
+  const body = welcomeBody(domainName, assistantAvailable);
   const conv = await createConversation({
     domainId,
     from: WELCOME_FROM,
@@ -522,7 +529,7 @@ export async function seedWelcomeConversation(domainId: string, domainName: stri
     conversationId: conv.id,
     from: WELCOME_FROM,
     body,
-    html: welcomeHtml(domainName),
+    html: welcomeHtml(domainName, assistantAvailable),
     direction: "inbound",
     createdAt: now,
     messageId,
@@ -654,7 +661,7 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
   if (isSesSetupNotification(receipt?.action?.objectKey, from, subject)) {
     const domainName = setupNotificationDomain(receipt);
     const domain = domainName ? await getDomainByName(domainName) : null;
-    if (domain) await seedWelcomeConversation(domain.id, domain.domain);
+    if (domain) await seedWelcomeConversation(domain.id, domain.domain, canUseAssistant(domain.ownerEmail));
     if (messageId) await markMessageProcessed(messageId);
     log("info", "forwarding", "SES setup notification replaced by welcome", { domain: domainName });
     return { action: "ignored", details: "SES setup notification" };
