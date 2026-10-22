@@ -227,7 +227,7 @@ import {
   isAdminEmail,
   assistantUsageDomainId,
 } from "./assistant.js";
-import { checkAgentBudget, recordAgentUsage, turnCostUsd, getAgentUsage, agentBudgetStatus, AGENT_INCLUDED_THREADS } from "./agent-quota.js";
+import { checkAgentBudget, recordAgentUsage, turnCostUsd, agentBudgetStatus, agentUsageView, renewalPhrase } from "./agent-quota.js";
 import { checkRateLimit } from "./rate-limit.js";
 import {
   verifyDomain,
@@ -2597,27 +2597,15 @@ const app = new Elysia({ adapter: node() })
     detail: { tags: ["Domains", "SDK"], summary: "Get a single domain by ID", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
-  // Consumo del agente en el mes (agent-quota.ts). El costo en USD es dato interno: sólo admins.
+  // Uso de Mascarito (agent-quota.ts): porcentajes de 5 h y de la semana. USD sólo para admins.
   .get("/api/domains/:id/agent-usage", async ({ request, params }) => {
     const user = await getAuthUser(request);
     if (!user) return jsonErr("No autenticado", 401);
     const access = await checkDomainAccess(user.email, params.id, "read");
     if (!access) return jsonErr("Dominio no encontrado", 404);
-    const row = getAgentUsage(access.domain.id);
-    const status = agentBudgetStatus(row);
-    return Response.json({
-      month: row.month,
-      threads: row.threads,
-      turns: row.turns,
-      toolCalls: row.toolCalls,
-      includedThreads: AGENT_INCLUDED_THREADS,
-      threadsPct: status.threadsPct,
-      internalPct: status.internalPct,
-      mode: status.mode,
-      ...(isAdminEmail(user.email) ? { costUsd: row.costUsd } : {}),
-    });
+    return Response.json(agentUsageView(agentBudgetStatus(access.domain.id, "panel"), isAdminEmail(user.email)));
   }, {
-    detail: { tags: ["Domains"], summary: "Consumo del agente Mascarito en el mes", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+    detail: { tags: ["Domains"], summary: "Uso de Mascarito: ventana de 5 h y semana", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
   .get("/api/domains/:id/health", async ({ request, params }) => {
@@ -8848,10 +8836,12 @@ const app = new Elysia({ adapter: node() })
     const saved = saveAssistantMessage(auth.email, "user", [text, ...files.map(attachmentMarkdown)].filter(Boolean).join("\n"));
 
     // Presupuesto del agente (agent-quota.ts): el turno se le carga al dominio en pantalla o al
-    // activado más antiguo. En pausa no se llama a Ghosty; se contesta con un SSE propio.
+    // activado más antiguo. Al 100 % no se llama a Ghosty; se contesta con un SSE propio.
     const usageDomainId = assistantUsageDomainId(auth.email, b.screen);
-    if (usageDomainId && checkAgentBudget(usageDomainId).mode === "paused") {
-      const msg = "Mascarito llegó al límite de uso de este mes en este dominio y está en pausa hasta el día 1. Puedes hacer el cambio desde el panel, o escríbenos a soporte si necesitas más.";
+    const budget = usageDomainId ? checkAgentBudget(usageDomainId, "panel") : null;
+    if (budget && !budget.allowed) {
+      const which = budget.reason === "week" ? "de esta semana" : "de las últimas 5 horas";
+      const msg = `Mascarito llegó a su límite de uso ${which} y vuelve ${renewalPhrase(budget)}. Mientras, puedes hacer el cambio tú desde el panel. Si se te queda corto, escríbenos y lo subimos.`;
       saveAssistantMessage(auth.email, "assistant", msg, "ok");
       const sse = `data: ${JSON.stringify({ type: "done", value: msg })}\n\n`;
       return new Response(sse, {
@@ -8893,7 +8883,7 @@ const app = new Elysia({ adapter: node() })
       if (content) saveAssistantMessage(auth.email, "assistant", content, o.status);
       if (usageDomainId) {
         try {
-          recordAgentUsage({ domainId: usageDomainId, turns: 1, toolCalls: o.toolCalls, costUsd: turnCostUsd(o, "panel") });
+          recordAgentUsage({ domainId: usageDomainId, channel: "panel", toolCalls: o.toolCalls, costUsd: turnCostUsd(o, "panel") });
         } catch (err) {
           log("error", "assistant", "No se pudo anotar el consumo del turno", { domainId: usageDomainId, error: String(err) });
         }
@@ -8916,6 +8906,22 @@ const app = new Elysia({ adapter: node() })
     if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
     return Response.json(getMessagePage(auth.email, new URL(request.url).searchParams.get("before")));
   }, { detail: { tags: ["Assistant"], summary: "Historial del asistente (paginado con ?before=ISO)" } })
+
+  // Uso de Mascarito para el indicador del dock: el del dominio al que se cargaría el turno.
+  .get("/api/asistente/usage", async ({ request }) => {
+    const auth = await getAuthUser(request);
+    if (!auth || auth.via !== "session") return jsonErr("No autenticado", 401);
+    if (!canUseAssistant(auth.email)) return jsonErr("El asistente todavía no está disponible para tu cuenta.", 403);
+    const domainId = assistantUsageDomainId(auth.email, { domainId: new URL(request.url).searchParams.get("domainId") ?? undefined });
+    if (!domainId) return Response.json({ domainId: null });
+    const budget = agentBudgetStatus(domainId, "panel");
+    return Response.json({
+      domainId,
+      ...agentUsageView(budget, isAdminEmail(auth.email)),
+      blocked: !budget.allowed,
+      renewal: budget.allowed ? null : renewalPhrase(budget),
+    });
+  }, { detail: { tags: ["Assistant"], summary: "Uso de Mascarito para el dock" } })
 
   .post("/api/asistente", async ({ request, body }) => {
     const auth = await getAuthUser(request);

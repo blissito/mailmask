@@ -670,15 +670,24 @@ export const dmarcRecords = sqliteTable("dmarc_records", {
   index("idx_dmarc_records_report").on(table.reportId),
 ]);
 
-// --- Consumo del agente por dominio y mes (`agent-quota.ts`, migración 0033) ---
+// --- Consumo del agente por dominio (`agent-quota.ts`, migración 0033) ---
 export const agentUsage = sqliteTable("agent_usage", {
   domainId: text("domain_id").notNull(),
-  month: text("month").notNull(), // YYYY-MM (UTC)
+  week: text("week").notNull(), // semana ISO YYYY-Www, corte el lunes 00:00 de CDMX
   threads: integer("threads").notNull().default(0),
-  turns: integer("turns").notNull().default(0),
+  mailTurns: integer("mail_turns").notNull().default(0),
+  panelTurns: integer("panel_turns").notNull().default(0),
   toolCalls: integer("tool_calls").notNull().default(0),
   costMicroUsd: integer("cost_micro_usd").notNull().default(0),
   updatedAt: text("updated_at").notNull(),
 }, (table) => [
-  primaryKey({ columns: [table.domainId, table.month] }),
+  primaryKey({ columns: [table.domainId, table.week] }),
+]);
+
+export const agentUsageHourly = sqliteTable("agent_usage_hourly", {
+  domainId: text("domain_id").notNull(),
+  hour: text("hour").notNull(), // YYYY-MM-DDTHH (UTC)
+  costMicroUsd: integer("cost_micro_usd").notNull().default(0),
+}, (table) => [
+  primaryKey({ columns: [table.domainId, table.hour] }),
 ]);

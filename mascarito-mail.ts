@@ -14,7 +14,7 @@
 import { addMessage, addNote, claimOnce, getDomain, indexMessage, isSuppressed, updateConversation } from "./db.js";
 import { getConfigSetName, sendFromDomain } from "./ses.js";
 import { collectTurn, openGhostyTurn, type TurnOutcome } from "./assistant.js";
-import { checkAgentBudget, recordAgentUsage, turnCostUsd } from "./agent-quota.js";
+import { checkAgentBudget, recordAgentUsage, renewalPhrase, turnCostUsd } from "./agent-quota.js";
 import { checkRateLimit } from "./rate-limit.js";
 import { notifyInbox } from "./sse-hub.js";
 import { logOutbound } from "./outbound-relay.js";
@@ -148,28 +148,25 @@ export async function answerMascaritoMail(m: MascaritoInbound): Promise<{ replie
     const domain = getDomain(m.domainId);
     if (!domain) return { replied: false, reason: "dominio" };
 
-    // Presupuesto del agente en este dominio (agent-quota.ts). En pausa no se llama al modelo.
-    const budget = checkAgentBudget(m.domainId);
-    if (budget.mode === "paused") {
+    // Presupuesto del agente (agent-quota.ts), compartido con el panel. Al 100 % (o sin el add-on
+    // de correo) no se llama al modelo: el hilo queda para una persona.
+    const budget = checkAgentBudget(m.domainId, "mail");
+    if (!budget.allowed) {
+      const why = budget.reason === "no_addon"
+        ? "este dominio no tiene a Mascarito en su correo"
+        : `Mascarito llegó a su límite de uso; vuelve ${renewalPhrase(budget)}`;
       await updateConversation(m.domainId, m.conversationId, { assignedTo: domain.ownerEmail });
-      await addNote({ conversationId: m.conversationId, author: MASCARITO_ADDRESS, body: "Mascarito IA está en pausa este mes en este dominio: el hilo queda para una persona.", createdAt: new Date().toISOString() });
-      log("warn", "mascarito", "Agente en pausa: hilo para una persona", { from: m.from, reason: budget.reason });
-      return { replied: false, reason: "agente en pausa" };
+      await addNote({ conversationId: m.conversationId, author: MASCARITO_ADDRESS, body: `Mascarito IA no contestó este hilo (${why}): queda para una persona.`, createdAt: new Date().toISOString() });
+      notifyInbox(m.domainId, "conv_note", { conversationId: m.conversationId, author: MASCARITO_ADDRESS, actor: MASCARITO_ADDRESS });
+      log("warn", "mascarito", "Sin presupuesto: hilo para una persona", { from: m.from, reason: budget.reason });
+      return { replied: false, reason: "límite de uso" };
     }
 
     const decision = await classify(m);
     const out = decision.outcome;
-    recordAgentUsage({ domainId: m.domainId, threads: 1, turns: out ? 1 : 0, toolCalls: out?.toolCalls ?? 0, costUsd: out ? turnCostUsd(out, "classify") : 0 });
+    recordAgentUsage({ domainId: m.domainId, channel: "mail", threads: 1, turns: out ? 1 : 0, toolCalls: out?.toolCalls ?? 0, costUsd: out ? turnCostUsd(out, "classify") : 0 });
     const { text, html } = renderTemplate(decision.template, decision.firstName);
 
-    // Hilos incluidos agotados: la respuesta queda como borrador (nota interna) y la manda una persona.
-    if (budget.mode === "draft_only") {
-      await updateConversation(m.domainId, m.conversationId, { assignedTo: domain.ownerEmail });
-      await addNote({ conversationId: m.conversationId, author: MASCARITO_ADDRESS, body: `Borrador de Mascarito IA (se acabaron los hilos incluidos del mes; revísalo y mándalo tú):\n\n${text}`, createdAt: new Date().toISOString() });
-      notifyInbox(m.domainId, "conv_note", { conversationId: m.conversationId, author: MASCARITO_ADDRESS, actor: MASCARITO_ADDRESS });
-      log("info", "mascarito", "Borrador por tope de hilos", { from: m.from, template: decision.template });
-      return { replied: false, reason: "borrador" };
-    }
     const subject = `Re: ${m.subject.replace(/^(re:\s*)+/i, "").replace(/[\r\n]+/g, " ").slice(0, 200)}`;
     const refs = [...m.references, m.messageId].filter(Boolean);
     const sent = await sendFromDomain(FROM_HEADER, m.from, subject, text, {

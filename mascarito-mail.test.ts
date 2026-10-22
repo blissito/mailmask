@@ -54,6 +54,8 @@ describe("Mascarito IA contesta su correo", () => {
     const d = dbmod.createDomain(owner, `masc-${Date.now()}.test`, ["k"], "v");
     dbmod.updateDomain(d.id, { verified: true });
     domainId = d.id;
+    // el canal de correo exige el add-on `agent` (salvo los dominios de la casa)
+    dbmod.createCourtesyAddon({ userEmail: owner, kind: "agent", domainId, currentPeriodEnd: new Date(Date.now() + 30 * 864e5).toISOString() });
   });
   after(() => { asis?.setGhostyFetch(null); quota?.setAgentQuotaNotifiers(null); });
 
@@ -161,53 +163,56 @@ describe("Mascarito IA contesta su correo", () => {
     }
   });
 
-  // --- Consumo y topes del agente (agent-quota.ts). Van al final: dejan el dominio topado. ---
+  // --- Presupuesto del agente (agent-quota.ts). Van al final: dejan el dominio topado. ---
 
-  it("cada correo contestado suma un hilo y un turno al dominio; sin usage se estima el clasificar", async () => {
+  it("cada correo contestado suma un hilo al dominio; sin usage se estima el clasificar", async () => {
     ghostyReply = '{"template":"what_is"}';
     ghostyUsage = undefined;
-    const before = quota.getAgentUsage(domainId);
+    const before = quota.getWeekUsage(domainId);
     assert.equal((await mm.answerMascaritoMail(inbound())).replied, true);
-    const after = quota.getAgentUsage(domainId);
+    const after = quota.getWeekUsage(domainId);
     assert.equal(after.threads - before.threads, 1);
-    assert.equal(after.turns - before.turns, 1);
+    assert.equal(after.mailTurns - before.mailTurns, 1);
+    assert.equal(after.panelTurns, before.panelTurns);
     assert.ok(Math.abs(after.costUsd - before.costUsd - quota.EST_CLASSIFY_USD) < 1e-6);
     // con done.usage se anota el costo real
     ghostyUsage = { costUsd: 0.0031, toolCalls: 0, model: "m" };
     await mm.answerMascaritoMail(inbound());
-    const after2 = quota.getAgentUsage(domainId);
+    const after2 = quota.getWeekUsage(domainId);
     assert.ok(Math.abs(after2.costUsd - after.costUsd - 0.0031) < 1e-6);
     ghostyUsage = undefined;
     // «HUMANO» es un hilo atendido sin turno de modelo
     await mm.answerMascaritoMail(inbound({ text: "HUMANO" }));
-    const after3 = quota.getAgentUsage(domainId);
+    const after3 = quota.getWeekUsage(domainId);
     assert.equal(after3.threads - after2.threads, 1);
-    assert.equal(after3.turns, after2.turns);
+    assert.equal(after3.mailTurns, after2.mailTurns);
   });
 
-  it("con los hilos incluidos agotados deja un borrador en nota y no manda nada", async () => {
-    const u = quota.getAgentUsage(domainId);
-    quota.recordAgentUsage({ domainId, threads: Math.max(0, quota.AGENT_INCLUDED_THREADS - u.threads), turns: 0, toolCalls: 0, costUsd: 0 });
-    ghostyReply = '{"template":"pricing"}';
-    const n = sent.length, calls = ghostyCalls;
-    const m = inbound();
-    assert.deepEqual(await mm.answerMascaritoMail(m), { replied: false, reason: "borrador" });
-    assert.equal(sent.length, n, "no sale correo");
-    assert.equal(ghostyCalls, calls + 1, "el modelo sí clasifica para el borrador");
-    const notes = dbmod.listNotes(m.conversationId);
-    assert.equal(notes.length, 1);
-    assert.match(notes[0].body, /Borrador de Mascarito/);
-    assert.ok(dbmod.getConversation(domainId, m.conversationId)!.assignedTo);
-  });
-
-  it("con el tope interno de gasto en pausa no llama al modelo y deja el hilo a una persona", async () => {
-    quota.recordAgentUsage({ domainId, turns: 0, toolCalls: 0, costUsd: quota.internalCapUsd() });
-    const n = sent.length, calls = ghostyCalls;
-    const m = inbound();
-    assert.deepEqual(await mm.answerMascaritoMail(m), { replied: false, reason: "agente en pausa" });
+  it("sin el add-on de correo no llama al modelo y deja el hilo a una persona", async () => {
+    const owner = `owner-masc2-${Date.now()}@example.com`;
+    dbmod.createUser(owner, "x");
+    const other = dbmod.createDomain(owner, `masc2-${Date.now()}.test`, ["k"], "v").id;
+    const conv = dbmod.createConversation({ domainId: other, from: "x@gmail.com", to: "hola@masc2.test", subject: "Hola", status: "open", priority: "normal",
+      lastMessageAt: new Date().toISOString(), messageCount: 1, tags: [], threadReferences: [] });
+    const calls = ghostyCalls, n = sent.length;
+    const r = await mm.answerMascaritoMail({ ...inbound(), domainId: other, conversationId: conv.id });
+    assert.deepEqual(r, { replied: false, reason: "límite de uso" });
     assert.equal(ghostyCalls, calls);
     assert.equal(sent.length, n);
-    assert.equal(dbmod.listNotes(m.conversationId).length, 1);
+    assert.match(dbmod.listNotes(conv.id)[0].body, /no tiene a Mascarito en su correo/);
+  });
+
+  it("al 100 % del presupuesto no llama al modelo, no manda nada y deja el hilo a una persona", async () => {
+    const lim = quota.agentBudgetStatus(domainId, "mail").window5h.limitUsd;
+    quota.recordAgentUsage({ domainId, channel: "panel", toolCalls: 0, costUsd: lim });
+    const n = sent.length, calls = ghostyCalls;
+    const m = inbound();
+    assert.deepEqual(await mm.answerMascaritoMail(m), { replied: false, reason: "límite de uso" });
+    assert.equal(ghostyCalls, calls);
+    assert.equal(sent.length, n);
+    const notes = dbmod.listNotes(m.conversationId);
+    assert.equal(notes.length, 1);
+    assert.match(notes[0].body, /límite de uso; vuelve a las \d{2}:\d{2}/);
     assert.ok(dbmod.getConversation(domainId, m.conversationId)!.assignedTo);
   });
 });

@@ -1133,42 +1133,49 @@ export function forwardCapReached(d: { cap: number; plan: string }): Email {
   };
 }
 
-/** Aviso al 80 % de los hilos que Mascarito atiende solo en el mes (`agent-quota.ts`). */
-export function agentQuotaWarning(d: { domain: string; used: number; cap: number }): Email {
-  const pct = Math.round((d.used / d.cap) * 100);
+// Avisos del presupuesto semanal de Mascarito (`agent-quota.ts`). Sólo porcentajes: el cliente
+// nunca ve tokens ni dólares. No hay excedente; si se queda corto, se ofrece subir.
+const agentUpsell = (hasAgentAddon: boolean) => hasAgentAddon
+  ? "¿Se te queda corto? Contesta este correo y te subimos el presupuesto."
+  : "¿Se te queda corto? Pon a Mascarito en tu correo ($199/mes): sube su presupuesto. Contesta este correo y lo activamos.";
+
+/** Aviso al 80 % de la semana. */
+export function agentQuotaWarning(d: { domain: string; pct: number; hasAgentAddon: boolean }): Email {
   return {
-    subject: cleanSubject(`Mascarito lleva ${pct}% de sus hilos del mes en ${d.domain}`),
+    subject: cleanSubject(`Mascarito lleva ${d.pct}% de su uso de la semana en ${d.domain}`),
     html: layout({
-      preheader: `${d.used.toLocaleString("es-MX")} de ${d.cap.toLocaleString("es-MX")} hilos atendidos este mes.`,
-      heading: "Mascarito va alto este mes",
-      body: p(`Tu agente en ${d.domain} incluye ${d.cap.toLocaleString("es-MX")} hilos atendidos al mes y ya lleva ${d.used.toLocaleString("es-MX")}.`)
-        + p("Si llega al tope, Mascarito deja de contestar solo: prepara la respuesta como borrador para que tú la revises y la mandes, hasta el día 1 del mes siguiente."),
+      preheader: `Va en ${d.pct}% de la semana; se renueva el lunes.`,
+      heading: "Mascarito va alto esta semana",
+      body: p(`Mascarito ya usó el ${d.pct}% de su presupuesto de esta semana en ${d.domain}.`)
+        + p("Si llega al 100%, deja de contestar solo hasta el lunes a las 00:00: los correos quedan en la Bandeja para una persona y el panel te avisa cuándo vuelve."),
       cta: { label: "Ver el uso de Mascarito", url: `${baseUrl()}/app` },
-      footerNote: "¿Necesitas más hilos? Contesta este correo y te ofrecemos un bloque extra.",
+      footerNote: agentUpsell(d.hasAgentAddon),
     }),
     text: textBlock([
-      `Tu agente en ${d.domain} incluye ${d.cap} hilos atendidos al mes y ya lleva ${d.used}.`,
-      "Si llega al tope, Mascarito prepara las respuestas como borrador para que tú las revises, hasta el día 1 del mes siguiente.",
+      `Mascarito ya usó el ${d.pct}% de su presupuesto de esta semana en ${d.domain}.`,
+      "Si llega al 100%, deja de contestar solo hasta el lunes a las 00:00.",
+      agentUpsell(d.hasAgentAddon),
       `Ver el uso: ${baseUrl()}/app`,
     ]),
   };
 }
 
-/** Aviso al 100 %: desde aquí el automático baja a borrador hasta el día 1. */
-export function agentQuotaReached(d: { domain: string; cap: number }): Email {
+/** Aviso al 100 % de la semana. */
+export function agentQuotaReached(d: { domain: string; pct: number; hasAgentAddon: boolean }): Email {
   return {
-    subject: cleanSubject(`Mascarito llegó a sus hilos del mes en ${d.domain}`),
+    subject: cleanSubject(`Mascarito llegó a su límite de la semana en ${d.domain}`),
     html: layout({
-      preheader: "Desde ahora prepara borradores; vuelve a contestar solo el día 1.",
-      heading: "Mascarito pasó a modo borrador",
-      body: p(`Tu agente en ${d.domain} ya atendió los ${d.cap.toLocaleString("es-MX")} hilos incluidos este mes.`)
-        + p("Desde ahora Mascarito no contesta solo: deja la respuesta como borrador en la Bandeja para que tú la revises y la mandes. Vuelve a contestar solo el día 1 del mes siguiente."),
+      preheader: "Vuelve el lunes a las 00:00; mientras, los correos quedan para una persona.",
+      heading: "Mascarito descansa hasta el lunes",
+      body: p(`Mascarito usó todo su presupuesto de esta semana en ${d.domain}.`)
+        + p("Hasta el lunes a las 00:00 (hora del centro de México) no contesta solo: los correos nuevos quedan en tu Bandeja para que los atienda una persona, y en el panel puedes hacer los cambios tú."),
       cta: { label: "Abrir la Bandeja", url: `${baseUrl()}/bandeja` },
-      footerNote: "¿Necesitas más hilos este mes? Contesta este correo y te ofrecemos un bloque extra.",
+      footerNote: agentUpsell(d.hasAgentAddon),
     }),
     text: textBlock([
-      `Tu agente en ${d.domain} ya atendió los ${d.cap} hilos incluidos este mes.`,
-      "Desde ahora Mascarito deja la respuesta como borrador en la Bandeja para que tú la revises. Vuelve a contestar solo el día 1 del mes siguiente.",
+      `Mascarito usó todo su presupuesto de esta semana en ${d.domain}.`,
+      "Hasta el lunes a las 00:00 (hora del centro de México) los correos nuevos quedan en tu Bandeja para una persona.",
+      agentUpsell(d.hasAgentAddon),
       `Abrir la Bandeja: ${baseUrl()}/bandeja`,
     ]),
   };

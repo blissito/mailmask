@@ -84,8 +84,10 @@ describe("Asistente: Ghosty, turn token y confirmaciones", () => {
     session = { cookie: `token=${await authmod.signJwt({ email })}`, csrf: authmod.generateCsrfToken() };
     key = (await dbmod.createApiKey(email, "asis-test")).plaintextKey;
     domainId = dbmod.createDomain(email, domainName, ["d1", "d2", "d3"], "vt").id;
+    // El dominio de las pruebas de chat no se topa: muchos turnos seguidos llenarían la ventana de 5 h.
+    process.env.AGENT_UNCAPPED_DOMAINS = `mailmask.studio,${domainName}`;
   });
-  after(() => asis?.setGhostyFetch(null));
+  after(() => { asis?.setGhostyFetch(null); delete process.env.AGENT_UNCAPPED_DOMAINS; });
   beforeEach(() => {
     sqlite.prepare("DELETE FROM rate_limits").run();
     delete process.env.GHOSTY_RUNTIME;
@@ -176,51 +178,63 @@ describe("Asistente: Ghosty, turn token y confirmaciones", () => {
     assert.equal(bad.usage, undefined);
   });
 
-  it("stream: el turno se le carga al dominio en pantalla (turnos, tool calls y costo)", async () => {
+  it("stream: el turno se le carga al dominio en pantalla (acción del panel, tool calls y costo)", async () => {
     const q = await import("./agent-quota.ts");
-    const before = q.getAgentUsage(domainId);
+    const before = q.getWeekUsage(domainId);
     sseFrames = [
       `data: ${JSON.stringify({ type: "tool", name: "mcp__mailmask__list_domains" })}\n\n`,
       `data: ${JSON.stringify({ type: "done", value: "ok", usage: { costUsd: 0.02, toolCalls: 1 } })}\n\n`,
     ];
     const res = await postJson("/api/asistente/stream", { text: "lista", attachments: [], screen: { domainId } }, withSession());
     await res.text();
-    const after = q.getAgentUsage(domainId);
-    assert.equal(after.turns - before.turns, 1);
+    const after = q.getWeekUsage(domainId);
+    assert.equal(after.panelTurns - before.panelTurns, 1);
     assert.equal(after.toolCalls - before.toolCalls, 1);
     assert.equal(after.threads, before.threads, "un turno del panel no es un hilo");
     assert.ok(Math.abs(after.costUsd - before.costUsd - 0.02) < 1e-6);
 
-    // La lectura del panel: sin costo para quien no es admin.
+    // La lectura del panel: porcentajes y fechas, sin USD para quien no es admin.
     const read = await (await req(`/api/domains/${domainId}/agent-usage`, { headers: { cookie: session.cookie } })).json();
-    assert.equal(read.turns, after.turns);
-    assert.equal(read.toolCalls, after.toolCalls);
-    assert.equal(read.includedThreads, q.AGENT_INCLUDED_THREADS);
-    assert.equal(read.mode, "auto");
-    assert.equal(typeof read.internalPct, "number");
-    assert.ok(!("costUsd" in read), "el costo en USD es sólo para admins");
+    assert.deepEqual(Object.keys(read).sort(), ["actions", "hasAgentAddon", "threads", "uncapped", "week", "window5h"]);
+    assert.equal(read.actions, after.panelTurns);
+    assert.equal(read.threads, after.threads);
+    assert.equal(typeof read.window5h.pct, "number");
+    assert.ok(read.window5h.resetsAt, "con uso, la ventana dice cuándo se libera");
+    assert.equal(typeof read.week.pct, "number");
+    assert.ok(Date.parse(read.week.resetsAt) > Date.now());
+    assert.equal(read.hasAgentAddon, false);
     const ajeno = await req(`/api/domains/no-existe/agent-usage`, { headers: { cookie: session.cookie } });
     assert.equal(ajeno.status, 404);
+
+    // El dock pide el del dominio al que se cargaría el turno.
+    const dock = await (await req(`/api/asistente/usage?domainId=${domainId}`, { headers: { cookie: session.cookie } })).json();
+    assert.equal(dock.domainId, domainId);
+    assert.equal(dock.blocked, false);
+    assert.equal(dock.week.pct, read.week.pct);
   });
 
-  it("stream: con el agente en pausa contesta claro y no llama a Ghosty", async () => {
+  it("stream: al 100 % contesta con la hora de renovación y no llama a Ghosty", async () => {
     const q = await import("./agent-quota.ts");
     q.setAgentQuotaNotifiers({ alert: () => {}, owner: () => {} });
     try {
-      const pausedId = dbmod.createDomain(email, `pausa-${suffix}.com`, ["d1"], "vt").id;
-      q.recordAgentUsage({ domainId: pausedId, turns: 1, toolCalls: 0, costUsd: q.internalCapUsd() + 1 });
+      const fullId = dbmod.createDomain(email, `lleno-${suffix}.com`, ["d1"], "vt").id;
+      q.recordAgentUsage({ domainId: fullId, channel: "panel", toolCalls: 0, costUsd: q.domainLimits(false).window5hUsd });
       lastCall = null;
-      const res = await postJson("/api/asistente/stream", { text: "hola", attachments: [], screen: { domainId: pausedId } }, withSession());
+      const res = await postJson("/api/asistente/stream", { text: "hola", attachments: [], screen: { domainId: fullId } }, withSession());
       assert.equal(res.status, 200);
       const out = await res.text();
       assert.match(out, /"type":"done"/);
-      assert.match(out, /pausa/);
+      assert.match(out, /límite de uso de las últimas 5 horas y vuelve a las \d{2}:\d{2}/);
       assert.equal(lastCall, null, "no se abrió turno en Ghosty");
-      assert.equal(q.getAgentUsage(pausedId).turns, 1, "un turno que no se hizo no se cobra");
+      assert.equal(q.getWeekUsage(fullId).panelTurns, 1, "un turno que no se hizo no se cobra");
+      const dock = await (await req(`/api/asistente/usage?domainId=${fullId}`, { headers: { cookie: session.cookie } })).json();
+      assert.equal(dock.blocked, true);
+      assert.match(dock.renewal, /^a las/);
     } finally {
       q.setAgentQuotaNotifiers(null);
     }
   });
+
 
   it("stream: sin cambio de pantalla igual viaja una línea con el dominio en pantalla", async () => {
     sseFrames = [`data: ${JSON.stringify({ type: "done", value: "ok" })}\n\n`];

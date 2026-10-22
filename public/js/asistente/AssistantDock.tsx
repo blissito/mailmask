@@ -35,6 +35,7 @@ import { usePendingActions } from "./usePendingActions"
 import { ASSISTANT_ICON, ASSISTANT_NAME } from "./brand"
 import { playReplyDone } from "./sound"
 import { useCurrentScreen } from "./screen"
+import { useAgentUsage, clockCdmx } from "./useAgentUsage"
 import { initialsOf, useUserProfile } from "./userProfile"
 
 /**
@@ -367,6 +368,10 @@ function DockChat({
     // backend habla con Ghosty también en dev, así que se deja mandar.
     isLocalhost: false,
   })
+  // Uso de Mascarito (ventana de 5 h y semana) del dominio al que se carga el turno.
+  const usage = useAgentUsage(screen)
+  const usagePct = usage?.domainId && !usage.uncapped ? (usage.window5h?.pct ?? 0) : null
+  const usageBlocked = !!usage?.blocked
 
   /* "Pídeselo al asistente": deja el texto escrito y el foco en la caja, sin
      mandarlo — el usuario lo revisa y da Enter. */
@@ -699,6 +704,32 @@ function DockChat({
           </div>
         )}
 
+        {/* Uso de Mascarito: pastilla con el % de 5 h; aviso suave al 80 % y,
+            al 100 %, la hora en que vuelve (el servidor tampoco llama al modelo). */}
+        {usagePct !== null && (
+          <div className="mx-3 mb-1 flex items-center gap-2 text-xs">
+            {usageBlocked ? (
+              <span className="flex-1 rounded-xl bg-red-500/10 border border-red-500/30 px-3 py-2 text-red-600 font-medium">
+                Mascarito llegó a su límite de uso y vuelve {usage?.renewal ?? "pronto"}. Mientras, puedes hacer el cambio tú desde el panel.
+              </span>
+            ) : usagePct >= 80 || (usage?.week?.pct ?? 0) >= 80 ? (
+              <span className="flex-1 rounded-xl bg-amber-500/15 px-3 py-2 text-amber-600 font-medium">
+                {(usage?.week?.pct ?? 0) >= 80
+                  ? `Mascarito lleva ${usage?.week?.pct}% de su uso de la semana.`
+                  : `Mascarito lleva ${usagePct}% de las últimas 5 horas${usage?.window5h?.resetsAt ? `; se renueva a las ${clockCdmx(usage.window5h.resetsAt)}` : ""}.`}
+              </span>
+            ) : (
+              <span className="flex-1" />
+            )}
+            <span
+              title="Uso de Mascarito en las últimas 5 horas"
+              className={`shrink-0 rounded-full px-2 py-0.5 border border-line font-medium ${usagePct >= 80 ? "text-amber-600" : "text-fg-muted"}`}
+            >
+              5 h · {Math.min(usagePct, 100)}%
+            </span>
+          </div>
+        )}
+
         <form
           onSubmit={onSend}
           className="px-3 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))] md:pb-3"
@@ -779,7 +810,7 @@ function DockChat({
                 <motion.button
                   type="submit"
                   whileTap={{ scale: 0.92 }}
-                  disabled={!canSend}
+                  disabled={!canSend || usageBlocked}
                   aria-label="Enviar"
                   className="w-9 h-9 shrink-0 rounded-full bg-accent text-white flex items-center justify-center disabled:opacity-40 transition"
                 >

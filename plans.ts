@@ -78,11 +78,18 @@ export const LEGACY_ADDONS = {
   mailbox: { price: 99_00, bytes: 10 * 1024 * 1024 * 1024, label: "Buzón IMAP 10 GB" },
 } as const;
 
+// Mascarito en un correo del dominio (`agent-quota.ts`): habilita el canal de correo y
+// multiplica el presupuesto del agente. Va FUERA de `ADDONS` a propósito: la ruta de checkout
+// acepta cualquier `kind in ADDONS`, y este todavía no se vende (beta por cortesía).
+// Nunca cobra excedente: si se queda corto, se ofrece subir.
+export const AGENT_ADDON = { kind: "agent", price: 199_00, label: "Mascarito en tu correo" } as const;
+
 export type AddonKind = keyof typeof ADDONS;
 export type PlanKey = keyof typeof PLANS;
 
 /** Precio en centavos de cualquier add-on, incluidos los legado. */
 export function addonPriceCents(kind: string): number | null {
+  if (kind === AGENT_ADDON.kind) return AGENT_ADDON.price;
   return (ADDONS as Record<string, { price?: number }>)[kind]?.price
     ?? (LEGACY_ADDONS as Record<string, { price?: number }>)[kind]?.price
     ?? null;
@@ -91,6 +98,7 @@ export function addonPriceCents(kind: string): number | null {
 // Etiqueta de cualquier cosa cobrable. `kind` no se valida: una cortesía de un add-on
 // que se invente mañana tiene que poder etiquetarse hoy, aunque sea con su propia llave.
 export function addonLabel(kind: string): string {
+  if (kind === AGENT_ADDON.kind) return AGENT_ADDON.label;
   return (ADDONS as Record<string, { label?: string }>)[kind]?.label
     ?? (LEGACY_ADDONS as Record<string, { label?: string }>)[kind]?.label
     ?? kind;

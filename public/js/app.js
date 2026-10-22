@@ -729,6 +729,7 @@ window.addEventListener("assistant:turn-end", async () => {
   selectedDomain = fresh;
   renderActivacion();
   loadDomainHealth();
+  loadAgentUsage();
   if (currentTab) switchTab(currentTab);
 });
 
@@ -1136,6 +1137,70 @@ async function selectDomain(id) {
   switchTab("aliases");
   await loadAliases();
   loadDomainHealth();
+  loadAgentUsage();
+}
+
+// --- Uso de Mascarito (agent-quota.ts) ---
+// Dos barras al estilo de Claude: ventana móvil de 5 h y semana (corta el lunes 00:00 de CDMX).
+// Sólo porcentajes: el cliente nunca ve tokens ni dólares.
+const AGENT_CONTACT = "mailto:admin@mailmask.studio?subject=Mascarito%20en%20mi%20correo";
+
+function agentClock(iso) {
+  return new Date(iso).toLocaleTimeString("es-MX", { timeZone: "America/Mexico_City", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function agentBar(label, pct, renewal) {
+  const shown = Math.min(100, Math.max(0, pct));
+  const color = pct >= 100 ? "bg-red-500" : pct >= 80 ? "bg-amber-500" : "bg-accent";
+  return `
+    <div class="mb-3">
+      <div class="flex items-baseline gap-2 mb-1.5">
+        <span class="text-sm text-fg">${label}: <span class="font-semibold ${pct >= 80 ? "text-amber-600" : ""}">${shown}%</span></span>
+        <span class="ml-auto text-xs text-fg-muted">${renewal}</span>
+      </div>
+      <div class="h-2 rounded-full bg-bg-inset overflow-hidden">
+        <div class="h-full ${color} rounded-full transition-all" style="width:${Math.max(shown, 1)}%"></div>
+      </div>
+    </div>`;
+}
+
+async function loadAgentUsage() {
+  const box = document.getElementById("detail-agent-usage");
+  if (!box) return;
+  const id = selectedDomain?.id;
+  if (!id || !currentUser?.assistant) { box.classList.add("hidden"); return; }
+  let u;
+  try {
+    const res = await fetch(`/api/domains/${id}/agent-usage`);
+    if (!res.ok) throw new Error(String(res.status));
+    u = await res.json();
+  } catch { box.classList.add("hidden"); return; }
+  if (selectedDomain?.id !== id) return;
+  const w = u.window5h, wk = u.week;
+  const top = Math.max(w.pct, wk.pct);
+  const note = u.uncapped
+    ? `<p class="text-xs text-fg-muted mt-1">Sin tope (dominio de la casa).</p>`
+    : top >= 100
+      ? `<p class="text-xs text-red-500 mt-1">Mascarito llegó a su límite: vuelve ${wk.pct >= 100 ? "el lunes" : `a las ${agentClock(w.resetsAt)}`}. ¿Se te queda corto? <a class="underline" href="${AGENT_CONTACT}">Escríbenos</a> y lo subimos.</p>`
+      : top >= 80
+        ? `<p class="text-xs text-amber-600 mt-1">Mascarito va alto. Si se te queda corto, <a class="underline" href="${AGENT_CONTACT}">escríbenos</a> y lo subimos.</p>`
+        : "";
+  box.innerHTML = `
+    <div class="bg-bg-elev border border-line rounded-xl px-4 py-3">
+      <div class="flex items-baseline gap-2 mb-3">
+        <span class="text-sm font-semibold text-fg">Uso de Mascarito</span>
+        <span class="ml-auto text-xs text-fg-muted">correo: ${u.threads} ${u.threads === 1 ? "hilo" : "hilos"} · panel: ${u.actions} ${u.actions === 1 ? "acción" : "acciones"}</span>
+      </div>
+      ${agentBar("Últimas 5 horas", w.pct, w.resetsAt ? `se renueva a las ${agentClock(w.resetsAt)}` : "sin uso reciente")}
+      ${agentBar("Esta semana", wk.pct, "se renueva el lunes")}
+      ${note}
+      ${u.hasAgentAddon || u.uncapped ? "" : `
+        <div class="flex items-center gap-2 border-t border-line pt-3 mt-2">
+          <span class="text-sm text-fg">Pon a Mascarito en tu correo · $199/mes</span>
+          <a class="ml-auto text-xs text-accent-text hover:underline" href="${AGENT_CONTACT}">Escríbenos</a>
+        </div>`}
+    </div>`;
+  box.classList.remove("hidden");
 }
 
 // Cuánto llevan usado los buzones del dominio. El almacenamiento crece solo y no

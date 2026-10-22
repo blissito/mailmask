@@ -11,7 +11,7 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { sqlite } from "./pg.js";
 import { getDomain, getUser, getAgentByEmail, derechosDeDominio, listUserDomains } from "./db.js";
-import type { AgentTurnUsage } from "./agent-quota.js";
+import { isUncappedDomain, type AgentTurnUsage } from "./agent-quota.js";
 
 // --- Quién puede usar el asistente ---
 
@@ -186,7 +186,11 @@ export function assistantUsageDomainId(email: string, screen: unknown): string |
   const s = screen && typeof screen === "object" ? (screen as { domainId?: unknown }) : {};
   if (typeof s.domainId === "string" && /^[A-Za-z0-9-]{1,64}$/.test(s.domainId)) {
     const domain = getDomain(s.domainId);
-    if (domain && (domain.ownerEmail === email || getAgentByEmail(domain.id, email))) return domain.id;
+    if (domain && (domain.ownerEmail === email || getAgentByEmail(domain.id, email))) {
+      // Sólo un dominio con presupuesto (activado o de la casa); uno gratis no tiene de dónde gastar.
+      const domOwner = getUser(domain.ownerEmail);
+      if (isUncappedDomain(domain.id) || (domOwner && derechosDeDominio(domain, domOwner).activado)) return domain.id;
+    }
   }
   const owner = getUser(email);
   if (!owner) return null;
