@@ -28,6 +28,7 @@ import {
   getDomainByName,
   getUserByApiKey,
   listUserDomains,
+  activatedParentDomain,
   updateDomain,
   deleteDomain,
   countUserDomains,
@@ -2534,11 +2535,30 @@ const app = new Elysia({ adapter: node() })
       dnsRecords.verificationToken,
     );
 
+    // Subdominio de un dominio cuya zona ya es nuestra (correo.fixter.org): los registros se
+    // escriben solos en la zona del padre. Es «agrega direcciones sin sacar a Google del MX».
+    let autoDnsIn: string | null = null;
+    const parentZone = listUserDomains(user.email).find((p) =>
+      p.id !== newDomain.id && p.hostedZoneId && domain.toLowerCase().endsWith(`.${p.domain.toLowerCase()}`));
+    if (parentZone) {
+      try {
+        const { configureDnsRecords } = await import("./route53.js");
+        await configureDnsRecords(parentZone.hostedZoneId!, domain.toLowerCase(), dnsRecords.verificationToken, dnsRecords.dkimTokens);
+        autoDnsIn = parentZone.domain;
+        log("info", "route53", "Subdominio configurado en la zona del padre", { domain, parent: parentZone.domain });
+      } catch (err) {
+        log("warn", "route53", "No se pudo configurar el subdominio en la zona del padre", { domain, parent: parentZone.domain, error: String(err) });
+      }
+    }
+    const subdomainRequiresActivation = requiereActivacion && !activatedParentDomain(newDomain);
+
     // Return DNS records the customer needs to configure
     return new Response(
       JSON.stringify({
         // El 2.º dominio nace bloqueado: la app abre el checkout de activación con esto.
-        requiereActivacion,
+        requiereActivacion: subdomainRequiresActivation,
+        // dominio padre en cuya zona ya escribimos los registros (null = hay que copiarlos)
+        autoDnsIn,
         domain: newDomain,
         dnsRecords: {
           mx: {

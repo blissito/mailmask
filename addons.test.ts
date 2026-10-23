@@ -302,3 +302,36 @@ describe("Supresión: matching insensible a mayúsculas", () => {
     assert.equal(isSuppressed(dom.id, "otro@empresa.com"), false);
   });
 });
+
+describe("Derechos por dominio: subdominios", () => {
+  it("un subdominio hereda la activación de su padre del mismo dueño", () => {
+    const email = cuenta("sub");
+    const base = `p-${crypto.randomUUID().slice(0, 8)}.test`;
+    const padre = dominio(email, base);
+    const otroGratis = dominio(email);
+    activar(email, padre.id);
+    const sub = dominio(email, `correo.${base}`);
+    const r = derechos(sub.id);
+    assert.equal(r.activado, true, "correo.<padre> va incluido en el $99 del padre");
+    assert.equal(r.bloqueado, false);
+    assert.equal(derechos(otroGratis.id).esGratis, true, "el subdominio no le quita el lugar gratis a otro dominio");
+  });
+
+  it("sin padre activado, o con padre de otro dueño, no hereda nada", () => {
+    const email = cuenta("sub");
+    const base = `p-${crypto.randomUUID().slice(0, 8)}.test`;
+    dominio(email, base);
+    dominio(email); // el gratis es el más antiguo (el padre); el subdominio queda bloqueado
+    const sub = dominio(email, `correo.${base}`);
+    assert.equal(derechos(sub.id).activado, false);
+
+    const ajeno = cuenta("sub");
+    const base2 = `p-${crypto.randomUUID().slice(0, 8)}.test`;
+    const padreAjeno = dominio(ajeno, base2);
+    activar(ajeno, padreAjeno.id);
+    const mio = cuenta("sub");
+    dominio(mio);
+    const subMio = dominio(mio, `correo.${base2}`);
+    assert.equal(derechos(subMio.id).activado, false, "el padre activado de otra cuenta no cuenta");
+  });
+});

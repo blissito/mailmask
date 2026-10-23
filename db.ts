@@ -1132,19 +1132,33 @@ export function freeDomainId(ownerEmail: string): string | null {
       .filter((a) => a.kind === "domain" && a.domainId && (a.status === "active" || a.currentPeriodEnd))
       .map((a) => a.domainId!),
   );
-  const rows = db.select({ id: domains.id }).from(domains)
+  const rows = db.select({ id: domains.id, domain: domains.domain }).from(domains)
     .where(eq(domains.ownerEmail, ownerEmail)).orderBy(asc(domains.createdAt)).all();
-  return rows.find((r) => !everActivated.has(r.id))?.id ?? null;
+  // un subdominio cubierto por su padre activado no gasta el lugar gratis
+  return rows.find((r) => !everActivated.has(r.id) && !activatedParentDomain({ ...r, ownerEmail }))?.id ?? null;
 }
 
-export function derechosDeDominio(domain: { id: string; ownerEmail: string }, owner?: User | null): DerechosDominio {
+/**
+ * Dominio activado del mismo dueño del que `domain` es subdominio (correo.fixter.org → fixter.org).
+ * Un subdominio va incluido en el $99 de su padre (decisión de bliss, 22-oct-2026): es la forma de
+ * agregar direcciones de MailMask sin sacar el MX principal de Google.
+ */
+export function activatedParentDomain(domain: { id: string; ownerEmail: string; domain?: string }): Domain | null {
+  const name = (domain.domain ?? getDomain(domain.id)?.domain ?? "").toLowerCase();
+  if (!name) return null;
+  return listUserDomains(domain.ownerEmail).find((p) =>
+    p.id !== domain.id && name.endsWith(`.${p.domain.toLowerCase()}`)
+    && listEffectiveAddonsForDomain(p.id).some((a) => a.kind === "domain")) ?? null;
+}
+
+export function derechosDeDominio(domain: { id: string; ownerEmail: string; domain?: string }, owner?: User | null): DerechosDominio {
   const propios = listEffectiveAddonsForDomain(domain.id);
   // Los add-ons sin dominio son de antes: aplican a todos los dominios del dueño.
   const legado = listEffectiveAddons(domain.ownerEmail).filter((a) => !a.domainId);
   const todos = [...propios, ...legado];
 
   const legadoVigente = suscripcionLegadoVigente(owner);
-  const activado = legadoVigente || propios.some((a) => a.kind === "domain");
+  const activado = legadoVigente || propios.some((a) => a.kind === "domain") || !!activatedParentDomain(domain);
   const esGratis = !activado && freeDomainId(domain.ownerEmail) === domain.id;
   const bloqueado = !activado && !esGratis;
 
