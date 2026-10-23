@@ -384,6 +384,30 @@ export interface DnsListResponse {
   hint?: string;
 }
 
+export type DnsAuditVerdict =
+  | "takeover_risk" | "duplicated_name" | "not_responding" | "previous_provider" | "cert_validation" | "in_use" | "keep";
+
+export interface DnsAuditFinding {
+  name: string;
+  type: string;
+  values: string[];
+  verdict: DnsAuditVerdict;
+  /** Lo que se midió, en español. */
+  evidence: string;
+  /** Qué conviene hacer, en español. */
+  action: string;
+}
+
+/** Respuesta de `dns.audit`: hallazgos ordenados, los urgentes primero. */
+export interface DnsAudit {
+  domain: string;
+  checkedAt: string;
+  summary: Partial<Record<DnsAuditVerdict, number>>;
+  findings: DnsAuditFinding[];
+  truncated: boolean;
+  note: string;
+}
+
 export interface DnsZoneCreated {
   hostedZoneId: string;
   nameservers: string[];

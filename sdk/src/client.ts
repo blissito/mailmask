@@ -4,7 +4,7 @@ import type {
   BulkSendInput, BulkJob, BulkJobCreated, SmtpCredential, SmtpCredentialCreated,
   ApiKey, SendOptions, UploadAttachmentInput, UploadedAttachment, Suppression,
   Webhook, WebhookCreated, CreateWebhookInput, UpdateWebhookInput, WebhookDelivery,
-  DnsRecordType, DnsRRSet, DnsListResponse, DnsZoneCreated, DnsDelegation, DnsImportResult,
+  DnsRecordType, DnsRRSet, DnsListResponse, DnsZoneCreated, DnsDelegation, DnsImportResult, DnsAudit,
   DnsChangeResult, DnsPreset, DnsPresetPreview, DnsSetup, WebsiteStatus,
   PublishEasyBitsSiteInput, EasyBitsPublishResult, EasyBitsSiteStatus, EasyBitsUnpublishResult,
   BillingStatus, AddonsResponse, CheckoutLink, DomainSearchResult, TldPrice, DomainRegistrationCreated,
@@ -154,6 +154,8 @@ class DnsResource {
   createZone(domainId: string) { return this.req<DnsZoneCreated>(`/api/domains/${domainId}/dns/zone`, { method: "POST" }); }
   delegation(domainId: string) { return this.req<DnsDelegation>(`/api/domains/${domainId}/dns/delegation`); }
   import(domainId: string) { return this.req<DnsImportResult>(`/api/domains/${domainId}/dns/import`, { method: "POST" }); }
+  /** Mide qué registros siguen vivos y los clasifica para podar (sólo lectura). */
+  audit(domainId: string) { return this.req<DnsAudit>(`/api/domains/${domainId}/dns/audit`); }
   /** Reemplaza el conjunto: `values` sustituye por completo lo que hubiera en ese nombre y tipo. */
   upsert(domainId: string, record: { name: string; type: DnsRecordType; values: string[]; ttl?: number }) {
     return this.req<DnsChangeResult>(`/api/domains/${domainId}/dns/records`, { method: "PUT", body: JSON.stringify(record) });

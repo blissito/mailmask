@@ -72,7 +72,7 @@ transfer_out manda el código EPP por correo al dueño, nunca al chat. lock_doma
 Borrar dominio, máscara, buzón o registro DNS, sacar a un miembro, transferir fuera o cancelar un add-on o una renovación (cancel_addon, cancel_renewal) son irreversibles: confírmalo con el usuario antes. Algunas responden que necesitan confirmación: el usuario la aprueba en la app; no reintentes ni busques otra vía.
 
 ## DNS administrado por MailMask
-Con zona propia (create_dns_zone + NS en el registrador) puedes editar registros; enseña \`imported\`; MX intacto, NS tras confirmar en el panel. list_dns_records antes de escribir; set_dns_record reemplaza el conjunto; point_domain_to para Vercel, Netlify y similares (website_status: a dónde apunta hoy). EasyBits: easybits_site_status → publish_easybits_site (dryRun primero); unpublish_easybits_site lo revierte. Los registros de correo están protegidos.
+Con zona propia (create_dns_zone + NS en el registrador) puedes editar registros; enseña \`imported\`; MX intacto, NS tras confirmar en el panel. list_dns_records antes de escribir; podar: audit_dns_records; set_dns_record reemplaza el conjunto; point_domain_to: Vercel/Netlify (website_status: destino hoy). EasyBits: easybits_site_status → publish_easybits_site (dryRun primero); unpublish_easybits_site lo revierte. Los registros de correo están protegidos.
 
 ## Bandeja: el correo de la máscara
 Cada máscara recibe en la Bandeja del dominio; desde ahí se lee y se contesta como esa máscara.
@@ -190,7 +190,7 @@ const KEYWORDS: Record<string, string> = {
 // revoca, cancela o reemplaza algo sin vuelta atrás desde aquí. `mcp.test.ts` exige que
 // toda herramienta caiga en una de las dos listas o sea escritura no destructiva a propósito.
 export const READ_ONLY_TOOLS = new Set([
-  "list_domains", "get_domain", "domain_health", "list_aliases", "list_dns_records", "dns_delegation_status", "website_status",
+  "list_domains", "get_domain", "domain_health", "list_aliases", "list_dns_records", "audit_dns_records", "dns_delegation_status", "website_status",
   "easybits_site_status",
   "import_dns_records", "list_rules", "list_webhooks", "webhook_deliveries", "bulk_status", "list_logs",
   "list_suppressions", "list_smtp_credentials", "domain_dns_setup", "billing_status", "list_addons",
@@ -227,6 +227,7 @@ export const TOOL_TITLES: Record<string, string> = {
   delete_mailbox: "Delete IMAP mailbox",
   reset_mailbox_password: "Reset mailbox password",
   list_dns_records: "List DNS records",
+  audit_dns_records: "Audit DNS records",
   create_dns_zone: "Create DNS zone",
   dns_delegation_status: "Check nameserver delegation",
   set_dns_record: "Set DNS record",
@@ -554,6 +555,10 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
   tool("create_dns_zone",
     "Creates a MailMask-managed DNS zone for a domain registered elsewhere. Copies the records it finds at the current provider (returned as `imported`) and keeps the existing MX untouched. The zone starts in review (`status: pending_review`, empty `nameservers`); the owner confirms the review in the MailMask app to see the nameservers. Edits take effect only after the nameservers change.",
     { domainId }, (a) => sdk.dns.createZone(a.domainId));
+
+  tool("audit_dns_records",
+    "Probes every record of a MailMask-managed zone (except MailMask's own email records) and classifies it: takeover_risk (points to a cloud app that no longer exists, so someone else can claim it), duplicated_name (name repeats the domain, never queried), not_responding, previous_provider (aliases of the former registrar or hosting), cert_validation, in_use or keep (email and verification records). Each finding has Spanish `evidence` and `action`, urgent first. Read-only; cached 10 minutes while the zone does not change.",
+    { domainId }, (a) => sdk.dns.audit(a.domainId));
 
   tool("dns_delegation_status",
     "Checks whether the domain already uses MailMask's nameservers. Returns the nameservers observed now and the expected ones. Nameserver changes take 1 to 48 hours.",

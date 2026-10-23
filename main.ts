@@ -8509,6 +8509,29 @@ const app = new Elysia({ adapter: node() })
     detail: { tags: ["DNS", "SDK"], summary: "Check whether the domain already points to our nameservers", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
+  .get("/api/domains/:id/dns/audit", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    // sondea hosts de terceros: más estricto que las lecturas normales
+    const limited = await rateLimitGuard(`dns-audit:${user.email}`, 5, 60_000);
+    if (limited) return limited;
+
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+    if (!d.hostedZoneId) return jsonErr("MailMask todavía no gestiona el DNS de este dominio: no hay zona que auditar.", 409);
+
+    const { listRecordSets } = await import("./route53.js");
+    const { anotarRegistros } = await import("./dns-records.js");
+    const { auditDnsRecordsCached } = await import("./dns-audit.js");
+    const records = anotarRegistros(await listRecordSets(d.hostedZoneId) as never, {
+      domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens,
+    });
+    return Response.json(await auditDnsRecordsCached(d.id, d, records));
+  }, {
+    detail: { tags: ["DNS", "SDK"], summary: "Audit which DNS records are still alive (read-only)", description: "Probes each non-managed record of the MailMask zone and classifies it: takeover_risk, duplicated_name, not_responding, previous_provider, cert_validation, in_use, keep. Cached 10 minutes while the zone does not change.", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
   .post("/api/domains/:id/dns/import", async ({ request, params }) => {
     const user = await getAuthUser(request);
     if (!user) return jsonErr("No autenticado", 401);

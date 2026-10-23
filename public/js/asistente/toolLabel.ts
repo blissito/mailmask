@@ -58,6 +58,7 @@ const EXACT: Record<string, string> = {
   mailbox_export_link: "Preparando la descarga del buzón",
   // DNS.
   list_dns_records: "Consultando los registros DNS",
+  audit_dns_records: "Revisando qué sigue vivo en tu DNS",
   create_dns_zone: "Creando la zona DNS",
   dns_delegation_status: "Revisando los nameservers",
   set_dns_record: "Guardando un registro DNS",

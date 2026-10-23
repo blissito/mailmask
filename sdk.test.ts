@@ -665,6 +665,28 @@ describe("SDK ↔ servidor: contrato", () => {
     assert.ok(i.warning);
   });
 
+  it("dns: audit clasifica sin tocar la red real", async () => {
+    const { setDnsAuditDeps } = await import("./dns-audit.ts");
+    setDnsAuditDeps({
+      resolve4: async () => ["203.0.113.9"],
+      resolveCname: async () => [],
+      httpGet: async () => ({ status: 404, body: "There's nothing here, yet." }),
+      tcpOpen: async () => false,
+    });
+    try {
+      zonaDns.set(`viejo.${dominio}|CNAME`, { name: `viejo.${dominio}`, type: "CNAME", ttl: 300, values: ["still-harbor-1.herokuapp.com"] });
+      zonaDns.set(`s1._domainkey.${dominio}.${dominio}|CNAME`, { name: `s1._domainkey.${dominio}.${dominio}`, type: "CNAME", ttl: 300, values: ["s1.domainkey.u1.wl1.sendgrid.net"] });
+      const a = await mm.dns.audit(domainId);
+      assert.equal(a.findings[0].verdict, "takeover_risk");
+      assert.ok(a.findings.some((f) => f.verdict === "duplicated_name"));
+      assert.ok(!a.findings.some((f) => f.name === dominio && f.type === "MX"), "los gestionados no se auditan");
+    } finally {
+      zonaDns.delete(`viejo.${dominio}|CNAME`);
+      zonaDns.delete(`s1._domainkey.${dominio}.${dominio}|CNAME`);
+      setDnsAuditDeps(null);
+    }
+  });
+
   it("domains: sitio de EasyBits (estado, publicar sin cuenta conectada, quitar sin nada publicado)", async () => {
     const st = await mm.domains.easyBitsSiteStatus(domainId);
     assert.equal(st.linked, false);
