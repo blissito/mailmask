@@ -15,6 +15,7 @@ export type AuditVerdict =
   | "keep";
 
 export interface AuditFinding {
+  /** Nombre completo (FQDN): es el que hay que pasar para borrar. Nunca recortarlo: en un duplicado, recortado nombra al registro bueno. */
   name: string;
   type: string;
   values: string[];
@@ -124,7 +125,7 @@ async function auditOne(r: RRSetAnotado, apex: string, previousProvider: string 
   const sub = label(r.name, apex);
 
   if (isDuplicatedName(r.name, apex)) {
-    return { ...base, verdict: "duplicated_name", evidence: `El nombre repite el dominio (${r.name}); ya venía así de tu proveedor anterior y nadie lo consulta con ese nombre.`, action: "Bórralo." };
+    return { ...base, verdict: "duplicated_name", evidence: `El nombre repite el dominio (${r.name}); ya venía así de tu proveedor anterior y nadie lo consulta con ese nombre. El registro bueno, ${r.name.slice(0, -(apex.length + 1))}, es otro y no se toca.`, action: `Bórralo con su nombre completo, ${r.name}.` };
   }
 
   if (sub === "_domainconnect" && previousProvider) {

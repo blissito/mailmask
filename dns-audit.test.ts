@@ -44,6 +44,8 @@ describe("auditDnsRecords", () => {
     assert.equal(v[`rocket.${apex}|CNAME`], "takeover_risk");
     assert.equal(v[`s1._domainkey.${apex}.${apex}|CNAME`], "duplicated_name");
     assert.equal(v[`s1._domainkey.${apex}|CNAME`], "keep");
+    const dup = a.findings.find((f) => f.verdict === "duplicated_name")!;
+    assert.match(dup.action, new RegExp(`${apex}\\.${apex}`), "la acción nombra el registro completo, no el bueno");
     assert.equal(v[`_domainconnect.${apex}|CNAME`], "previous_provider");
     assert.equal(v[`blog.${apex}|A`], "not_responding");
     assert.equal(v[`www.${apex}|A`], "in_use");

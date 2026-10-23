@@ -557,7 +557,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
     { domainId }, (a) => sdk.dns.createZone(a.domainId));
 
   tool("audit_dns_records",
-    "Probes every record of a MailMask-managed zone (except MailMask's own email records) and classifies it: takeover_risk (points to a cloud app that no longer exists, so someone else can claim it), duplicated_name (name repeats the domain, never queried), not_responding, previous_provider (aliases of the former registrar or hosting), cert_validation, in_use or keep (email and verification records). Each finding has Spanish `evidence` and `action`, urgent first. Read-only; cached 10 minutes while the zone does not change.",
+    "Probes every record of a MailMask-managed zone (except MailMask's own email records) and classifies it: takeover_risk (points to a cloud app that no longer exists, so someone else can claim it), duplicated_name (name repeats the domain, never queried), not_responding, previous_provider (aliases of the former registrar or hosting), cert_validation, in_use or keep (email and verification records). Each finding has the full record `name` (FQDN, the exact name to delete it by) and Spanish `evidence` and `action`, urgent first. Read-only; cached 10 minutes while the zone does not change.",
     { domainId }, (a) => sdk.dns.audit(a.domainId));
 
   tool("dns_delegation_status",
