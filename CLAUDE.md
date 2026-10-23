@@ -300,7 +300,7 @@ vendible de «agrega direcciones sin dejar Google». **Split delivery en Workspa
 (Business Starter):** host `inbound-smtp.us-east-1.amazonaws.com:25` (TLS validado) + enrutamiento
 predeterminado «todos los destinatarios, sólo no reconocidos → cambiar ruta»: tres pruebas en una hora rebotaron
 dentro de Google con `5.7.1 …policy that prohibited the mail` en 0.2 s, sin intentar SES. Sin probar: la regla de
-«Enrutamiento» normal y ediciones superiores de Workspace. No venderlo hasta probarlo en Business Standard.
+«Enrutamiento» normal y ediciones superiores de Workspace. **Decisión de bliss (22-oct-2026): no se soporta.** No se ofrece ni se documenta configurar ruteo en Workspace/365; la única migración soportada es delegar los NS a MailMask («Conectar sin mudarte»), y el subdominio cuelga de esa zona.
 Relacionado: la entrada ya no descarta un correo que SES entregó aunque `verified` (caché) diga false, y la
 reconstrucción desde S3 lee 64 KB de encabezados y decodifica RFC 2047.
 
