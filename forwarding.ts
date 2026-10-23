@@ -1,4 +1,4 @@
-import { getDomainByName, getAlias, isSuppressed, listAliases, listRules, addLog, bumpAliasStats, getUser, derechosDeDominio, incrementMonthlyForwards, getMonthlyForwards, claimOnce, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, indexMessage, type Rule, type ForwardQueueItem } from "./db.js";
+import { getDomainByName, updateDomain, getAlias, isSuppressed, listAliases, listRules, addLog, bumpAliasStats, getUser, derechosDeDominio, incrementMonthlyForwards, getMonthlyForwards, claimOnce, isMessageProcessed, markMessageProcessed, enqueueForward, listForwardQueue, dequeueForward, updateForwardQueueItem, moveToDeadLetter, RETRY_DELAYS, MAX_ATTEMPTS, findConversationByThread, createConversation, updateConversation, addMessage, indexMessage, type Rule, type ForwardQueueItem } from "./db.js";
 import { forwardEmail, fetchEmailFromS3, sendAlert, listInboundEmailKeys, fetchEmailHeadersFromS3, sendFromDomain } from "./ses.js";
 import { sendTemplate, firstEmailReceived, forwardCapWarning, forwardCapReached } from "./emails.js";
 import { checkRateLimit } from "./rate-limit.js";
@@ -728,7 +728,15 @@ export async function processInbound(body: SnsNotification): Promise<{ action: s
     if (!domainName) continue;
 
     const domain = await getDomainByName(domainName);
-    if (!domain || !domain.verified) continue;
+    if (!domain) continue;
+    // SES sólo entrega a identidades que ya verificó en nuestra cuenta: si el correo llegó, el
+    // dominio está verificado aunque `verified` (caché) todavía no lo sepa. Antes se descartaba
+    // y lo que llegaba en los minutos tras darlo de alta se perdía (correo.fixter.org).
+    if (!domain.verified) {
+      log("info", "forwarding", "Dominio aún no marcado como verificado; SES ya lo entregó, se procesa", { domain: domainName });
+      await updateDomain(domain.id, { verified: true });
+      domain.verified = true;
+    }
 
     // Reportes DMARC de nuestros propios dominios (uso interno). Dirección completa: el
     // `dmarc@` de un cliente sigue el camino normal. No entra a la Bandeja ni cuenta topes.
