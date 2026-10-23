@@ -48,13 +48,17 @@ if (new URLSearchParams(location.search).get("success") === "1") {
 // Billing toggle
 let currentBilling = "monthly";
 
+// Formato de los montos: lo pone pricing-fx.js (MXN, o USD de referencia). Sin él, sólo MXN.
+const fmt = (n) => (window.precioEnMoneda ? window.precioEnMoneda(n) : "$" + Number(n).toLocaleString("es-MX"));
+
 function animatePrice(el, from, to, duration = 1500) {
   const start = performance.now();
   const step = (now) => {
     const t = Math.min((now - start) / duration, 1);
     const ease = 1 - Math.pow(1 - t, 3);
     const current = Math.round(from + (to - from) * ease);
-    el.textContent = "$" + current.toLocaleString("es-MX");
+    el.dataset.mxn = current;
+    el.textContent = fmt(current);
     if (t < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
@@ -85,7 +89,8 @@ function toggleBilling() {
     const period = card.querySelector(".plan-period");
     const savings = card.querySelector(".plan-savings");
 
-    const oldNum = parsePrice(price.textContent);
+    // El valor en MXN va en data-mxn: el texto puede estar en dólares.
+    const oldNum = Number(price.dataset.mxn) || parsePrice(price.textContent);
     const newNum = isYearly
       ? parsePrice(card.dataset.yearly)
       : parseInt(card.dataset.monthly, 10);
@@ -94,7 +99,7 @@ function toggleBilling() {
 
     if (isYearly) {
       period.textContent = "/año";
-      savings.textContent = "Ahorras $" + card.dataset.savings;
+      savings.textContent = "Ahorras " + fmt(card.dataset.savings);
       savings.classList.remove("hidden");
       savings.animate([
         { opacity: 0, transform: "translateY(6px)" },
