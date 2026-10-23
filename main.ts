@@ -215,6 +215,7 @@ import {
   isOwnUpload,
   attachmentMarkdown,
   saveAssistantMessage,
+  receiptsSinceLastUserMessage,
   getMessagePage,
   clearAssistantMessages,
   rotateAssistantNonce,
@@ -8890,9 +8891,13 @@ const app = new Elysia({ adapter: node() })
     // lección de Deník), así que cuando la pantalla cambió también viaja en el mensaje.
     // Si no cambió, igual viaja una línea: sin ella el agente seguía el dominio del hilo.
     const screenNote = b.screenChanged === true ? pantalla : buildScreenReminder(auth.email, b.screen);
-    const textForGhosty = screenNote
+    const receipts = receiptsSinceLastUserMessage(auth.email, saved.id);
+    const receiptNote = receipts.length
+      ? `<acciones-confirmadas>\nDesde tu último mensaje, el dueño aprobó o MailMask registró esto; ya está hecho, no es de nadie más:\n${receipts.join("\n")}\n</acciones-confirmadas>\n\n`
+      : "";
+    const textForGhosty = receiptNote + (screenNote
       ? `<contexto-de-pantalla>\n${screenNote}\n</contexto-de-pantalla>\n\n${text}`
-      : text;
+      : text);
 
     const upstreamAbort = new AbortController();
     let relayDone = false;

@@ -428,6 +428,22 @@ export function getMessagePage(email: string, beforeIso?: string | null): { mess
   return { messages: (hasMore ? rows.slice(0, HISTORY_PAGE_SIZE) : rows).reverse(), hasMore };
 }
 
+/**
+ * Recibos (lo aprobado, descartado o fallido en las tarjetas) guardados después del mensaje
+ * anterior del usuario. Ghosty no los ve —viven sólo en nuestro historial—, y sin ellos el
+ * agente encontraba la zona cambiada y alertaba de que «alguien» había borrado registros.
+ */
+export function receiptsSinceLastUserMessage(email: string, currentId: string): string[] {
+  const prev = sqlite
+    .prepare("SELECT created_at AS at FROM assistant_messages WHERE user_email = ? AND role = 'user' AND id != ? ORDER BY created_at DESC LIMIT 1")
+    .get(email, currentId) as { at: string } | undefined;
+  const rows = sqlite
+    .prepare(`SELECT content FROM assistant_messages WHERE user_email = ? AND role = 'assistant' AND created_at > ?
+              AND (content LIKE '✓%' OR content LIKE '- ✓%' OR content LIKE '✕%' OR content LIKE '⚠️ No se pudo%') ORDER BY created_at`)
+    .all(email, prev?.at ?? "") as { content: string }[];
+  return rows.map((r) => r.content.replace(/\\([_*`])/g, "$1"));
+}
+
 export function clearAssistantMessages(email: string): void {
   sqlite.prepare("DELETE FROM assistant_messages WHERE user_email = ?").run(email);
 }

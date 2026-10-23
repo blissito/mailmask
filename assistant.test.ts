@@ -370,6 +370,22 @@ describe("Asistente: Ghosty, turn token y confirmaciones", () => {
     assert.equal(p2.messages[0].content, "m0");
   });
 
+  it("los recibos desde el mensaje anterior del usuario viajan al agente, sin escapes de markdown", () => {
+    asis.clearAssistantMessages(email);
+    const e = email;
+    asis.saveAssistantMessage(e, "user", "borra todo");
+    asis.saveAssistantMessage(e, "assistant", "Pide aprobar las tarjetas");
+    asis.saveAssistantMessage(e, "assistant", "✓ Hecho: Borrar el registro CNAME de \\_domainconnect.fixter.org");
+    asis.saveAssistantMessage(e, "assistant", "✕ Descartado: Borrar el registro A de blog.fixter.org");
+    const cur = asis.saveAssistantMessage(e, "user", "¿ya quedó?");
+    assert.deepEqual(asis.receiptsSinceLastUserMessage(e, cur.id), [
+      "✓ Hecho: Borrar el registro CNAME de _domainconnect.fixter.org",
+      "✕ Descartado: Borrar el registro A de blog.fixter.org",
+    ]);
+    const next = asis.saveAssistantMessage(e, "user", "gracias");
+    assert.deepEqual(asis.receiptsSinceLastUserMessage(e, next.id), [], "ya se le dijeron en el turno anterior");
+  });
+
   // --- Turn token ---
 
   it("mt_: no crea ni lista API keys ni SMTP; vencido o como cookie no sirve", async () => {
