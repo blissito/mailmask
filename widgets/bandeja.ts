@@ -5,7 +5,6 @@
 // Tarjeta en el chat = lista corta y 2 botones (guía de UI del Apps SDK); filtros, detalle y
 // acciones viven en pantalla completa. Se compila con `npm run build:widgets`.
 import { App, PostMessageTransport, applyDocumentTheme } from "@modelcontextprotocol/ext-apps";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
 type Conversation = {
   id: string; contact: string; alias: string; subject: string; status: string; unread: boolean | null;
@@ -19,6 +18,9 @@ type Detail = {
   assignedTo: string | null; messages: Message[]; notes: { author: string; body: string; date: string }[];
 };
 type Filter = "open" | "unread" | "snoozed" | "closed";
+
+// El tipo sale del App (ext-apps 2), no del SDK 1: su callServerTool devuelve su propio CallToolResult.
+type CallToolResult = Awaited<ReturnType<App["callServerTool"]>>;
 
 const INLINE_ROWS = 8;
 
