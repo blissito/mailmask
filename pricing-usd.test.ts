@@ -30,6 +30,13 @@ test("la pregunta «¿Puedo pagar en dólares?» está en el FAQ y en su JSON-LD
   assert.ok(html.includes('"name": "¿Puedo pagar en dólares?"'), "falta en el FAQPage");
 });
 
+test("cada monto de la página lleva su MXN en data-mxn: el badge de ahorro y la nota", () => {
+  // Sin esto, esos montos se quedan con «$» al cambiar a USD (hallazgo de revisión sobre el PR).
+  assert.match(html, /id="promo-badge"[\s\S]*?<span data-mxn="189" data-prefijo="Ahorras ">Ahorras \$189<\/span> al año/);
+  assert.match(html, /<span data-mxn="99">\$99<\/span> más/);
+  assert.match(html, /Anual: <span data-mxn="999">\$999<\/span> por dominio \(ahorras <span data-mxn="189">\$189<\/span>\)/);
+});
+
 test("el JSON-LD sigue en MXN: la página en dólares no cambia lo que se cobra", () => {
   assert.ok(!/priceCurrency": "USD"/.test(html));
 });
