@@ -1773,6 +1773,18 @@ const app = new Elysia({ adapter: node() })
   .get("/cli/authorize", () => serveStatic("/cli-authorize.html"))
   .get("/landing", () => serveStatic("/landing.html"))
   .get("/pricing", () => serveStatic("/pricing.html"))
+  // Referencia en dólares de /pricing. Usa la última lectura, no el máximo de 30 días con el
+  // que se cotiza (tipoDeCambio): un precio en pantalla no se cobra. Ficha: docs/agents/precios-usd.md
+  .get("/api/fx", async ({ set }) => {
+    const { ultimaLectura } = await import("./fx.js");
+    const lectura = ultimaLectura();
+    if (!lectura) {
+      set.status = 404;
+      return { error: "sin tipo de cambio" };
+    }
+    set.headers["cache-control"] = "public, max-age=3600";
+    return { rate: lectura.rate, fetchedAt: lectura.fetchedAt };
+  })
   .get("/bandeja-compartida", () => serveStatic("/bandeja-compartida.html"))
   .get("/dominios", () => serveStatic("/dominios.html"))
   .get("/alternativa-google-workspace", () => serveStatic("/alternativa-google-workspace.html"))

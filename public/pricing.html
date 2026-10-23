@@ -196,6 +196,14 @@
               },
               {
                 "@type": "Question",
+                "name": "¿Puedo pagar en dólares?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No se cobra en dólares: MercadoPago en México cobra sólo en MXN, así que tu banco o tu tarjeta hace la conversión. Los montos en dólares de esta página son una referencia aproximada con el tipo de cambio del día."
+                }
+              },
+              {
+                "@type": "Question",
                 "name": "¿Mascarito cuesta aparte?",
                 "acceptedAnswer": {
                   "@type": "Answer",
@@ -302,7 +310,16 @@
           <span id="toggle-dot" class="absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform"></span>
         </button>
         <span id="label-yearly" class="text-sm font-semibold text-fg-subtle">Anual</span>
-        <span id="promo-badge" class="text-xs bg-accent/10 text-accent-text font-bold px-2 py-1 rounded-full">Ahorras $189 al año</span>
+        <span id="promo-badge" class="text-xs bg-accent/10 text-accent-text font-bold px-2 py-1 rounded-full"><span data-mxn="189" data-prefijo="Ahorras ">Ahorras $189</span> al año</span>
+      </div>
+
+      <!-- Referencia en dólares: aparece sólo si /api/fx da un tipo de cambio -->
+      <div id="selector-moneda" class="hidden flex flex-col items-center gap-2 -mt-6 mb-10">
+        <div role="group" aria-label="Moneda de referencia" class="inline-flex rounded-full border border-line p-1 text-sm font-semibold">
+          <button type="button" data-moneda="mxn" aria-pressed="true" class="px-4 py-1.5 rounded-full bg-accent text-white focus:outline-none focus:ring-2 focus:ring-accent">MXN</button>
+          <button type="button" data-moneda="usd" aria-pressed="false" class="px-4 py-1.5 rounded-full text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent">USD</button>
+        </div>
+        <p id="tipo-cambio" class="text-xs text-fg-subtle"></p>
       </div>
 
       <div class="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
@@ -332,7 +349,7 @@
           <h3 class="font-semibold text-lg">Dominio activado</h3>
           <p class="text-sm text-fg-muted mt-1">Tu equipo entero, tus buzones, tu correo saliente. Por dominio.</p>
           <div class="mt-4">
-            <span class="plan-price text-4xl font-semibold tracking-tight">$99</span>
+            <span class="plan-price text-4xl font-semibold tracking-tight" data-mxn="99">$99</span>
             <span class="plan-period text-fg-muted">/mes</span>
           </div>
           <p class="plan-savings text-xs text-accent-text mt-1 hidden"></p>
@@ -353,9 +370,9 @@
       </div>
 
       <p class="text-center text-sm text-fg-muted mt-8">
-        Todos los precios en MXN. Pago con MercadoPago, mes a mes, cancelas cuando quieras.<br/>
-        Un dominio más son $99 más — no hay planes ni escaleras. ¿Más de 10 dominios? <a href="mailto:hola@mailmask.studio" class="text-accent-text hover:underline">Escríbenos</a>.<br/>
-        Anual: $999 por dominio (ahorras $189).<br/>
+        <span data-solo-mxn>Todos los precios en MXN. </span><span data-solo-usd hidden>Se cobra en MXN por MercadoPago; tu banco hace la conversión. Los dólares son aproximados. </span>Pago con MercadoPago, mes a mes, cancelas cuando quieras.<br/>
+        Un dominio más son <span data-mxn="99">$99</span> más — no hay planes ni escaleras. ¿Más de 10 dominios? <a href="mailto:hola@mailmask.studio" class="text-accent-text hover:underline">Escríbenos</a>.<br/>
+        Anual: <span data-mxn="999">$999</span> por dominio (ahorras <span data-mxn="189">$189</span>).<br/>
         Tu agente (Claude, ChatGPT, Ghosty) usa tu Bandeja por MCP con sólo la URL <code class="font-mono text-fg">https://www.mailmask.studio/mcp</code>, sin costo extra.
       </p>
     </section>
@@ -372,7 +389,7 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-14 max-w-6xl mx-auto">
         <div class="card p-6 flex flex-col" data-addon="storage50" data-price="99">
           <h3 class="font-bold text-lg">+50 GB de buzón</h3>
-          <div class="mt-2"><span class="text-3xl font-semibold tracking-tight">+$99</span><span class="text-fg-subtle text-sm"> MXN/mes</span></div>
+          <div class="mt-2"><span class="text-3xl font-semibold tracking-tight" data-mxn="99" data-prefijo="+">+$99</span><span class="text-fg-subtle text-sm unidad-moneda"> MXN/mes</span></div>
           <p class="text-sm text-fg-muted mt-4 flex-1">
             50 GB más para los buzones IMAP de ese dominio, repartidos como quieras entre las
             personas. Se suma a los 10 GB incluidos, tantas veces como haga falta.
@@ -382,7 +399,7 @@
 
         <div class="card p-6 flex flex-col" data-addon="sends100" data-price="99">
           <h3 class="font-bold text-lg">+100 envíos al día</h3>
-          <div class="mt-2"><span class="text-3xl font-semibold tracking-tight">+$99</span><span class="text-fg-subtle text-sm"> MXN/mes</span></div>
+          <div class="mt-2"><span class="text-3xl font-semibold tracking-tight" data-mxn="99" data-prefijo="+">+$99</span><span class="text-fg-subtle text-sm unidad-moneda"> MXN/mes</span></div>
           <p class="text-sm text-fg-muted mt-4 flex-1">
             Para quien manda por API o desde un sistema. Se suma a los 50 al día incluidos;
             responder desde la Bandeja nunca gasta de aquí.
@@ -394,7 +411,7 @@
           <img src="/blog/img/correo-ia-il.jpg" alt="Mascarito, el buzón con ojos, manda una respuesta a la Bandeja" width="1200" height="800" loading="lazy" class="w-full h-32 object-cover rounded-lg mb-4 border border-line">
           <p class="text-xs text-fg-muted">Dale su propio correo a un agente de IA</p>
           <h3 class="font-bold text-lg">Mascarito en tu correo</h3>
-          <div class="mt-2"><span class="text-3xl font-semibold tracking-tight">+$199</span><span class="text-fg-subtle text-sm"> MXN/mes</span></div>
+          <div class="mt-2"><span class="text-3xl font-semibold tracking-tight" data-mxn="199" data-prefijo="+">+$199</span><span class="text-fg-subtle text-sm unidad-moneda"> MXN/mes</span></div>
           <p class="text-sm text-fg-muted mt-4 flex-1">
             Pon a Mascarito a contestar una dirección o un buzón de ese dominio: responde con tus
             plantillas, le deja a una persona lo que no sabe y cada respuesta dice que la escribió
@@ -461,6 +478,10 @@
           <details class="group">
             <summary>¿Cómo se cobra?<span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span></summary>
             <p>Con MercadoPago, mes a mes. Cada dominio y cada bloque es su propio cargo ($99; Mascarito en tu correo, $199), así que en tu estado de cuenta ves exactamente qué estás pagando y cancelas cualquiera por separado.</p>
+          </details>
+          <details class="group">
+            <summary>¿Puedo pagar en dólares?<span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span></summary>
+            <p>No se cobra en dólares: MercadoPago en México cobra sólo en MXN, así que tu banco o tu tarjeta hace la conversión. Los montos en dólares de esta página son una referencia aproximada con el tipo de cambio del día.</p>
           </details>
           <details class="group">
             <summary>¿Mascarito cuesta aparte?<span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span></summary>
@@ -541,6 +562,7 @@
         © 2026 by <a href="https://fixter.org" target="_blank" rel="noopener" class="hover:text-fg underline decoration-dotted transition-colors">fixter.org</a>
       </p>
     </footer>
+        <script src="/js/pricing-fx.js"></script>
         <script src="/js/landing.js"></script>
   </body>
 </html>
