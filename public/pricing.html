@@ -43,7 +43,7 @@
     <meta name="twitter:image:alt" content="Precios de MailMask: gratis para empezar y $99 MXN al mes por dominio" />
 
     <!-- Un solo JSON-LD: un `@graph` con #org y #website compartidos, el WebPage de /pricing
-         (con su breadcrumb y su dateModified) y UN Product con las 5 ofertas de hoy.
+         (con su breadcrumb y su dateModified) y UN Product con las 6 ofertas de hoy.
          Los precios de estas ofertas están amarrados a plans.ts por pricing-seo.test.ts. -->
     <script type="application/ld+json">
       {
@@ -75,7 +75,7 @@
             "about": { "@id": "https://www.mailmask.studio/#org" },
             "breadcrumb": { "@id": "https://www.mailmask.studio/pricing#breadcrumb" },
             "primaryImageOfPage": { "@type": "ImageObject", "url": "https://www.mailmask.studio/img/og-pricing.jpg" },
-            "dateModified": "2026-10-12"
+            "dateModified": "2026-10-22"
           },
           {
             "@type": "BreadcrumbList",
@@ -133,6 +133,15 @@
               },
               {
                 "@type": "Offer",
+                "name": "Mascarito en tu correo",
+                "description": "Mascarito, el agente de IA, contesta una dirección o buzón de un dominio activado con tus plantillas y deja a una persona lo que no sabe. Sube al doble su límite de uso. Se contrata escribiéndonos.",
+                "price": "199",
+                "priceCurrency": "MXN",
+                "availability": "https://schema.org/InStock",
+                "url": "https://www.mailmask.studio/pricing#addons"
+              },
+              {
+                "@type": "Offer",
                 "name": "Dominio activado — anual",
                 "description": "Doce meses de dominio activado pagados por adelantado: $999 en vez de $1,188 (dos meses de regalo).",
                 "price": "999",
@@ -182,7 +191,39 @@
                 "name": "¿Cómo se cobra?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Con MercadoPago, mes a mes. Cada dominio y cada bloque es su propio cargo de $99, así que en tu estado de cuenta ves exactamente qué estás pagando y cancelas cualquiera por separado."
+                  "text": "Con MercadoPago, mes a mes. Cada dominio y cada bloque es su propio cargo ($99; Mascarito en tu correo, $199), así que en tu estado de cuenta ves exactamente qué estás pagando y cancelas cualquiera por separado."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Mascarito cuesta aparte?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No en el panel: Mascarito viene incluido en cada dominio activado ($99 al mes). Es un asistente de IA que hace las cosas por ti en tu cuenta: da de alta direcciones, configura tu DNS, lo audita y lo poda, diagnostica tu dominio y revisa su HTTPS y su vencimiento. Tiene un límite de uso por 5 horas y otro semanal; en el panel ves en porcentaje cuánto llevas."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Qué incluye «Mascarito en tu correo»?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Es un bloque de $199 al mes por dominio. Mascarito contesta una dirección o un buzón de ese dominio con tus plantillas y le deja a una persona de tu equipo lo que no sabe resolver. Cada respuesta dice que la escribió un agente de IA. Además sube al doble el límite de uso de Mascarito, que se comparte entre el panel y el correo. Por ahora se contrata escribiéndonos a admin@mailmask.studio."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Un subdominio cuesta otros $99?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Un subdominio como correo.tudominio.com va incluido en el $99 de su dominio activado, y si el DNS de tu dominio está en MailMask sus registros se ponen solos. Sirve para agregar direcciones sin mover tu correo de Google."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Conectar mi propio agente de IA cuesta extra?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Cualquier agente (Claude, ChatGPT, Ghosty) puede usar tu Bandeja por MCP con sólo la URL https://www.mailmask.studio/mcp, sin costo extra."
                 }
               }
             ]
@@ -300,7 +341,9 @@
             <li>✓ <strong class="font-semibold">Bandeja compartida sin límite de personas</strong>: asignar, notas, historial completo (adjuntos 90 días)</li>
             <li>✓ <strong class="font-semibold">Buzones IMAP ilimitados</strong> con 10 GB: Apple Mail, Outlook, Thunderbird</li>
             <li>✓ Envía como tu@dominio: 50 correos nuevos al día</li>
+            <li>✓ <strong class="font-semibold">Mascarito, asistente de IA en tu panel</strong>: da de alta direcciones, arregla y poda tu DNS, revisa HTTPS y el vencimiento del dominio (límite de uso por 5 horas y semanal, en porcentaje a la vista)</li>
             <li>✓ Máscaras ilimitadas · reenvío hasta 10,000 al mes</li>
+            <li>✓ Subdominio incluido (correo.tudominio.com): suma direcciones sin mover tu correo de Google</li>
             <li>✓ Reglas, webhooks y SMTP relay para tu sistema</li>
             <li>✓ Registro de reenvíos 90 días · API REST + SDK · soporte por email</li>
             <li>✓ Al cancelar: 30 días de solo lectura y descarga .mbox de tus buzones</li>
@@ -312,7 +355,8 @@
       <p class="text-center text-sm text-fg-muted mt-8">
         Todos los precios en MXN. Pago con MercadoPago, mes a mes, cancelas cuando quieras.<br/>
         Un dominio más son $99 más — no hay planes ni escaleras. ¿Más de 10 dominios? <a href="mailto:hola@mailmask.studio" class="text-accent-text hover:underline">Escríbenos</a>.<br/>
-        Anual: $999 por dominio (ahorras $189).
+        Anual: $999 por dominio (ahorras $189).<br/>
+        Tu agente (Claude, ChatGPT, Ghosty) usa tu Bandeja por MCP con sólo la URL <code class="font-mono text-fg">https://www.mailmask.studio/mcp</code>, sin costo extra.
       </p>
     </section>
 
@@ -321,11 +365,11 @@
       <p class="eyebrow mb-3">Bloques</p>
       <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight text-center">¿Te quedaste corto? Sumas bloques.</h2>
       <p class="text-center text-fg-muted mt-3 max-w-2xl mx-auto">
-        Sobre un dominio activado, lo único que escala con tu uso se compra en bloques del mismo precio.
+        Sobre un dominio activado, lo único que escala con tu uso se compra en bloques.
         Cuantos quieras, mes a mes, y los cancelas cuando quieras.
       </p>
 
-      <div class="grid md:grid-cols-2 gap-6 mt-14 max-w-4xl mx-auto">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-14 max-w-6xl mx-auto">
         <div class="card p-6 flex flex-col" data-addon="storage50" data-price="99">
           <h3 class="font-bold text-lg">+50 GB de buzón</h3>
           <div class="mt-2"><span class="text-3xl font-semibold tracking-tight">+$99</span><span class="text-fg-subtle text-sm"> MXN/mes</span></div>
@@ -344,6 +388,18 @@
             responder desde la Bandeja nunca gasta de aquí.
           </p>
           <a href="/app" class="mt-5 block w-full text-center btn-secondary !py-2.5">Agregar desde tu panel</a>
+        </div>
+
+        <div class="card p-6 flex flex-col" data-addon="agent" data-price="199">
+          <p class="text-xs text-fg-muted">Dale su propio correo a un agente de IA</p>
+          <h3 class="font-bold text-lg">Mascarito en tu correo</h3>
+          <div class="mt-2"><span class="text-3xl font-semibold tracking-tight">+$199</span><span class="text-fg-subtle text-sm"> MXN/mes</span></div>
+          <p class="text-sm text-fg-muted mt-4 flex-1">
+            Pon a Mascarito a contestar una dirección o un buzón de ese dominio: responde con tus
+            plantillas, le deja a una persona lo que no sabe y cada respuesta dice que la escribió
+            una IA. Además sube al doble el uso de Mascarito.
+          </p>
+          <a href="mailto:admin@mailmask.studio?subject=Mascarito%20en%20mi%20correo" class="mt-5 block w-full text-center btn-secondary !py-2.5">Escríbenos</a>
         </div>
       </div>
       <p class="text-center text-sm text-fg-muted mt-10">
@@ -390,7 +446,23 @@
           </details>
           <details class="group">
             <summary>¿Cómo se cobra?<span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span></summary>
-            <p>Con MercadoPago, mes a mes. Cada dominio y cada bloque es su propio cargo de $99, así que en tu estado de cuenta ves exactamente qué estás pagando y cancelas cualquiera por separado.</p>
+            <p>Con MercadoPago, mes a mes. Cada dominio y cada bloque es su propio cargo ($99; Mascarito en tu correo, $199), así que en tu estado de cuenta ves exactamente qué estás pagando y cancelas cualquiera por separado.</p>
+          </details>
+          <details class="group">
+            <summary>¿Mascarito cuesta aparte?<span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span></summary>
+            <p>No en el panel: Mascarito viene incluido en cada dominio activado ($99 al mes). Es un asistente de IA que hace las cosas por ti en tu cuenta: da de alta direcciones, configura tu DNS, lo audita y lo poda, diagnostica tu dominio y revisa su HTTPS y su vencimiento. Tiene un límite de uso por 5 horas y otro semanal; en el panel ves en porcentaje cuánto llevas.</p>
+          </details>
+          <details class="group">
+            <summary>¿Qué incluye «Mascarito en tu correo»?<span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span></summary>
+            <p>Es un bloque de $199 al mes por dominio. Mascarito contesta una dirección o un buzón de ese dominio con tus plantillas y le deja a una persona de tu equipo lo que no sabe resolver. Cada respuesta dice que la escribió un agente de IA. Además sube al doble el límite de uso de Mascarito, que se comparte entre el panel y el correo. Por ahora se contrata <a href="mailto:admin@mailmask.studio?subject=Mascarito%20en%20mi%20correo" class="text-accent-text hover:underline">escribiéndonos</a>.</p>
+          </details>
+          <details class="group">
+            <summary>¿Un subdominio cuesta otros $99?<span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span></summary>
+            <p>No. Un subdominio como correo.tudominio.com va incluido en el $99 de su dominio activado, y si el DNS de tu dominio está en MailMask sus registros se ponen solos. Sirve para agregar direcciones sin mover tu correo de Google.</p>
+          </details>
+          <details class="group">
+            <summary>¿Conectar mi propio agente de IA cuesta extra?<span class="text-fg-subtle group-open:rotate-45 transition-transform text-xl leading-none">+</span></summary>
+            <p>No. Cualquier agente (Claude, ChatGPT, Ghosty) puede usar tu Bandeja por MCP con sólo la URL <code class="font-mono text-fg">https://www.mailmask.studio/mcp</code>, sin costo extra.</p>
           </details>
         </div>
       </div>
@@ -449,7 +521,7 @@
         </div>
       </div>
       <p class="text-center text-fg-subtle text-xs mt-6">
-        Actualizado: <time datetime="2026-10-12">12 de octubre de 2026</time>
+        Actualizado: <time datetime="2026-10-22">22 de octubre de 2026</time>
       </p>
       <p class="text-center text-fg-subtle text-xs mt-1">
         © 2026 by <a href="https://fixter.org" target="_blank" rel="noopener" class="hover:text-fg underline decoration-dotted transition-colors">fixter.org</a>

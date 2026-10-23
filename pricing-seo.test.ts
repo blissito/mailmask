@@ -1,4 +1,4 @@
-// Lo propio de /pricing: un solo `@graph` con las 5 ofertas de hoy y una imagen social propia.
+// Lo propio de /pricing: un solo `@graph` con las 6 ofertas de hoy y una imagen social propia.
 // Además amarra los precios que MUESTRA la página a `plans.ts` (lo que de verdad se cobra):
 // si alguien cambia un precio en el catálogo sin tocar la página, esta prueba truena.
 // Reglas compartidas y medidas de la imagen: seo-checks.ts · Ficha: docs/agents/seo-paginas-publicas.md
@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
-import { ADDONS, DOMAIN_ANNUAL_PRICE } from "./plans.ts";
+import { ADDONS, AGENT_ADDON, DOMAIN_ANNUAL_PRICE } from "./plans.ts";
 import { HOST, grafo, leerHead, meta as metaDe, metas as metasDe, medidasJpeg } from "./seo-checks.ts";
 
 const html = readFileSync(new URL("./public/pricing.html", import.meta.url), "utf8");
@@ -37,15 +37,16 @@ function tarjeta(attrs: string): string {
   throw new Error(`${attrs}: el <div> de la tarjeta no cierra`);
 }
 
-test("el @graph de /pricing trae un solo Product con las 5 ofertas y sus precios de plans.ts", () => {
+test("el @graph de /pricing trae un solo Product con las 6 ofertas y sus precios de plans.ts", () => {
   assert.equal(nodos.filter((n) => n["@type"] === "Product").length, 1, "los precios viven en un solo Product");
-  assert.equal(ofertas.length, 5);
+  assert.equal(ofertas.length, 6);
 
   const porNombre = Object.fromEntries(ofertas.map((o) => [o.name, o.price]));
   assert.equal(porNombre["Gratis"], "0", "el plan gratis no tiene precio en plans.ts: es $0 por definición");
   assert.equal(porNombre["Dominio activado"], precioMostrado(ADDONS.domain.price));
   assert.equal(porNombre["+50 GB de buzón"], precioMostrado(ADDONS.storage50.price));
   assert.equal(porNombre["+100 envíos al día"], precioMostrado(ADDONS.sends100.price));
+  assert.equal(porNombre["Mascarito en tu correo"], precioMostrado(AGENT_ADDON.price));
   assert.equal(porNombre["Dominio activado — anual"], precioMostrado(DOMAIN_ANNUAL_PRICE));
 
   // El anual se cobra cada 12 meses, no cada mes: va en su propia UnitPriceSpecification.
@@ -73,15 +74,16 @@ test("los precios que muestra la tarjeta del dominio son los de plans.ts", () =>
 });
 
 test("los bloques de add-on muestran el precio de plans.ts", () => {
-  for (const kind of ["storage50", "sends100"] as const) {
+  const precios = { storage50: ADDONS.storage50.price, sends100: ADDONS.sends100.price, agent: AGENT_ADDON.price };
+  for (const kind of ["storage50", "sends100", "agent"] as const) {
     const bloque = tarjeta(`data-addon="${kind}"`);
     assert.ok(bloque, `la página no trae el bloque ${kind}`);
-    const precio = precioMostrado(ADDONS[kind].price);
+    const precio = precioMostrado(precios[kind]);
     assert.equal(bloque.match(/data-price="(\d+)"/)?.[1], precio, `el data-price de ${kind}`);
     assert.ok(bloque.includes(`+$${precio}`), `el bloque ${kind} no muestra +$${precio}`);
     // La captura es la SUYA, no la de al lado: si el bloque se estira hasta el siguiente,
     // el +$99 de la tarjeta vecina hace pasar la aserción de arriba.
-    for (const vecino of ["storage50", "sends100"] as const) {
+    for (const vecino of ["storage50", "sends100", "agent"] as const) {
       if (vecino === kind) continue;
       assert.ok(!bloque.includes(`data-addon="${vecino}"`), `el bloque de ${kind} se estiró hasta ${vecino}`);
     }
