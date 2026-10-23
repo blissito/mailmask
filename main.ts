@@ -2619,7 +2619,7 @@ const app = new Elysia({ adapter: node() })
 
     const domain = access.domain;
     const d = domain.domain;
-    const checks: Record<string, { ok: boolean; detail: string }> = {};
+    const checks: Record<string, { ok: boolean; detail: string; pending?: boolean }> = {};
 
     // 1. Verificado — se le pregunta a SES, no a la base. La bandera local
     // decía "verificado en SES" sin haber consultado a SES nunca, que fue
@@ -2684,6 +2684,13 @@ const app = new Elysia({ adapter: node() })
         const dkimAttrs = dkimRes.DkimAttributes?.[d];
         if (dkimAttrs?.DkimVerificationStatus === "Success") {
           checks.dkim = { ok: true, detail: "DKIM verificado por SES" };
+        } else if (dkimAttrs?.DkimVerificationStatus === "Pending") {
+          // Si los 3 CNAMEs ya resuelven no hay nada que arreglar: SES los confirma a su ritmo
+          const published = await Promise.all(dkimTokens.map((t) =>
+            dns.resolveCname(`${t}._domainkey.${d}`).then((v) => v.some((x) => x.includes(t)), () => false)));
+          checks.dkim = published.every(Boolean)
+            ? { ok: false, pending: true, detail: "Los 3 CNAMEs ya están publicados; Amazon los confirma solo (hasta 72 h)" }
+            : { ok: false, detail: "DKIM pendiente — faltan CNAMEs por publicar" };
         } else {
           checks.dkim = { ok: false, detail: `DKIM ${dkimAttrs?.DkimVerificationStatus ?? "no configurado"} — verifica los 3 CNAMEs` };
         }
@@ -2696,7 +2703,10 @@ const app = new Elysia({ adapter: node() })
     const aliases = listAliases(domain.id).filter(a => a.enabled);
     checks.aliases = aliases.length > 0
       ? { ok: true, detail: `${aliases.length} ${aliases.length === 1 ? "dirección activa" : "direcciones activas"}` }
-      : { ok: false, detail: "No hay direcciones activas — los correos no se reenviarán" };
+      : keepsMail
+        // con el MX ajeno el correo no pasa por aquí: no tener direcciones no rompe nada
+        ? { ok: true, detail: "Tu correo llega a tu proveedor actual; las direcciones de MailMask sirven cuando muevas el MX" }
+        : { ok: false, detail: "No hay direcciones activas — los correos no se reenviarán" };
 
     // 6. Plan
     const ownerUser = getUser(domain.ownerEmail);
@@ -2726,6 +2736,8 @@ const app = new Elysia({ adapter: node() })
       summary = "Falta activar este dominio: guarda el correo pero no lo reenvía";
     } else if (!checks.mx.ok) {
       summary = "Tu dominio no puede recibir emails: el registro MX no apunta a MailMask";
+    } else if (checks.spf.ok && checks.dkim.pending) {
+      summary = "DKIM en verificación: tus registros ya están publicados y Amazon los confirma solo (hasta 72 h)";
     } else if (!checks.spf.ok || !checks.dkim.ok) {
       summary = "Tu dominio puede tener problemas de entregabilidad — revisa SPF y DKIM";
     } else if (!checks.aliases.ok) {
