@@ -291,6 +291,19 @@ ausente porque el CLI publicado lo recorre); `POST /dns/zone/confirm {checked:tr
 copiar. En `rolled_back` y `pending_review` no se sondea la delegación. Pruebas:
 `dns-zone-keep-mail.test.ts`. El SDK no tiene `confirm`/`rollback` a propósito: la revisión es humana.
 
+**Subdominio incluido y coexistencia con Google (22-oct-2026).** Un subdominio (`correo.fixter.org`) va
+incluido en el $99 de su padre activado del mismo dueño (`activatedParentDomain` en `db.ts`, también lo saca del
+lugar gratis) y, si la zona del padre es nuestra, `POST /api/domains` escribe sus registros de SES ahí
+(`configureDnsRecords` con el FQDN del subdominio); `GET /dns` del subdominio responde `zone.status: "parent"` y
+la pestaña los muestra sólo lectura. Probado de punta a punta: `hola@correo.fixter.org` reenvía. Es la forma
+vendible de «agrega direcciones sin dejar Google». **Split delivery en Workspace NO funcionó en fixter.org
+(Business Starter):** host `inbound-smtp.us-east-1.amazonaws.com:25` (TLS validado) + enrutamiento
+predeterminado «todos los destinatarios, sólo no reconocidos → cambiar ruta»: tres pruebas en una hora rebotaron
+dentro de Google con `5.7.1 …policy that prohibited the mail` en 0.2 s, sin intentar SES. Sin probar: la regla de
+«Enrutamiento» normal y ediciones superiores de Workspace. No venderlo hasta probarlo en Business Standard.
+Relacionado: la entrada ya no descarta un correo que SES entregó aunque `verified` (caché) diga false, y la
+reconstrucción desde S3 lee 64 KB de encabezados y decodifica RFC 2047.
+
 ### Transferencias (`domain-transfer.ts`)
 
 **Transfer-in.** Los requisitos se comprueban **antes de cobrar** (`CheckDomainTransferability`
