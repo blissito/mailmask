@@ -542,6 +542,20 @@ export async function seedWelcomeConversation(domainId: string, domainName: stri
 
 // --- Rebuild conversations from S3 ---
 
+/** Decodifica palabras MIME (RFC 2047) de un encabezado crudo: «=?UTF-8?Q?H=C3=A9ctor?=» → «Héctor». */
+export function decodeEncodedWords(value: string): string {
+  return value.replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=(\s+(?==\?))?/g, (_m, charset: string, enc: string, text: string) => {
+    try {
+      const bytes = enc.toUpperCase() === "B"
+        ? Buffer.from(text, "base64")
+        : Buffer.from(text.replace(/_/g, " ").replace(/=([0-9A-Fa-f]{2})/g, (_x, h) => String.fromCharCode(parseInt(h, 16))), "latin1");
+      return new TextDecoder(charset.toLowerCase()).decode(bytes);
+    } catch {
+      return text;
+    }
+  });
+}
+
 export async function rebuildConversationsFromS3(domainId: string, domainName: string): Promise<number> {
   const s3Bucket = process.env.S3_BUCKET ?? "mailmask-inbound";
   const keys = await listInboundEmailKeys(domainName);
@@ -557,8 +571,8 @@ export async function rebuildConversationsFromS3(domainId: string, domainName: s
       const raw = await fetchEmailHeadersFromS3(s3Bucket, obj.key, 65536);
       const headerEnd = raw.search(/\r?\n\r?\n/);
       const partial = headerEnd > 0 ? raw.slice(0, headerEnd) : raw;
-      const from = extractHeader(partial, "From");
-      const subject = extractHeader(partial, "Subject") || "(sin asunto)";
+      const from = decodeEncodedWords(extractHeader(partial, "From"));
+      const subject = decodeEncodedWords(extractHeader(partial, "Subject")) || "(sin asunto)";
 
       // El aviso de prueba de SES se cambia por la bienvenida de Mascarito, igual que al recibirlo
       if (isSesSetupNotification(obj.key, from, subject)) {
