@@ -7990,6 +7990,20 @@ const app = new Elysia({ adapter: node() })
     }
 
     if (!d.hostedZoneId) {
+      // Subdominio cuyos registros viven en la zona del padre (correo.fixter.org → fixter.org):
+      // se muestran sólo lectura; se editan desde el padre.
+      const parent = listUserDomains(d.ownerEmail).find((p) =>
+        p.id !== d.id && p.hostedZoneId && d.domain.toLowerCase().endsWith(`.${p.domain.toLowerCase()}`));
+      if (parent) {
+        const { listRecordSets } = await import("./route53.js");
+        const { anotarRegistros } = await import("./dns-records.js");
+        const sub = d.domain.toLowerCase();
+        const own = (await listRecordSets(parent.hostedZoneId!)).filter((r) => r.name === sub || r.name.endsWith(`.${sub}`));
+        return Response.json({
+          zone: { status: "parent" as const, parent: parent.domain, parentId: parent.id },
+          records: anotarRegistros(own as never, { domain: d.domain, verificationToken: d.verificationToken, dkimTokens: d.dkimTokens }),
+        });
+      }
       // A propósito no es un 404: ante un 404 un agente abandona, ante una pista actúa.
       return Response.json({
         zone: { status: "none" as const },

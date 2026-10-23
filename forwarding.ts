@@ -552,10 +552,20 @@ export async function rebuildConversationsFromS3(domainId: string, domainName: s
   let rebuilt = 0;
   for (const obj of keys) {
     try {
-      // Fetch first 4KB to parse headers
-      const partial = await fetchEmailHeadersFromS3(s3Bucket, obj.key);
+      // 64 KB y no 4: un correo de Gmail trae ARC, DKIM y Received antes de From/Subject, y con
+      // 4 KB salía «(sin asunto)» de «unknown» (correo.fixter.org, 22-oct-2026)
+      const raw = await fetchEmailHeadersFromS3(s3Bucket, obj.key, 65536);
+      const headerEnd = raw.search(/\r?\n\r?\n/);
+      const partial = headerEnd > 0 ? raw.slice(0, headerEnd) : raw;
       const from = extractHeader(partial, "From");
       const subject = extractHeader(partial, "Subject") || "(sin asunto)";
+
+      // El aviso de prueba de SES se cambia por la bienvenida de Mascarito, igual que al recibirlo
+      if (isSesSetupNotification(obj.key, from, subject)) {
+        const owner = (await getDomainByName(domainName))?.ownerEmail;
+        await seedWelcomeConversation(domainId, domainName, !!owner && canUseAssistant(owner));
+        continue;
+      }
       const messageIdHeader = extractHeader(partial, "Message-ID");
       const date = extractHeader(partial, "Date");
       const references = extractReferences(partial);

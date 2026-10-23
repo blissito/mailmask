@@ -2478,7 +2478,8 @@ async function loadDns() {
   }
 
   const estado = _dnsEstado.zone.status;
-  if (estado === "none") renderDnsSinZona(cont);
+  if (estado === "parent") renderDnsPadre(cont);
+  else if (estado === "none") renderDnsSinZona(cont);
   else if (estado === "pending_review") renderDnsRevision(cont);
   else if (estado === "pending_delegation") renderDnsDelegacion(cont);
   else if (estado === "rolled_back") renderDnsRegresado(cont);
@@ -2644,6 +2645,33 @@ function renderDnsRegresado(cont) {
       <div class="flex flex-wrap gap-2">${dnsBotonRespaldo("current", "Descargar respaldo de mi DNS")}</div>
     </div>`;
   cont.querySelector('[data-action="dns-comprobar"]').addEventListener("click", dnsComprobarDelegacion);
+}
+
+// Subdominio: sus registros viven en la zona del dominio padre, que ya lleva MailMask.
+function renderDnsPadre(cont) {
+  const z = _dnsEstado.zone;
+  const filas = (_dnsEstado.records || []).map(r => `
+    <tr class="border-t border-line">
+      <td class="py-2 pr-3 text-xs font-mono text-fg">${esc(r.type)}</td>
+      <td class="py-2 pr-3 text-xs font-mono text-fg break-all">${esc(r.name)}</td>
+      <td class="py-2 text-xs font-mono text-fg-muted break-all">${r.values.map(esc).join("<br>")}</td>
+    </tr>`).join("");
+  cont.innerHTML = `
+    <div class="p-4 space-y-3">
+      <p class="text-sm text-fg-muted">
+        Los registros de <strong>${esc(selectedDomain.domain)}</strong> viven en la zona de
+        <strong>${esc(z.parent)}</strong>, que ya lleva MailMask: los pusimos solos al agregar el subdominio.
+        Para cambiarlos, abre <a href="#" data-action="select-domain" data-domain-id="${esc(z.parentId)}" class="text-accent-text underline">${esc(z.parent)}</a>.
+      </p>
+      <table class="w-full"><thead><tr class="text-left text-[11px] uppercase tracking-wide text-fg-subtle">
+        <th class="pb-1 pr-3">Tipo</th><th class="pb-1 pr-3">Nombre</th><th class="pb-1">Valor</th></tr></thead>
+        <tbody>${filas}</tbody></table>
+    </div>`;
+  cont.querySelector('[data-action="select-domain"]').addEventListener("click", (e) => {
+    e.preventDefault();
+    selectDomain(z.parentId);
+    switchTab("dns");
+  });
 }
 
 function renderDnsSinZona(cont) {
