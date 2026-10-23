@@ -1147,6 +1147,18 @@ correo pasa el hilo a una persona. El canal de correo exige el add-on salvo `AGE
 (`mailmask.studio`, sin tope pero con alerta > $40/mes). Simulador de precio: `scripts/sim-agente-precio.mts`.
 **Revisar el uso real a las 2–4 semanas** y ajustar las constantes; falta el costo de Ghosty por turno.
 
+**Diagnóstico en vivo (22-oct-2026).** Mascarito no adivina ni pide `dig`: mide con herramientas del MCP que
+corren en el servidor y sirven a cualquier cliente. `audit_dns_records` (`dns-audit.ts`, sólo con zona nuestra:
+toma de subdominio por huella del proveedor —si el nombre propio ya no tiene certificado le pregunta directo al
+proveedor—, nombres `x.dominio.dominio`, alias del proveedor anterior, validación de certificados, sin respuesta;
+los duplicados se nombran y borran por su FQDN porque recortados apuntan al registro bueno). `lookup_dns`,
+`check_https`, `domain_registration_info` (`domain-diagnostics.ts`, `rdap.ts`) y DMARC + listas negras
+(Spamhaus DBL, SURBL; `127.255.255.x` = consulta rechazada, no «listado») como checks `advisory` de
+`domain_health`, que no cambian el estado. Todo sólo sobre dominios de la cuenta, nunca IPs privadas.
+Lo aprobado en las tarjetas queda en el historial (`✓ Hecho: …`) y viaja al agente como
+`<acciones-confirmadas>` en el siguiente turno; sin eso el dock parecía no hacer nada y el agente alertaba de que
+«alguien» había borrado registros.
+
 ### Apps conectadas (OAuth)
 
 - [ ] **Pantalla de «apps conectadas» en `/app`** (anotado 19-oct-2026). El consentimiento de
