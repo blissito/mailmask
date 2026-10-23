@@ -9049,7 +9049,8 @@ const app = new Elysia({ adapter: node() })
       const line = data.outcome === "executed" ? `✓ Hecho: ${title}`
         : data.outcome === "rejected" ? `✕ Descartado: ${title}`
         : data.outcome === "failed" ? `⚠️ No se pudo: ${title}${data.error ? ` (${data.error})` : ""}` : "";
-      if (line && title) saveAssistantMessage(auth.email, "assistant", line);
+      // el historial se pinta como markdown: los «_» de nombres DNS como _domainconnect lo volvían cursiva
+      if (line && title) saveAssistantMessage(auth.email, "assistant", line.replace(/([_*`])/g, "\\$1"));
       return res;
     };
     if (b.intent === "reject") return logOutcome(rejectAction(auth.email, actionId));
