@@ -1137,6 +1137,16 @@ tiene agente**, así que a ella sólo se le dice que aparece al activar el domin
   (Mascarito, `GHOSTY_AGENT_ID`) con `MAIL_INSTRUCTIONS` y un `turnToken` que su MCP rechaza, que sólo elige plantilla, y plantillas fijas
   (`mascarito-templates.ts`). Traspaso → asignado al dueño + nota. Reglas y fuentes: `docs/agents/mascarito-correo-seguridad.md`.
 
+**Presupuesto de uso (`agent-quota.ts`, tabla `agent_usage`, migración 0033).** Uno por dominio, compartido por
+el panel y el correo; el costo sale de `done.usage` de Ghosty. Ventana móvil de 5 h y semana (lunes 00:00 CDMX),
+al cliente sólo % y hora de renovación (`GET /api/domains/:id/agent-usage`, ficha del dominio y pastilla del dock).
+Topes medidos con el bench del 22-oct (tarea del panel con herramientas ≈ $0.021 USD, Haiku): 5 h $0.20, semana
+$0.50, add-on `agent` ($199) ×2; la semana nunca pasa del 40 % de los $99 + 20 % del add-on (decisión de bliss:
+casi nadie llena el tope). Aviso al 80 % y 100 %, una vez por semana; al 100 % el panel dice cuándo renueva y el
+correo pasa el hilo a una persona. El canal de correo exige el add-on salvo `AGENT_UNCAPPED_DOMAINS`
+(`mailmask.studio`, sin tope pero con alerta > $40/mes). Simulador de precio: `scripts/sim-agente-precio.mts`.
+**Revisar el uso real a las 2–4 semanas** y ajustar las constantes; falta el costo de Ghosty por turno.
+
 ### Apps conectadas (OAuth)
 
 - [ ] **Pantalla de «apps conectadas» en `/app`** (anotado 19-oct-2026). El consentimiento de
