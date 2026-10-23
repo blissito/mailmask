@@ -665,6 +665,29 @@ describe("SDK ↔ servidor: contrato", () => {
     assert.ok(i.warning);
   });
 
+  it("diagnóstico: lookup, https y registro sin tocar la red real", async () => {
+    const { setDiagnosticsDeps } = await import("./domain-diagnostics.ts");
+    setDiagnosticsDeps({
+      resolve: async () => ["203.0.113.9"],
+      tlsPeer: async (host) => ({ issuer: "Let's Encrypt", validTo: new Date(Date.now() + 30 * 864e5).toUTCString(), altNames: [host] }),
+      httpHead: async () => ({ status: 200, location: null }),
+      rdap: async () => ({ registrar: "GoDaddy", createdAt: null, expiresAt: null, statuses: [], nameservers: [] }),
+    });
+    try {
+      const l = await mm.dns.lookup(domainId, "www", "A");
+      assert.equal(l.propagated, true);
+      assert.equal(l.name, `www.${dominio}`);
+      // un nombre ajeno se lee como subdominio del propio dominio: nunca sale de la zona
+      assert.equal((await mm.dns.lookup(domainId, "otro-dominio.com")).name, `otro-dominio.com.${dominio}`);
+      const h = await mm.domains.httpsCheck(domainId, "www");
+      assert.equal(h.ok, true);
+      const r = await mm.domains.registrationInfo(domainId);
+      assert.equal(r.registrar, "GoDaddy");
+    } finally {
+      setDiagnosticsDeps(null);
+    }
+  });
+
   it("dns: audit clasifica sin tocar la red real", async () => {
     const { setDnsAuditDeps } = await import("./dns-audit.ts");
     setDnsAuditDeps({

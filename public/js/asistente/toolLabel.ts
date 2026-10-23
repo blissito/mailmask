@@ -59,6 +59,9 @@ const EXACT: Record<string, string> = {
   // DNS.
   list_dns_records: "Consultando los registros DNS",
   audit_dns_records: "Revisando qué sigue vivo en tu DNS",
+  lookup_dns: "Consultando el DNS público",
+  check_https: "Revisando el HTTPS",
+  domain_registration_info: "Consultando el registro del dominio",
   create_dns_zone: "Creando la zona DNS",
   dns_delegation_status: "Revisando los nameservers",
   set_dns_record: "Guardando un registro DNS",

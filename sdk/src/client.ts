@@ -4,7 +4,7 @@ import type {
   BulkSendInput, BulkJob, BulkJobCreated, SmtpCredential, SmtpCredentialCreated,
   ApiKey, SendOptions, UploadAttachmentInput, UploadedAttachment, Suppression,
   Webhook, WebhookCreated, CreateWebhookInput, UpdateWebhookInput, WebhookDelivery,
-  DnsRecordType, DnsRRSet, DnsListResponse, DnsZoneCreated, DnsDelegation, DnsImportResult, DnsAudit,
+  DnsRecordType, DnsRRSet, DnsListResponse, DnsZoneCreated, DnsDelegation, DnsImportResult, DnsAudit, DnsLookup, DnsLookupType, HttpsCheck, RegistrationInfo,
   DnsChangeResult, DnsPreset, DnsPresetPreview, DnsSetup, WebsiteStatus,
   PublishEasyBitsSiteInput, EasyBitsPublishResult, EasyBitsSiteStatus, EasyBitsUnpublishResult,
   BillingStatus, AddonsResponse, CheckoutLink, DomainSearchResult, TldPrice, DomainRegistrationCreated,
@@ -112,6 +112,10 @@ class DomainsResource {
   create(domain: string) { return this.req<DomainCreated>("/api/domains", { method: "POST", body: JSON.stringify({ domain }) }); }
   delete(id: string) { return this.req<{ ok: boolean }>(`/api/domains/${id}`, { method: "DELETE" }); }
   health(id: string) { return this.req<Record<string, unknown>>(`/api/domains/${id}/health`); }
+  /** Certificado, vencimiento y redirecciones de la web del dominio o un subdominio ('@', 'www'). */
+  httpsCheck(id: string, host = "@") { return this.req<HttpsCheck>(`/api/domains/${id}/https-check?host=${encodeURIComponent(host)}`); }
+  /** Datos públicos del registro (RDAP): registrador, vencimiento, candados y nameservers. */
+  registrationInfo(id: string) { return this.req<RegistrationInfo>(`/api/domains/${id}/registration-info`); }
   verify(id: string) { return this.req<DomainVerification>(`/api/domains/${id}/verify`, { method: "POST" }); }
   /** Registros a pegar en el registrador. Con `live` los compara con el DNS público y deduce el panel. */
   dnsSetup(id: string, opts?: { live?: boolean }) { return this.req<DnsSetup>(`/api/domains/${id}/dns-setup${opts?.live ? "?live=1" : ""}`); }
@@ -156,6 +160,10 @@ class DnsResource {
   import(domainId: string) { return this.req<DnsImportResult>(`/api/domains/${domainId}/dns/import`, { method: "POST" }); }
   /** Mide qué registros siguen vivos y los clasifica para podar (sólo lectura). */
   audit(domainId: string) { return this.req<DnsAudit>(`/api/domains/${domainId}/dns/audit`); }
+  /** Lo que contestan los resolvers públicos y los nameservers del dominio para un nombre (propagación). */
+  lookup(domainId: string, name: string, type: DnsLookupType = "A") {
+    return this.req<DnsLookup>(`/api/domains/${domainId}/dns/lookup?name=${encodeURIComponent(name)}&type=${type}`);
+  }
   /** Reemplaza el conjunto: `values` sustituye por completo lo que hubiera en ese nombre y tipo. */
   upsert(domainId: string, record: { name: string; type: DnsRecordType; values: string[]; ttl?: number }) {
     return this.req<DnsChangeResult>(`/api/domains/${domainId}/dns/records`, { method: "PUT", body: JSON.stringify(record) });

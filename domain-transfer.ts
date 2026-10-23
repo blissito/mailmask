@@ -97,27 +97,15 @@ export async function checkDomainReadiness(domain: string): Promise<{ listo: boo
   let lockServidor = false;
   let registrador: string | null = null;
   try {
-    const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(domain)}`, {
-      headers: {
-        accept: "application/rdap+json",
-        // Sin User-Agent, Cloudflare contesta 403 con una página HTML y el JSON.parse
-        // revienta. La consulta fallaba SIEMPRE y todos los requisitos salían como "?".
-        "user-agent": "MailMask/1.0 (+https://www.mailmask.studio)",
-      },
-      signal: AbortSignal.timeout(12_000),
-      redirect: "follow",
-    });
-    if (res.ok && (res.headers.get("content-type") ?? "").includes("json")) {
-      const j: any = await res.json();
-      const alta = (j.events ?? []).find((e: any) => e.eventAction === "registration")?.eventDate;
-      if (alta) edadOk = Date.now() - Date.parse(alta) > 60 * 864e5;
-      const estados: string[] = j.status ?? [];
+    const { fetchRdap } = await import("./rdap.js");
+    const info = await fetchRdap(domain);
+    if (info) {
+      if (info.createdAt) edadOk = Date.now() - Date.parse(info.createdAt) > 60 * 864e5;
       // `server transfer prohibited` no lo puede quitar el cliente desde su panel: lo pone
       // el registro. Se distingue del `client…`, que sí depende de él.
-      lockServidor = estados.some((e) => /server transfer prohibited/i.test(e));
-      lockOk = !estados.some((e) => /transfer prohibited/i.test(e));
-      registrador = (j.entities ?? []).find((e: any) => (e.roles ?? []).includes("registrar"))?.vcardArray?.[1]
-        ?.find((v: any[]) => v[0] === "fn")?.[3] ?? null;
+      lockServidor = info.statuses.some((e) => /server transfer prohibited/i.test(e));
+      lockOk = !info.statuses.some((e) => /transfer prohibited/i.test(e));
+      registrador = info.registrar;
     }
   } catch (err) {
     log("warn", "route53", "RDAP falló", { domain, error: String(err) });

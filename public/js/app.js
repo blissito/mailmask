@@ -2341,8 +2341,8 @@ function renderHealthPanel() {
   const summaryBg = { ok: "border-accent/30 bg-mask-500/10", warning: "border-amber-500/30 bg-amber-500/15", error: "border-red-500/30 bg-red-500/10" };
   const summaryText = { ok: "text-accent-text", warning: "text-amber-600", error: "text-red-500" };
 
-  const checkOrder = ["verified", "mx", "spf", "dkim", "aliases", "plan"];
-  const checkLabels = { verified: "Verificación", mx: "MX (recepción)", spf: "SPF", dkim: "DKIM", aliases: "Direcciones", plan: "Plan" };
+  const checkOrder = ["verified", "mx", "spf", "dkim", "dmarc", "blocklists", "aliases", "plan"];
+  const checkLabels = { verified: "Verificación", mx: "MX (recepción)", spf: "SPF", dkim: "DKIM", dmarc: "DMARC", blocklists: "Listas negras", aliases: "Direcciones", plan: "Plan" };
 
   panel.innerHTML = `
     <div class="mb-6 border ${summaryBg[health.status]} rounded-xl p-5">

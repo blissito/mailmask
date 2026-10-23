@@ -2620,7 +2620,7 @@ const app = new Elysia({ adapter: node() })
 
     const domain = access.domain;
     const d = domain.domain;
-    const checks: Record<string, { ok: boolean; detail: string; pending?: boolean }> = {};
+    const checks: Record<string, { ok: boolean; detail: string; pending?: boolean; advisory?: boolean }> = {};
 
     // 1. Verificado — se le pregunta a SES, no a la base. La bandera local
     // decía "verificado en SES" sin haber consultado a SES nunca, que fue
@@ -2709,7 +2709,16 @@ const app = new Elysia({ adapter: node() })
         ? { ok: true, detail: "Tu correo llega a tu proveedor actual; las direcciones de MailMask sirven cuando muevas el MX" }
         : { ok: false, detail: "No hay direcciones activas — los correos no se reenviarán" };
 
-    // 6. Plan
+    // 6. DMARC y listas negras: informativos, no cambian el estado (si no, todo dominio sin DMARC
+    //    pasaría a «warning» de golpe)
+    {
+      const { checkDmarc, checkDomainBlocklists } = await import("./domain-diagnostics.js");
+      const [dmarc, bl] = await Promise.all([checkDmarc(d), checkDomainBlocklists(d)]);
+      checks.dmarc = { ok: dmarc.ok, detail: dmarc.detail, advisory: true };
+      checks.blocklists = { ok: bl.ok, detail: bl.detail, advisory: true };
+    }
+
+    // 7. Plan
     const ownerUser = getUser(domain.ownerEmail);
     if (ownerUser) {
       const derechos = derechosDeDominio(domain, ownerUser);
@@ -2724,7 +2733,7 @@ const app = new Elysia({ adapter: node() })
     // "error" es sólo lo técnico (SES no verifica el dominio). Un dominio sin activar
     // funciona —guarda el correo— y pintarlo de rojo mandaba a la gente a revisar su DNS
     // cuando lo que faltaba era activarlo (kandey.com.mx, insightslab.com.mx).
-    const allOk = Object.values(checks).every(c => c.ok);
+    const allOk = Object.values(checks).every(c => c.ok || c.advisory);
     const hasError = !checks.verified.ok;
     const status = allOk ? "ok" : hasError ? "error" : "warning";
 
@@ -8531,6 +8540,63 @@ const app = new Elysia({ adapter: node() })
     return Response.json(await auditDnsRecordsCached(d.id, d, records));
   }, {
     detail: { tags: ["DNS", "SDK"], summary: "Audit which DNS records are still alive (read-only)", description: "Probes each non-managed record of the MailMask zone and classifies it: takeover_risk, duplicated_name, not_responding, previous_provider, cert_validation, in_use, keep. Cached 10 minutes while the zone does not change.", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  // --- Diagnóstico en vivo para el agente (domain-diagnostics.ts) ---
+  .get("/api/domains/:id/dns/lookup", async ({ request, params, query }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(`diag:${user.email}`, 20, 60_000);
+    if (limited) return limited;
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const d = access.domain;
+    const { LOOKUP_TYPES, lookupDns } = await import("./domain-diagnostics.js");
+    const type = String(query.type ?? "A").toUpperCase();
+    if (!(LOOKUP_TYPES as readonly string[]).includes(type)) return jsonErr(`Tipo inválido. Válidos: ${LOOKUP_TYPES.join(", ")}`, 400);
+    const { normalizarNombre } = await import("./dns-records.js");
+    let name: string;
+    try { name = normalizarNombre(String(query.name ?? "@"), d.domain); } catch { return jsonErr(`Sólo se consultan nombres de ${d.domain}.`, 400); }
+
+    let zoneValues: string[] | null = null;
+    if (d.hostedZoneId) {
+      const { listRecordSets } = await import("./route53.js");
+      zoneValues = (await listRecordSets(d.hostedZoneId)).find((r) => r.name === name && r.type === type)?.values ?? [];
+    }
+    let authoritative: string[] = [];
+    try { authoritative = await dns.resolveNs(d.domain); } catch { /* sin NS públicos */ }
+    return Response.json(await lookupDns(name, type as never, { zoneValues, authoritative }));
+  }, {
+    detail: { tags: ["DNS", "SDK"], summary: "Look up a name on public resolvers and the authoritative nameservers (read-only)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .get("/api/domains/:id/https-check", async ({ request, params, query }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(`diag:${user.email}`, 20, 60_000);
+    if (limited) return limited;
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const { normalizarNombre } = await import("./dns-records.js");
+    let host: string;
+    try { host = normalizarNombre(String(query.host ?? "@"), access.domain.domain); } catch { return jsonErr(`Sólo se revisan nombres de ${access.domain.domain}.`, 400); }
+    const { checkHttps } = await import("./domain-diagnostics.js");
+    return Response.json(await checkHttps(host));
+  }, {
+    detail: { tags: ["Domains", "SDK"], summary: "Check HTTPS of the domain or a subdomain: certificate, expiry and redirects (read-only)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
+  })
+
+  .get("/api/domains/:id/registration-info", async ({ request, params }) => {
+    const user = await getAuthUser(request);
+    if (!user) return jsonErr("No autenticado", 401);
+    const limited = await rateLimitGuard(`diag:${user.email}`, 20, 60_000);
+    if (limited) return limited;
+    const access = await checkDomainAccess(user.email, params.id, "read");
+    if (!access) return jsonErr("Dominio no encontrado", 404);
+    const { registrationInfo } = await import("./domain-diagnostics.js");
+    return Response.json(await registrationInfo(access.domain.domain));
+  }, {
+    detail: { tags: ["Domains", "SDK"], summary: "Public registration data (RDAP): registrar, expiry, locks and nameservers (read-only)", security: [{ cookieAuth: [] }, { bearerAuth: [] }] },
   })
 
   .post("/api/domains/:id/dns/import", async ({ request, params }) => {

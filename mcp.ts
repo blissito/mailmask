@@ -190,7 +190,7 @@ const KEYWORDS: Record<string, string> = {
 // revoca, cancela o reemplaza algo sin vuelta atrás desde aquí. `mcp.test.ts` exige que
 // toda herramienta caiga en una de las dos listas o sea escritura no destructiva a propósito.
 export const READ_ONLY_TOOLS = new Set([
-  "list_domains", "get_domain", "domain_health", "list_aliases", "list_dns_records", "audit_dns_records", "dns_delegation_status", "website_status",
+  "list_domains", "get_domain", "domain_health", "list_aliases", "list_dns_records", "audit_dns_records", "lookup_dns", "check_https", "domain_registration_info", "dns_delegation_status", "website_status",
   "easybits_site_status",
   "import_dns_records", "list_rules", "list_webhooks", "webhook_deliveries", "bulk_status", "list_logs",
   "list_suppressions", "list_smtp_credentials", "domain_dns_setup", "billing_status", "list_addons",
@@ -228,6 +228,9 @@ export const TOOL_TITLES: Record<string, string> = {
   reset_mailbox_password: "Reset mailbox password",
   list_dns_records: "List DNS records",
   audit_dns_records: "Audit DNS records",
+  lookup_dns: "Look up DNS publicly",
+  check_https: "Check HTTPS",
+  domain_registration_info: "Domain registration info",
   create_dns_zone: "Create DNS zone",
   dns_delegation_status: "Check nameserver delegation",
   set_dns_record: "Set DNS record",
@@ -526,7 +529,7 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
     "Adds a domain to the account and returns the DNS records to configure at the registrar (MX, verification TXT, 3 DKIM CNAMEs, SPF). The account's first domain is free; additional domains start blocked until activated ($99 MXN/month per domain).",
     { domain: z.string().describe("Domain, e.g. yourdomain.com") }, (a) => sdk.domains.create(a.domain));
   tool("verify_domain", "Re-checks with Amazon SES whether the domain's DNS is verified (identity and DKIM) and whether its MX points to MailMask, stores the result and returns it.", { domainId }, (a) => sdk.domains.verify(a.domainId));
-  tool("domain_health", "Checks the domain live: SES verification, MX, SPF, DKIM, active addresses and plan. Returns the measured status and stores it.", { domainId }, (a) => sdk.domains.health(a.domainId));
+  tool("domain_health", "Checks the domain live: SES verification, MX, SPF, DKIM, active addresses and plan, plus advisory DMARC and domain blocklists (Spamhaus DBL, SURBL) that do not change the status. Returns the measured status and stores it.", { domainId }, (a) => sdk.domains.health(a.domainId));
   tool("delete_domain", "Permanently deletes the domain with all its addresses, rules and mailboxes.", { domainId }, (a) => sdk.domains.delete(a.domainId));
 
   // --- Máscaras ---
@@ -559,6 +562,24 @@ export function crearServidorMcp(o: { apiKey: string; fetchLocal: typeof fetch; 
   tool("audit_dns_records",
     "Probes every record of a MailMask-managed zone (except MailMask's own email records) and classifies it: takeover_risk (points to a cloud app that no longer exists, so someone else can claim it), duplicated_name (name repeats the domain, never queried), not_responding, previous_provider (aliases of the former registrar or hosting), cert_validation, in_use or keep (email and verification records). Each finding has the full record `name` (FQDN, the exact name to delete it by) and Spanish `evidence` and `action`, urgent first. Read-only; cached 10 minutes while the zone does not change.",
     { domainId }, (a) => sdk.dns.audit(a.domainId));
+
+  tool("lookup_dns",
+    "Looks up a name of the domain on three public resolvers (Google, Cloudflare, Quad9) and the domain's current authoritative nameservers. Returns each answer, `propagated` (all agree), `matchesZone` (public answer equals what the MailMask zone stores; null without a MailMask zone) and a Spanish `summary`. Read-only.",
+    {
+      domainId,
+      name: z.string().describe("'@' for the root, a subdomain ('www') or the full name"),
+      type: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA"]).optional().describe("Default A"),
+    },
+    (a) => sdk.dns.lookup(a.domainId, a.name, a.type));
+
+  tool("check_https",
+    "Checks HTTPS for the domain or one of its subdomains from the server: certificate issuer, expiry, whether it covers the name, the redirect chain and the final HTTP status, with a Spanish `summary`. Read-only.",
+    { domainId, host: z.string().optional().describe("'@' (default), a subdomain ('www') or the full name") },
+    (a) => sdk.domains.httpsCheck(a.domainId, a.host));
+
+  tool("domain_registration_info",
+    "Returns the public registration data of the domain (RDAP): registrar, creation and expiry dates, days to expire, EPP statuses, transfer lock and nameservers, with a Spanish `summary`. Some TLDs (like .mx) do not publish RDAP. Read-only.",
+    { domainId }, (a) => sdk.domains.registrationInfo(a.domainId));
 
   tool("dns_delegation_status",
     "Checks whether the domain already uses MailMask's nameservers. Returns the nameservers observed now and the expected ones. Nameserver changes take 1 to 48 hours.",

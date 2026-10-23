@@ -408,6 +408,43 @@ export interface DnsAudit {
   note: string;
 }
 
+export type DnsLookupType = "A" | "AAAA" | "CNAME" | "MX" | "TXT" | "NS" | "CAA";
+
+/** Respuesta de `dns.lookup`. */
+export interface DnsLookup {
+  name: string;
+  type: DnsLookupType;
+  answers: { server: string; values: string[] | null; error?: string }[];
+  propagated: boolean;
+  /** null si la zona no es de MailMask. */
+  matchesZone: boolean | null;
+  summary: string;
+}
+
+/** Respuesta de `domains.httpsCheck`. */
+export interface HttpsCheck {
+  host: string;
+  ip: string | null;
+  certificate: { issuer: string; validTo: string; daysLeft: number; coversHost: boolean } | null;
+  redirects: { url: string; status: number }[];
+  finalStatus: number | null;
+  ok: boolean;
+  summary: string;
+}
+
+/** Respuesta de `domains.registrationInfo`. */
+export interface RegistrationInfo {
+  domain: string;
+  registrar: string | null;
+  createdAt: string | null;
+  expiresAt: string | null;
+  statuses: string[];
+  nameservers: string[];
+  daysToExpire: number | null;
+  transferLocked: boolean | null;
+  summary: string;
+}
+
 export interface DnsZoneCreated {
   hostedZoneId: string;
   nameservers: string[];
