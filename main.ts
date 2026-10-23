@@ -205,7 +205,7 @@ import {
   issueTurnToken,
   verifyTurnToken,
 } from "./auth.js";
-import { requireConfirmation, listPendingActions, confirmAction, rejectAction } from "./agent-actions.js";
+import { requireConfirmation, listPendingActions, confirmAction, rejectAction, getPendingAction } from "./agent-actions.js";
 import { handleGetProfile, handleUpdateProfile, handleUploadAvatar, handleDeleteAvatar, handleServeAvatar, applyGoogleProfile, profileOf, profileForEmail, readOwnUpload } from "./profile.js";
 import {
   openGhostyTurn,
@@ -9039,7 +9039,20 @@ const app = new Elysia({ adapter: node() })
     const b = (body ?? {}) as { intent?: unknown; actionId?: unknown };
     const actionId = String(b.actionId ?? "");
     if (!/^[0-9a-f-]{36}$/i.test(actionId)) return jsonErr("actionId inválido", 400);
-    if (b.intent === "reject") return rejectAction(auth.email, actionId);
+    // Lo resuelto queda en el historial del chat: el recibo del dock vive en memoria y al
+    // reabrirlo sólo se leía «apruébala», como si nada hubiera pasado.
+    const logOutcome = async (res: Response): Promise<Response> => {
+      if (res.status !== 200 && res.status !== 422) return res;
+      const data = await res.clone().json().catch(() => ({})) as { outcome?: string; error?: string };
+      let title = "";
+      try { title = JSON.parse(getPendingAction(actionId)?.summary ?? "{}").title ?? ""; } catch { /* sin título */ }
+      const line = data.outcome === "executed" ? `✓ Hecho: ${title}`
+        : data.outcome === "rejected" ? `✕ Descartado: ${title}`
+        : data.outcome === "failed" ? `⚠️ No se pudo: ${title}${data.error ? ` (${data.error})` : ""}` : "";
+      if (line && title) saveAssistantMessage(auth.email, "assistant", line);
+      return res;
+    };
+    if (b.intent === "reject") return logOutcome(rejectAction(auth.email, actionId));
     if (b.intent !== "confirm") return jsonErr("Unknown intent", 400);
 
     // Se re-ejecuta la petición archivada contra la MISMA ruta con la sesión de quien
@@ -9050,11 +9063,11 @@ const app = new Elysia({ adapter: node() })
       const v = request.headers.get(h);
       if (v) fwd[h] = v;
     }
-    return confirmAction(auth.email, actionId, (p): Promise<Response> => (app.fetch as (r: Request) => Promise<Response>)(new Request(`http://internal.local${p.path}`, {
+    return logOutcome(await confirmAction(auth.email, actionId, (p): Promise<Response> => (app.fetch as (r: Request) => Promise<Response>)(new Request(`http://internal.local${p.path}`, {
       method: p.method,
       headers: p.body !== undefined ? { ...fwd, "content-type": "application/json" } : fwd,
       body: p.body !== undefined ? JSON.stringify(p.body) : undefined,
-    })));
+    }))));
   }, { detail: { tags: ["Assistant"], summary: "Aprueba o rechaza una acción del asistente" } })
 
   // --- API Keys ---
