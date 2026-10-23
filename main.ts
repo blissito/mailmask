@@ -8603,7 +8603,7 @@ const app = new Elysia({ adapter: node() })
   .delete("/api/domains/:id/dns/records", async ({ request, params, body }) => {
     const user = await getAuthUser(request);
     if (!user) return jsonErr("No autenticado", 401);
-    const limited = await rateLimitGuard(getIp(request), 10, 60_000);
+    const limited = await rateLimitGuard(getIp(request), 30, 60_000);
     if (limited) return limited;
 
     const access = await checkDomainAccess(user.email, params.id, "admin");

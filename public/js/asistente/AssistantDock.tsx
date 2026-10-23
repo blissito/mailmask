@@ -419,6 +419,8 @@ function DockChat({
 
   const {
     actions: pendingActions,
+    receipts,
+    clearReceipts,
     refresh: refreshPending,
     confirm,
     reject,
@@ -436,13 +438,15 @@ function DockChat({
   }, [])
   const wasStreaming = useRef(false)
   useEffect(() => {
+    // un turno nuevo empieza: los recibos de antes ya se leyeron
+    if (!wasStreaming.current && streaming) clearReceipts()
     if (wasStreaming.current && !streaming) {
       void refreshPending()
       revalidate()
       playReplyDone()
     }
     wasStreaming.current = streaming
-  }, [streaming, refreshPending, revalidate])
+  }, [streaming, refreshPending, revalidate, clearReceipts])
 
   // Y también al aprobar una acción: ahí la mutación la hace el servidor.
   const resolveAndRevalidate = useCallback(
@@ -453,6 +457,23 @@ function DockChat({
     },
     [revalidate],
   )
+
+  // Aprobar varias de un jalón: el agente pidió borrar diez registros y aprobarlos uno por
+  // uno, sin ver cómo terminaba cada uno, se sintió como si nada pasara.
+  const [approvingAll, setApprovingAll] = useState(false)
+  const approveAll = useCallback(async () => {
+    if (approvingAll) return
+    setApprovingAll(true)
+    try {
+      let any = false
+      for (const a of pendingActions) {
+        if ((await confirm(a.id)) === "executed") any = true
+      }
+      if (any) revalidate()
+    } finally {
+      setApprovingAll(false)
+    }
+  }, [approvingAll, pendingActions, confirm, revalidate])
 
   // (El bloqueo de scroll en mobile vive en `DockShell`, que es quien monta el
   // backdrop. Estaba duplicado aquí, idéntico, corriendo dos veces.)
@@ -678,6 +699,49 @@ function DockChat({
             recortado justo donde están sus botones — visible pero imposible de
             aprobar, que es peor que no mostrarlo. El card es compacto y el
             `flex-1 min-h-0` del hilo ya le cede el espacio que necesita. */}
+        {!!receipts.length && (
+          <div className="px-4 pb-1 flex flex-col gap-0.5 text-sm font-medium text-fg-muted">
+            {receipts.slice(-3).map((r) => (
+              <p key={r.id} className="flex gap-2">
+                <span className={r.outcome === "executed" ? "text-accent-text" : ""} aria-hidden>
+                  {r.outcome === "executed" ? "✓" : r.outcome === "rejected" ? "✕" : "!"}
+                </span>
+                <span className="min-w-0 break-words">
+                  {r.outcome === "executed" ? "Hecho" : r.outcome === "rejected" ? "No se hizo" : r.outcome === "expired" ? "Venció" : "Falló"}:{" "}
+                  <span className="text-fg-subtle">{r.title.toLowerCase()}</span>
+                </span>
+              </p>
+            ))}
+            {receipts.length > 3 && (
+              <p className="text-xs">
+                y {receipts.length - 3} más · {receipts.filter((r) => r.outcome === "executed").length} de {receipts.length} hechas
+              </p>
+            )}
+          </div>
+        )}
+
+        {pendingActions.length > 1 && (
+          <div className="px-3 pb-1 flex flex-col gap-2">
+            {/* lo que se aprueba de un jalón se ve completo, no sólo la primera tarjeta */}
+            <ul className="px-1 text-xs text-fg-muted flex flex-col gap-0.5 max-h-32 overflow-y-auto">
+              {pendingActions.map((a) => (
+                <li key={a.id} className="break-words">· {a.summary.title}</li>
+              ))}
+            </ul>
+            <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={approveAll}
+              disabled={approvingAll}
+              title={pendingActions.map((a) => a.summary.title).join("\n")}
+              className="text-sm font-medium text-white px-4 py-2 rounded-full bg-red-600 hover:bg-red-600/90 transition disabled:opacity-40"
+            >
+              {approvingAll ? "Aprobando…" : `Aprobar las ${pendingActions.length}`}
+            </button>
+            </div>
+          </div>
+        )}
+
         {!!pendingActions.length && (
           <div className="px-3 pb-2">
             <PendingActionList

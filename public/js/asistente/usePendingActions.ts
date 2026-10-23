@@ -23,6 +23,9 @@ export function usePendingActions({
   enabled?: boolean
 } = {}) {
   const [actions, setActions] = useState<PendingAction[]>([])
+  // Recibos de lo ya resuelto. La tarjeta sale de la lista en cuanto se resuelve, así que
+  // sin esto el «✓ Hecho» nunca se veía y aprobar diez borrados parecía no hacer nada.
+  const [receipts, setReceipts] = useState<{ id: string; title: string; outcome: ActionOutcome }[]>([])
   const inFlight = useRef(false)
 
   const refresh = useCallback(async () => {
@@ -49,6 +52,11 @@ export function usePendingActions({
       id: string,
       intent: "confirm" | "reject",
     ): Promise<ActionOutcome> => {
+      const title = actions.find((a) => a.id === id)?.summary.title ?? ""
+      const done = (outcome: ActionOutcome) => {
+        setReceipts((prev) => [...prev.filter((r) => r.id !== id), { id, title, outcome }])
+        return outcome
+      }
       try {
         const res = await fetch("/api/agent-actions", {
           method: "POST",
@@ -59,21 +67,24 @@ export function usePendingActions({
         // (otra pestaña la resolvió, o venció), dejarla en pantalla con sus
         // botones vivos es mentir sobre lo que se puede hacer.
         setActions((prev) => prev.filter((a) => a.id !== id))
-        if (res.ok) return intent === "confirm" ? "executed" : "rejected"
+        if (res.ok) return done(intent === "confirm" ? "executed" : "rejected")
         const data = (await res.json().catch(() => ({}))) as { status?: string }
-        if (data.status === "expired") return "expired"
-        if (data.status === "executed") return "executed"
-        if (data.status === "rejected") return "rejected"
-        return "failed"
+        if (data.status === "expired") return done("expired")
+        if (data.status === "executed") return done("executed")
+        if (data.status === "rejected") return done("rejected")
+        return done("failed")
       } catch {
-        return "failed"
+        return done("failed")
       }
     },
-    [],
+    [actions],
   )
 
   const confirm = useCallback((id: string) => resolve(id, "confirm"), [resolve])
   const reject = useCallback((id: string) => resolve(id, "reject"), [resolve])
 
-  return { actions, refresh, confirm, reject }
+  /** Se limpian al mandar el siguiente mensaje: ya cumplieron su papel. */
+  const clearReceipts = useCallback(() => setReceipts([]), [])
+
+  return { actions, receipts, clearReceipts, refresh, confirm, reject }
 }
