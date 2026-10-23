@@ -16,7 +16,10 @@ function deps(over: Partial<AuditDeps> = {}): AuditDeps & { probed: string[] } {
       return ["203.0.113.10"];
     },
     resolveCname: async () => [],
-    httpGet: async (url) => url.includes("pelusina") ? { status: 404, body: "There's nothing here, yet." } : { status: 200, body: "ok" },
+    httpGet: async (url) => url.includes("pelusina") ? { status: 404, body: "There's nothing here, yet." }
+      : url.includes("demo.") ? null // sin certificado: el nombre propio no contesta
+      : url.includes("firebaseapp") ? { status: 404, body: "<title>Site Not Found</title>" }
+      : { status: 200, body: "ok" },
     tcpOpen: async (ip) => { probed.push(ip); return ip === "203.0.113.10"; },
     ...over,
   };
@@ -34,6 +37,7 @@ describe("auditDnsRecords", () => {
       rr(`_domainconnect.${apex}`, "CNAME", ["_domainconnect.gd.domaincontrol.com"]),
       rr(`_83122ec3df556c8c94311369176322e9.rocket.${apex}`, "CNAME", ["_x.tljzshvwok.acm-validations.aws"]),
       rr(`_655120f33fb3ab717c2daf7a8195f395.test.${apex}`, "CNAME", ["_y.tljzshvwok.acm-validations.aws"]),
+      rr(`demo.${apex}`, "CNAME", ["hidalgo-f65ba.firebaseapp.com"]),
       rr(`blog.${apex}`, "A", ["198.51.100.7"]),
       rr(`www.${apex}`, "A", ["203.0.113.10"]),
       rr(`_amazonses.${apex}`, "TXT", ["x"], true),
@@ -42,6 +46,7 @@ describe("auditDnsRecords", () => {
     const v = Object.fromEntries(a.findings.map((f) => [`${f.name}|${f.type}`, f.verdict]));
     assert.equal(v[`pelusina.${apex}|CNAME`], "takeover_risk");
     assert.equal(v[`rocket.${apex}|CNAME`], "takeover_risk");
+    assert.equal(v[`demo.${apex}|CNAME`], "takeover_risk", "Firebase sin sitio, aunque el nombre propio ya no tenga certificado");
     assert.equal(v[`s1._domainkey.${apex}.${apex}|CNAME`], "duplicated_name");
     assert.equal(v[`s1._domainkey.${apex}|CNAME`], "keep");
     const dup = a.findings.find((f) => f.verdict === "duplicated_name")!;

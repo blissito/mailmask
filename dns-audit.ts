@@ -166,7 +166,10 @@ async function auditOne(r: RRSetAnotado, apex: string, previousProvider: string 
     }
 
     if (provider?.body && !targetIps.some(isPrivateIp)) {
-      const res = await deps.httpGet(`https://${r.name}/`) ?? await deps.httpGet(`http://${r.name}/`);
+      // por el nombre propio primero (lleva el Host correcto); si el certificado ya no existe esa
+      // petición falla, y entonces se le pregunta directo al proveedor (demo.fixter.org → Firebase)
+      let res = await deps.httpGet(`https://${r.name}/`) ?? await deps.httpGet(`http://${r.name}/`);
+      if (!res || !provider.body.test(res.body)) res = await deps.httpGet(`https://${target}/`) ?? res;
       if (res && provider.body.test(res.body)) {
         return { ...base, verdict: "takeover_risk", evidence: `Apunta a ${target} y ${provider.name} contesta que esa app ya no existe (HTTP ${res.status}): otra persona puede reclamarla y servir su contenido en ${r.name}.`, action: "Bórralo ya." };
       }
